@@ -7,17 +7,19 @@
     <style>
         :root {
             color-scheme: light;
-            --ink: #17211f;
-            --muted: #65706d;
-            --line: #dce3df;
-            --paper: #fbfcfb;
+            --ink: #171313;
+            --muted: #6f6765;
+            --line: #ded7d4;
+            --paper: #faf8f6;
             --panel: #ffffff;
-            --brand: #0f766e;
-            --brand-strong: #115e59;
-            --warn: #b45309;
-            --danger: #b91c1c;
-            --ok: #15803d;
-            --soft: #eef6f4;
+            --brand: #f26f63;
+            --brand-strong: #d94f45;
+            --brand-dark: #1d1717;
+            --warn: #a66214;
+            --danger: #b42318;
+            --ok: #147a52;
+            --soft: #fff0ed;
+            --shadow: 0 18px 44px rgba(29, 23, 23, .07);
         }
 
         * {
@@ -28,7 +30,7 @@
             margin: 0;
             background: var(--paper);
             color: var(--ink);
-            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-family: "Helvetica Neue", Arial, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             font-size: 15px;
             line-height: 1.5;
         }
@@ -49,18 +51,20 @@
         }
 
         .sidebar {
-            background: #102522;
-            color: #e8f5f2;
-            padding: 24px 18px;
+            background: var(--brand-dark);
+            color: #fff7f5;
+            padding: 28px 18px;
         }
 
         .brand {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 30px;
+            margin-bottom: 34px;
+            font-size: 13px;
             font-weight: 800;
-            letter-spacing: .02em;
+            letter-spacing: .12em;
+            text-transform: uppercase;
         }
 
         .brand-mark {
@@ -68,9 +72,10 @@
             width: 34px;
             height: 34px;
             place-items: center;
-            border-radius: 8px;
-            background: #f5c542;
-            color: #102522;
+            border-radius: 4px;
+            background: var(--brand);
+            color: #ffffff;
+            letter-spacing: 0;
         }
 
         .nav {
@@ -87,18 +92,23 @@
             min-height: 42px;
             padding: 10px 12px;
             border: 0;
-            border-radius: 8px;
+            border-radius: 4px;
             background: transparent;
-            color: #e8f5f2;
+            color: #fff7f5;
             cursor: pointer;
             font: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
             text-align: left;
         }
 
         .nav a[aria-current="page"],
         .nav a:hover,
         .logout-button:hover {
-            background: rgba(255, 255, 255, .1);
+            background: rgba(242, 111, 99, .18);
+            color: #ffffff;
             text-decoration: none;
         }
 
@@ -114,7 +124,7 @@
             min-height: 72px;
             padding: 18px 28px;
             border-bottom: 1px solid var(--line);
-            background: var(--panel);
+            background: rgba(255, 255, 255, .92);
         }
 
         .content {
@@ -131,10 +141,12 @@
 
         h1 {
             font-size: 28px;
+            letter-spacing: .01em;
         }
 
         h2 {
             font-size: 20px;
+            font-weight: 800;
         }
 
         h3 {
@@ -160,8 +172,9 @@
 
         .card {
             border: 1px solid var(--line);
-            border-radius: 8px;
+            border-radius: 4px;
             background: var(--panel);
+            box-shadow: var(--shadow);
             overflow: hidden;
         }
 
@@ -178,6 +191,7 @@
         .metric strong {
             font-size: 28px;
             line-height: 1;
+            color: var(--brand-dark);
         }
 
         .toolbar {
@@ -209,11 +223,19 @@
             width: 100%;
             min-height: 42px;
             border: 1px solid var(--line);
-            border-radius: 8px;
+            border-radius: 4px;
             background: #fff;
             color: var(--ink);
             font: inherit;
             padding: 9px 11px;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: var(--brand);
+            box-shadow: 0 0 0 3px rgba(242, 111, 99, .16);
+            outline: 0;
         }
 
         textarea {
@@ -231,12 +253,13 @@
             gap: 8px;
             min-height: 40px;
             border: 1px solid transparent;
-            border-radius: 8px;
+            border-radius: 4px;
             background: var(--brand);
             color: #fff;
             cursor: pointer;
             font: inherit;
             font-weight: 700;
+            letter-spacing: .02em;
             padding: 9px 13px;
         }
 
@@ -250,6 +273,12 @@
             border-color: var(--line);
             background: #fff;
             color: var(--ink);
+        }
+
+        .button.secondary:hover {
+            border-color: var(--brand);
+            background: var(--soft);
+            color: var(--brand-strong);
         }
 
         .button.danger,
@@ -273,8 +302,12 @@
         th {
             color: var(--muted);
             font-size: 12px;
-            letter-spacing: .04em;
+            letter-spacing: .08em;
             text-transform: uppercase;
+        }
+
+        tbody tr:hover {
+            background: #fffaf9;
         }
 
         .truncate {
@@ -289,7 +322,7 @@
             align-items: center;
             min-height: 24px;
             padding: 3px 8px;
-            border-radius: 999px;
+            border-radius: 4px;
             background: var(--soft);
             color: var(--brand-strong);
             font-size: 12px;
@@ -309,16 +342,16 @@
 
         .notice {
             margin-bottom: 16px;
-            border: 1px solid #b7ddd4;
-            border-radius: 8px;
-            background: #effaf7;
+            border: 1px solid #f5b6ad;
+            border-radius: 4px;
+            background: var(--soft);
             padding: 12px 14px;
         }
 
         .error-list {
             margin-bottom: 16px;
             border: 1px solid #fecaca;
-            border-radius: 8px;
+            border-radius: 4px;
             background: #fff1f2;
             color: var(--danger);
             padding: 12px 14px;
@@ -345,16 +378,16 @@
             min-height: 100vh;
             place-items: center;
             padding: 24px;
-            background: linear-gradient(135deg, #102522, #173f3a 48%, #f5c542 48%, #f5c542);
+            background: linear-gradient(135deg, #1d1717, #332827 50%, #f26f63 50%, #f26f63);
         }
 
         .login-card {
             width: min(430px, 100%);
             border: 1px solid rgba(255, 255, 255, .55);
-            border-radius: 8px;
+            border-radius: 4px;
             background: rgba(255, 255, 255, .96);
             padding: 26px;
-            box-shadow: 0 24px 70px rgba(16, 37, 34, .24);
+            box-shadow: 0 24px 70px rgba(29, 23, 23, .24);
         }
 
         .pagination {

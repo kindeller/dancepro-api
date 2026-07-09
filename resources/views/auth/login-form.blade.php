@@ -1,12 +1,12 @@
 <style>
     :root {
         color-scheme: light;
-        --ink: #17211f;
-        --muted: #65706d;
-        --line: #dce3df;
-        --brand: #0f766e;
-        --brand-strong: #115e59;
-        --danger: #b91c1c;
+        --ink: #171313;
+        --muted: #6f6765;
+        --line: #ded7d4;
+        --brand: #f26f63;
+        --brand-strong: #d94f45;
+        --danger: #b42318;
     }
 
     * {
@@ -15,7 +15,7 @@
 
     body {
         margin: 0;
-        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: "Helvetica Neue", Arial, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
     .login-page {
@@ -23,16 +23,16 @@
         min-height: 100vh;
         place-items: center;
         padding: 24px;
-        background: linear-gradient(135deg, #102522, #173f3a 48%, #f5c542 48%, #f5c542);
+        background: linear-gradient(135deg, #1d1717, #332827 50%, #f26f63 50%, #f26f63);
     }
 
     .login-card {
         width: min(430px, 100%);
         border: 1px solid rgba(255, 255, 255, .55);
-        border-radius: 8px;
+        border-radius: 4px;
         background: rgba(255, 255, 255, .96);
         padding: 26px;
-        box-shadow: 0 24px 70px rgba(16, 37, 34, .24);
+        box-shadow: 0 24px 70px rgba(29, 23, 23, .24);
     }
 
     h1 {
@@ -40,6 +40,7 @@
         color: var(--ink);
         font-size: 28px;
         line-height: 1.15;
+        letter-spacing: .01em;
     }
 
     p {
@@ -63,21 +64,28 @@
     input {
         min-height: 44px;
         border: 1px solid var(--line);
-        border-radius: 8px;
+        border-radius: 4px;
         padding: 9px 11px;
         color: var(--ink);
         font: inherit;
     }
 
+    input:focus {
+        border-color: var(--brand);
+        box-shadow: 0 0 0 3px rgba(242, 111, 99, .16);
+        outline: 0;
+    }
+
     button {
         min-height: 44px;
         border: 0;
-        border-radius: 8px;
+        border-radius: 4px;
         background: var(--brand);
         color: #fff;
         cursor: pointer;
         font: inherit;
         font-weight: 800;
+        letter-spacing: .02em;
     }
 
     button:hover {
@@ -87,7 +95,7 @@
     .error-list {
         margin-bottom: 16px;
         border: 1px solid #fecaca;
-        border-radius: 8px;
+        border-radius: 4px;
         background: #fff1f2;
         color: var(--danger);
         padding: 12px 14px;
