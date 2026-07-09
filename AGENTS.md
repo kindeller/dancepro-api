@@ -313,7 +313,8 @@ Before committing:
 -   Review `git status`.
 -   Stage only files changed for the current task.
 -   Do not stage or revert unrelated user changes.
--   Use a concise, descriptive commit message.
+-   Use a concise, descriptive commit message prefixed with a standard type,
+    such as `feat:`, `fix:`, `chore:`, `docs:`, `test:`, or `refactor:`.
 -   Do not create a commit if required verification failed, unless the user
     explicitly asks for a commit and the failure is documented.
 
