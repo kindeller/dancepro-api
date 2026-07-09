@@ -14,7 +14,7 @@ return [
 
     'allowed_disks' => array_filter(array_map(
         'trim',
-        explode(',', env('DOWNLOAD_ALLOWED_DISKS', 's3_competitions')),
+        explode(',', env('DOWNLOAD_ALLOWED_DISKS', 's3_competitions,s3_concerts')),
     )),
 
     'default_disk' => env('DOWNLOAD_DEFAULT_DISK', 's3_competitions'),

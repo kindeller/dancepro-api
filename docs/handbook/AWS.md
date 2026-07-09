@@ -42,9 +42,29 @@ Downloads should allow only the disks that are intended to be exposed through
 tracking links:
 
 ```text
-DOWNLOAD_ALLOWED_DISKS=s3_competitions
+DOWNLOAD_ALLOWED_DISKS=s3_competitions,s3_concerts
 DOWNLOAD_DEFAULT_DISK=s3_competitions
 ```
+
+## Concert Downloads
+
+Concert download links use the `s3_concerts` filesystem disk. This may point at
+the existing general video bucket while giving V2 a clear domain-specific disk
+name.
+
+```text
+AWS_CONCERT_ACCESS_KEY_ID=
+AWS_CONCERT_SECRET_ACCESS_KEY=
+AWS_CONCERT_DEFAULT_REGION=
+AWS_CONCERT_BUCKET=
+AWS_CONCERT_URL=
+AWS_CONCERT_ENDPOINT=
+AWS_CONCERT_USE_PATH_STYLE_ENDPOINT=false
+```
+
+If the concert-specific access key, secret, or region are not set, the disk
+falls back to the shared `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and
+`AWS_DEFAULT_REGION` values.
 
 ## Links to Related Documentation
 

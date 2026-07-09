@@ -73,6 +73,19 @@ return [
             'report' => false,
         ],
 
+        's3_concerts' => [
+            'driver' => 's3',
+            'key' => env('AWS_CONCERT_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('AWS_CONCERT_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('AWS_CONCERT_DEFAULT_REGION', env('AWS_DEFAULT_REGION')),
+            'bucket' => env('AWS_CONCERT_BUCKET', env('AWS_BUCKET')),
+            'url' => env('AWS_CONCERT_URL', env('AWS_URL')),
+            'endpoint' => env('AWS_CONCERT_ENDPOINT', env('AWS_ENDPOINT')),
+            'use_path_style_endpoint' => env('AWS_CONCERT_USE_PATH_STYLE_ENDPOINT', env('AWS_USE_PATH_STYLE_ENDPOINT', false)),
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*
