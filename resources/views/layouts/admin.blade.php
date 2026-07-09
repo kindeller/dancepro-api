@@ -425,8 +425,9 @@
 
             <nav class="nav" aria-label="Admin navigation">
                 <a href="{{ route('admin.dashboard') }}" @if(request()->routeIs('admin.dashboard')) aria-current="page" @endif>Dashboard</a>
-                <a href="{{ route('admin.download-links.index') }}" @if(request()->routeIs('admin.download-links.*')) aria-current="page" @endif>Download Links</a>
-                <a href="{{ route('admin.download-links.create') }}">Create Links</a>
+                <a href="{{ route('admin.competition.objects.index') }}" @if(request()->routeIs('admin.competition.objects.index')) aria-current="page" @endif>Competition Objects</a>
+                <a href="{{ route('admin.download-links.index') }}" @if(request()->routeIs('admin.download-links.index', 'admin.download-links.show')) aria-current="page" @endif>Download Links</a>
+                <a href="{{ route('admin.download-links.create') }}" @if(request()->routeIs('admin.download-links.create')) aria-current="page" @endif>Create Links</a>
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button class="logout-button" type="submit">Sign out</button>

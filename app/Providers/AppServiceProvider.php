@@ -23,5 +23,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(DownloadLink::class, DownloadLinkPolicy::class);
+
+        Gate::define('viewCompetitionObjects', fn ($user): bool => $user->is_active);
     }
 }
