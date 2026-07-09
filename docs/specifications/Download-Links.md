@@ -91,6 +91,8 @@ Behaviour:
 - For a valid link, update first/last opened timestamps, increment
   `download_count`, create a successful `download_accesses` row, generate a
   short-lived signed URL, and redirect.
+- S3 temporary URLs are generated with `Content-Disposition: attachment` so
+  supported browsers download files instead of previewing playable media inline.
 
 ### Management
 

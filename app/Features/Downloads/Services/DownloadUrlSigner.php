@@ -19,6 +19,9 @@ class DownloadUrlSigner
         return Storage::disk($downloadLink->storage_disk)->temporaryUrl(
             $downloadLink->storage_key,
             $expiresAt,
+            [
+                'ResponseContentDisposition' => $this->contentDisposition($downloadLink),
+            ],
         );
     }
 
@@ -58,6 +61,18 @@ class DownloadUrlSigner
             'Signature' => $this->cloudFrontEncode($signature),
             'Key-Pair-Id' => config('downloads.cloudfront.key_pair_id'),
         ], '', '&', PHP_QUERY_RFC3986);
+    }
+
+    private function contentDisposition(DownloadLink $downloadLink): string
+    {
+        $filename = $downloadLink->original_filename ?: basename($downloadLink->storage_key);
+        $fallback = str_replace(['"', '\\', "\r", "\n"], '', $filename);
+
+        return sprintf(
+            'attachment; filename="%s"; filename*=UTF-8\'\'%s',
+            $fallback,
+            rawurlencode($filename),
+        );
     }
 
     private function privateKey(): ?string
