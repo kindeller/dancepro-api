@@ -21,7 +21,7 @@ The handbook contains stable development and architecture guidance.
 
 Use it for conventions that should apply across the project, including local
 development, architecture, API responses, authentication approach, AWS,
-deployment, security, testing, and git workflow.
+deployment, security, testing, brand style, and git workflow.
 
 Start with:
 
@@ -29,6 +29,7 @@ Start with:
 - [Git Workflow](handbook/Git-Workflow.md)
 - [Architecture](handbook/Architecture.md)
 - [API Guidelines](handbook/API-Guidelines.md)
+- [Brand Style](handbook/Brand-Style.md)
 - [Security](handbook/Security.md)
 
 ## Epics

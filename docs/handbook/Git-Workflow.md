@@ -53,14 +53,19 @@ sail pint
 If a required check cannot be run because of the local environment, record the
 exact command and reason in the work summary.
 
-## Automatic Commit Workflow
+## Approval-Gated Commit Workflow
 
-After the Definition of Done is satisfied, AI-assisted work should be committed
-automatically unless the user explicitly asks not to commit.
+After the Definition of Done is satisfied, AI-assisted work should not be
+committed until the user explicitly approves the commit.
+
+Before asking for commit approval:
+
+- Run all applicable verification commands.
+- Review `git status`.
+- Summarise changed files and verification results for the user.
 
 Before committing:
 
-- Review `git status`.
 - Stage only files changed for the current task.
 - Do not stage or revert unrelated user changes.
 - Use a concise, descriptive commit message.

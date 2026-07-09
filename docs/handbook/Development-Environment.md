@@ -30,7 +30,7 @@ Avoid bare `php artisan`, `composer`, or `vendor/bin/pint` commands unless
 explicitly working inside the Sail container.
 
 Before finalising a task, complete the project Definition of Done and follow
-the local automatic commit workflow in [Git Workflow](Git-Workflow.md).
+the local approval-gated commit workflow in [Git Workflow](Git-Workflow.md).
 
 ## Links to Related Documentation
 

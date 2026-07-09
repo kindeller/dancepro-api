@@ -303,14 +303,19 @@ exact command and reason.
 
 ------------------------------------------------------------------------
 
-# Automatic Commit Workflow
+# Approval-Gated Commit Workflow
 
-After the Definition of Done is satisfied, AI agents should prepare a git
-commit automatically unless the user explicitly asks not to commit.
+After the Definition of Done is satisfied, AI agents should not create a git
+commit until the user explicitly approves the commit.
+
+Before asking for commit approval:
+
+-   Run all applicable verification commands.
+-   Review `git status`.
+-   Summarise changed files and verification results for the user.
 
 Before committing:
 
--   Review `git status`.
 -   Stage only files changed for the current task.
 -   Do not stage or revert unrelated user changes.
 -   Use a concise, descriptive commit message prefixed with a standard type,
@@ -353,7 +358,7 @@ When implementing work:
     documenting it rather than inventing a new pattern.
 5.  Minimise technical debt with every change.
 6.  Complete the Definition of Done before finalising the task.
-7.  Follow the automatic commit workflow unless instructed otherwise.
+7.  Follow the approval-gated commit workflow unless instructed otherwise.
 
 ------------------------------------------------------------------------
 

@@ -7,19 +7,19 @@
     <style>
         :root {
             color-scheme: light;
-            --ink: #171313;
-            --muted: #6f6765;
-            --line: #ded7d4;
-            --paper: #faf8f6;
+            --ink: #141719;
+            --muted: #66737a;
+            --line: #d7e4ea;
+            --paper: #f7fbfd;
             --panel: #ffffff;
-            --brand: #f26f63;
-            --brand-strong: #d94f45;
-            --brand-dark: #1d1717;
+            --brand: #0AA0DB;
+            --brand-strong: #087fb0;
+            --brand-dark: #101820;
             --warn: #a66214;
             --danger: #b42318;
             --ok: #147a52;
-            --soft: #fff0ed;
-            --shadow: 0 18px 44px rgba(29, 23, 23, .07);
+            --soft: #eaf8fd;
+            --shadow: 0 18px 44px rgba(16, 24, 32, .07);
         }
 
         * {
@@ -52,7 +52,7 @@
 
         .sidebar {
             background: var(--brand-dark);
-            color: #fff7f5;
+            color: #f4fbff;
             padding: 28px 18px;
         }
 
@@ -94,7 +94,7 @@
             border: 0;
             border-radius: 4px;
             background: transparent;
-            color: #fff7f5;
+            color: #f4fbff;
             cursor: pointer;
             font: inherit;
             font-size: 13px;
@@ -107,7 +107,7 @@
         .nav a[aria-current="page"],
         .nav a:hover,
         .logout-button:hover {
-            background: rgba(242, 111, 99, .18);
+            background: rgba(10, 160, 219, .2);
             color: #ffffff;
             text-decoration: none;
         }
@@ -234,7 +234,7 @@
         select:focus,
         textarea:focus {
             border-color: var(--brand);
-            box-shadow: 0 0 0 3px rgba(242, 111, 99, .16);
+            box-shadow: 0 0 0 3px rgba(10, 160, 219, .16);
             outline: 0;
         }
 
@@ -307,7 +307,7 @@
         }
 
         tbody tr:hover {
-            background: #fffaf9;
+            background: #f5fbfe;
         }
 
         .truncate {
@@ -342,7 +342,7 @@
 
         .notice {
             margin-bottom: 16px;
-            border: 1px solid #f5b6ad;
+            border: 1px solid #9bdcf4;
             border-radius: 4px;
             background: var(--soft);
             padding: 12px 14px;
@@ -378,7 +378,7 @@
             min-height: 100vh;
             place-items: center;
             padding: 24px;
-            background: linear-gradient(135deg, #1d1717, #332827 50%, #f26f63 50%, #f26f63);
+            background: linear-gradient(135deg, #101820, #1b2a35 50%, #0AA0DB 50%, #0AA0DB);
         }
 
         .login-card {
@@ -387,7 +387,7 @@
             border-radius: 4px;
             background: rgba(255, 255, 255, .96);
             padding: 26px;
-            box-shadow: 0 24px 70px rgba(29, 23, 23, .24);
+            box-shadow: 0 24px 70px rgba(16, 24, 32, .24);
         }
 
         .pagination {
