@@ -10,7 +10,7 @@ interfaces.
 The primary DancePro brand colour is:
 
 ```text
-#0AA0DB
+#00A1DD
 ```
 
 Use this blue for primary actions, active navigation states, focus states, and
