@@ -19,6 +19,33 @@ downloads are expected to use private storage and server-side signed redirects.
 - Public competition download access should use Laravel tracking links before
   redirecting to short-lived signed URLs.
 
+## Competition Downloads
+
+Competition download links use the `s3_competitions` filesystem disk. Configure
+that disk with the competition-specific environment variables:
+
+```text
+AWS_COMPETITIONS_ACCESS_KEY_ID=
+AWS_COMPETITIONS_SECRET_ACCESS_KEY=
+AWS_COMPETITIONS_DEFAULT_REGION=
+AWS_COMPETITIONS_BUCKET=
+AWS_COMPETITIONS_URL=
+AWS_COMPETITIONS_ENDPOINT=
+AWS_COMPETITIONS_USE_PATH_STYLE_ENDPOINT=false
+```
+
+If the competition-specific access key, secret, or region are not set, the disk
+falls back to the shared `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and
+`AWS_DEFAULT_REGION` values.
+
+Downloads should allow only the disks that are intended to be exposed through
+tracking links:
+
+```text
+DOWNLOAD_ALLOWED_DISKS=s3_competitions
+DOWNLOAD_DEFAULT_DISK=s3_competitions
+```
+
 ## Links to Related Documentation
 
 - [Competition Downloads Specification](../specifications/Competition-Downloads.md)
