@@ -57,15 +57,11 @@
         }
 
         .brand-mark {
-            display: grid;
             width: 36px;
             height: 36px;
             flex: 0 0 auto;
-            place-items: center;
+            object-fit: contain;
             border-radius: 4px;
-            color: #ffffff;
-            background: var(--brand);
-            letter-spacing: 0;
         }
 
         .content {
@@ -115,7 +111,7 @@
 </head>
 <body>
     <main>
-        <p class="brand"><span class="brand-mark">DP</span> DancePro</p>
+        <p class="brand"><img class="brand-mark" src="{{ asset('storage/1024.png') }}" alt=""> DancePro</p>
 
         <div class="content">
             <h1>{{ $heading }}</h1>

@@ -72,14 +72,10 @@
         }
 
         .brand-mark {
-            display: grid;
             width: 34px;
             height: 34px;
-            place-items: center;
+            object-fit: contain;
             border-radius: 4px;
-            background: var(--brand);
-            color: #ffffff;
-            letter-spacing: 0;
         }
 
         .nav {
@@ -447,7 +443,7 @@
     <div class="shell">
         <aside class="sidebar">
             <div class="brand">
-                <span class="brand-mark">DP</span>
+                <img class="brand-mark" src="{{ asset('storage/1024.png') }}" alt="">
                 <span>DancePro Admin</span>
             </div>
 
