@@ -132,7 +132,7 @@
         }
 
         .content {
-            width: min(1180px, 100%);
+            width: 100%;
             padding: 28px;
         }
 
@@ -179,7 +179,8 @@
             border-radius: 4px;
             background: var(--panel);
             box-shadow: var(--shadow);
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
         }
 
         .card-pad {
@@ -299,7 +300,7 @@
         td {
             padding: 12px 14px;
             border-bottom: 1px solid var(--line);
-            text-align: left;
+            text-align: center;
             vertical-align: top;
         }
 
