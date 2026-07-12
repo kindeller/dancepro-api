@@ -26,6 +26,10 @@
             box-sizing: border-box;
         }
 
+        [hidden] {
+            display: none !important;
+        }
+
         body {
             margin: 0;
             background: var(--paper);
@@ -308,6 +312,29 @@
 
         tbody tr:hover {
             background: #f5fbfe;
+        }
+
+        .selectable-row {
+            cursor: pointer;
+        }
+
+        .selectable-row.is-selected,
+        .selectable-row.is-selected:hover {
+            background: var(--soft);
+        }
+
+        input.selection-checkbox {
+            width: auto;
+            cursor: pointer;
+        }
+
+        .competition-objects-table td {
+            vertical-align: middle;
+        }
+
+        .competition-objects-table .selection-cell {
+            width: 76px;
+            text-align: center;
         }
 
         .truncate {

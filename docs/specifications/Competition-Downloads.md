@@ -61,6 +61,10 @@ not return signed file URLs. S3-backed listings use shallow paged requests with
 `limit` and `continuation_token` so large folders can be loaded incrementally.
 The admin portal automatically loads 25-object chunks up to a 250-object soft
 cap before showing a manual continue control.
+File names in the admin portal link to the object's AWS Console location using
+the configured competition bucket and region. These are console navigation
+links, not signed download URLs; AWS performs its normal authentication and
+authorization checks when an administrator follows one.
 Administrators can select file rows or their checkboxes to build a shortlist
 that persists for the current browser tab. Opening the existing Create Links
 screen pre-fills its storage-key list from that selection; clearing a checkbox

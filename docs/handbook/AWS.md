@@ -34,6 +34,10 @@ AWS_COMPETITIONS_ENDPOINT=
 AWS_COMPETITIONS_USE_PATH_STYLE_ENDPOINT=false
 ```
 
+The admin competition object browser derives AWS Console links from
+`AWS_COMPETITIONS_DEFAULT_REGION` and `AWS_COMPETITIONS_BUCKET`. The links do
+not grant object access and do not replace tracked download links.
+
 If the competition-specific access key, secret, or region are not set, the disk
 falls back to the shared `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and
 `AWS_DEFAULT_REGION` values.

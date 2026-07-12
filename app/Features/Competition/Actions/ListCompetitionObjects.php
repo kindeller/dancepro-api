@@ -19,7 +19,7 @@ class ListCompetitionObjects
      *     prefix: string,
      *     breadcrumbs: list<array{name: string, prefix: string}>,
      *     directories: list<array{type: string, name: string, prefix: string}>,
-     *     files: list<array{type: string, name: string, key: string, extension: string|null, size: int|null, last_modified: string|null}>,
+     *     files: list<array{type: string, name: string, key: string, extension: string|null, size: int|null, last_modified: string|null, console_url: string|null}>,
      *     pagination: array{limit: int, next_token: string|null, has_more: bool}
      * }
      */
@@ -51,6 +51,7 @@ class ListCompetitionObjects
                 'extension' => pathinfo($file, PATHINFO_EXTENSION) ?: null,
                 'size' => $this->size($file),
                 'last_modified' => $this->lastModified($file),
+                'console_url' => $this->consoleUrl($file),
             ])
             ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
             ->values()
@@ -76,7 +77,7 @@ class ListCompetitionObjects
      *     prefix: string,
      *     breadcrumbs: list<array{name: string, prefix: string}>,
      *     directories: list<array{type: string, name: string, prefix: string}>,
-     *     files: list<array{type: string, name: string, key: string, extension: string|null, size: int|null, last_modified: string|null}>,
+     *     files: list<array{type: string, name: string, key: string, extension: string|null, size: int|null, last_modified: string|null, console_url: string|null}>,
      *     pagination: array{limit: int, next_token: string|null, has_more: bool}
      * }
      */
@@ -122,6 +123,7 @@ class ListCompetitionObjects
                     'extension' => pathinfo($key, PATHINFO_EXTENSION) ?: null,
                     'size' => isset($item['Size']) ? (int) $item['Size'] : null,
                     'last_modified' => isset($item['LastModified']) ? $item['LastModified']->format(DATE_ATOM) : null,
+                    'console_url' => $this->consoleUrl($key),
                 ];
             })
             ->filter(fn (array $file): bool => $file['key'] !== '' && $file['name'] !== '')
@@ -214,5 +216,26 @@ class ListCompetitionObjects
         } catch (Throwable) {
             return null;
         }
+    }
+
+    private function consoleUrl(string $key): ?string
+    {
+        $bucket = config('filesystems.disks.'.self::DISK.'.bucket');
+        $region = config('filesystems.disks.'.self::DISK.'.region');
+
+        if (! is_string($bucket) || $bucket === '' || ! is_string($region) || $region === '') {
+            return null;
+        }
+
+        return sprintf(
+            'https://%s.console.aws.amazon.com/s3/buckets/%s?%s',
+            rawurlencode($region),
+            rawurlencode($bucket),
+            http_build_query([
+                'region' => $region,
+                'prefix' => $key,
+                'showversions' => 'false',
+            ], encoding_type: PHP_QUERY_RFC3986),
+        );
     }
 }

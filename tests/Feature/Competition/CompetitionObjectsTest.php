@@ -14,6 +14,11 @@ class CompetitionObjectsTest extends TestCase
 
     public function test_authenticated_user_can_list_competition_objects(): void
     {
+        config([
+            'filesystems.disks.s3_competitions.bucket' => 'dance-pro-competitions',
+            'filesystems.disks.s3_competitions.region' => 'ap-southeast-2',
+        ]);
+
         Storage::fake('s3_competitions');
         Storage::disk('s3_competitions')->put('competition-a/video-2.mp4', 'video');
         Storage::disk('s3_competitions')->put('competition-a/routines/video-1.mp4', 'video');
@@ -43,10 +48,15 @@ class CompetitionObjectsTest extends TestCase
                         ['type', 'name', 'prefix'],
                     ],
                     'files' => [
-                        ['type', 'name', 'key', 'extension', 'size', 'last_modified'],
+                        ['type', 'name', 'key', 'extension', 'size', 'last_modified', 'console_url'],
                     ],
                 ],
             ]);
+
+        $response->assertJsonPath(
+            'data.files.0.console_url',
+            'https://ap-southeast-2.console.aws.amazon.com/s3/buckets/dance-pro-competitions?region=ap-southeast-2&prefix=root-file.pdf&showversions=false',
+        );
     }
 
     public function test_authenticated_user_can_list_competition_objects_by_prefix(): void
@@ -86,21 +96,33 @@ class CompetitionObjectsTest extends TestCase
 
     public function test_admin_can_view_competition_objects_portal(): void
     {
+        config([
+            'filesystems.disks.s3_competitions.bucket' => 'dance-pro-competitions',
+            'filesystems.disks.s3_competitions.region' => 'ap-southeast-2',
+        ]);
+
         Storage::fake('s3_competitions');
-        Storage::disk('s3_competitions')->put('competition-a/video-2.mp4', 'video');
+        Storage::disk('s3_competitions')->put('competition-a/video-2.mp4', str_repeat('x', 2048));
         Storage::disk('s3_competitions')->put('competition-a/routines/video-1.mp4', 'video');
 
         $this->actingAs(User::factory()->create())
             ->get('/admin/competitions/objects?prefix=competition-a')
             ->assertOk()
             ->assertSee('Competition Objects')
+            ->assertSee('display: none !important', false)
             ->assertSee('data-auto-load-url', false)
             ->assertSee('Continue loading')
             ->assertSee('routines')
             ->assertSee('video-2.mp4')
+            ->assertSee('2 KB')
+            ->assertSee('<time datetime=', false)
+            ->assertSee('new Intl.DateTimeFormat(undefined', false)
+            ->assertDontSee('Australia/Perth')
             ->assertSee('data-storage-key="competition-a/video-2.mp4"', false)
             ->assertSee('Select competition-a/video-2.mp4 for link creation')
-            ->assertSee('dancepro.competition.selected-objects');
+            ->assertSee('dancepro.competition.selected-objects')
+            ->assertSee('Open competition-a/video-2.mp4 in the AWS Console')
+            ->assertSee('prefix=competition-a%2Fvideo-2.mp4', false);
     }
 
     public function test_admin_chunk_endpoint_returns_competition_objects_json(): void

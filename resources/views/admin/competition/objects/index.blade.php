@@ -39,14 +39,14 @@
     @endif
 
     <div class="card">
-        <table>
+        <table class="competition-objects-table">
             <thead>
                 <tr>
                     <th>Name</th>
                     <th>Type</th>
                     <th>Size</th>
                     <th>Last modified</th>
-                    <th>Select</th>
+                    <th class="selection-cell">Select</th>
                 </tr>
             </thead>
             <tbody
@@ -67,18 +67,36 @@
                         <td><span class="badge">folder</span></td>
                         <td class="muted">-</td>
                         <td class="muted">-</td>
-                        <td></td>
+                        <td class="selection-cell"></td>
                     </tr>
                 @empty
                 @endforelse
 
                 @forelse ($objects['files'] as $file)
                     <tr class="selectable-row" data-storage-key="{{ $file['key'] }}">
-                        <td>{{ $file['name'] }}</td>
+                        <td>
+                            @if ($file['console_url'])
+                                <a href="{{ $file['console_url'] }}" target="_blank" rel="noopener noreferrer" title="Open {{ $file['key'] }} in the AWS Console">{{ $file['name'] }}</a>
+                            @else
+                                {{ $file['name'] }}
+                            @endif
+                        </td>
                         <td><span class="badge">{{ $file['extension'] ?: 'file' }}</span></td>
-                        <td>{{ $file['size'] === null ? 'Unknown' : number_format($file['size']).' bytes' }}</td>
-                        <td>{{ $file['last_modified'] ?? 'Unknown' }}</td>
-                        <td><input class="selection-checkbox" type="checkbox" aria-label="Select {{ $file['key'] }} for link creation"></td>
+                        <td title="{{ $file['size'] === null ? '' : number_format($file['size']).' bytes' }}">{{ $file['size'] === null ? 'Unknown' : Illuminate\Support\Number::fileSize($file['size'], precision: 2) }}</td>
+                        <td>
+                            @if ($file['last_modified'])
+                                <time datetime="{{ $file['last_modified'] }}">{{ $file['last_modified'] }}</time>
+                            @else
+                                Unknown
+                            @endif
+                        </td>
+                        <td class="selection-cell">
+                            <input
+                                class="selection-checkbox"
+                                type="checkbox"
+                                aria-label="Select {{ $file['key'] }} for link creation"
+                            >
+                        </td>
                     </tr>
                 @empty
                 @endforelse
@@ -123,6 +141,7 @@
             const readSelection = () => {
                 try {
                     const storedKeys = JSON.parse(sessionStorage.getItem(selectionStorageKey) || '[]');
+
                     return new Set(Array.isArray(storedKeys) ? storedKeys.filter((key) => typeof key === 'string') : []);
                 } catch (error) {
                     return new Set();
@@ -130,6 +149,7 @@
             };
 
             const selectedKeys = readSelection();
+
             const state = {
                 url: body.dataset.autoLoadUrl,
                 prefix: body.dataset.prefix || '',
@@ -142,6 +162,48 @@
             };
 
             const formatCount = (value) => new Intl.NumberFormat().format(value);
+
+            const formatFileSize = (bytes) => {
+                if (bytes === null || bytes === undefined) {
+                    return 'Unknown';
+                }
+
+                const units = ['bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'];
+                const unitIndex = Math.min(
+                    Math.floor(Math.log(Math.max(bytes, 1)) / Math.log(1024)),
+                    units.length - 1,
+                );
+                const value = bytes / (1024 ** unitIndex);
+                const precision = unitIndex === 0 ? 0 : 2;
+
+                return `${new Intl.NumberFormat('en-AU', { maximumFractionDigits: precision }).format(value)} ${units[unitIndex]}`;
+            };
+
+            const formatDateTime = (value) => {
+                if (!value) {
+                    return 'Unknown';
+                }
+
+                const date = new Date(value);
+
+                if (Number.isNaN(date.getTime())) {
+                    return 'Unknown';
+                }
+
+                return new Intl.DateTimeFormat(undefined, {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                }).format(date);
+            };
+
+            const localizeDateTimes = (container = body) => {
+                container.querySelectorAll('time[datetime]').forEach((element) => {
+                    element.textContent = formatDateTime(element.dateTime);
+                });
+            };
 
             const updateStatus = (message = null) => {
                 if (message) {
@@ -186,7 +248,9 @@
                 body.querySelectorAll('.selectable-row').forEach((row) => {
                     const isSelected = selectedKeys.has(row.dataset.storageKey);
                     row.classList.toggle('is-selected', isSelected);
+
                     const checkbox = row.querySelector('.selection-checkbox');
+
                     if (checkbox) {
                         checkbox.checked = isSelected;
                     }
@@ -195,17 +259,22 @@
 
             const toggleSelection = (row, selected = null) => {
                 const key = row.dataset.storageKey;
+
                 if (!key) {
                     return;
                 }
+
                 const shouldSelect = selected ?? !selectedKeys.has(key);
+
                 if (shouldSelect) {
                     selectedKeys.add(key);
                 } else {
                     selectedKeys.delete(key);
                 }
+
                 updateSelection();
             };
+
             const appendDirectory = (directory) => {
                 const url = new URL(window.location.href);
                 url.searchParams.set('prefix', directory.prefix);
@@ -218,26 +287,34 @@
                         <td><span class="badge">folder</span></td>
                         <td class="muted">-</td>
                         <td class="muted">-</td>
-                        <td class="truncate">${escapeHtml(directory.prefix)}</td>
+                        <td class="selection-cell"></td>
                     </tr>
                 `);
             };
 
             const appendFile = (file) => {
                 const extension = file.extension || 'file';
-                const size = file.size === null || file.size === undefined
-                    ? 'Unknown'
+                const size = formatFileSize(file.size);
+                const sizeTitle = file.size === null || file.size === undefined
+                    ? ''
                     : `${formatCount(file.size)} bytes`;
+                const name = file.console_url
+                    ? `<a href="${escapeHtml(file.console_url)}" target="_blank" rel="noopener noreferrer" title="Open ${escapeHtml(file.key)} in the AWS Console">${escapeHtml(file.name)}</a>`
+                    : escapeHtml(file.name);
+                const modified = file.last_modified
+                    ? `<time datetime="${escapeHtml(file.last_modified)}">${escapeHtml(formatDateTime(file.last_modified))}</time>`
+                    : 'Unknown';
 
                 body.insertAdjacentHTML('beforeend', `
                     <tr class="selectable-row" data-storage-key="${escapeHtml(file.key)}">
-                        <td>${escapeHtml(file.name)}</td>
+                        <td>${name}</td>
                         <td><span class="badge">${escapeHtml(extension)}</span></td>
-                        <td>${escapeHtml(size)}</td>
-                        <td>${escapeHtml(file.last_modified || 'Unknown')}</td>
-                        <td><input class="selection-checkbox" type="checkbox" aria-label="Select ${escapeHtml(file.key)} for link creation"></td>
+                        <td title="${escapeHtml(sizeTitle)}">${escapeHtml(size)}</td>
+                        <td>${modified}</td>
+                        <td class="selection-cell"><input class="selection-checkbox" type="checkbox" aria-label="Select ${escapeHtml(file.key)} for link creation"></td>
                     </tr>
                 `);
+
                 updateSelection();
             };
 
@@ -307,17 +384,21 @@
 
             body.addEventListener('click', (event) => {
                 const row = event.target.closest('.selectable-row');
+
                 if (!row || event.target.closest('a')) {
                     return;
                 }
+
                 if (event.target.matches('.selection-checkbox')) {
                     toggleSelection(row, event.target.checked);
                     return;
                 }
+
                 toggleSelection(row);
             });
 
             updateSelection();
+            localizeDateTimes();
             updateStatus();
             window.setTimeout(() => loadNextChunk(), 150);
         })();
