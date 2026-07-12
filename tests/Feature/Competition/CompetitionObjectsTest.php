@@ -98,7 +98,9 @@ class CompetitionObjectsTest extends TestCase
             ->assertSee('Continue loading')
             ->assertSee('routines')
             ->assertSee('video-2.mp4')
-            ->assertSee('competition-a/video-2.mp4');
+            ->assertSee('data-storage-key="competition-a/video-2.mp4"', false)
+            ->assertSee('Select competition-a/video-2.mp4 for link creation')
+            ->assertSee('dancepro.competition.selected-objects');
     }
 
     public function test_admin_chunk_endpoint_returns_competition_objects_json(): void

@@ -19,7 +19,13 @@
             <a class="button secondary" href="{{ route('admin.competition.objects.index') }}">Root</a>
         </form>
 
-        <a class="button secondary" href="{{ route('admin.download-links.create') }}">Create links</a>
+        <a
+            id="create-links-from-selection"
+            class="button secondary"
+            href="{{ route('admin.download-links.create') }}"
+        >
+            Create links <span id="competition-selection-count"></span>
+        </a>
     </div>
 
     @if ($objects['breadcrumbs'] !== [])
@@ -40,7 +46,7 @@
                     <th>Type</th>
                     <th>Size</th>
                     <th>Last modified</th>
-                    <th>Key</th>
+                    <th>Select</th>
                 </tr>
             </thead>
             <tbody
@@ -61,18 +67,18 @@
                         <td><span class="badge">folder</span></td>
                         <td class="muted">-</td>
                         <td class="muted">-</td>
-                        <td class="truncate">{{ $directory['prefix'] }}</td>
+                        <td></td>
                     </tr>
                 @empty
                 @endforelse
 
                 @forelse ($objects['files'] as $file)
-                    <tr>
+                    <tr class="selectable-row" data-storage-key="{{ $file['key'] }}">
                         <td>{{ $file['name'] }}</td>
                         <td><span class="badge">{{ $file['extension'] ?: 'file' }}</span></td>
                         <td>{{ $file['size'] === null ? 'Unknown' : number_format($file['size']).' bytes' }}</td>
                         <td>{{ $file['last_modified'] ?? 'Unknown' }}</td>
-                        <td class="truncate">{{ $file['key'] }}</td>
+                        <td><input class="selection-checkbox" type="checkbox" aria-label="Select {{ $file['key'] }} for link creation"></td>
                     </tr>
                 @empty
                 @endforelse
@@ -106,11 +112,24 @@
             const body = document.getElementById('competition-objects-body');
             const status = document.getElementById('competition-objects-status');
             const continueButton = document.getElementById('competition-objects-continue');
+            const selectionCount = document.getElementById('competition-selection-count');
 
-            if (!body || !status || !continueButton) {
+            if (!body || !status || !continueButton || !selectionCount) {
                 return;
             }
 
+            const selectionStorageKey = 'dancepro.competition.selected-objects';
+
+            const readSelection = () => {
+                try {
+                    const storedKeys = JSON.parse(sessionStorage.getItem(selectionStorageKey) || '[]');
+                    return new Set(Array.isArray(storedKeys) ? storedKeys.filter((key) => typeof key === 'string') : []);
+                } catch (error) {
+                    return new Set();
+                }
+            };
+
+            const selectedKeys = readSelection();
             const state = {
                 url: body.dataset.autoLoadUrl,
                 prefix: body.dataset.prefix || '',
@@ -155,6 +174,38 @@
                 "'": '&#039;',
             }[character]));
 
+            const updateSelection = () => {
+                try {
+                    sessionStorage.setItem(selectionStorageKey, JSON.stringify([...selectedKeys]));
+                } catch (error) {
+                    // Selection still works on this page if browser storage is unavailable.
+                }
+
+                selectionCount.textContent = selectedKeys.size === 0 ? '' : `(${formatCount(selectedKeys.size)})`;
+
+                body.querySelectorAll('.selectable-row').forEach((row) => {
+                    const isSelected = selectedKeys.has(row.dataset.storageKey);
+                    row.classList.toggle('is-selected', isSelected);
+                    const checkbox = row.querySelector('.selection-checkbox');
+                    if (checkbox) {
+                        checkbox.checked = isSelected;
+                    }
+                });
+            };
+
+            const toggleSelection = (row, selected = null) => {
+                const key = row.dataset.storageKey;
+                if (!key) {
+                    return;
+                }
+                const shouldSelect = selected ?? !selectedKeys.has(key);
+                if (shouldSelect) {
+                    selectedKeys.add(key);
+                } else {
+                    selectedKeys.delete(key);
+                }
+                updateSelection();
+            };
             const appendDirectory = (directory) => {
                 const url = new URL(window.location.href);
                 url.searchParams.set('prefix', directory.prefix);
@@ -179,14 +230,15 @@
                     : `${formatCount(file.size)} bytes`;
 
                 body.insertAdjacentHTML('beforeend', `
-                    <tr>
+                    <tr class="selectable-row" data-storage-key="${escapeHtml(file.key)}">
                         <td>${escapeHtml(file.name)}</td>
                         <td><span class="badge">${escapeHtml(extension)}</span></td>
                         <td>${escapeHtml(size)}</td>
                         <td>${escapeHtml(file.last_modified || 'Unknown')}</td>
-                        <td class="truncate">${escapeHtml(file.key)}</td>
+                        <td><input class="selection-checkbox" type="checkbox" aria-label="Select ${escapeHtml(file.key)} for link creation"></td>
                     </tr>
                 `);
+                updateSelection();
             };
 
             const appendObjects = (objects) => {
@@ -253,6 +305,19 @@
                 loadNextChunk({ ignoreSoftCap: true });
             });
 
+            body.addEventListener('click', (event) => {
+                const row = event.target.closest('.selectable-row');
+                if (!row || event.target.closest('a')) {
+                    return;
+                }
+                if (event.target.matches('.selection-checkbox')) {
+                    toggleSelection(row, event.target.checked);
+                    return;
+                }
+                toggleSelection(row);
+            });
+
+            updateSelection();
             updateStatus();
             window.setTimeout(() => loadNextChunk(), 150);
         })();

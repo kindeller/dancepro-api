@@ -61,6 +61,10 @@ not return signed file URLs. S3-backed listings use shallow paged requests with
 `limit` and `continuation_token` so large folders can be loaded incrementally.
 The admin portal automatically loads 25-object chunks up to a 250-object soft
 cap before showing a manual continue control.
+Administrators can select file rows or their checkboxes to build a shortlist
+that persists for the current browser tab. Opening the existing Create Links
+screen pre-fills its storage-key list from that selection; clearing a checkbox
+removes the corresponding key.
 Download access should still use database-backed tracking links.
 
 ## Links to Related Documentation

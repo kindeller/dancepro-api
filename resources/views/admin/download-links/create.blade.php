@@ -40,7 +40,7 @@
         <div class="grid two-col">
             <label>
                 Storage keys
-                <textarea name="keys" placeholder="competition-folder/video-001.mp4&#10;competition-folder/video-002.mp4" required>{{ old('keys') }}</textarea>
+                <textarea id="download-link-keys" name="keys" placeholder="competition-folder/video-001.mp4&#10;competition-folder/video-002.mp4" required>{{ old('keys') }}</textarea>
             </label>
 
             <div class="grid">
@@ -75,4 +75,34 @@
             <a class="button secondary" href="{{ route('admin.download-links.index') }}">Back to table</a>
         </div>
     </form>
+
+    <script>
+        (() => {
+            const keysInput = document.getElementById('download-link-keys');
+
+            if (!keysInput) {
+                return;
+            }
+
+            const selectionStorageKey = 'dancepro.competition.selected-objects';
+
+            @if (session('created_links'))
+                sessionStorage.removeItem(selectionStorageKey);
+            @else
+                if (keysInput.value.trim() === '') {
+                    try {
+                        const selectedKeys = JSON.parse(sessionStorage.getItem(selectionStorageKey) || '[]');
+
+                        if (Array.isArray(selectedKeys)) {
+                            keysInput.value = selectedKeys
+                                .filter((key) => typeof key === 'string')
+                                .join('\n');
+                        }
+                    } catch (error) {
+                        sessionStorage.removeItem(selectionStorageKey);
+                    }
+                }
+            @endif
+        })();
+    </script>
 @endsection

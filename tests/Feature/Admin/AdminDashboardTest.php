@@ -93,6 +93,15 @@ class AdminDashboardTest extends TestCase
         ]);
     }
 
+    public function test_download_link_form_can_receive_competition_object_selections(): void
+    {
+        $this->actingAs(User::factory()->create())
+            ->get('/admin/download-links/create')
+            ->assertOk()
+            ->assertSee('id="download-link-keys"', false)
+            ->assertSee('dancepro.competition.selected-objects');
+    }
+
     public function test_existing_download_link_detail_does_not_expose_raw_public_token(): void
     {
         $user = User::factory()->create();
