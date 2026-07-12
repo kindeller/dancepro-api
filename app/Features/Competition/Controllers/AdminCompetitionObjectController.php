@@ -11,7 +11,7 @@ use Illuminate\View\View;
 
 class AdminCompetitionObjectController extends Controller
 {
-    private const DEFAULT_CHUNK_SIZE = 25;
+    private const DEFAULT_CHUNK_SIZE = 250;
 
     public function index(
         ListCompetitionObjectsRequest $request,
@@ -29,7 +29,6 @@ class AdminCompetitionObjectController extends Controller
             'objects' => $objects,
             'prefix' => $objects['prefix'],
             'limit' => $objects['pagination']['limit'],
-            'softCap' => 250,
         ]);
     }
 

@@ -59,8 +59,12 @@ GET /admin/competitions/objects/chunk
 The object browser is read-only, fixed to the `s3_competitions` disk, and does
 not return signed file URLs. S3-backed listings use shallow paged requests with
 `limit` and `continuation_token` so large folders can be loaded incrementally.
-The admin portal automatically loads 25-object chunks up to a 250-object soft
-cap before showing a manual continue control.
+The admin portal automatically requests every 250-object chunk until the current
+prefix is fully loaded. A progress indicator above the table remains visible as
+each chunk is appended, then disappears when loading completes. If a chunk
+request fails, the administrator can retry from the failed point. The container
+exposes `data-load-state="loading|complete|error"` so browser automation can
+wait for a complete listing before reading rows.
 File names in the admin portal link to the object's AWS Console location using
 the configured competition bucket and region. These are console navigation
 links, not signed download URLs; AWS performs its normal authentication and

@@ -12,7 +12,7 @@
                 <input name="prefix" value="{{ $prefix }}" placeholder="Folder path">
             </label>
             <label>
-                Chunk size
+                Request chunk size
                 <input name="limit" type="number" min="1" max="1000" value="{{ $limit }}">
             </label>
             <button type="submit">View</button>
@@ -38,7 +38,32 @@
         </div>
     @endif
 
-    <div class="card">
+    <div
+        id="competition-objects-card"
+        class="card competition-objects-card"
+        data-load-state="{{ $objects['pagination']['has_more'] ? 'loading' : 'complete' }}"
+        aria-busy="{{ $objects['pagination']['has_more'] ? 'true' : 'false' }}"
+    >
+        <div id="competition-objects-loading-panel" class="pagination" @if (! $objects['pagination']['has_more']) hidden @endif>
+            <span id="competition-objects-loading" class="loading-indicator" role="status" @if (! $objects['pagination']['has_more']) hidden @endif>
+                <span class="loading-spinner" aria-hidden="true"></span>
+                Loading
+            </span>
+
+            <span id="competition-objects-loading-status" class="muted">
+                Loading all objects... {{ number_format(count($objects['directories']) + count($objects['files'])) }} loaded.
+            </span>
+
+            <button
+                id="competition-objects-continue"
+                class="button secondary"
+                type="button"
+                hidden
+            >
+                Retry loading
+            </button>
+        </div>
+
         <table class="competition-objects-table">
             <thead>
                 <tr>
@@ -54,7 +79,6 @@
                 data-auto-load-url="{{ route('admin.competition.objects.chunk') }}"
                 data-prefix="{{ $prefix }}"
                 data-limit="{{ $limit }}"
-                data-soft-cap="{{ $softCap }}"
                 data-next-token="{{ $objects['pagination']['next_token'] }}"
                 data-has-more="{{ $objects['pagination']['has_more'] ? '1' : '0' }}"
                 data-loaded-count="{{ count($objects['directories']) + count($objects['files']) }}"
@@ -109,30 +133,27 @@
             </tbody>
         </table>
 
-        <div class="pagination">
-            <span id="competition-objects-status" class="muted">
-                Showing {{ number_format(count($objects['directories']) + count($objects['files'])) }} objects from this prefix.
+        <div id="competition-objects-complete-panel" class="pagination" @if ($objects['pagination']['has_more']) hidden @endif>
+            <span id="competition-objects-complete-status" class="muted">
+                Showing {{ number_format(count($objects['directories']) + count($objects['files'])) }} objects. All objects loaded.
             </span>
-
-            <button
-                id="competition-objects-continue"
-                class="button secondary"
-                type="button"
-                hidden
-            >
-                Continue loading
-            </button>
         </div>
+
     </div>
 
     <script>
         (() => {
             const body = document.getElementById('competition-objects-body');
-            const status = document.getElementById('competition-objects-status');
+            const card = document.getElementById('competition-objects-card');
+            const loadingPanel = document.getElementById('competition-objects-loading-panel');
+            const loadingIndicator = document.getElementById('competition-objects-loading');
+            const loadingStatus = document.getElementById('competition-objects-loading-status');
+            const completePanel = document.getElementById('competition-objects-complete-panel');
+            const completeStatus = document.getElementById('competition-objects-complete-status');
             const continueButton = document.getElementById('competition-objects-continue');
             const selectionCount = document.getElementById('competition-selection-count');
 
-            if (!body || !status || !continueButton || !selectionCount) {
+            if (!body || !card || !loadingPanel || !loadingIndicator || !loadingStatus || !completePanel || !completeStatus || !continueButton || !selectionCount) {
                 return;
             }
 
@@ -153,12 +174,12 @@
             const state = {
                 url: body.dataset.autoLoadUrl,
                 prefix: body.dataset.prefix || '',
-                limit: Number.parseInt(body.dataset.limit || '25', 10),
-                softCap: Number.parseInt(body.dataset.softCap || '250', 10),
+                limit: Number.parseInt(body.dataset.limit || '250', 10),
                 nextToken: body.dataset.nextToken || '',
                 hasMore: body.dataset.hasMore === '1',
                 loadedCount: Number.parseInt(body.dataset.loadedCount || '0', 10),
                 isLoading: false,
+                loadFailed: false,
             };
 
             const formatCount = (value) => new Intl.NumberFormat().format(value);
@@ -205,27 +226,36 @@
                 });
             };
 
-            const updateStatus = (message = null) => {
-                if (message) {
-                    status.textContent = message;
-                    return;
-                }
-
-                if (state.isLoading) {
-                    status.textContent = `Showing ${formatCount(state.loadedCount)} objects. Loading more...`;
-                    return;
-                }
-
-                if (state.hasMore && state.loadedCount >= state.softCap) {
-                    status.textContent = `Showing ${formatCount(state.loadedCount)} objects. More objects are available.`;
+            const updateStatus = () => {
+                if (state.loadFailed) {
+                    card.dataset.loadState = 'error';
+                    card.setAttribute('aria-busy', 'false');
+                    loadingPanel.hidden = false;
+                    loadingIndicator.hidden = true;
+                    completePanel.hidden = true;
                     continueButton.hidden = false;
+                    loadingStatus.textContent = `${formatCount(state.loadedCount)} objects loaded. Loading stopped after an error.`;
                     return;
                 }
 
+                if (state.isLoading || state.hasMore) {
+                    card.dataset.loadState = 'loading';
+                    card.setAttribute('aria-busy', 'true');
+                    loadingPanel.hidden = false;
+                    loadingIndicator.hidden = false;
+                    completePanel.hidden = true;
+                    continueButton.hidden = true;
+                    loadingStatus.textContent = `Loading all objects... ${formatCount(state.loadedCount)} loaded.`;
+                    return;
+                }
+
+                card.dataset.loadState = 'complete';
+                card.setAttribute('aria-busy', 'false');
+                loadingPanel.hidden = true;
+                loadingIndicator.hidden = true;
+                completePanel.hidden = false;
                 continueButton.hidden = true;
-                status.textContent = state.hasMore
-                    ? `Showing ${formatCount(state.loadedCount)} objects.`
-                    : `Showing ${formatCount(state.loadedCount)} objects. All objects loaded.`;
+                completeStatus.textContent = `Showing ${formatCount(state.loadedCount)} objects. All objects loaded.`;
             };
 
             const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -329,19 +359,20 @@
                 state.hasMore = Boolean(objects.pagination.has_more);
             };
 
-            const loadNextChunk = async ({ ignoreSoftCap = false } = {}) => {
-                if (state.isLoading || !state.hasMore || !state.nextToken) {
+            const loadNextChunk = async () => {
+                if (state.isLoading || !state.hasMore) {
                     updateStatus();
                     return;
                 }
 
-                if (!ignoreSoftCap && state.loadedCount >= state.softCap) {
+                if (!state.nextToken) {
+                    state.loadFailed = true;
                     updateStatus();
                     return;
                 }
 
                 state.isLoading = true;
-                continueButton.hidden = true;
+                state.loadFailed = false;
                 updateStatus();
 
                 const url = new URL(state.url, window.location.origin);
@@ -363,23 +394,24 @@
                     const payload = await response.json();
                     appendObjects(payload.data);
                 } catch (error) {
-                    state.hasMore = false;
-                    updateStatus('Objects loaded so far. Background loading stopped after an error.');
-                    return;
+                    state.loadFailed = true;
                 } finally {
                     state.isLoading = false;
                 }
 
                 updateStatus();
 
-                if (state.hasMore && state.loadedCount < state.softCap) {
-                    window.setTimeout(() => loadNextChunk(), 150);
+                if (state.loadFailed) {
+                    return;
+                }
+
+                if (state.hasMore) {
+                    window.setTimeout(() => loadNextChunk(), 0);
                 }
             };
 
             continueButton.addEventListener('click', () => {
-                state.softCap += 250;
-                loadNextChunk({ ignoreSoftCap: true });
+                loadNextChunk();
             });
 
             body.addEventListener('click', (event) => {
@@ -400,7 +432,7 @@
             updateSelection();
             localizeDateTimes();
             updateStatus();
-            window.setTimeout(() => loadNextChunk(), 150);
+            window.setTimeout(() => loadNextChunk(), 0);
         })();
     </script>
 @endsection

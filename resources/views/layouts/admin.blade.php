@@ -322,10 +322,15 @@
 
         input.selection-checkbox {
             width: auto;
+            height: 18px;
+            min-height: 0;
+            padding: 0;
             cursor: pointer;
         }
 
+        .competition-objects-table th,
         .competition-objects-table td {
+            padding: 7px 10px;
             vertical-align: middle;
         }
 
@@ -415,7 +420,42 @@
         }
 
         .pagination {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
             padding: 14px;
+        }
+
+        .loading-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            color: var(--brand-strong);
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .loading-spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--line);
+            border-top-color: var(--brand);
+            border-radius: 50%;
+            animation: competition-loading-spin .7s linear infinite;
+        }
+
+        @keyframes competition-loading-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .loading-spinner {
+                animation: none;
+            }
         }
 
         @media (max-width: 900px) {
