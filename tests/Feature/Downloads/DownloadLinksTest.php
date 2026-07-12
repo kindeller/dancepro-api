@@ -10,6 +10,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Mockery\MockInterface;
+use RuntimeException;
 use Tests\TestCase;
 
 class DownloadLinksTest extends TestCase
@@ -156,8 +157,14 @@ class DownloadLinksTest extends TestCase
 
         $response
             ->assertGone()
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'Download link is no longer available.');
+            ->assertViewIs('downloads.unavailable')
+            ->assertSee('Download expired')
+            ->assertSee('This download link has expired.')
+            ->assertSee($downloadLink->original_filename)
+            ->assertSee('Expired on')
+            ->assertSee('datetime="'.$downloadLink->expires_at->toISOString().'"', false)
+            ->assertSee('new Intl.DateTimeFormat(undefined', false)
+            ->assertDontSee($downloadLink->storage_key);
 
         $this->assertDatabaseHas('download_accesses', [
             'download_link_id' => $downloadLink->id,
@@ -171,19 +178,61 @@ class DownloadLinksTest extends TestCase
         $token = Str::random(64);
         $downloadLink = DownloadLink::factory()->revoked()->create([
             'token_hash' => hash('sha256', $token),
+            'revoke_reason' => 'Internal administrative reason.',
         ]);
 
         $response = $this->get('/download/'.$token);
 
         $response
             ->assertGone()
-            ->assertJsonPath('success', false)
-            ->assertJsonPath('message', 'Download link is no longer available.');
+            ->assertViewIs('downloads.unavailable')
+            ->assertSee('This download link is no longer available.')
+            ->assertSee('Download unavailable')
+            ->assertSee($downloadLink->original_filename)
+            ->assertDontSee($downloadLink->revoke_reason);
 
         $this->assertDatabaseHas('download_accesses', [
             'download_link_id' => $downloadLink->id,
             'was_successful' => false,
             'failure_reason' => 'revoked',
+        ]);
+    }
+
+    public function test_unknown_link_renders_safe_public_failure_page(): void
+    {
+        $this->get('/download/'.Str::random(64))
+            ->assertNotFound()
+            ->assertViewIs('downloads.unavailable')
+            ->assertSee('Incorrect download link')
+            ->assertSee('This link does not exist. Check that the complete link was copied correctly.')
+            ->assertDontSee('<h1>Download unavailable</h1>', false);
+    }
+
+    public function test_signing_failure_renders_temporary_public_failure_page(): void
+    {
+        $token = Str::random(64);
+        $downloadLink = DownloadLink::factory()->create([
+            'token_hash' => hash('sha256', $token),
+        ]);
+
+        $this->mock(DownloadUrlSigner::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('signedUrl')
+                ->once()
+                ->andThrow(new RuntimeException('Signing failed.'));
+        });
+
+        $this->get('/download/'.$token)
+            ->assertServiceUnavailable()
+            ->assertViewIs('downloads.unavailable')
+            ->assertSee('Download temporarily unavailable')
+            ->assertSee('This download is temporarily unavailable. Please try again later.')
+            ->assertSee($downloadLink->original_filename)
+            ->assertDontSee('Signing failed.');
+
+        $this->assertDatabaseHas('download_accesses', [
+            'download_link_id' => $downloadLink->id,
+            'was_successful' => false,
+            'failure_reason' => 'signing_failed',
         ]);
     }
 

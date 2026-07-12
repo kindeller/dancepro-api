@@ -5,10 +5,9 @@ namespace App\Features\Downloads\Actions;
 use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Downloads\Services\DownloadUrlSigner;
 use App\Features\Downloads\Support\DownloadLinkStatus;
-use App\Shared\Responses\ApiResponse;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -19,20 +18,29 @@ class ResolveDownloadLink
         private readonly RecordDownloadAccess $recordDownloadAccess,
     ) {}
 
-    public function handle(string $token, Request $request): RedirectResponse|JsonResponse
+    public function handle(string $token, Request $request): RedirectResponse|Response
     {
         $downloadLink = DownloadLink::query()
             ->where('token_hash', hash('sha256', $token))
             ->first();
 
         if (! $downloadLink) {
-            return ApiResponse::error('Download link not found or expired.', status: 404);
+            return $this->unavailable(
+                'Invalid download',
+                'This link does not exist. Check that the complete link was copied correctly.',
+                404,
+            );
         }
 
         if ($downloadLink->isRevoked()) {
             $this->recordDownloadAccess->handle($downloadLink, $request, false, 'revoked');
 
-            return ApiResponse::error('Download link is no longer available.', status: 410);
+            return $this->unavailable(
+                'Download unavailable',
+                'This download link is no longer available.',
+                410,
+                $downloadLink->original_filename,
+            );
         }
 
         if ($downloadLink->isExpired()) {
@@ -42,7 +50,13 @@ class ResolveDownloadLink
 
             $this->recordDownloadAccess->handle($downloadLink, $request, false, 'expired');
 
-            return ApiResponse::error('Download link is no longer available.', status: 410);
+            return $this->unavailable(
+                'Download expired',
+                'This download link has expired.',
+                410,
+                $downloadLink->original_filename,
+                $downloadLink->expires_at?->toISOString(),
+            );
         }
 
         try {
@@ -50,7 +64,12 @@ class ResolveDownloadLink
         } catch (Throwable) {
             $this->recordDownloadAccess->handle($downloadLink, $request, false, 'signing_failed');
 
-            return ApiResponse::error('Download link is temporarily unavailable.', status: 503);
+            return $this->unavailable(
+                'Download temporarily unavailable',
+                'This download is temporarily unavailable. Please try again later.',
+                503,
+                $downloadLink->original_filename,
+            );
         }
 
         DB::transaction(function () use ($downloadLink, $request): void {
@@ -66,5 +85,20 @@ class ResolveDownloadLink
         });
 
         return redirect()->away($signedUrl);
+    }
+
+    private function unavailable(
+        string $heading,
+        string $message,
+        int $status,
+        ?string $filename = null,
+        ?string $expiresAt = null,
+    ): Response {
+        return response()->view('downloads.unavailable', [
+            'heading' => $heading,
+            'message' => $message,
+            'filename' => $filename,
+            'expiresAt' => $expiresAt,
+        ], $status);
     }
 }

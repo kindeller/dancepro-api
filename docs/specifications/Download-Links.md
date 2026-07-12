@@ -86,8 +86,13 @@ Behaviour:
 
 - Hash the incoming token.
 - Find `download_links.token_hash`.
-- Return a safe 404 response if no link exists.
-- Return a safe 410 response and log access if the link is expired or revoked.
+- Render a safe public HTML failure page with a 404 status if no link exists.
+- Render the public failure page with a 410 status and log access if the link is
+  expired or revoked. Known links may show their original filename, but never
+  their storage key or internal metadata. Expired-link pages show the expiry
+  timestamp formatted in the visitor's browser timezone.
+- Render the public failure page with a 503 status if a signed URL cannot be
+  generated.
 - For a valid link, update first/last opened timestamps, increment
   `download_count`, create a successful `download_accesses` row, generate a
   short-lived signed URL, and redirect.
