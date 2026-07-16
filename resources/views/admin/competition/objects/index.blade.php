@@ -84,7 +84,7 @@
                 data-loaded-count="{{ count($objects['directories']) + count($objects['files']) }}"
             >
                 @forelse ($objects['directories'] as $directory)
-                    <tr>
+                    <tr data-object-type="directory" data-object-key="{{ $directory['prefix'] }}">
                         <td>
                             <a href="{{ route('admin.competition.objects.index', ['prefix' => $directory['prefix']]) }}">{{ $directory['name'] }}</a>
                         </td>
@@ -97,7 +97,7 @@
                 @endforelse
 
                 @forelse ($objects['files'] as $file)
-                    <tr class="selectable-row" data-storage-key="{{ $file['key'] }}">
+                    <tr class="selectable-row" data-object-type="file" data-object-key="{{ $file['key'] }}" data-storage-key="{{ $file['key'] }}">
                         <td>
                             @if ($file['console_url'])
                                 <a href="{{ $file['console_url'] }}" target="_blank" rel="noopener noreferrer" title="Open {{ $file['key'] }} in the AWS Console">{{ $file['name'] }}</a>
@@ -158,6 +158,10 @@
             }
 
             const selectionStorageKey = 'dancepro.competition.selected-objects';
+            const objectKeyCollator = new Intl.Collator(undefined, {
+                numeric: true,
+                sensitivity: 'base',
+            });
 
             const readSelection = () => {
                 try {
@@ -305,6 +309,26 @@
                 updateSelection();
             };
 
+            const sortObjects = () => {
+                const rows = [...body.querySelectorAll('tr[data-object-key]')];
+
+                rows.sort((left, right) => {
+                    const typeOrder = (left.dataset.objectType === 'directory' ? 0 : 1)
+                        - (right.dataset.objectType === 'directory' ? 0 : 1);
+
+                    if (typeOrder !== 0) {
+                        return typeOrder;
+                    }
+
+                    return objectKeyCollator.compare(
+                        left.dataset.objectKey || '',
+                        right.dataset.objectKey || '',
+                    );
+                });
+
+                rows.forEach((row) => body.append(row));
+            };
+
             const appendDirectory = (directory) => {
                 const url = new URL(window.location.href);
                 url.searchParams.set('prefix', directory.prefix);
@@ -312,7 +336,7 @@
                 url.searchParams.delete('continuation_token');
 
                 body.insertAdjacentHTML('beforeend', `
-                    <tr>
+                    <tr data-object-type="directory" data-object-key="${escapeHtml(directory.prefix)}">
                         <td><a href="${escapeHtml(url.toString())}">${escapeHtml(directory.name)}</a></td>
                         <td><span class="badge">folder</span></td>
                         <td class="muted">-</td>
@@ -336,7 +360,7 @@
                     : 'Unknown';
 
                 body.insertAdjacentHTML('beforeend', `
-                    <tr class="selectable-row" data-storage-key="${escapeHtml(file.key)}">
+                    <tr class="selectable-row" data-object-type="file" data-object-key="${escapeHtml(file.key)}" data-storage-key="${escapeHtml(file.key)}">
                         <td>${name}</td>
                         <td><span class="badge">${escapeHtml(extension)}</span></td>
                         <td title="${escapeHtml(sizeTitle)}">${escapeHtml(size)}</td>
@@ -353,6 +377,7 @@
 
                 objects.directories.forEach(appendDirectory);
                 objects.files.forEach(appendFile);
+                sortObjects();
 
                 state.loadedCount += objects.directories.length + objects.files.length;
                 state.nextToken = objects.pagination.next_token || '';

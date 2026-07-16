@@ -129,6 +129,9 @@ class CompetitionObjectsTest extends TestCase
             ->assertSee('data-storage-key="competition-a/video-2.mp4"', false)
             ->assertSee('Select competition-a/video-2.mp4 for link creation')
             ->assertSee('dancepro.competition.selected-objects')
+            ->assertSee('new Intl.Collator(undefined', false)
+            ->assertSee('numeric: true', false)
+            ->assertSee('sortObjects();', false)
             ->assertSee('Open competition-a/video-2.mp4 in the AWS Console')
             ->assertSee('prefix=competition-a%2Fvideo-2.mp4', false);
     }
