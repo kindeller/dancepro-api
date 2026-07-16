@@ -5,20 +5,57 @@
 ])
 
 @section('content')
-    <div class="toolbar">
-        <form class="filters" method="GET" action="{{ route('admin.competition.objects.index') }}">
-            <label>
-                Prefix
-                <input name="prefix" value="{{ $prefix }}" placeholder="Folder path">
-            </label>
-            <label>
-                Request chunk size
-                <input name="limit" type="number" min="1" max="1000" value="{{ $limit }}">
-            </label>
-            <button type="submit">View</button>
-            <a class="button secondary" href="{{ route('admin.competition.objects.index') }}">Root</a>
-        </form>
+    <style>
+        .competition-browser-toolbar {
+            align-items: center;
+        }
 
+        .competition-file-filter {
+            position: relative;
+            width: min(260px, 100%);
+            margin-left: auto;
+        }
+
+        .competition-file-filter input {
+            min-height: 40px;
+            padding: 8px 38px;
+        }
+
+        .competition-file-filter input::-webkit-search-cancel-button {
+            display: none;
+        }
+
+        .competition-file-filter .search-icon {
+            position: absolute;
+            top: 50%;
+            left: 12px;
+            width: 17px;
+            height: 17px;
+            color: var(--muted);
+            pointer-events: none;
+            transform: translateY(-50%);
+        }
+
+        .competition-file-filter .clear-filter {
+            position: absolute;
+            top: 50%;
+            right: 5px;
+            width: 30px;
+            min-height: 30px;
+            border: 0;
+            background: transparent;
+            color: var(--muted);
+            padding: 0;
+            transform: translateY(-50%);
+        }
+
+        .competition-file-filter .clear-filter:hover {
+            background: var(--soft);
+            color: var(--brand-strong);
+        }
+    </style>
+
+    <div class="toolbar competition-browser-toolbar">
         <a
             id="create-links-from-selection"
             class="button secondary"
@@ -26,6 +63,30 @@
         >
             Create links <span id="competition-selection-count"></span>
         </a>
+
+        <div class="competition-file-filter" role="search">
+            <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"></circle>
+                <path d="m16 16 5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+            </svg>
+            <input
+                id="competition-file-filter"
+                type="search"
+                placeholder="Filter files"
+                aria-label="Filter files"
+                autocomplete="off"
+            >
+            <button
+                id="competition-file-filter-clear"
+                class="clear-filter"
+                type="button"
+                aria-label="Clear file filter"
+                title="Clear filter"
+                hidden
+            >
+                &times;
+            </button>
+        </div>
     </div>
 
     @if ($objects['breadcrumbs'] !== [])
@@ -152,8 +213,10 @@
             const completeStatus = document.getElementById('competition-objects-complete-status');
             const continueButton = document.getElementById('competition-objects-continue');
             const selectionCount = document.getElementById('competition-selection-count');
+            const fileFilter = document.getElementById('competition-file-filter');
+            const clearFileFilter = document.getElementById('competition-file-filter-clear');
 
-            if (!body || !card || !loadingPanel || !loadingIndicator || !loadingStatus || !completePanel || !completeStatus || !continueButton || !selectionCount) {
+            if (!body || !card || !loadingPanel || !loadingIndicator || !loadingStatus || !completePanel || !completeStatus || !continueButton || !selectionCount || !fileFilter || !clearFileFilter) {
                 return;
             }
 
@@ -187,6 +250,89 @@
             };
 
             const formatCount = (value) => new Intl.NumberFormat().format(value);
+            const tokenize = (value) => String(value ?? '')
+                .toLocaleLowerCase()
+                .split(/[^a-z0-9]+/)
+                .filter(Boolean);
+
+            const numericToken = (value) => {
+                const match = value.match(/^0*(\d+)([a-z]*)$/);
+
+                if (!match) {
+                    return null;
+                }
+
+                return {
+                    number: Number.parseInt(match[1], 10),
+                    suffix: match[2],
+                };
+            };
+
+            const tokenMatches = (fileToken, queryToken) => {
+                const numericQuery = numericToken(queryToken);
+
+                if (!numericQuery) {
+                    return fileToken.includes(queryToken);
+                }
+
+                const numericFile = numericToken(fileToken);
+
+                return numericFile !== null
+                    && numericFile.number === numericQuery.number
+                    && (numericQuery.suffix === '' || numericFile.suffix === numericQuery.suffix);
+            };
+
+            const fileMatches = (key, queryTokens) => {
+                if (queryTokens.length === 0) {
+                    return true;
+                }
+
+                const filename = String(key ?? '').split('/').pop() || '';
+                const fileTokens = tokenize(filename);
+
+                if (queryTokens.length === 1) {
+                    return fileTokens.some((fileToken) => tokenMatches(fileToken, queryTokens[0]));
+                }
+
+                return fileTokens.some((fileToken, startIndex) => queryTokens.every(
+                    (queryToken, offset) => fileTokens[startIndex + offset] !== undefined
+                        && tokenMatches(fileTokens[startIndex + offset], queryToken),
+                ));
+            };
+
+            const applyFileFilter = () => {
+                const queryTokens = tokenize(fileFilter.value);
+                const storageEmpty = document.getElementById('competition-objects-empty');
+                let visibleFiles = 0;
+
+                document.getElementById('competition-file-filter-empty')?.remove();
+                clearFileFilter.hidden = fileFilter.value.length === 0;
+
+                if (storageEmpty) {
+                    storageEmpty.hidden = queryTokens.length > 0;
+                }
+
+                body.querySelectorAll('tr[data-object-key]').forEach((row) => {
+                    const isFile = row.dataset.objectType === 'file';
+                    const isVisible = isFile
+                        ? fileMatches(row.dataset.objectKey, queryTokens)
+                        : queryTokens.length === 0;
+
+                    row.hidden = !isVisible;
+
+                    if (isFile && isVisible) {
+                        visibleFiles += 1;
+                    }
+                });
+
+                if (queryTokens.length > 0 && visibleFiles === 0) {
+                    body.insertAdjacentHTML('beforeend', `
+                        <tr id="competition-file-filter-empty">
+                            <td colspan="5" class="muted">No files match this filter.</td>
+                        </tr>
+                    `);
+                }
+            };
 
             const formatFileSize = (bytes) => {
                 if (bytes === null || bytes === undefined) {
@@ -378,6 +524,7 @@
                 objects.directories.forEach(appendDirectory);
                 objects.files.forEach(appendFile);
                 sortObjects();
+                applyFileFilter();
 
                 state.loadedCount += objects.directories.length + objects.files.length;
                 state.nextToken = objects.pagination.next_token || '';
@@ -439,6 +586,13 @@
                 loadNextChunk();
             });
 
+            fileFilter.addEventListener('input', applyFileFilter);
+            clearFileFilter.addEventListener('click', () => {
+                fileFilter.value = '';
+                applyFileFilter();
+                fileFilter.focus();
+            });
+
             body.addEventListener('click', (event) => {
                 const row = event.target.closest('.selectable-row');
 
@@ -456,6 +610,7 @@
 
             updateSelection();
             localizeDateTimes();
+            applyFileFilter();
             updateStatus();
             window.setTimeout(() => loadNextChunk(), 0);
         })();
