@@ -19,7 +19,7 @@
 #   - supports a non-destructive --dry-run mode
 #   - creates a timestamped rollback tag
 #   - logs the complete deployment
-#   - enters Laravel maintenance mode
+#   - enters Laravel maintenance mode using a pre-rendered maintenance page
 #   - performs a fast-forward-only update
 #   - installs locked production dependencies when Composer files changed
 #   - reviews and optionally runs pending migrations
@@ -134,7 +134,7 @@ print_rollback_instructions() {
 Rollback commands:
 
   cd "$APP_DIR"
-  php artisan down --retry=60
+  php artisan down --render="errors.503"
   git reset --hard "$ROLLBACK_TAG"
   composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
   php artisan optimize:clear
@@ -329,7 +329,7 @@ git tag "$ROLLBACK_TAG" "$CURRENT_COMMIT"
 printf 'Created local rollback tag: %s -> %s\n' "$ROLLBACK_TAG" "$CURRENT_COMMIT"
 
 log "Enable maintenance mode"
-php artisan down --retry=60
+php artisan down --render="errors.503"
 DEPLOY_STARTED=true
 
 log "Update production branch"
@@ -449,7 +449,7 @@ for ((attempt=1; attempt<=HEALTHCHECK_ATTEMPTS; attempt++)); do
 done
 
 if [[ "$HEALTHCHECK_OK" != true ]]; then
-    php artisan down --retry=60
+    php artisan down --render="errors.503"
     fail "Health check failed. The application was returned to maintenance mode."
 fi
 
