@@ -239,6 +239,40 @@ manifests/
 
 A readable slug may be included, but the immutable UUID should remain part of the path.
 
+
+
+## 4.4 Concert media storage convention
+
+Concert media is storage-derived by default.
+
+A concert stores only:
+
+- `storage_disk`
+- `storage_prefix`
+
+The application assumes the following folder convention beneath the concert prefix:
+
+```text
+videos/original/
+videos/streaming/
+photos/
+```
+
+The database does not require individual rows for videos or photos simply because they exist in S3.
+
+`media_assets` are created only when a file requires durable business identity, for example:
+
+- Orders
+- Favourites
+- Custom metadata
+- Manual visibility control
+- Archive tracking
+- Processing state
+- Stable external references
+
+Original and streaming videos are not modelled as separate database collections or assets by default. Their relationship is inferred from the agreed folder structure and filename conventions.
+
+
 ## 4.3 Storage identity
 
 A physical S3 object is identified by:
@@ -580,8 +614,9 @@ Meaning:
 Initial recommendation:
 
 ```text
-Videos: managed or hybrid
-Photos: storage or hybrid
+Concert media: storage by default
+Competition media: storage by default
+Managed or hybrid mode: only when individual files require database-managed identity
 ```
 
 ## 8.7 Visibility values
@@ -1776,9 +1811,9 @@ The agreed design is:
 5. Both buckets may contain photos and videos.
 6. Every meaningful gallery or folder has a `media_collections` record.
 7. Not every S3 photo requires a database row.
-8. Videos will usually be represented by `media_assets`.
-9. Photos may remain storage-derived until individually managed.
-10. Purchased or otherwise important photos are promoted into `media_assets`.
+8. Videos and photos are storage-derived by default.
+9. Individual files are promoted into `media_assets` only when they require durable business identity.
+10. Purchased or otherwise important media is promoted into `media_assets`.
 11. A media asset UUID is the durable logical identity.
 12. A media asset stores its current physical location.
 13. An order item stores both the media asset relationship and a historical location snapshot.
