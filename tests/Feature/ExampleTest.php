@@ -2,18 +2,17 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * The public homepage is the studio discovery experience.
      */
     public function test_the_application_returns_a_successful_response(): void
     {
-        $response = $this->get('/');
-
-        $response->assertRedirect('/admin');
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Find your dance studio.');
     }
 }

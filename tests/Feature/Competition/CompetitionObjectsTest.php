@@ -122,7 +122,7 @@ class CompetitionObjectsTest extends TestCase
             ->assertDontSee('state.softCap', false)
             ->assertSee('placeholder="Filter files"', false)
             ->assertSee('aria-label="Clear file filter"', false)
-            ->assertSee(".split(/[^a-z0-9]+/)", false)
+            ->assertSee('.split(/[^a-z0-9]+/)', false)
             ->assertSee('fileMatches(row.dataset.objectKey, queryTokens)', false)
             ->assertSee('routines')
             ->assertSee('video-2.mp4')

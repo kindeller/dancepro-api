@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Features\Customers\Support\UserType;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -53,5 +54,15 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'is_active' => false,
         ]);
+    }
+
+    public function staff(): static
+    {
+        return $this->state(fn () => ['type' => UserType::Staff->value]);
+    }
+
+    public function customer(): static
+    {
+        return $this->state(fn () => ['type' => UserType::Customer->value]);
     }
 }

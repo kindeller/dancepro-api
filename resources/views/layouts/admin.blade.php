@@ -210,6 +210,13 @@
             gap: 10px;
         }
 
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+        }
+
         label {
             display: grid;
             gap: 6px;
@@ -489,6 +496,12 @@
 
             <nav class="nav" aria-label="Admin navigation">
                 <a href="{{ route('admin.dashboard') }}" @if(request()->routeIs('admin.dashboard')) aria-current="page" @endif>Dashboard</a>
+                @can('manageStudios')
+                    <a href="{{ route('admin.studios.index') }}" @if(request()->routeIs('admin.studios.*')) aria-current="page" @endif>Studios</a>
+                @endcan
+                @can('manageConcerts')
+                    <a href="{{ route('admin.concerts.index') }}" @if(request()->routeIs('admin.concerts.*')) aria-current="page" @endif>Concerts</a>
+                @endcan
                 <a href="{{ route('admin.competition.objects.index') }}" @if(request()->routeIs('admin.competition.objects.index')) aria-current="page" @endif>Competition Objects</a>
                 <a href="{{ route('admin.download-links.index') }}" @if(request()->routeIs('admin.download-links.index', 'admin.download-links.show')) aria-current="page" @endif>Download Links</a>
                 <a href="{{ route('admin.download-links.create') }}" @if(request()->routeIs('admin.download-links.create')) aria-current="page" @endif>Create Links</a>

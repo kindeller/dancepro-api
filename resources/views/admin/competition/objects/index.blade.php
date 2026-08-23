@@ -167,7 +167,7 @@
                             @endif
                         </td>
                         <td><span class="badge">{{ $file['extension'] ?: 'file' }}</span></td>
-                        <td title="{{ $file['size'] === null ? '' : number_format($file['size']).' bytes' }}">{{ $file['size'] === null ? 'Unknown' : Illuminate\Support\Number::fileSize($file['size'], precision: 2) }}</td>
+                        <td title="{{ $file['size'] === null ? '' : number_format($file['size']).' bytes' }}">{{ $file['size'] === null ? 'Unknown' : Illuminate\Support\Number::fileSize($file['size'], precision: 0) }}</td>
                         <td>
                             @if ($file['last_modified'])
                                 <time datetime="{{ $file['last_modified'] }}">{{ $file['last_modified'] }}</time>

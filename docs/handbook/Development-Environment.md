@@ -29,6 +29,23 @@ sail pint
 Avoid bare `php artisan`, `composer`, or `vendor/bin/pint` commands unless
 explicitly working inside the Sail container.
 
+## Local Demonstration Data
+
+After running migrations, seed the opt-in fictional development dataset with:
+
+```bash
+sail artisan db:seed --class='Database\Seeders\LocalDevelopmentSeeder'
+```
+
+The seeder refuses to run unless `APP_ENV=local`. It is not called by
+`DatabaseSeeder`, does not require S3, and uses the private `local` disk for
+placeholder media files. It updates its deterministic demonstration records
+when run again instead of continually adding duplicates.
+
+Fictional local accounts use `local-demo-password`. The protected “Paper Wings”
+concert uses `paper-wings-demo`. These credentials are for local development
+only and must not be reused in a deployed environment.
+
 Before finalising a task, complete the project Definition of Done and follow
 the local approval-gated commit workflow in [Git Workflow](Git-Workflow.md).
 

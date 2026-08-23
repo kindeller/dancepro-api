@@ -2,8 +2,13 @@
 
 use App\Features\Auth\Controllers\AuthController;
 use App\Features\Competition\Controllers\CompetitionObjectController;
+use App\Features\Concerts\Controllers\PublicConcertApiController;
 use App\Features\Downloads\Controllers\DownloadLinkController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('studios', [PublicConcertApiController::class, 'studios']);
+Route::get('studios/{studio}', [PublicConcertApiController::class, 'studio']);
+Route::get('concerts/{concert}', [PublicConcertApiController::class, 'concert']);
 
 Route::prefix('auth')->group(function (): void {
     Route::post('login', [AuthController::class, 'login']);

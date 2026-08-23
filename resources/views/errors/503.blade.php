@@ -228,7 +228,7 @@
                 <p class="intro">
                     DancePro is temporarily unavailable while we carry out scheduled maintenance.
                     <strong>This maintenance window should last no longer than 30 minutes.</strong>
-                    Please check back soon.
+                    Please check back soon. There’s no need to contact us during this window.
                 </p>
 
                 <div class="actions">

@@ -2,7 +2,11 @@
 
 namespace App\Features\Downloads\Models;
 
+use App\Features\Concerts\Models\Concert;
 use App\Features\Downloads\Support\DownloadLinkStatus;
+use App\Features\Media\Models\MediaAsset;
+use App\Features\Media\Models\MediaCollection;
+use App\Features\Orders\Models\OrderItem;
 use App\Models\User;
 use Database\Factories\DownloadLinkFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -15,6 +19,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable([
     'uuid',
     'generated_by_user_id',
+    'concert_id',
+    'media_collection_id',
+    'media_asset_id',
+    'order_item_id',
     'storage_disk',
     'storage_key',
     'original_filename',
@@ -65,6 +73,26 @@ class DownloadLink extends Model
     public function accesses(): HasMany
     {
         return $this->hasMany(DownloadAccess::class);
+    }
+
+    public function concert(): BelongsTo
+    {
+        return $this->belongsTo(Concert::class);
+    }
+
+    public function mediaCollection(): BelongsTo
+    {
+        return $this->belongsTo(MediaCollection::class);
+    }
+
+    public function mediaAsset(): BelongsTo
+    {
+        return $this->belongsTo(MediaAsset::class);
+    }
+
+    public function orderItem(): BelongsTo
+    {
+        return $this->belongsTo(OrderItem::class);
     }
 
     public function isRevoked(): bool

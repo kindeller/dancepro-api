@@ -62,6 +62,8 @@ Current specifications:
 - [Authentication](specifications/Authentication.md)
 - [Download Links](specifications/Download-Links.md)
 - [Competition Downloads](specifications/Competition-Downloads.md)
+- [DancePro V2 Functional Specification](specifications/DancePro-V2-Functional-Specification.md)
+- [Concerts and Media Database Migration](specifications/DancePro-V2-Concerts-Media-Database-Migration-Spec.md)
 
 ## Milestones
 
