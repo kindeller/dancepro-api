@@ -373,3 +373,58 @@ Build a platform that is:
 -   Easy to extend
 
 Every feature should leave the project cleaner than it was before.
+
+------------------------------------------------------------------------
+
+# AWS Guidance
+
+-   Prefer the AWS MCP Server for AWS interactions — it provides sandboxed
+    execution, observability, and audit logging. If unavailable, use the
+    AWS CLI directly.
+-   Before starting a task, check whether a relevant AWS skill is available.
+    Load the skill with `retrieve_skill` and prefer its guidance over
+    general knowledge.
+-   When uncertain about specific AWS details (API parameters, permissions,
+    limits, error codes), verify against documentation rather than guessing.
+    State uncertainty explicitly if you cannot confirm.
+-   When creating infrastructure, prefer infrastructure-as-code (AWS CDK or
+    CloudFormation) over direct CLI commands.
+-   When working with infrastructure, follow AWS Well-Architected Framework
+    principles.
+-   Do not use em dashes in AWS resource names or descriptions. Use
+    hyphens instead.
+
+## Secret Safety
+
+-   MUST load the `aws-secrets-manager` skill first for any secret,
+    credential, API key, token, or password task. MUST NOT call
+    `secretsmanager get-secret-value` or `batch-get-secret-value`, and MUST
+    NOT hit the Secrets Manager Agent daemon directly. MUST use
+    `{{resolve:secretsmanager:secret-id:SecretString:json-key}}` with
+    `asm-exec` so the secret resolves at runtime without entering context.
+
+## S3 Destructive Action Safety
+
+-   Treat all S3 data, object versions, delete markers, buckets, access points,
+    policies, lifecycle rules, and replication configuration as protected from
+    deletion by default.
+-   Never run an S3 delete operation, or attempt one to test permissions,
+    unless the user has specifically requested deletion of an exact target.
+-   An initial deletion request is not confirmation. Before taking any delete
+    action, show the exact bucket, object key or other resource, version ID when
+    applicable, number of affected items, and recovery implications. Then ask
+    for a separate explicit confirmation and wait for the user's response.
+-   Do not run delete-capable AWS CLI commands for exploration, validation,
+    troubleshooting, or cleanup. This includes `aws s3 rm`,
+    `aws s3 rb`, `aws s3api delete-object`, `delete-objects`,
+    `delete-bucket`, and commands that remove versions or delete markers.
+-   Even after confirmation, do not use recursive deletion, wildcards, broad
+    prefixes, unresolved variables, or bulk deletion unless the user has
+    explicitly approved the fully enumerated targets and item count.
+-   Prefer a recoverable approach when one exists. Never disable or bypass S3
+    Versioning, Object Lock, retention, legal holds, MFA Delete, or another
+    protection in order to perform a deletion.
+-   Treat IAM denial of S3 deletion as an additional security boundary. Never
+    modify IAM, bucket policies, permission boundaries, service control
+    policies, or resource protections to gain deletion access unless the user
+    separately and explicitly requests that exact permissions change.
