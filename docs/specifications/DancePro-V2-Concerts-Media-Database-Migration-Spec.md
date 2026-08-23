@@ -12,6 +12,37 @@ This document defines the proposed database structure and migration approach for
 - Concert access tracking
 - Optional saved concert access
 - Future carts, orders and individual photo purchases
+
+## Current Implementation Status
+
+The additive database foundation described by this specification has been
+implemented for studios, concerts, media collections, media assets, media asset
+locations, customer profiles, concert access grants, concert accesses, orders,
+order items and download-link relationships. Models, enums, factories, local
+demonstration data and domain tests are present.
+
+The following application behavior is also implemented:
+
+- Public studio and concert discovery.
+- Concert approval, publication, availability and password controls.
+- Password and student-name session access with attempt logging.
+- Ordered managed-video playback and automatic next-item playback.
+- Basic staff studio and concert administration.
+- Read-only competition object browsing and generic tracked downloads.
+
+The next implementation work is not another schema expansion. It is the
+production-readiness layer around the existing Concert domain:
+
+- Staff collection and managed-asset administration.
+- Storage-derived concert object listing within collection boundaries.
+- Program and cover-image management.
+- Short-lived S3 or CloudFront playback with byte-range support.
+- Concert originals delivered through the generic Downloads bounded context.
+- Operational authorization, testing and deployment documentation.
+
+Orders and customer account workflows remain scaffolded or future work. Their
+existing design remains in this specification, but they are not part of the
+current Concert production-readiness milestone.
 - Durable media location tracking
 
 The immediate priority is to establish a stable database design that can be implemented and tested locally before the customer-facing behaviour is finalised.

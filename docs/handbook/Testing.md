@@ -6,8 +6,15 @@ Define testing expectations for DancePro V2 development.
 
 ## Current Status
 
-Feature tests should cover API behaviour for new features where practical.
-Authentication has the initial baseline test focus.
+Feature tests cover authentication, user access, generic download links and
+signing, Competition object browsing, the Concert/media domain, public Concert
+access, staff studio/concert management, local demonstration data and
+maintenance behavior.
+
+Browser playback has also been manually checked on desktop and mobile across
+multiple browsers. The current playlist advances automatically without closing
+the active player. Production-like S3 or CloudFront delivery still requires
+separate playback, seeking and failure-state validation.
 
 ## Scope
 
@@ -30,6 +37,21 @@ Initial baseline coverage should include:
 - Inactive users cannot log in.
 - Authenticated users can call `/api/auth/me`.
 - Unauthenticated users cannot access protected routes.
+
+Current Concert production-readiness coverage should include:
+
+- Staff media collection and asset authorization and validation.
+- Submitted object keys cannot escape the configured collection prefix.
+- Missing storage objects are handled safely.
+- Playback authorization produces only short-lived signed delivery.
+- Production media responses support byte-range seeking.
+- Concert originals use tracked download links with expiry, revocation and
+  access logging.
+- Program and cover upload validation.
+- Existing password, approval, availability, playlist and download behavior
+  does not regress.
+- Manual desktop and mobile checks for playback, seeking, fullscreen item
+  transitions, final-item behavior and delivery failures.
 
 ## Links to Related Documentation
 

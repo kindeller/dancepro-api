@@ -25,6 +25,11 @@ The public URL returned to clients is always a Laravel URL:
 Opening that URL records an access attempt, validates the link, generates a
 short-lived CloudFront or S3 signed URL, and redirects the user to the asset.
 
+Competition link creation currently consumes this workflow. Concert media has
+the required nullable relationships on download links, but the public Concert
+page still uses direct Laravel filesystem downloads. Connecting Concert
+originals to Downloads is part of the Concert production-readiness milestone.
+
 ## Future Scope
 
 Future bounded contexts should consume Downloads instead of reimplementing file

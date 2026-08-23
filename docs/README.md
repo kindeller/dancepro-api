@@ -26,6 +26,8 @@ deployment, security, testing, brand style, and git workflow.
 Start with:
 
 - [Development Environment](handbook/Development-Environment.md)
+- [Remote Development](handbook/Remote-Development.md)
+- [Remote Development Cheat Sheet](handbook/Remote-Development-Cheat-Sheet.md)
 - [Git Workflow](handbook/Git-Workflow.md)
 - [Architecture](handbook/Architecture.md)
 - [API Guidelines](handbook/API-Guidelines.md)
@@ -77,6 +79,7 @@ Current milestones:
 
 - [Milestone 01 - Foundation](milestones/Milestone-01-Foundation.md)
 - [Milestone 02 - Competition](milestones/Milestone-02-Competition.md)
+- [Milestone 03 - Concert Production Readiness](milestones/Milestone-03-Concert-Production-Readiness.md)
 
 ## Decisions
 

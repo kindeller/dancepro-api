@@ -6,6 +6,35 @@ This document defines the functional behaviour of DancePro V2. It describes the 
 
 The objective is to define **what the system should do**, allowing the underlying implementation to evolve while preserving the customer experience.
 
+## Implementation Status
+
+The following MVP customer behavior is implemented:
+
+- Public studio and released-concert browsing.
+- Approval, enabled/disabled and availability controls.
+- Password and student-name access with session unlocks and attempt logging.
+- Ordered concert video playback with automatic next-item playback.
+- Optional program and external-gallery links with unavailable states.
+- Individual downloads and a browser-driven bulk-download manager.
+- Staff creation and editing of studios and concerts.
+- Local demonstration media for workflow testing.
+
+Automatic next-item playback has been manually validated on desktop and mobile
+across multiple browsers and retains the active player during the transition.
+
+The current production-readiness work is limited to finishing existing MVP
+operations:
+
+- Move concert playback and originals to authorised, short-lived S3 or
+  CloudFront delivery.
+- Use database-backed Downloads tracking for concert originals.
+- Add staff media collection, asset, program and cover management.
+- Complete playback error states, thumbnails, authorization, production
+  configuration and verification.
+
+Customer accounts, ordering and payments remain future capabilities and are not
+required to make the current anonymous Concert experience operational.
+
 ---
 
 # Vision
@@ -224,6 +253,10 @@ The initial implementation should provide:
 - Seeded/local media support
 
 Object storage, streaming generation and CDN integration may be introduced after the functional workflows are complete.
+
+The functional workflows are now sufficiently established to begin the object
+storage and CDN alignment. This work is tracked by
+[Milestone 03 - Concert Production Readiness](../milestones/Milestone-03-Concert-Production-Readiness.md).
 
 ---
 

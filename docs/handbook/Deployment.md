@@ -117,7 +117,9 @@ Laravel should access configuration using the `config()` helper.
 
 The production environment requires valid AWS credentials.
 
-Competition storage currently uses the `s3_competitions` filesystem disk.
+Competition storage uses the `s3_competitions` filesystem disk. Concert media
+uses `s3_concerts`. Production credentials should be scoped to the required
+bucket and operations for each domain.
 
 The following values must be configured:
 
@@ -130,7 +132,21 @@ AWS_COMPETITIONS_ACCESS_KEY_ID
 AWS_COMPETITIONS_SECRET_ACCESS_KEY
 AWS_COMPETITIONS_DEFAULT_REGION
 AWS_COMPETITIONS_BUCKET
+
+AWS_CONCERT_ACCESS_KEY_ID
+AWS_CONCERT_SECRET_ACCESS_KEY
+AWS_CONCERT_DEFAULT_REGION
+AWS_CONCERT_BUCKET
+
+DOWNLOAD_ALLOWED_DISKS
+DOWNLOAD_DEFAULT_DISK
+DOWNLOAD_SIGNED_URL_TTL_MINUTES
 ```
+
+When CloudFront signing is enabled, production also requires the configured
+distribution domain, key-pair ID and private key or readable private-key path
+described in [AWS](AWS.md). Private-key contents must remain outside source
+control.
 
 The configured region should always resolve to:
 
@@ -157,7 +173,7 @@ Verify:
 - Correct database connection
 - Correct filesystem configuration
 
-Check the competition storage disk:
+Check both storage disks:
 
 ```bash
 php artisan tinker
@@ -165,11 +181,18 @@ php artisan tinker
 
 ```php
 config('filesystems.disks.s3_competitions.region');
+config('filesystems.disks.s3_concerts.region');
 
 Storage::disk('s3_competitions')->directories('');
+Storage::disk('s3_concerts')->directories('');
 ```
 
-The region should resolve correctly and the competition bucket should be accessible.
+The regions should resolve correctly and both configured buckets should be
+accessible with their production credentials.
+
+When CloudFront concert delivery is implemented, also verify that Laravel can
+generate a short-lived playback URL and a short-lived attachment URL without
+logging or displaying private signing material.
 
 ---
 
@@ -180,9 +203,15 @@ Following deployment, verify:
 - Application loads.
 - Authentication succeeds.
 - Competition objects are listed.
-- Competition uploads work.
 - Download links are generated.
 - Downloads complete successfully.
+- Public studios and available concerts are listed.
+- Password-protected concert access succeeds and failed attempts are handled.
+- A concert playlist loads and advances to the next video.
+- Desktop and mobile playback can seek when using the production media path.
+- The player handles an unavailable or expired media URL safely.
+- Concert originals use tracking links and download as attachments.
+- Disabled, unavailable or unapproved concerts remain inaccessible.
 
 ---
 

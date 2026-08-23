@@ -11,6 +11,10 @@ The dashboard uses Laravel session authentication and lives under `/admin`.
 Authenticated active users can:
 
 - view aggregate download-link counts;
+- browse, create and edit studios;
+- browse, create and edit concerts;
+- manage concert approval, publication, availability and password settings;
+- browse Competition storage objects and select files for link creation;
 - browse generated download links;
 - inspect individual link metadata and access history;
 - generate new public tracking URLs for private storage keys;
@@ -27,6 +31,18 @@ are never stored.
 - `POST /login`
 - `POST /logout`
 - `GET /admin`
+- `GET /admin/studios`
+- `GET /admin/studios/create`
+- `POST /admin/studios`
+- `GET /admin/studios/{studio}/edit`
+- `PUT/PATCH /admin/studios/{studio}`
+- `GET /admin/concerts`
+- `GET /admin/concerts/create`
+- `POST /admin/concerts`
+- `GET /admin/concerts/{concert}/edit`
+- `PUT/PATCH /admin/concerts/{concert}`
+- `GET /admin/competitions/objects`
+- `GET /admin/competitions/objects/chunk`
 - `GET /admin/download-links`
 - `GET /admin/download-links/create`
 - `POST /admin/download-links`
@@ -38,3 +54,7 @@ are never stored.
 This is intentionally functional and conservative. Future dashboard work can
 split the UI into richer feature-specific areas once the Competition domain has
 database-backed meaning.
+
+Concert media collections, assets, programs and cover uploads are not yet
+managed through the dashboard. They are part of the Concert production-readiness
+milestone.

@@ -7,8 +7,14 @@ before rebuilding major product capabilities.
 
 ## Current Status
 
-Foundation work is in progress. The Phase 0 foundation plan captures the main
-direction and delivery priorities.
+The initial foundation is substantially implemented. The application uses the
+feature-based structure, shared API responses, Sanctum authentication, a user
+foundation, security defaults, maintained documentation and feature tests.
+
+Remaining foundation work is production hardening carried by the active feature
+milestones rather than a new foundation build. This includes completing the
+security review, expanding authorization where staff responsibilities require
+it, and keeping verification and deployment guidance current.
 
 ## Scope
 
@@ -33,4 +39,5 @@ direction and delivery priorities.
 
 This epic intentionally points to the existing Phase 0 plan rather than
 duplicating it. Keep implementation records in milestones and durable technical
-choices in decisions.
+choices in decisions. The implemented foundation should now be improved as part
+of each product delivery rather than treated as a separate unfinished phase.
