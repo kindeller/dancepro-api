@@ -123,6 +123,7 @@ disk rather than assuming one domain serves every asset.
 
 ## Links to Related Documentation
 
+- [Concert Streaming AWS Setup Handoff](Concert-Streaming-AWS-Setup-Handoff.md)
 - [DancePro V1 S3 Structure](V1-S3-Structure.md)
 - [Competition Downloads Specification](../specifications/Competition-Downloads.md)
 - [Concert Epic](../epics/Concert.md)

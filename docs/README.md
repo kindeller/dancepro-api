@@ -32,6 +32,7 @@ Start with:
 - [Architecture](handbook/Architecture.md)
 - [API Guidelines](handbook/API-Guidelines.md)
 - [DancePro V1 S3 Structure](handbook/V1-S3-Structure.md)
+- [Concert Streaming AWS Setup Handoff](handbook/Concert-Streaming-AWS-Setup-Handoff.md)
 - [Brand Style](handbook/Brand-Style.md)
 - [Security](handbook/Security.md)
 
