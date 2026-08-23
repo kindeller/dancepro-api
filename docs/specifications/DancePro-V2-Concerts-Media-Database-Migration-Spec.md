@@ -210,6 +210,10 @@ download_links
 
 # 4. Storage Strategy
 
+The canonical legacy bucket layout and UUID-to-prefix relationship are recorded
+in the [DancePro V1 S3 Structure](../handbook/V1-S3-Structure.md) handbook
+reference. Use that document when interpreting V1 source keys during migration.
+
 ## 4.1 Laravel disks
 
 Retain separate Laravel storage disks:

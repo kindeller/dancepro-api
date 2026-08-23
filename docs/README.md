@@ -31,6 +31,7 @@ Start with:
 - [Git Workflow](handbook/Git-Workflow.md)
 - [Architecture](handbook/Architecture.md)
 - [API Guidelines](handbook/API-Guidelines.md)
+- [DancePro V1 S3 Structure](handbook/V1-S3-Structure.md)
 - [Brand Style](handbook/Brand-Style.md)
 - [Security](handbook/Security.md)
 

@@ -123,6 +123,7 @@ disk rather than assuming one domain serves every asset.
 
 ## Links to Related Documentation
 
+- [DancePro V1 S3 Structure](V1-S3-Structure.md)
 - [Competition Downloads Specification](../specifications/Competition-Downloads.md)
 - [Concert Epic](../epics/Concert.md)
 - [Milestone 03 - Concert Production Readiness](../milestones/Milestone-03-Concert-Production-Readiness.md)
