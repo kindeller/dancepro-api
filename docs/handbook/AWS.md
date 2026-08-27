@@ -6,14 +6,17 @@ Document stable AWS guidance for DancePro V2 integrations.
 
 ## Current Status
 
-The `s3_competitions` and `s3_concerts` Laravel disks are configured. Competition
-object browsing is implemented, and the generic Downloads bounded context can
-redirect valid tracking links to short-lived S3 or CloudFront URLs.
+The `s3_competitions`, `s3_concerts` and `s3_concerts_legacy` Laravel disks are
+configured. Competition object browsing is implemented, and the generic
+Downloads bounded context can redirect valid tracking links to short-lived S3
+or CloudFront URLs.
 
-Concert playback and original downloads are not yet aligned with that delivery
-boundary. They currently use Laravel filesystem responses. Moving authorised
-playback and concert originals to short-lived S3 or CloudFront delivery is the
-highest-priority AWS work for the current Concert milestone.
+Concert playback now resolves HLS, a progressive streaming fallback and the
+recorded original in that order. The application can issue CloudFront signed
+cookies for HLS after the distribution, trusted key group and signing
+configuration are supplied. Progressive playback and original downloads retain
+their existing Laravel filesystem responses pending the remaining production
+delivery work.
 
 ## Scope
 
@@ -55,15 +58,15 @@ Downloads should allow only the disks that are intended to be exposed through
 tracking links:
 
 ```text
-DOWNLOAD_ALLOWED_DISKS=s3_competitions,s3_concerts
+DOWNLOAD_ALLOWED_DISKS=s3_competitions,s3_concerts,s3_concerts_legacy
 DOWNLOAD_DEFAULT_DISK=s3_competitions
 ```
 
 ## Concert Media Delivery
 
-Concert download links use the `s3_concerts` filesystem disk. This may point at
-the existing general video bucket while giving V2 a clear domain-specific disk
-name.
+New V2 concert media uses the `s3_concerts` filesystem disk backed by the
+dedicated `dance-pro-concerts` bucket. Legacy V1 media uses
+`s3_concerts_legacy`, backed by `dance-pro-videos`.
 
 ```text
 AWS_CONCERT_ACCESS_KEY_ID=
@@ -73,19 +76,47 @@ AWS_CONCERT_BUCKET=
 AWS_CONCERT_URL=
 AWS_CONCERT_ENDPOINT=
 AWS_CONCERT_USE_PATH_STYLE_ENDPOINT=false
+
+AWS_CONCERT_LEGACY_ACCESS_KEY_ID=
+AWS_CONCERT_LEGACY_SECRET_ACCESS_KEY=
+AWS_CONCERT_LEGACY_DEFAULT_REGION=
+AWS_CONCERT_LEGACY_BUCKET=
+AWS_CONCERT_LEGACY_URL=
+AWS_CONCERT_LEGACY_ENDPOINT=
+AWS_CONCERT_LEGACY_USE_PATH_STYLE_ENDPOINT=false
 ```
 
 If the concert-specific access key, secret, or region are not set, the disk
 falls back to the shared `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and
 `AWS_DEFAULT_REGION` values.
 
-### Playback target
+### Playback
 
-The public player must not proxy production video bodies through Laravel.
-Laravel should validate concert availability, asset ownership, visibility and
-the customer's concert access, then redirect to a short-lived signed S3 or
-CloudFront streaming URL. S3 or CloudFront should return the media content and
-handle byte-range requests.
+Laravel validates concert availability, asset ownership, visibility and the
+customer's concert access. It returns an HLS manifest URL with short-lived
+CloudFront signed cookies when HLS delivery is configured. The browser uses
+native HLS or `hls.js` and falls back to the progressive MP4 route after a fatal
+HLS error.
+
+Configure playback using:
+
+```text
+CONCERT_PLAYBACK_SIGNED_URL_TTL_MINUTES=15
+CLOUDFRONT_CONCERT_DOMAIN=
+CLOUDFRONT_CONCERT_KEY_PAIR_ID=
+CLOUDFRONT_CONCERT_PRIVATE_KEY=
+CLOUDFRONT_CONCERT_PRIVATE_KEY_PATH=app/private/keys/dancepro-concerts-private.pem
+CLOUDFRONT_CONCERT_COOKIE_DOMAIN=
+CLOUDFRONT_CONCERT_COOKIE_PATH=/
+CLOUDFRONT_CONCERT_COOKIE_SECURE=true
+CLOUDFRONT_CONCERT_COOKIE_SAME_SITE=lax
+```
+
+For file-based signing, leave `CLOUDFRONT_CONCERT_PRIVATE_KEY` empty. Laravel
+resolves `CLOUDFRONT_CONCERT_PRIVATE_KEY_PATH` through `storage_path()`, so the
+value above points to
+`storage/app/private/keys/dancepro-concerts-private.pem`. The directory is
+excluded from Git; deploy the key separately and never commit its contents.
 
 Validate at least:
 
@@ -124,6 +155,7 @@ disk rather than assuming one domain serves every asset.
 ## Links to Related Documentation
 
 - [Concert Streaming AWS Setup Handoff](Concert-Streaming-AWS-Setup-Handoff.md)
+- [ADR-0002 - Concert Media Storage and Playback](../decisions/ADR-0002-Concert-Media-Storage-and-Playback.md)
 - [DancePro V1 S3 Structure](V1-S3-Structure.md)
 - [Competition Downloads Specification](../specifications/Competition-Downloads.md)
 - [Concert Epic](../epics/Concert.md)

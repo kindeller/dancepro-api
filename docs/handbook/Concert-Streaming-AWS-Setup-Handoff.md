@@ -1,5 +1,8 @@
 # Concert Streaming AWS Setup Handoff
 
+For a paste-ready interactive setup prompt, see
+[Concert Streaming AWS ChatGPT Prompt](Concert-Streaming-AWS-ChatGPT-Prompt.md).
+
 ## Purpose
 
 This document is a handoff for configuring the AWS infrastructure required by
@@ -138,11 +141,18 @@ The application will need non-secret configuration equivalent to:
 ```text
 CLOUDFRONT_CONCERT_DOMAIN=
 CLOUDFRONT_CONCERT_KEY_PAIR_ID=
+CLOUDFRONT_CONCERT_COOKIE_DOMAIN=
 ```
 
 The private signing key must be supplied through the project's approved secret
 management process. Never paste it into source control, documentation, issue
 comments, chat messages or command output.
+
+The standard file-based runtime location is
+`storage/app/private/keys/dancepro-concerts-private.pem`, configured as
+`CLOUDFRONT_CONCERT_PRIVATE_KEY_PATH=app/private/keys/dancepro-concerts-private.pem`.
+Laravel resolves the environment value through `storage_path()`. The key file
+must be deployed separately and must remain outside source control.
 
 Signed-cookie policies should:
 
@@ -260,4 +270,3 @@ Return only non-secret deployment information:
 - [Using CloudFront signed cookies](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-signed-cookies.html)
 - [Restricting S3 origin access with Origin Access Control](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html)
 - [FFmpeg HLS muxer](https://ffmpeg.org/ffmpeg-formats.html#hls-2)
-

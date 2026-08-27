@@ -69,8 +69,7 @@ class AdminStudioConcertManagementTest extends TestCase
         $concert = Concert::query()->where('name', 'Fictional Winter Showcase')->firstOrFail();
         $this->assertFalse($concert->isPubliclyAvailable());
         $this->assertTrue($concert->passwordMatches('concert-password'));
-        $this->assertStringContainsString($studio->uuid, $concert->storage_prefix);
-        $this->assertStringContainsString($concert->uuid, $concert->storage_prefix);
+        $this->assertSame($concert->uuid.'/', $concert->storage_prefix);
 
         $this->actingAs($staff)->put('/admin/concerts/'.$concert->uuid, [
             'studio_id' => $studio->id,

@@ -33,6 +33,7 @@ Start with:
 - [API Guidelines](handbook/API-Guidelines.md)
 - [DancePro V1 S3 Structure](handbook/V1-S3-Structure.md)
 - [Concert Streaming AWS Setup Handoff](handbook/Concert-Streaming-AWS-Setup-Handoff.md)
+- [Concert Streaming AWS ChatGPT Prompt](handbook/Concert-Streaming-AWS-ChatGPT-Prompt.md)
 - [Brand Style](handbook/Brand-Style.md)
 - [Security](handbook/Security.md)
 
@@ -94,6 +95,7 @@ Current records:
 
 - [DancePro V2 - Phase 0 Foundation Plan](decisions/DancePro-V2-Phase-0-Foundation-Plan.md)
 - [ADR-0001 - Generic Downloads Bounded Context](decisions/ADR-0001-Generic-Downloads-Bounded-Context.md)
+- [ADR-0002 - Concert Media Storage and Playback](decisions/ADR-0002-Concert-Media-Storage-and-Playback.md)
 
 ## Documentation Principle
 

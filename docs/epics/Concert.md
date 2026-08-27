@@ -36,8 +36,9 @@ use.
 
 Work through these areas before beginning another major product capability:
 
-1. Align concert playback with short-lived S3 or CloudFront delivery so the CDN
-   handles byte-range requests and large video traffic.
+1. Provision and validate the documented S3 and CloudFront infrastructure for
+   the implemented HLS signed-cookie playback flow, then move remaining
+   progressive video traffic behind the production delivery boundary.
 2. Route protected concert originals through the generic Downloads bounded
    context for consistent tracking, expiry, revocation and signing.
 3. Add staff media collection and asset management, including storage-derived

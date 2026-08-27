@@ -27,6 +27,8 @@ The following application behavior is also implemented:
 - Concert approval, publication, availability and password controls.
 - Password and student-name session access with attempt logging.
 - Ordered managed-video playback and automatic next-item playback.
+- HLS playback-source resolution, CloudFront signed-cookie generation and
+  progressive MP4 fallback.
 - Basic staff studio and concert administration.
 - Read-only competition object browsing and generic tracked downloads.
 
@@ -36,7 +38,7 @@ production-readiness layer around the existing Concert domain:
 - Staff collection and managed-asset administration.
 - Storage-derived concert object listing within collection boundaries.
 - Program and cover-image management.
-- Short-lived S3 or CloudFront playback with byte-range support.
+- Production CloudFront, S3, CORS and signing-key configuration and validation.
 - Concert originals delivered through the generic Downloads bounded context.
 - Operational authorization, testing and deployment documentation.
 
@@ -220,93 +222,38 @@ Retain separate Laravel storage disks:
 
 ```text
 s3_concerts
+s3_concerts_legacy
 s3_competitions
 ```
 
-These may point to separate S3 buckets.
-
-Separate buckets are acceptable and recommended because concerts and competitions are major business domains with potentially different:
-
-- IAM permissions
-- Retention rules
-- Lifecycle rules
-- Migration paths
-- Operational access
-- Cost reporting
-- Archival policies
-
-Do not split buckets by file type unless a later operational requirement justifies it.
-
-Preferred boundary:
+Concerts and competitions remain separate business and operational domains.
+The intended bucket boundary is:
 
 ```text
-concert bucket
-  ├── photos
-  └── videos
-
-competition bucket
-  ├── photos
-  └── videos
+s3_concerts         → dance-pro-concerts
+s3_concerts_legacy  → dance-pro-videos
+s3_competitions     → competition storage
 ```
+
+This supports independent IAM, retention, lifecycle, migration, access and cost
+policies without forcing an immediate V1 media migration.
 
 ## 4.2 Prefix stability
 
-Storage prefixes should contain immutable identifiers.
+Storage prefixes must contain immutable identifiers. Studio names, concert
+names, slugs and other mutable business data must not appear in authoritative
+concert storage prefixes.
 
-Do not derive storage prefixes only from mutable names or dates.
-
-Recommended examples:
-
-```text
-studios/{studio-uuid}/concerts/{concert-uuid}/
-competitions/{competition-uuid}/
-```
-
-Within the entity prefix:
+Recommended roots:
 
 ```text
-photos/
-videos/
-thumbnails/
-downloads/
-manifests/
+{collection_uuid}/media/{asset_uuid}/
+competitions/{competition_uuid}/
 ```
 
-A readable slug may be included, but the immutable UUID should remain part of the path.
-
-
-
-## 4.4 Concert media storage convention
-
-Concert media is storage-derived by default.
-
-A concert stores only:
-
-- `storage_disk`
-- `storage_prefix`
-
-The application assumes the following folder convention beneath the concert prefix:
-
-```text
-videos/original/
-videos/streaming/
-photos/
-```
-
-The database does not require individual rows for videos or photos simply because they exist in S3.
-
-`media_assets` are created only when a file requires durable business identity, for example:
-
-- Orders
-- Favourites
-- Custom metadata
-- Manual visibility control
-- Archive tracking
-- Processing state
-- Stable external references
-
-Original and streaming videos are not modelled as separate database collections or assets by default. Their relationship is inferred from the agreed folder structure and filename conventions.
-
+The collection UUID identifies the logical media grouping. The asset UUID
+identifies one managed video independently of its display name, owning studio
+or concert name.
 
 ## 4.3 Storage identity
 
@@ -316,9 +263,72 @@ A physical S3 object is identified by:
 storage_disk + full storage_key
 ```
 
-Never use the filename alone as an identifier.
+Never use the filename alone as an identifier. Repeated fixed filenames such
+as `video.mp4` are safe because their full UUID-based keys differ.
 
-Repeated filenames such as `IMG_0001.jpg` are expected and safe because their full keys differ.
+## 4.4 Concert video storage convention
+
+Managed concert videos use the following convention:
+
+```text
+{collection_uuid}/
+└── media/
+    └── {asset_uuid}/
+        ├── original/video.mp4
+        ├── stream/master.m3u8
+        ├── stream/high.m3u8
+        ├── stream/high-init.mp4
+        ├── stream/high-{segment}.m4s
+        ├── stream/standard.m3u8
+        ├── stream/standard-init.mp4
+        ├── stream/standard-{segment}.m4s
+        ├── stream/fallback.mp4
+        └── thumbnail/poster.png
+```
+
+The stream is HLS video on demand using fragmented MP4 segments. `high` and
+`standard` are playback renditions, not historical file versions. Their files
+may remain flat inside `stream/` when their names prevent collisions.
+
+Concert programs may remain beneath the collection:
+
+```text
+{collection_uuid}/documents/program.pdf
+```
+
+Playback resolution order is:
+
+```text
+stream/master.m3u8
+    ↓ unavailable or playback failure
+stream/fallback.mp4
+    ↓ unavailable
+original/video.mp4
+```
+
+For migrated or transitional assets, `media_assets.storage_key` remains the
+authoritative recorded original location and may be used as the final fallback.
+The application does not require a database readiness flag because complete
+media packages are uploaded before a concert is released.
+
+Laravel authorises playback. HLS is delivered by CloudFront using short-lived
+signed cookies scoped to the selected asset prefix. Progressive fallback
+retains the existing application delivery path until production delivery is
+fully moved behind CloudFront.
+
+## 4.5 Storage-derived and managed media
+
+The database does not require individual rows for photos simply because they
+exist in S3. Concert videos require managed assets so their original,
+renditions, thumbnail and fallback share one durable asset UUID.
+
+`media_assets` should also be created whenever a file requires durable business
+identity, such as for orders, favourites, custom metadata, manual visibility,
+archive tracking or stable external references.
+
+Original, HLS, fallback and thumbnail objects are renditions or locations of
+one media asset. They are not separate business assets merely because multiple
+S3 objects exist.
 
 ---
 
@@ -395,6 +405,10 @@ Do not use a database enum.
 - `legacy_id` supports V1 migration and reconciliation.
 - Do not make `slug` globally authoritative.
 - UUID should be used for public routes.
+- Optional `GET /s/{slug}` and `GET /c/{slug}` convenience routes may resolve
+  exactly one studio or concert and temporarily redirect to its canonical UUID
+  route. Missing and ambiguous slugs must return `404`; downstream access and
+  media security checks remain on the canonical routes.
 - Contact fields are business contact information, not authentication identity.
 
 ---
@@ -495,15 +509,19 @@ Do not store a recoverable plain-text concert password.
 
 ## 7.5 Storage prefix
 
-`storage_prefix` identifies the root S3 location for the concert.
+`storage_prefix` is retained as an immutable concert-level compatibility and
+administrative boundary. It must not contain the studio name, studio UUID,
+concert name or slug.
 
 Example:
 
 ```text
-studios/{studio-uuid}/concerts/{concert-uuid}/
+{concert_uuid}/
 ```
 
-Media collections may point to folders beneath this prefix.
+Managed V2 media collections use their own collection UUID roots as described
+in the storage convention. Reassigning a concert to another studio must not
+change either prefix.
 
 ---
 

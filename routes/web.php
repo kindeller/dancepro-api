@@ -7,14 +7,18 @@ use App\Features\Admin\Controllers\AdminStudioController;
 use App\Features\Auth\Controllers\WebAuthController;
 use App\Features\Competition\Controllers\AdminCompetitionObjectController;
 use App\Features\Concerts\Controllers\PublicConcertController;
+use App\Features\Concerts\Controllers\PublicSlugRedirectController;
 use App\Features\Concerts\Controllers\PublicStudioController;
 use App\Features\Downloads\Controllers\PublicDownloadController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PublicStudioController::class, 'index'])->name('studios.index');
+Route::get('s/{slug}', [PublicSlugRedirectController::class, 'studio'])->name('studios.resolve-slug');
+Route::get('c/{slug}', [PublicSlugRedirectController::class, 'concert'])->name('concerts.resolve-slug');
 Route::get('studios/{studio}', [PublicStudioController::class, 'show'])->name('studios.show');
 Route::get('concerts/{concert}', [PublicConcertController::class, 'show'])->name('concerts.show');
 Route::post('concerts/{concert}/unlock', [PublicConcertController::class, 'unlock'])->middleware('throttle:10,1')->name('concerts.unlock');
+Route::get('concerts/{concert}/media/{asset}/playback', [PublicConcertController::class, 'playback'])->name('concerts.media.playback');
 Route::get('concerts/{concert}/media/{asset}', [PublicConcertController::class, 'media'])->name('concerts.media.stream');
 Route::get('concerts/{concert}/media/{asset}/download', [PublicConcertController::class, 'download'])->name('concerts.media.download');
 

@@ -8,12 +8,13 @@
     <div class="empty"><h3>Media is not available yet</h3><p class="muted">This concert has been released, but its playable media is still being prepared.</p></div>
 @else
     @php($first = $assets->first())
+    @php($playerScriptAvailable = file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
     <div class="section-head"><div><div class="eyebrow">Concert media</div><h2>Watch the performance</h2></div><div class="meta">{{ $assets->count() }} items</div></div>
     <div class="player-grid">
-        <section class="card player"><video id="concert-player" controls preload="metadata" src="{{ route('concerts.media.stream', [$concert, $first]) }}"></video><div class="player-info"><h3 id="player-title">{{ $first->display_name ?? $first->original_filename }}</h3><div class="actions"><a id="player-download" class="button" href="{{ $downloadUrls[$first->uuid] }}">Download original</a></div></div></section>
+        <section class="card player"><video id="concert-player" controls preload="metadata" crossorigin="use-credentials" @unless($playerScriptAvailable) src="{{ route('concerts.media.stream', [$concert, $first]) }}" @endunless></video><div class="player-info"><h3 id="player-title">{{ $first->display_name ?? $first->original_filename }}</h3><div class="meta" id="player-status" style="color:#a9bec8">{{ $playerScriptAvailable ? 'Preparing playback…' : 'MP4 playback' }}</div><div class="actions"><label style="margin:0;color:#d9e8ee">Quality <select id="player-quality" disabled><option value="-1">Auto</option></select></label><a id="player-download" class="button" href="{{ $downloadUrls[$first->uuid] }}">Download original</a></div></div></section>
         <aside class="card playlist" aria-label="Concert playlist">
         @foreach($assets as $asset)
-            <button class="playlist-item @if($loop->first) active @endif" type="button" data-src="{{ route('concerts.media.stream', [$concert, $asset]) }}" data-download="{{ $downloadUrls[$asset->uuid] }}" data-title="{{ $asset->display_name ?? $asset->original_filename }}"><span class="playlist-thumb">▶</span><span><strong>{{ $asset->display_name ?? $asset->original_filename }}</strong><br><span class="meta">{{ $asset->duration_seconds ? gmdate('i:s', $asset->duration_seconds) : ucfirst($asset->media_type->value) }}</span></span></button>
+            <button class="playlist-item @if($loop->first) active @endif" type="button" data-playback="{{ route('concerts.media.playback', [$concert, $asset]) }}" data-download="{{ $downloadUrls[$asset->uuid] }}" data-title="{{ $asset->display_name ?? $asset->original_filename }}"><span class="playlist-thumb">▶</span><span><strong>{{ $asset->display_name ?? $asset->original_filename }}</strong><br><span class="meta">{{ $asset->duration_seconds ? gmdate('i:s', $asset->duration_seconds) : ucfirst($asset->media_type->value) }}</span></span></button>
         @endforeach
         </aside>
     </div>
@@ -27,39 +28,9 @@
 @endsection
 
 @push('scripts')
-@if($assets->isNotEmpty())<script>
-const player = document.querySelector('#concert-player');
-const items = [...document.querySelectorAll('.playlist-item')];
-function selectItem(item, autoplay = true) {
-    items.forEach(entry => entry.classList.toggle('active', entry === item));
-    player.src = item.dataset.src;
-    document.querySelector('#player-title').textContent = item.dataset.title;
-    document.querySelector('#player-download').href = item.dataset.download;
-    if (autoplay) player.play().catch(() => {});
-}
-items.forEach(item => item.addEventListener('click', () => selectItem(item)));
-player.addEventListener('ended', () => { const next = items[items.findIndex(item => item.classList.contains('active')) + 1]; if (next) selectItem(next); });
-let downloadIndex = 0;
-let downloadTimer;
-let downloadsPaused = false;
-const downloadStatus = document.querySelector('#download-status');
-const startButton = document.querySelector('#download-all');
-const pauseButton = document.querySelector('#download-pause');
-function updateDownloadStatus(message) { downloadStatus.textContent = message ?? `${downloadIndex} of ${items.length} downloads started.`; }
-function runDownloads() {
-    if (downloadsPaused || downloadIndex >= items.length) { if (downloadIndex >= items.length) { updateDownloadStatus('All downloads have been sent to your browser.'); pauseButton.disabled = true; } return; }
-    const link = document.createElement('a'); link.href = items[downloadIndex].dataset.download; link.click(); downloadIndex++; updateDownloadStatus();
-    downloadTimer = setTimeout(runDownloads, 900);
-}
-startButton.addEventListener('click', () => {
-    if (downloadIndex === 0 && !confirm('Your browser may ask permission to download multiple files. Continue?')) return;
-    downloadsPaused = false; pauseButton.disabled = false; pauseButton.textContent = 'Pause'; runDownloads();
-});
-pauseButton.addEventListener('click', () => {
-    downloadsPaused = !downloadsPaused; clearTimeout(downloadTimer); pauseButton.textContent = downloadsPaused ? 'Resume' : 'Pause';
-    updateDownloadStatus(downloadsPaused ? `Paused after ${downloadIndex} of ${items.length} downloads.` : null);
-    if (!downloadsPaused) runDownloads();
-});
-document.querySelector('#download-reset').addEventListener('click', () => { clearTimeout(downloadTimer); downloadIndex = 0; downloadsPaused = false; pauseButton.disabled = true; pauseButton.textContent = 'Pause'; updateDownloadStatus(`Ready to download ${items.length} originals.`); });
-</script>@endif
+@if($assets->isNotEmpty())
+    @if($playerScriptAvailable)
+        @vite('resources/js/concert-player.js')
+    @endif
+@endif
 @endpush

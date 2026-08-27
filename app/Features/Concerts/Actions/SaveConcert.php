@@ -4,7 +4,6 @@ namespace App\Features\Concerts\Actions;
 
 use App\Features\Concerts\Models\Concert;
 use App\Features\Concerts\Support\ConcertStatus;
-use App\Features\Studios\Models\Studio;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -37,10 +36,9 @@ class SaveConcert
             : null;
 
         if ($creating) {
-            $studioUuid = Studio::query()->findOrFail($attributes['studio_id'])->uuid;
             $attributes['created_by_user_id'] = $staff->id;
             $attributes['storage_disk'] = 's3_concerts';
-            $attributes['storage_prefix'] = "studios/{$studioUuid}/concerts/{$uuid}/";
+            $attributes['storage_prefix'] = "{$uuid}/";
         }
 
         if ($clearPassword) {

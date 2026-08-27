@@ -21,7 +21,7 @@ class ConcertFactory extends Factory
             'is_enabled' => true,
             'event_date' => fake()->dateTimeBetween('-1 year', '+1 year'),
             'storage_disk' => 's3_concerts',
-            'storage_prefix' => 'studios/'.fake()->uuid().'/concerts/'.fake()->uuid().'/',
+            'storage_prefix' => fake()->uuid().'/',
         ];
     }
 

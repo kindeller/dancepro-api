@@ -26,7 +26,7 @@ class MediaCollectionFactory extends Factory
             'status' => MediaCollectionStatus::Draft,
             'visibility' => MediaCollectionVisibility::Private,
             'storage_disk' => 's3_concerts',
-            'storage_prefix' => 'photos/'.fake()->uuid().'/',
+            'storage_prefix' => fake()->uuid().'/',
         ];
     }
 

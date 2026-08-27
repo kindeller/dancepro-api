@@ -12,16 +12,22 @@ Competition domain.
 
 ## Current Status
 
-Planned and ready to begin.
+In progress.
 
 The public studio and concert journey, password access, access logging, ordered
 video playlist, next-item playback, individual downloads, bulk-download manager
 and basic studio/concert administration are implemented. Next-video playback
 has been manually validated on desktop and mobile across multiple browsers.
 
-The remaining gap is operational: staff cannot yet manage concert media through
-the application, and concert video/download responses are still proxied by
-Laravel instead of using the established S3 and CloudFront delivery boundary.
+The application-side streaming foundation is implemented. Playback resolves an
+HLS manifest, progressive stream fallback and original in order; generates
+asset-prefix-scoped CloudFront signed cookies; and uses native HLS or `hls.js`
+with automatic and manual quality selection. New concert prefixes no longer
+contain studio identity.
+
+AWS provisioning and production validation remain outstanding. Progressive
+video/download responses are still proxied by Laravel, and staff cannot yet
+manage concert media through the application.
 
 ## In Scope
 
