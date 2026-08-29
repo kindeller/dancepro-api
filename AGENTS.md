@@ -305,8 +305,27 @@ exact command and reason.
 
 # Approval-Gated Commit Workflow
 
-After the Definition of Done is satisfied, AI agents should not create a git
-commit until the user explicitly approves the commit.
+The canonical integration branch is `master`. Direct pushes to `master` are
+reserved for the repository owner. All other contributors must complete work
+on a branch and submit a Pull Request into `master` for owner review and
+approval.
+
+Working branches must use:
+
+``` text
+<developer-id>-<work-description>
+```
+
+Use a recognisable developer ID and a short lowercase kebab-case description,
+for example `alex-competition-download-audit`.
+
+AI agents must not create or switch branches, commit, push, open or modify Pull
+Requests, merge, or change repository settings unless the user explicitly
+authorises that specific action. Approval for one action does not authorise the
+next action.
+
+After the Definition of Done is satisfied, AI agents must not create a git
+commit until the user explicitly approves the exact commit.
 
 Before asking for commit approval:
 
@@ -322,8 +341,21 @@ Before committing:
     such as `feat:`, `fix:`, `chore:`, `docs:`, `test:`, or `refactor:`.
 -   Do not create a commit if required verification failed, unless the user
     explicitly asks for a commit and the failure is documented.
+-   Never stage, revert, overwrite, or reformat unrelated user or contributor
+    changes.
+-   Never bypass branch protection or force-push a shared branch.
 
-This workflow is local only. Do not add CI/CD, GitHub Actions, or deployment
+Before requesting permission to push or open a Pull Request:
+
+-   Report the current branch and commits to be pushed.
+-   Report verification results.
+-   State the intended remote and PR target branch.
+
+Only the repository owner may approve a Pull Request for merge. AI agents must
+not merge without an explicit request for that exact merge after owner review.
+
+The full contributor workflow is documented in
+`docs/handbook/Git-Workflow.md`. Do not add CI/CD, GitHub Actions, or deployment
 automation unless explicitly requested.
 
 ------------------------------------------------------------------------

@@ -17,11 +17,11 @@ The intended deployment workflow is:
 3. Push to GitHub.
 4. Open a Pull Request.
 5. Automated tests are executed.
-6. Merge into `main`.
+6. Merge into `master`.
 7. Deploy the latest version to the production EC2 instance.
 8. Perform a production smoke test.
 
-Production deployments should always originate from the `main` branch.
+Production deployments should always originate from the `master` branch.
 
 ---
 
@@ -206,7 +206,7 @@ GitHub Actions
 Run Tests
         │
         ▼
-Merge to main
+Merge to master
         │
         ▼
 Deploy to EC2
