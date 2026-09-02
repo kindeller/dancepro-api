@@ -29,6 +29,10 @@ use.
 - Read-only public studio and concert API discovery.
 - Local demonstration content for workflow testing.
 - Staff studio list, creation and editing.
+- Staff review of booking contact details against the studio directory, with
+  field-level discrepancy warnings and explicit update-or-add reconciliation.
+- Creation of an unmatched studio directly from booking review, with submitted
+  studio and event-contact details prefilled into the full editable studio form.
 - Staff concert list, creation and editing.
 - Staff approval, publication, availability and password controls.
 
@@ -63,6 +67,10 @@ Work through these areas before beginning another major product capability:
 
 ## Notes / Future Work
 
+- Concert bookings retain their submitted contact snapshot after directory
+  reconciliation so the original submission remains auditable. Matching uses
+  the normalised studio name, then contact email and contact name; no directory
+  field is changed automatically.
 - Customer accounts, ordering and payments remain future work and are not
   required to complete the current Concert production-readiness milestone.
 - Automatic transcoding, archive restoration and deeper streaming optimisation

@@ -100,11 +100,23 @@
         color: var(--danger);
         padding: 12px 14px;
     }
+
+    .status-message {
+        margin-bottom: 16px;
+        border-radius: 4px;
+        background: #eaf8fd;
+        color: #075d7c;
+        padding: 12px 14px;
+    }
 </style>
 
 <section class="login-card">
     <h1>DancePro Admin</h1>
     <p>Sign in to inspect download links, access history, and platform data.</p>
+
+    @if (session('status'))
+        <div class="status-message">{{ session('status') }}</div>
+    @endif
 
     @if ($errors->any())
         <div class="error-list">
@@ -133,5 +145,6 @@
         </label>
 
         <button type="submit">Sign in</button>
+        <a href="{{ route('password.request') }}" style="color:var(--brand-strong);font-size:13px;text-align:center;">Forgot password?</a>
     </form>
 </section>

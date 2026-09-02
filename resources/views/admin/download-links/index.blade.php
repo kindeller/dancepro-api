@@ -65,7 +65,7 @@
         </table>
 
         <div class="pagination">
-            {{ $downloadLinks->links() }}
+            <x-admin-pagination :paginator="$downloadLinks" />
         </div>
     </div>
 @endsection

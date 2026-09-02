@@ -65,4 +65,9 @@ class UserFactory extends Factory
     {
         return $this->state(fn () => ['type' => UserType::Customer->value]);
     }
+
+    public function crew(): static
+    {
+        return $this->state(fn () => ['type' => UserType::Crew->value, 'onboarding_completed_at' => now()]);
+    }
 }

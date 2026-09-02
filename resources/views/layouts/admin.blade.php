@@ -84,6 +84,7 @@
         }
 
         .nav a,
+        .nav summary,
         .logout-button {
             display: flex;
             align-items: center;
@@ -106,10 +107,66 @@
 
         .nav a[aria-current="page"],
         .nav a:hover,
+        .nav summary:hover,
         .logout-button:hover {
             background: rgba(10, 160, 219, .2);
             color: #ffffff;
             text-decoration: none;
+        }
+
+        .nav-group {
+            border-radius: 4px;
+        }
+
+        .nav-group summary {
+            list-style: none;
+        }
+
+        .nav-group summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .nav-group summary::after {
+            margin-left: auto;
+            content: "+";
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .nav-group[open] summary::after {
+            content: "−";
+        }
+
+        .nav-group.active > summary {
+            background: rgba(10, 160, 219, .2);
+            color: #ffffff;
+        }
+
+        .nav-submenu {
+            display: grid;
+            gap: 3px;
+            margin: 3px 0 8px 10px;
+            padding-left: 10px;
+            border-left: 1px solid rgba(244, 251, 255, .2);
+        }
+
+        .nav-submenu a {
+            min-height: 36px;
+            padding: 8px 10px;
+            font-size: 11px;
+        }
+
+        .nav-notification {
+            display: grid;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            place-items: center;
+            border-radius: 99px;
+            background: #e84848;
+            color: #fff;
+            font-size: 10px;
+            line-height: 1;
         }
 
         .main {
@@ -183,6 +240,15 @@
             padding: 18px;
         }
 
+        .entity-logo {
+            width: 180px;
+            aspect-ratio: 3508 / 2480;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            background: #fff;
+            object-fit: contain;
+        }
+
         .metric {
             display: grid;
             gap: 6px;
@@ -208,6 +274,31 @@
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
+        }
+
+        .contact-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            padding: 4px;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            background: #fff;
+        }
+
+        .contact-tabs a {
+            flex: 1;
+            padding: 9px 12px;
+            border-radius: 3px;
+            color: var(--muted);
+            font-weight: 800;
+            text-align: center;
+        }
+
+        .contact-tabs a.active {
+            background: var(--brand-dark);
+            color: #fff;
+            text-decoration: none;
         }
 
         .actions {
@@ -376,6 +467,16 @@
             color: var(--danger);
         }
 
+        .badge.attention {
+            background: #fff2cc;
+            color: var(--warn);
+        }
+
+        .badge.success {
+            background: #dcfce7;
+            color: var(--ok);
+        }
+
         .notice {
             margin-bottom: 16px;
             border: 1px solid #9bdcf4;
@@ -409,6 +510,37 @@
             overflow-wrap: anywhere;
         }
 
+        .invoice-overview {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .invoice-overview > div {
+            display: flex;
+            min-height: 78px;
+            flex-direction: column;
+            justify-content: center;
+            gap: 5px;
+            padding: 14px 16px;
+            border-radius: 4px;
+            background: #f2f7f9;
+        }
+
+        .invoice-overview span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+
+        .invoice-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; }
+        .invoice-table { min-width: 760px; }
+        .invoice-table th:nth-last-child(-n+3), .invoice-table td:nth-last-child(-n+3) { text-align: right; }
+        .invoice-table tfoot th { border-bottom: 0; background: var(--soft); color: var(--ink); }
+
         .login-page {
             display: grid;
             min-height: 100vh;
@@ -427,12 +559,39 @@
         }
 
         .pagination {
+            padding: 14px;
+        }
+
+        .admin-pagination {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
+            justify-content: space-between;
             gap: 12px;
-            padding: 14px;
         }
+
+        .admin-pagination-links {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .admin-page-link {
+            display: inline-flex;
+            min-width: 36px;
+            min-height: 36px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            background: #fff;
+            padding: 6px 10px;
+            font-weight: 700;
+        }
+
+        .admin-page-link.current { border-color: var(--brand); background: var(--brand); color: #fff; }
+        .admin-page-link.disabled { color: var(--muted); opacity: .55; }
 
         .loading-indicator {
             display: inline-flex;
@@ -485,6 +644,7 @@
             }
         }
     </style>
+    @stack('styles')
 </head>
 <body>
     <div class="shell">
@@ -495,16 +655,44 @@
             </div>
 
             <nav class="nav" aria-label="Admin navigation">
-                <a href="{{ route('admin.dashboard') }}" @if(request()->routeIs('admin.dashboard')) aria-current="page" @endif>Dashboard</a>
-                @can('manageStudios')
-                    <a href="{{ route('admin.studios.index') }}" @if(request()->routeIs('admin.studios.*')) aria-current="page" @endif>Studios</a>
-                @endcan
-                @can('manageConcerts')
-                    <a href="{{ route('admin.concerts.index') }}" @if(request()->routeIs('admin.concerts.*')) aria-current="page" @endif>Concerts</a>
-                @endcan
-                <a href="{{ route('admin.competition.objects.index') }}" @if(request()->routeIs('admin.competition.objects.index')) aria-current="page" @endif>Competition Objects</a>
-                <a href="{{ route('admin.download-links.index') }}" @if(request()->routeIs('admin.download-links.index', 'admin.download-links.show')) aria-current="page" @endif>Download Links</a>
-                <a href="{{ route('admin.download-links.create') }}" @if(request()->routeIs('admin.download-links.create')) aria-current="page" @endif>Create Links</a>
+                @if(auth()->user()?->crewProfile)
+                    <a href="{{ route('crew.availability.index') }}">My Hub</a>
+                @endif
+                @php($hubManagementActive = request()->routeIs('admin.hub.*', 'admin.exceptions.*', 'admin.studios.*', 'admin.competition-contacts.*', 'admin.crew.*', 'admin.crew-roles.*', 'admin.crew-contracts.*', 'admin.crew-management.*', 'admin.scheduling-events.*', 'admin.event-management.*', 'admin.event-types.*', 'admin.venues.*', 'admin.operations.*', 'admin.payments.*', 'admin.timesheets.*', 'admin.concert-bookings.*', 'admin.concert-booking-events.*'))
+                <details class="nav-group {{ $hubManagementActive ? 'active' : '' }}" @if($hubManagementActive) open @endif>
+                    <summary>Hub Management</summary>
+                    <div class="nav-submenu">
+                        @can('manageScheduling')
+                            <a href="{{ route('admin.hub.dashboard') }}" @if(request()->routeIs('admin.hub.*')) aria-current="page" @endif>Dashboard</a>
+                        @endcan
+                        @can('manageStudios')
+                            <a href="{{ route('admin.studios.index') }}" @if(request()->routeIs('admin.studios.*', 'admin.competition-contacts.*')) aria-current="page" @endif>Contacts</a>
+                        @endcan
+                        @can('manageCrew')
+                            <a href="{{ route('admin.crew.index') }}" @if(request()->routeIs('admin.crew.*', 'admin.crew-roles.*', 'admin.crew-contracts.*', 'admin.crew-management.*')) aria-current="page" @endif>Crew Management</a>
+                        @endcan
+                        @can('manageScheduling')
+                            <a href="{{ route('admin.exceptions.index') }}" @if(request()->routeIs('admin.exceptions.*')) aria-current="page" @endif>@if($adminExceptionCount)<span class="nav-notification">{{ $adminExceptionCount }}</span>@endif Exceptions</a>
+                            <a href="{{ route('admin.concert-bookings.index') }}" @if(request()->routeIs('admin.scheduling-events.*', 'admin.event-management.*', 'admin.event-types.*', 'admin.concert-bookings.*', 'admin.concert-booking-events.*')) aria-current="page" @endif>Event Management</a>
+                            <a href="{{ route('admin.venues.index') }}" @if(request()->routeIs('admin.venues.*')) aria-current="page" @endif>Venue Management</a>
+                            <a href="{{ route('admin.timesheets.index') }}" @if(request()->routeIs('admin.timesheets.*', 'admin.payments.*')) aria-current="page" @endif>Crew Payments</a>
+                        @endcan
+                    </div>
+                </details>
+                @php($mediaActive = request()->routeIs('admin.dashboard', 'admin.concerts.*', 'admin.competition.objects.*', 'admin.download-links.*'))
+                <details class="nav-group {{ $mediaActive ? 'active' : '' }}" @if($mediaActive) open @endif>
+                    <summary>Media</summary>
+                    <div class="nav-submenu">
+                        <a href="{{ route('admin.dashboard') }}" @if(request()->routeIs('admin.dashboard')) aria-current="page" @endif>Media Dashboard</a>
+                        @can('manageConcerts')
+                            <a href="{{ route('admin.concerts.index') }}" @if(request()->routeIs('admin.concerts.*')) aria-current="page" @endif>Concert Media</a>
+                        @endcan
+                        <a href="{{ route('admin.competition.objects.index') }}" @if(request()->routeIs('admin.competition.objects.*')) aria-current="page" @endif>Competition Media</a>
+                        <a href="{{ route('admin.download-links.index') }}" @if(request()->routeIs('admin.download-links.index', 'admin.download-links.show')) aria-current="page" @endif>Download Links</a>
+                        <a href="{{ route('admin.download-links.create') }}" @if(request()->routeIs('admin.download-links.create')) aria-current="page" @endif>Create Link</a>
+                    </div>
+                </details>
+                @if(config('security.two_factor.enabled'))<a href="{{ route('account.security') }}">Account security</a>@endif
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
                     <button class="logout-button" type="submit">Sign out</button>
@@ -543,5 +731,6 @@
             </div>
         </main>
     </div>
+    @stack('scripts')
 </body>
 </html>

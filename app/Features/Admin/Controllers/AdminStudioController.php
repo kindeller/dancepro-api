@@ -3,6 +3,7 @@
 namespace App\Features\Admin\Controllers;
 
 use App\Features\Admin\Requests\SaveStudioRequest;
+use App\Features\Admin\Requests\UpdateStudioStatusRequest;
 use App\Features\Studios\Actions\SaveStudio;
 use App\Features\Studios\Models\Studio;
 use App\Features\Studios\Support\StudioStatus;
@@ -18,19 +19,35 @@ class AdminStudioController extends Controller
     {
         Gate::authorize('manageStudios');
 
-        $studios = Studio::query()
+        $studioQuery = Studio::query()
+            ->with('contacts')
             ->withCount('concerts')
             ->when($request->filled('search'), function ($query) use ($request): void {
                 $search = $request->string('search')->toString();
-                $query->where(fn ($query) => $query->where('name', 'like', "%{$search}%")->orWhere('contact_email', 'like', "%{$search}%"));
+                $query->where(fn ($query) => $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhereHas('contacts', fn ($query) => $query
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('role', 'like', "%{$search}%")
+                        ->orWhere('emails', 'like', "%{$search}%")));
             })
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()))
+            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()));
+
+        $statusCounts = (clone $studioQuery)
+            ->select('status')
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        $studios = $studioQuery
+            ->orderByRaw("case status when 'active' then 0 when 'inactive' then 1 else 2 end")
             ->orderBy('name')
             ->paginate(25)
             ->withQueryString();
 
         return view('admin.studios.index', [
             'studios' => $studios,
+            'statusCounts' => $statusCounts,
             'statuses' => StudioStatus::cases(),
             'filters' => $request->only(['search', 'status']),
         ]);
@@ -54,7 +71,7 @@ class AdminStudioController extends Controller
     {
         Gate::authorize('manageStudios');
 
-        $studio->load(['concerts' => fn ($query) => $query
+        $studio->load(['contacts', 'concerts' => fn ($query) => $query
             ->withCount('mediaCollections')
             ->orderByDesc('event_date')
             ->orderBy('name')]);
@@ -67,5 +84,12 @@ class AdminStudioController extends Controller
         $saveStudio->execute($request->validated(), $studio);
 
         return back()->with('status', 'Studio updated.');
+    }
+
+    public function updateStatus(UpdateStudioStatusRequest $request, Studio $studio): RedirectResponse
+    {
+        $studio->update(['status' => $request->validated('status')]);
+
+        return back()->with('status', 'Studio status updated.');
     }
 }

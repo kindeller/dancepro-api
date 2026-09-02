@@ -48,6 +48,7 @@ instead of duplicating them.
 Current epics:
 
 - [Foundation](epics/Foundation.md)
+- [Crew Scheduling](epics/Crew-Scheduling.md)
 - [Downloads](epics/Downloads.md)
 - [Competition](epics/Competition.md)
 - [Concert](epics/Concert.md)
@@ -64,6 +65,7 @@ rules, data expectations, and edge cases.
 
 Current specifications:
 
+- [Crew Scheduling Project Specification](specifications/DancePro-Crew-Scheduling-Project-Specification.md)
 - [Authentication](specifications/Authentication.md)
 - [Download Links](specifications/Download-Links.md)
 - [Competition Downloads](specifications/Competition-Downloads.md)
@@ -94,6 +96,7 @@ including the decision, alternatives considered, and consequences.
 Current records:
 
 - [DancePro V2 - Phase 0 Foundation Plan](decisions/DancePro-V2-Phase-0-Foundation-Plan.md)
+- [Crew Scheduling - Phase 0 Integration Plan](decisions/DancePro-Crew-Scheduling-Phase-0-Integration-Plan.md)
 - [ADR-0001 - Generic Downloads Bounded Context](decisions/ADR-0001-Generic-Downloads-Bounded-Context.md)
 - [ADR-0002 - Concert Media Storage and Playback](decisions/ADR-0002-Concert-Media-Storage-and-Playback.md)
 

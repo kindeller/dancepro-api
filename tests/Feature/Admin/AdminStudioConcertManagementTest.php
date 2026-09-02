@@ -8,6 +8,8 @@ use App\Features\Customers\Support\UserType;
 use App\Features\Studios\Models\Studio;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdminStudioConcertManagementTest extends TestCase
@@ -16,6 +18,7 @@ class AdminStudioConcertManagementTest extends TestCase
 
     public function test_staff_can_browse_create_and_edit_studios(): void
     {
+        Storage::fake('public');
         $staff = User::factory()->staff()->create();
 
         $this->actingAs($staff)->get('/admin/studios')
@@ -24,18 +27,30 @@ class AdminStudioConcertManagementTest extends TestCase
 
         $this->actingAs($staff)->post('/admin/studios', [
             'name' => 'Fictional Coast Dance',
+            'code' => 'fcd',
             'status' => 'active',
             'brand_color' => '#126A8A',
-            'contact_email' => 'studio@example.test',
+            'contacts' => [
+                ['name' => 'Morgan Director', 'role' => 'Studio owner', 'emails' => 'studio@example.test, accounts@example.test', 'phone' => '0400 111 222'],
+                ['name' => 'Taylor Admin', 'role' => 'Administrator', 'emails' => 'admin@example.test'],
+            ],
             'description' => 'A fictional studio used by this feature test.',
+            'logo' => UploadedFile::fake()->image('studio-logo.jpg', 3508, 2480),
         ])->assertRedirect();
 
         $studio = Studio::query()->where('name', 'Fictional Coast Dance')->firstOrFail();
         $this->assertNotNull($studio->uuid);
+        $this->assertSame('FCD', $studio->code);
         $this->assertStringStartsWith('fictional-coast-dance-', $studio->slug);
+        $this->assertCount(2, $studio->contacts);
+        $this->assertSame(['studio@example.test', 'accounts@example.test'], $studio->contacts->first()->emailAddresses());
+        $this->assertSame(['studio@example.test', 'accounts@example.test', 'admin@example.test'], $studio->contactEmailAddresses());
+        $this->assertSame('studio@example.test', $studio->contact_email);
+        Storage::disk('public')->assertExists($studio->logo_path);
 
         $this->actingAs($staff)->put('/admin/studios/'.$studio->uuid, [
             'name' => 'Fictional Coast Performing Arts',
+            'code' => 'fcpa',
             'slug' => $studio->slug,
             'status' => 'inactive',
             'brand_color' => '#126A8A',
@@ -44,8 +59,67 @@ class AdminStudioConcertManagementTest extends TestCase
         $this->assertDatabaseHas('studios', [
             'uuid' => $studio->uuid,
             'name' => 'Fictional Coast Performing Arts',
+            'code' => 'FCPA',
             'status' => 'inactive',
         ]);
+        $this->actingAs($staff)->get(route('admin.studios.edit', $studio))->assertOk()->assertSee('Studio code')->assertSee($studio->logoUrl(), false);
+
+        $this->actingAs($staff)->get(route('admin.studios.index', ['search' => 'FCPA']))
+            ->assertOk()
+            ->assertSee('Fictional Coast Performing Arts')
+            ->assertSee('studio-thumbnail', false)
+            ->assertSee($studio->logoUrl(), false);
+    }
+
+    public function test_each_studio_staff_member_may_have_multiple_comma_separated_email_addresses(): void
+    {
+        $staff = User::factory()->staff()->create();
+
+        $this->actingAs($staff)->post('/admin/studios', [
+            'name' => 'Multiple Contact Studio',
+            'status' => 'active',
+            'contacts' => [[
+                'name' => 'Casey Manager',
+                'emails' => ' CASEY@example.test, bookings@example.test, casey@example.test ',
+            ]],
+        ])->assertRedirect();
+
+        $studio = Studio::query()->where('name', 'Multiple Contact Studio')->firstOrFail();
+
+        $this->assertSame(['casey@example.test', 'bookings@example.test'], $studio->contacts->first()->emailAddresses());
+
+        $this->actingAs($staff)->post('/admin/studios', [
+            'name' => 'Invalid Contact Studio',
+            'status' => 'active',
+            'contacts' => [['name' => 'Casey Manager', 'emails' => 'valid@example.test, not-an-email']],
+        ])->assertSessionHasErrors('contacts.0.emails');
+    }
+
+    public function test_studio_contacts_are_grouped_and_status_can_be_changed_inline(): void
+    {
+        $staff = User::factory()->staff()->create();
+        $active = Studio::factory()->create(['name' => 'Active Studio', 'code' => 'ACT', 'status' => 'active']);
+        $inactive = Studio::factory()->create(['name' => 'Inactive Studio', 'code' => 'INA', 'status' => 'inactive']);
+
+        $response = $this->actingAs($staff)->get(route('admin.studios.index'));
+
+        $response->assertOk()
+            ->assertSeeInOrder(['<h2 class="studio-group-heading">Active (1)</h2>', 'Active Studio', '<h2 class="studio-group-heading">Inactive (1)</h2>', 'Inactive Studio'], false)
+            ->assertSee('data-href="'.route('admin.studios.edit', $active).'"', false)
+            ->assertDontSee('Active studio contacts')
+            ->assertSee('status-'.$active->uuid, false)
+            ->assertDontSee('>Studio status<', false)
+            ->assertDontSee($active->slug);
+
+        $this->actingAs($staff)->patch(route('admin.studios.status.update', $active), [
+            'status' => 'inactive',
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('studios', ['id' => $active->id, 'status' => 'inactive']);
+
+        $this->actingAs($staff)->patch(route('admin.studios.status.update', $inactive), [
+            'status' => 'not-a-status',
+        ])->assertSessionHasErrors('status');
     }
 
     public function test_staff_can_create_and_approve_a_password_protected_concert(): void

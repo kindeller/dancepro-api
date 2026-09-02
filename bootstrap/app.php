@@ -1,5 +1,7 @@
 <?php
 
+use App\Features\Auth\Middleware\RequireTwoFactorAuthentication;
+use App\Features\Crew\Middleware\RequireCompletedCrewOnboarding;
 use App\Shared\Responses\ApiResponse;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -21,6 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->alias([
+            'two-factor.required' => RequireTwoFactorAuthentication::class,
+            'crew.onboarded' => RequireCompletedCrewOnboarding::class,
+        ]);
         $middleware->encryptCookies(except: [
             'CloudFront-Policy',
             'CloudFront-Signature',

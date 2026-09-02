@@ -1,0 +1,2 @@
+@extends('layouts.admin', ['title' => 'Add competition', 'heading' => 'Add competition', 'subheading' => 'Set the days and roles now. Times and availability can be added later.'])
+@section('content')@include('admin.event-management._tabs')<form method="POST" action="{{ route('admin.scheduling-events.store') }}" enctype="multipart/form-data">@csrf @include('admin.scheduling-events._form', ['submitLabel' => 'Create event'])</form>@endsection

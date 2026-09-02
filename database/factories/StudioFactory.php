@@ -15,6 +15,7 @@ class StudioFactory extends Factory
     {
         return [
             'name' => fake()->company(),
+            'code' => fake()->unique()->bothify('STU-###'),
             'slug' => fake()->unique()->slug(3),
             'status' => StudioStatus::Active,
             'description' => fake()->sentence(12),

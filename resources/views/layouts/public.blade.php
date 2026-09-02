@@ -7,6 +7,7 @@
     <style>
         :root { --brand: #0aa0db; --ink: #101820; --muted: #66737a; --paper: #f4f8fa; --panel: #fff; --line: #dbe5e9; --accent: var(--concert-brand, #0aa0db); color-scheme: light; }
         * { box-sizing: border-box; }
+        [hidden] { display: none !important; }
         body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; }
         a { color: inherit; }
         img { display: block; max-width: 100%; }
@@ -31,6 +32,7 @@
         .card { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 16px 45px rgba(16, 24, 32, .07); }
         .card-media { aspect-ratio: 16/9; background: linear-gradient(135deg, var(--accent), #101820); object-fit: cover; width: 100%; }
         .card-body { padding: 20px; }
+        .entity-logo { width: 180px; aspect-ratio: 3508 / 2480; border: 1px solid var(--line); border-radius: 7px; background: #fff; object-fit: contain; }
         .card a.stretched { text-decoration: none; }
         .meta, .muted { color: var(--muted); }
         .meta { font-size: 14px; font-weight: 650; }
@@ -39,8 +41,11 @@
         .empty { border: 1px dashed #b6c8cf; border-radius: 12px; background: #fff; padding: 48px; text-align: center; }
         .unlock { width: min(520px, calc(100% - 40px)); margin: 70px auto; padding: 30px; }
         label { display: grid; gap: 7px; margin-bottom: 16px; color: var(--muted); font-size: 14px; font-weight: 750; }
-        input { width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 7px; padding: 10px 12px; font: inherit; }
-        input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); outline: 0; }
+        input, select, textarea { width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 7px; background:#fff; padding: 10px 12px; color:var(--ink); font: inherit; }
+        input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); outline: 0; }
+        input[type="checkbox"], input[type="radio"] { width:18px; min-height:18px; height:18px; margin:2px 0 0; padding:0; flex:0 0 18px; accent-color:var(--accent); }
+        .choice { display:flex; align-items:flex-start; gap:10px; margin-bottom:12px; color:var(--ink); font-weight:650; }
+        .agreement-group { margin-top:22px; border-top:1px solid var(--line); padding-top:18px; }
         .error { margin-bottom: 18px; border-left: 4px solid #b42318; background: #fff1f2; color: #8e1b13; padding: 12px; }
         .player-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(290px, .7fr); gap: 20px; }
         .player { background: #05090c; color: #fff; }

@@ -1,0 +1,2 @@
+@extends('layouts.public', ['title' => 'Booking received'])
+@section('content')<section class="section"><div class="container"><div class="card card-body" style="max-width:700px;margin:auto"><h1 style="font-size:44px">Thank you.</h1><p>Your booking request has been received. DancePro will review the details before confirming the booking. Submission does not automatically release the event to crew.</p></div></div></section>@endsection

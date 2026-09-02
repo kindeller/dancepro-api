@@ -1,7 +1,7 @@
 @extends('layouts.public')
 
 @section('content')
-<section class="hero"><div class="container"><div class="eyebrow">Dance studio</div><h1>{{ $studio->name }}</h1><p class="lead">{{ $studio->description }}</p></div></section>
+<section class="hero"><div class="container">@if($studio->logo_path)<img class="entity-logo" src="{{ $studio->logoUrl() }}" alt="{{ $studio->name }} logo" style="margin-bottom:22px">@endif<div class="eyebrow">Dance studio</div><h1>{{ $studio->name }}</h1><p class="lead">{{ $studio->description }}</p></div></section>
 <section class="section"><div class="container"><div class="section-head"><h2>Concerts</h2><a href="{{ route('studios.index') }}">All studios</a></div><div class="grid">
 @foreach($concerts as $concert)
     <article class="card">

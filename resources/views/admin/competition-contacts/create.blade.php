@@ -1,0 +1,2 @@
+@extends('layouts.admin', ['title' => 'Add Competition Contact', 'heading' => 'Add Competition Contact', 'subheading' => 'Create reusable organiser details for future competition events.'])
+@section('content')@include('admin.contacts._tabs')<form class="card card-pad" method="POST" action="{{ route('admin.competition-contacts.store') }}" enctype="multipart/form-data">@csrf @include('admin.competition-contacts._form', ['submitLabel' => 'Create competition contact'])</form>@endsection

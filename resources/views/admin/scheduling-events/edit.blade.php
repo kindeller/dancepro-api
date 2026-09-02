@@ -1,0 +1,2 @@
+@extends('layouts.admin', ['title' => 'Edit event', 'heading' => 'Edit '.$event->name, 'subheading' => 'Times and availability settings remain independent for each shift.'])
+@section('content')@include('admin.event-management._tabs')<form method="POST" action="{{ route('admin.scheduling-events.update', $event) }}" enctype="multipart/form-data">@csrf @method('PUT') @include('admin.scheduling-events._form', ['submitLabel' => 'Save event'])</form>@endsection

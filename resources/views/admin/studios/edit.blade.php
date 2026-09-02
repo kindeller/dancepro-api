@@ -1,6 +1,15 @@
-@extends('layouts.admin', ['title' => 'Edit '.$studio->name, 'heading' => 'Edit Studio', 'subheading' => $studio->name])
+@extends('layouts.admin', ['title' => $studio->name, 'heading' => $studio->name, 'subheading' => $studio->code])
 @section('content')
-<form class="card card-pad" method="POST" action="{{ route('admin.studios.update', $studio) }}">@csrf @method('PUT')
+<div class="studio-page-controls">
+    <a class="button secondary" href="{{ route('admin.studios.index') }}">← Back to studio contacts</a>
+    <form class="studio-status-form" method="POST" action="{{ route('admin.studios.status.update', $studio) }}">
+        @csrf @method('PATCH')
+        <select id="studio-page-status" class="status-select status-{{ $studio->status->value }}" name="status" aria-label="Change studio status" onchange="this.form.submit()">
+            @foreach($statuses as $status)<option value="{{ $status->value }}" @selected($studio->status === $status)>{{ ucfirst($status->value) }}</option>@endforeach
+        </select>
+    </form>
+</div>
+<form class="card card-pad" method="POST" action="{{ route('admin.studios.update', $studio) }}" enctype="multipart/form-data">@csrf @method('PUT')
     @include('admin.studios._form', ['submitLabel' => 'Save studio'])
 </form>
 
@@ -40,3 +49,12 @@
     </div>
 </section>
 @endsection
+
+@push('styles')
+<style>
+    .studio-page-controls { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
+    .studio-status-form { margin:0; }
+    .status-select { width:auto; min-width:0; min-height:24px; border:0; border-radius:4px; padding:3px 8px; appearance:none; -webkit-appearance:none; background:var(--soft); color:var(--brand-strong); font:inherit; font-size:12px; font-weight:800; line-height:18px; text-align:left; text-transform:capitalize; cursor:pointer; }
+    .status-inactive, .status-archived { background:#fef2f2; color:var(--danger); }
+</style>
+@endpush

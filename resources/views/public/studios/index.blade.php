@@ -10,7 +10,7 @@
         <div class="grid">
             @foreach($studios as $studio)
                 <article class="card" style="--accent: {{ $studio->brand_color ?? '#0aa0db' }}">
-                    @if($studio->cover_image_url)<img class="card-media" src="{{ $studio->cover_image_url }}" alt="">@else<div class="card-media"></div>@endif
+                    @if($studio->logo_path)<img class="card-media" src="{{ $studio->logoUrl() }}" alt="{{ $studio->name }} logo" style="object-fit:contain;background:#fff">@elseif($studio->cover_image_url)<img class="card-media" src="{{ $studio->cover_image_url }}" alt="">@else<div class="card-media"></div>@endif
                     <div class="card-body"><div class="meta">{{ $studio->available_concerts_count }} {{ Str::plural('concert', $studio->available_concerts_count) }}</div><h3><a class="stretched" href="{{ route('studios.show', $studio) }}">{{ $studio->name }}</a></h3><p class="muted">{{ Str::limit($studio->description, 120) }}</p></div>
                 </article>
             @endforeach

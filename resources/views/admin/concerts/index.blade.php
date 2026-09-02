@@ -13,5 +13,5 @@
 @forelse($concerts as $concert)
     <tr><td><strong>{{ $concert->name }}</strong><div class="muted">{{ $concert->event_date?->format('j M Y') }} @if($concert->venue_name) · {{ $concert->venue_name }} @endif</div></td><td>{{ $concert->studio->name }}</td><td><span class="badge">{{ $concert->status->value }}</span><div class="muted">@if(!$concert->is_enabled) Disabled @elseif($concert->requires_approval && !$concert->approved_at) Awaiting approval @elseif($concert->isPubliclyAvailable()) Public @else Not public @endif</div></td><td>{{ $concert->available_from?->format('j M Y H:i') ?? 'Immediately' }}<div class="muted">to {{ $concert->available_until?->format('j M Y H:i') ?? 'no end date' }}</div></td><td>{{ $concert->media_collections_count }} collections</td><td><a class="button secondary" href="{{ route('admin.concerts.edit', $concert) }}">Edit</a></td></tr>
 @empty<tr><td colspan="6" class="muted">No concerts match this view.</td></tr>@endforelse
-</tbody></table><div class="pagination">{{ $concerts->links() }}</div></div>
+</tbody></table><div class="pagination"><x-admin-pagination :paginator="$concerts" /></div></div>
 @endsection

@@ -129,7 +129,7 @@ class PublicConcertExperienceTest extends TestCase
         $this->assertIsString($fallbackUrl);
         $this->get($fallbackUrl)
             ->assertOk()
-            ->assertContent('stream-video');
+            ->assertStreamedContent('stream-video');
     }
 
     public function test_playback_uses_fallback_mp4_when_cloudfront_is_not_configured(): void
@@ -150,7 +150,7 @@ class PublicConcertExperienceTest extends TestCase
 
         $this->get($response->json('data.url'))
             ->assertOk()
-            ->assertContent('stream-video');
+            ->assertStreamedContent('stream-video');
     }
 
     public function test_playback_falls_back_to_the_recorded_original_storage_key(): void
@@ -167,7 +167,7 @@ class PublicConcertExperienceTest extends TestCase
 
         $this->get($response->json('data.url'))
             ->assertOk()
-            ->assertContent('original-video');
+            ->assertStreamedContent('original-video');
     }
 
     public function test_playback_returns_not_found_when_no_expected_source_exists(): void

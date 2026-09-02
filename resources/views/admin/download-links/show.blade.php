@@ -102,7 +102,7 @@
             </tbody>
         </table>
         <div class="pagination">
-            {{ $accesses->links() }}
+            <x-admin-pagination :paginator="$accesses" />
         </div>
     </section>
 @endsection

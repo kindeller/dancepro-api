@@ -41,6 +41,14 @@ class WebAuthController extends Controller
                 ->onlyInput('email');
         }
 
+        if (config('security.two_factor.enabled') && $user->two_factor_confirmed_at !== null) {
+            $request->session()->put('two_factor_login_user_id', $user->id);
+            $request->session()->put('two_factor_login_remember', $request->boolean('remember'));
+            Auth::logout();
+
+            return redirect()->route('two-factor.challenge');
+        }
+
         $request->session()->regenerate();
 
         $user->forceFill([
@@ -48,7 +56,11 @@ class WebAuthController extends Controller
             'last_seen_at' => now(),
         ])->save();
 
-        return redirect()->intended(route('admin.dashboard'));
+        if (config('security.two_factor.enabled') && config('security.two_factor.enforced') && $user->two_factor_confirmed_at === null) {
+            return redirect()->route('account.security');
+        }
+
+        return redirect()->intended(route($user->homeRouteName()));
     }
 
     public function destroy(Request $request): RedirectResponse

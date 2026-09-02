@@ -49,6 +49,13 @@ class LocalDevelopmentSeeder extends Seeder
         $orders = $this->seedOrders($customers, $photoCollection, $photoAsset);
         $this->seedDownloadLinks($staff, $openConcert, $videoCollection, $videoAssets, $orders);
         $this->writeLocalPlaceholderFiles([...$videoAssets, $photoAsset]);
+        $this->call([
+            ConcertBookingDemoSeeder::class,
+            CrewSchedulingDemoSeeder::class,
+            EventOperationsSeeder::class,
+            PaymentPlaceholderSeeder::class,
+            TimesheetInvoiceDemoSeeder::class,
+        ]);
 
         $this->command?->info('Local DancePro development data seeded.');
         $this->command?->warn('Fictional local logins use password: '.self::PASSWORD);
@@ -155,12 +162,20 @@ class LocalDevelopmentSeeder extends Seeder
 
     private function studio(string $uuid, string $slug, string $name, StudioStatus $status, string $brandColor): Studio
     {
-        return Studio::withTrashed()->updateOrCreate(['uuid' => $uuid], [
+        $studio = Studio::withTrashed()->updateOrCreate(['uuid' => $uuid], [
             'name' => $name, 'slug' => $slug, 'status' => $status,
             'description' => 'A fictional studio created only for local DancePro development.',
             'brand_color' => $brandColor, 'contact_name' => 'Local Studio Contact',
             'contact_email' => $slug.'@example.test', 'notes' => 'Local development data.', 'deleted_at' => null,
         ]);
+
+        $studio->contacts()->updateOrCreate(['position' => 0], [
+            'name' => 'Local Studio Contact',
+            'role' => 'Placeholder contact',
+            'emails' => [$slug.'@example.test'],
+        ]);
+
+        return $studio;
     }
 
     private function concert(string $uuid, Studio $studio, User $staff, array $attributes): Concert
