@@ -10,6 +10,13 @@ Phase 0 establishes the security defaults for later DancePro features.
 - Inactive users cannot log in.
 - Browser and API login attempts are rate limited by hashed email/IP and by IP.
 - Password-reset link requests and reset submissions have separate rate limits.
+- Public booking submissions and download links have endpoint-specific rate
+  limits. Limit events log only hashed IP/token identifiers.
+- The booking form uses a honeypot and suppresses identical submissions made
+  within `BOOKING_DUPLICATE_WINDOW_MINUTES` (10 minutes by default).
+- Download access records are pruned daily after
+  `DOWNLOAD_ACCESS_RETENTION_DAYS` (180 days by default). Production must run
+  Laravel's scheduler for this and other scheduled maintenance.
 - Protected API routes must use `auth:sanctum`.
 - Non-trivial input must use Form Requests.
 - Authorization logic should use policies rather than controller conditionals.

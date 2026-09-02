@@ -13,11 +13,11 @@ This checklist tracks the 22 findings from the pre-publication audit. Update the
 | 7 | High | Login and password-reset endpoints have no rate limiting | Resolved | Separate hashed email/IP and IP-wide limits cover browser/API login, reset-link requests and reset submissions; 206 tests / 1,694 assertions |
 | 8 | High | API tokens receive unrestricted abilities | Resolved | Explicit account, competition-object and download-link abilities replace wildcard tokens and are enforced alongside database permissions; 209 tests / 1,699 assertions; `93dc93f` |
 | 9 | High | Production environment defaults and validation are unsafe | Resolved | Deployment-blocking configuration validation and documentation; existing media remains unchanged; `93dc93f` |
-| 10 | High | Storage failures can be silent | Resolved - pending commit approval | All application disks throw and report failures; browser and API writes receive explicit retryable errors; regression coverage added. |
-| 11 | High | Deployments have no automated database backup | Resolved - pending commit approval | Deployment now creates and verifies a private compressed MySQL/MariaDB dump before migrations, records a SHA-256 manifest, applies bounded retention, and documents isolated restoration drills. |
-| 12 | High | Deployment health check is too permissive | Resolved - pending commit approval | Deployment verifies database, cache, queue, private storage and mail dependencies, then requires an exact JSON success response from the production HTTPS `/up` endpoint without following redirects. |
-| 13 | High | Automated test suite was red due to copy drift | Pending recheck | Current suite passed while resolving item 3 |
-| 14 | High | Public forms lack sufficient abuse protection | Pending | |
+| 10 | High | Storage failures can be silent | Resolved | All application disks throw and report failures; browser and API writes receive explicit retryable errors; `6b3c0aa` |
+| 11 | High | Deployments have no automated database backup | Resolved | Verified private database backup, checksum manifest, bounded retention and restoration guidance; `210a0af` |
+| 12 | High | Deployment health check is too permissive | Resolved | Strict production dependency checks and exact HTTPS `/up` response validation; `627070a` |
+| 13 | High | Automated test suite was red due to copy drift | Resolved - pending commit approval | “My Profile” and “Clocked out” interface copy matches its assertions; full suite green at 220 tests / 1,742 assertions. No application change was required. |
+| 14 | High | Public forms lack sufficient abuse protection | Resolved - pending commit approval | Separate booking/download limits with hashed alert context; booking honeypot and 10-minute duplicate suppression; scheduled 180-day access-log retention; 225 tests / 1,797 assertions. |
 | 15 | High | Uploaded files rely on local server storage | Pending | |
 | 16 | Usability | Mobile admin navigation is cumbersome | Pending | |
 | 17 | Usability | Crew navigation is cramped on small phones | Pending | |

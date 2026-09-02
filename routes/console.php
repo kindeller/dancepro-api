@@ -5,10 +5,12 @@ use App\Features\Contacts\Actions\ImportContactDirectory;
 use App\Features\Deployment\Services\DatabaseBackup;
 use App\Features\Deployment\Services\ProductionDependencyCheck;
 use App\Features\Deployment\Services\ProductionEnvironmentValidator;
+use App\Features\Downloads\Actions\PruneDownloadAccesses;
 use App\Features\Operations\Actions\SecureExistingInternalDocuments;
 use App\Features\Venues\Actions\ImportVenueCatalog;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -63,6 +65,14 @@ Artisan::command('production:healthcheck-url', function (): int {
 
     return self::SUCCESS;
 })->purpose('Print the configured production health-check URL');
+
+Artisan::command('downloads:prune-accesses', function (PruneDownloadAccesses $prune): int {
+    $this->info('Removed '.$prune->execute().' expired download access record(s).');
+
+    return self::SUCCESS;
+})->purpose('Remove download access records beyond the configured retention period');
+
+Schedule::command('downloads:prune-accesses')->daily()->withoutOverlapping();
 
 Artisan::command('venues:import {source?}', function (ImportVenueCatalog $import): int {
     $source = $this->argument('source') ?: storage_path('app/private/imports/venue-maps');

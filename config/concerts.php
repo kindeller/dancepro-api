@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'booking_duplicate_window_minutes' => (int) env('BOOKING_DUPLICATE_WINDOW_MINUTES', 10),
+
     'playback' => [
         'signed_url_ttl_minutes' => (int) env('CONCERT_PLAYBACK_SIGNED_URL_TTL_MINUTES', 15),
 

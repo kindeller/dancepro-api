@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -54,6 +55,39 @@ class AppServiceProvider extends ServiceProvider
             return [
                 Limit::perMinute(5)->by('password-reset:'.$emailAndIp),
                 Limit::perHour(20)->by('password-reset-ip:'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('concert-booking', function (Request $request): array {
+            $emailAndIp = hash('sha256', mb_strtolower($request->string('contact_email')->toString()).'|'.$request->ip());
+            $response = function (Request $request, array $headers) {
+                Log::warning('Public concert booking rate limit exceeded.', [
+                    'ip_hash' => hash('sha256', (string) $request->ip()),
+                ]);
+
+                return response('Too many booking attempts. Please wait and try again.', 429, $headers);
+            };
+
+            return [
+                Limit::perMinute(5)->by('concert-booking:'.$emailAndIp)->response($response),
+                Limit::perHour(20)->by('concert-booking-ip:'.$request->ip())->response($response),
+            ];
+        });
+
+        RateLimiter::for('public-download', function (Request $request): array {
+            $tokenAndIp = hash('sha256', $request->route('token').'|'.$request->ip());
+            $response = function (Request $request, array $headers) {
+                Log::warning('Public download rate limit exceeded.', [
+                    'ip_hash' => hash('sha256', (string) $request->ip()),
+                    'token_hash' => hash('sha256', (string) $request->route('token')),
+                ]);
+
+                return response('Too many download attempts. Please wait and try again.', 429, $headers);
+            };
+
+            return [
+                Limit::perMinute(30)->by('public-download:'.$tokenAndIp)->response($response),
+                Limit::perMinute(120)->by('public-download-ip:'.$request->ip())->response($response),
             ];
         });
 

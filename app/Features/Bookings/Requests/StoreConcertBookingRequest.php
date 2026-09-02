@@ -40,6 +40,7 @@ class StoreConcertBookingRequest extends FormRequest
         $videoFieldPresence = $this->boolean('wants_concert_videography') ? ['required'] : ['nullable'];
 
         return [
+            'website' => ['nullable', 'prohibited'],
             'studio_name' => ['required', 'string', 'max:255'],
             'contact_name' => ['required', 'string', 'max:255'],
             'contact_email' => ['required', 'email', 'max:255'],

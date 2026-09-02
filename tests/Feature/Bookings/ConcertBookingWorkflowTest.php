@@ -38,6 +38,39 @@ class ConcertBookingWorkflowTest extends TestCase
         $this->assertSame('pending', $booking->status->value);
     }
 
+    public function test_public_booking_rejects_honeypot_submissions(): void
+    {
+        $this->post(route('concert-bookings.store'), [
+            ...$this->bookingData(),
+            'website' => 'https://spam.example',
+        ])->assertSessionHasErrors('website');
+
+        $this->assertDatabaseCount('concert_bookings', 0);
+    }
+
+    public function test_identical_booking_submissions_are_deduplicated_within_the_safety_window(): void
+    {
+        $data = $this->bookingData();
+
+        $this->post(route('concert-bookings.store'), $data)->assertRedirect(route('concert-bookings.thanks'));
+        $this->post(route('concert-bookings.store'), $data)->assertRedirect(route('concert-bookings.thanks'));
+
+        $this->assertDatabaseCount('concert_bookings', 1);
+        $this->assertDatabaseCount('concert_booking_items', 2);
+        $this->assertNotNull(ConcertBooking::query()->firstOrFail()->submission_fingerprint);
+    }
+
+    public function test_public_booking_submissions_are_rate_limited(): void
+    {
+        $data = $this->bookingData();
+
+        foreach (range(1, 5) as $attempt) {
+            $this->post(route('concert-bookings.store'), $data)->assertRedirect(route('concert-bookings.thanks'));
+        }
+
+        $this->post(route('concert-bookings.store'), $data)->assertTooManyRequests();
+    }
+
     public function test_concert_title_is_optional_but_video_delivery_fields_are_required_for_videography(): void
     {
         $data = $this->bookingData();

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Downloads;
 
 use App\Features\Auth\Support\TokenAbility;
+use App\Features\Downloads\Models\DownloadAccess;
 use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Downloads\Services\DownloadUrlSigner;
 use App\Features\Downloads\Support\DownloadLinkStatus;
@@ -187,6 +188,30 @@ class DownloadLinksTest extends TestCase
             'was_successful' => true,
             'failure_reason' => null,
         ]);
+    }
+
+    public function test_public_downloads_are_rate_limited(): void
+    {
+        $token = Str::random(64);
+
+        foreach (range(1, 30) as $attempt) {
+            $this->get('/download/'.$token)->assertNotFound();
+        }
+
+        $this->get('/download/'.$token)->assertTooManyRequests();
+    }
+
+    public function test_expired_download_access_records_can_be_pruned(): void
+    {
+        config(['downloads.access_retention_days' => 180]);
+        DownloadAccess::factory()->create(['accessed_at' => now()->subDays(181)]);
+        DownloadAccess::factory()->create(['accessed_at' => now()->subDays(179)]);
+
+        $this->artisan('downloads:prune-accesses')
+            ->expectsOutput('Removed 1 expired download access record(s).')
+            ->assertSuccessful();
+
+        $this->assertDatabaseCount('download_accesses', 1);
     }
 
     public function test_expired_link_does_not_redirect(): void

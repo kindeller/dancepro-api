@@ -81,7 +81,7 @@ Route::middleware('auth')->group(function (): void {
 });
 
 Route::get('book-your-concert', [PublicConcertBookingController::class, 'create'])->name('concert-bookings.create');
-Route::post('book-your-concert', [PublicConcertBookingController::class, 'store'])->name('concert-bookings.store');
+Route::post('book-your-concert', [PublicConcertBookingController::class, 'store'])->middleware('throttle:concert-booking')->name('concert-bookings.store');
 Route::get('book-your-concert/thanks', [PublicConcertBookingController::class, 'thanks'])->name('concert-bookings.thanks');
 
 Route::middleware(['auth', 'two-factor.required'])->prefix('internal-documents')->name('internal-documents.')->group(function (): void {
@@ -226,4 +226,5 @@ Route::middleware(['auth', 'crew.required', 'two-factor.required', 'crew.onboard
 });
 
 Route::get('download/{token}', [PublicDownloadController::class, 'show'])
+    ->middleware('throttle:public-download')
     ->name('downloads.public.show');

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['uuid', 'status', 'studio_name', 'contact_name', 'contact_email', 'contact_phone', 'wants_portrait_photography', 'portrait_photography_interest', 'wants_concert_photography', 'wants_concert_videography', 'concert_inclusions', 'multiple_concert_relationship', 'approximate_family_count', 'postal_address', 'previous_video_feedback', 'accepted_requirements', 'internal_review_note', 'reviewed_by_user_id', 'reviewed_at'])]
+#[Fillable(['uuid', 'status', 'submission_fingerprint', 'studio_name', 'contact_name', 'contact_email', 'contact_phone', 'wants_portrait_photography', 'portrait_photography_interest', 'wants_concert_photography', 'wants_concert_videography', 'concert_inclusions', 'multiple_concert_relationship', 'approximate_family_count', 'postal_address', 'previous_video_feedback', 'accepted_requirements', 'internal_review_note', 'reviewed_by_user_id', 'reviewed_at'])]
 class ConcertBooking extends Model
 {
     use HasPublicUuid;
