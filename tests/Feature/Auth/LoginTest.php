@@ -80,4 +80,44 @@ class LoginTest extends TestCase
 
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }
+
+    public function test_api_login_is_rate_limited_by_email_and_ip(): void
+    {
+        User::factory()->create([
+            'email' => 'limited-api@example.com',
+            'password' => Hash::make('secret-password'),
+        ]);
+
+        foreach (range(1, 5) as $attempt) {
+            $this->postJson('/api/auth/login', [
+                'email' => 'limited-api@example.com',
+                'password' => 'wrong-password',
+            ])->assertUnauthorized();
+        }
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'limited-api@example.com',
+            'password' => 'wrong-password',
+        ])->assertTooManyRequests();
+    }
+
+    public function test_web_login_is_rate_limited_by_email_and_ip(): void
+    {
+        User::factory()->create([
+            'email' => 'limited-web@example.com',
+            'password' => Hash::make('secret-password'),
+        ]);
+
+        foreach (range(1, 5) as $attempt) {
+            $this->post(route('login.store'), [
+                'email' => 'limited-web@example.com',
+                'password' => 'wrong-password',
+            ])->assertSessionHasErrors('email');
+        }
+
+        $this->post(route('login.store'), [
+            'email' => 'limited-web@example.com',
+            'password' => 'wrong-password',
+        ])->assertTooManyRequests();
+    }
 }

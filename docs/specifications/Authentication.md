@@ -38,6 +38,19 @@ Only active users can receive a token. The response includes a bearer token that
 Authorization: Bearer <token>
 ```
 
+Browser and API login submissions share two rate limits: five attempts per
+minute for an email-address/IP combination and 30 attempts per minute for an IP
+address. The email portion of the limiter key is hashed before it is cached.
+
+## Password Reset
+
+Browser password-reset link requests are limited to three per minute for an
+email-address/IP combination and ten per hour for an IP address. Reset
+submissions are limited to five per minute for an email-address/IP combination
+and 20 per hour for an IP address. These limits supplement the password
+broker's token protections and apply equally to known and unknown email
+addresses.
+
 ## Logout
 
 `POST /api/auth/logout` revokes the current Sanctum token only.

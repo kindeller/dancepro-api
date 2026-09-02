@@ -57,11 +57,11 @@ Route::get('concerts/{concert}/media/{asset}/download', [PublicConcertController
 
 Route::middleware('guest')->group(function (): void {
     Route::get('login', [WebAuthController::class, 'create'])->name('login');
-    Route::post('login', [WebAuthController::class, 'store'])->name('login.store');
+    Route::post('login', [WebAuthController::class, 'store'])->middleware('throttle:login')->name('login.store');
     Route::get('forgot-password', [PasswordResetController::class, 'requestForm'])->name('password.request');
-    Route::post('forgot-password', [PasswordResetController::class, 'sendLink'])->name('password.email');
+    Route::post('forgot-password', [PasswordResetController::class, 'sendLink'])->middleware('throttle:password-reset-link')->name('password.email');
     Route::get('reset-password/{token}', [PasswordResetController::class, 'resetForm'])->name('password.reset');
-    Route::post('reset-password', [PasswordResetController::class, 'reset'])->name('password.update');
+    Route::post('reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:password-reset')->name('password.update');
 });
 
 Route::post('logout', [WebAuthController::class, 'destroy'])

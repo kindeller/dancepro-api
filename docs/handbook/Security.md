@@ -6,6 +6,8 @@ Phase 0 establishes the security defaults for later DancePro features.
 - API authentication uses Laravel Sanctum bearer tokens.
 - Passwords are hashed through Laravel's password hashing cast/factory helpers.
 - Inactive users cannot log in.
+- Browser and API login attempts are rate limited by hashed email/IP and by IP.
+- Password-reset link requests and reset submissions have separate rate limits.
 - Protected API routes must use `auth:sanctum`.
 - Non-trivial input must use Form Requests.
 - Authorization logic should use policies rather than controller conditionals.

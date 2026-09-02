@@ -46,4 +46,37 @@ class PasswordResetTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('status', 'If an account matches that email, a password reset link has been sent.');
     }
+
+    public function test_password_reset_link_requests_are_rate_limited(): void
+    {
+        Notification::fake();
+
+        foreach (range(1, 3) as $attempt) {
+            $this->post(route('password.email'), ['email' => 'limited-reset@dancepro.test'])
+                ->assertRedirect()
+                ->assertSessionHas('status');
+        }
+
+        $this->post(route('password.email'), ['email' => 'limited-reset@dancepro.test'])
+            ->assertTooManyRequests();
+    }
+
+    public function test_password_reset_submissions_are_rate_limited(): void
+    {
+        $payload = [
+            'token' => 'invalid-token',
+            'email' => 'limited-submit@dancepro.test',
+            'password' => 'new-secure-password',
+            'password_confirmation' => 'new-secure-password',
+        ];
+
+        foreach (range(1, 5) as $attempt) {
+            $this->post(route('password.update'), $payload)
+                ->assertRedirect()
+                ->assertSessionHasErrors('email');
+        }
+
+        $this->post(route('password.update'), $payload)
+            ->assertTooManyRequests();
+    }
 }

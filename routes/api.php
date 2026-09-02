@@ -11,7 +11,7 @@ Route::get('studios/{studio}', [PublicConcertApiController::class, 'studio']);
 Route::get('concerts/{concert}', [PublicConcertApiController::class, 'concert']);
 
 Route::prefix('auth')->group(function (): void {
-    Route::post('login', [AuthController::class, 'login']);
+    Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
 
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('logout', [AuthController::class, 'logout']);
