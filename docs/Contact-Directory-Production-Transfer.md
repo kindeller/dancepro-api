@@ -20,7 +20,7 @@ Copy the archive to the same private path on the production server, then run the
 sail artisan contacts:import
 ```
 
-Set `CONTACT_DIRECTORY_LOGO_DISK` to a durable, browser-accessible filesystem disk before applying the import. A single-server installation with persistent shared storage can use `public`; multi-server or replaceable-server deployments should use an appropriately configured object-storage disk.
+Set `PUBLIC_UPLOAD_DISK` to a durable, browser-accessible filesystem disk before applying the import. Production validation rejects the local `public` disk; use the configured `s3_public_uploads` disk or an explicitly persistent shared-volume disk.
 
 Review the reported new and updated record counts. The command rejects unsupported archives, malformed contacts, missing or modified logos, duplicate codes and records that have the same name or code as a different existing UUID.
 

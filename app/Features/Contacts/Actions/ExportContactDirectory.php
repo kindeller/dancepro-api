@@ -121,7 +121,7 @@ class ExportContactDirectory
             return null;
         }
 
-        $disk = Storage::disk(config('contact-directory.logo_disk'));
+        $disk = Storage::disk(config('uploads.public_disk'));
         if (! $disk->exists($storagePath)) {
             throw new RuntimeException("Directory logo is missing from public storage: {$storagePath}");
         }

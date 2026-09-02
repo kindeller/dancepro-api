@@ -52,7 +52,10 @@ class SaveCrewProfile
             $crewProfile->save();
 
             if (isset($data['profile_photo'])) {
-                $crewProfile->profile_photo_path = $data['profile_photo']->store("crew-profile-photos/{$crewProfile->uuid}");
+                $crewProfile->profile_photo_path = $data['profile_photo']->store(
+                    "crew-profile-photos/{$crewProfile->uuid}",
+                    config('operations.filesystem_disk'),
+                );
                 $crewProfile->save();
             }
 

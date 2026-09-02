@@ -27,7 +27,7 @@ class CompetitionContact extends Model
 
     public function logoUrl(): ?string
     {
-        return $this->logo_path ? Storage::disk(config('contact-directory.logo_disk'))->url($this->logo_path) : null;
+        return $this->logo_path ? Storage::disk(config('uploads.public_disk'))->url($this->logo_path) : null;
     }
 
     /** @return list<string> */

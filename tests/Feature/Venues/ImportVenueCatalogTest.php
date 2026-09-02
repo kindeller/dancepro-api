@@ -18,6 +18,8 @@ class ImportVenueCatalogTest extends TestCase
     public function test_it_imports_real_venues_maps_notes_and_replaces_placeholders(): void
     {
         Storage::fake('public');
+        Storage::fake('local');
+        config(['uploads.public_disk' => 'public', 'operations.filesystem_disk' => 'local']);
         $source = storage_path('framework/testing/venue-catalog');
         File::deleteDirectory($source);
         File::ensureDirectoryExists($source);
@@ -52,7 +54,7 @@ class ImportVenueCatalogTest extends TestCase
         $this->assertSame($regal->id, $event->refresh()->venue_id);
 
         $kingsway = Venue::query()->where('name', 'Kingsway Christian College Auditorium')->firstOrFail();
-        Storage::disk('public')->assertExists($kingsway->map_path);
+        Storage::disk('local')->assertExists($kingsway->map_path);
         Storage::disk('public')->assertExists($kingsway->reference_image_path);
 
         $nexus = Venue::query()->where('name', 'Nexus Theatre - Murdoch University')->firstOrFail();

@@ -244,7 +244,7 @@ class ImportContactDirectory
             'image/webp' => 'webp',
         };
         $path = "logos/{$type}/{$uuid}/import-".substr($logo['sha256'], 0, 16).".{$extension}";
-        if (! Storage::disk(config('contact-directory.logo_disk'))->put($path, $contents)) {
+        if (! Storage::disk(config('uploads.public_disk'))->put($path, $contents)) {
             throw new RuntimeException("Unable to store imported logo: {$path}");
         }
 

@@ -25,17 +25,11 @@ final class ProductionDependencyCheck
         Cache::forget($cacheKey);
         $checks[] = 'cache';
 
-        $disk = Storage::disk((string) config('operations.filesystem_disk'));
-        $storagePath = 'deployment-health/'.Str::uuid().'.txt';
-        try {
-            $disk->put($storagePath, 'ok');
-            if ($disk->get($storagePath) !== 'ok') {
-                throw new RuntimeException('Private storage failed its write/read check.');
-            }
-        } finally {
-            $disk->delete($storagePath);
-        }
+        $this->checkStorageDisk((string) config('operations.filesystem_disk'), 'Private storage');
         $checks[] = 'private storage';
+
+        $this->checkStorageDisk((string) config('uploads.public_disk'), 'Public upload storage');
+        $checks[] = 'public upload storage';
 
         Mail::mailer()->getSymfonyTransport();
         $checks[] = 'mail transport';
@@ -54,5 +48,19 @@ final class ProductionDependencyCheck
         $checks[] = 'queue';
 
         return $checks;
+    }
+
+    private function checkStorageDisk(string $diskName, string $label): void
+    {
+        $disk = Storage::disk($diskName);
+        $storagePath = 'deployment-health/'.Str::uuid().'.txt';
+        try {
+            $disk->put($storagePath, 'ok');
+            if ($disk->get($storagePath) !== 'ok') {
+                throw new RuntimeException("{$label} failed its write/read check.");
+            }
+        } finally {
+            $disk->delete($storagePath);
+        }
     }
 }

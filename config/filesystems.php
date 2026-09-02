@@ -36,6 +36,7 @@ return [
             'serve' => true,
             'throw' => true,
             'report' => true,
+            'persistent' => false,
         ],
 
         'public' => [
@@ -45,6 +46,8 @@ return [
             'visibility' => 'public',
             'throw' => true,
             'report' => true,
+            'persistent' => false,
+            'browser_accessible' => true,
         ],
 
         's3' => [
@@ -58,6 +61,22 @@ return [
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => true,
             'report' => true,
+            'persistent' => true,
+        ],
+
+        's3_public_uploads' => [
+            'driver' => 's3',
+            'key' => env('AWS_PUBLIC_UPLOADS_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('AWS_PUBLIC_UPLOADS_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('AWS_PUBLIC_UPLOADS_DEFAULT_REGION', env('AWS_DEFAULT_REGION')),
+            'bucket' => env('AWS_PUBLIC_UPLOADS_BUCKET'),
+            'url' => env('AWS_PUBLIC_UPLOADS_URL'),
+            'endpoint' => env('AWS_PUBLIC_UPLOADS_ENDPOINT', env('AWS_ENDPOINT')),
+            'use_path_style_endpoint' => env('AWS_PUBLIC_UPLOADS_USE_PATH_STYLE_ENDPOINT', env('AWS_USE_PATH_STYLE_ENDPOINT', false)),
+            'throw' => true,
+            'report' => true,
+            'persistent' => true,
+            'browser_accessible' => true,
         ],
 
         's3_competitions' => [

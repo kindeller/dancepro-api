@@ -41,7 +41,7 @@ class SaveStudio
                 $studio->logo_path = $attributes['logo']->storeAs(
                     "logos/studios/{$studio->uuid}",
                     'logo.'.$attributes['logo']->extension(),
-                    config('contact-directory.logo_disk'),
+                    config('uploads.public_disk'),
                 );
                 $studio->save();
             }

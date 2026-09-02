@@ -2,6 +2,7 @@
 
 use App\Features\Contacts\Actions\ExportContactDirectory;
 use App\Features\Contacts\Actions\ImportContactDirectory;
+use App\Features\Deployment\Actions\MigratePublicUploads;
 use App\Features\Deployment\Services\DatabaseBackup;
 use App\Features\Deployment\Services\ProductionDependencyCheck;
 use App\Features\Deployment\Services\ProductionEnvironmentValidator;
@@ -73,6 +74,18 @@ Artisan::command('downloads:prune-accesses', function (PruneDownloadAccesses $pr
 })->purpose('Remove download access records beyond the configured retention period');
 
 Schedule::command('downloads:prune-accesses')->daily()->withoutOverlapping();
+
+Artisan::command('uploads:migrate-public {--from=public} {--apply}', function (MigratePublicUploads $migrate): int {
+    $summary = $migrate->execute((string) $this->option('from'), (bool) $this->option('apply'));
+    $verb = $summary['applied'] ? 'Copied' : 'Would copy';
+    $this->info("{$verb} {$summary['copied']} of {$summary['tracked']} tracked public upload(s).");
+    $this->line("Already present: {$summary['already_present']}; missing: {$summary['missing']}.");
+    if (! $summary['applied']) {
+        $this->warn('Dry-run only. Run again with --apply after reviewing the result. Source files are retained.');
+    }
+
+    return $summary['missing'] > 0 ? self::FAILURE : self::SUCCESS;
+})->purpose('Copy tracked public uploads to the configured durable disk');
 
 Artisan::command('venues:import {source?}', function (ImportVenueCatalog $import): int {
     $source = $this->argument('source') ?: storage_path('app/private/imports/venue-maps');

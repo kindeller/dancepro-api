@@ -77,8 +77,8 @@ final class ProductionEnvironmentValidator
         );
 
         $this->validateLogging($errors);
-        $this->validateFilesystem('operations.filesystem_disk', 'OPERATIONS_FILESYSTEM_DISK', $errors, requirePrivate: true);
-        $this->validateFilesystem('contact-directory.logo_disk', 'CONTACT_DIRECTORY_LOGO_DISK', $errors);
+        $this->validateFilesystem('operations.filesystem_disk', 'OPERATIONS_FILESYSTEM_DISK', $errors, requirePrivate: true, requirePersistent: true);
+        $this->validateFilesystem('uploads.public_disk', 'PUBLIC_UPLOAD_DISK', $errors, requirePublic: true, requirePersistent: true);
         $this->validateDownloadSigner($errors);
 
         return $errors;
@@ -113,6 +113,8 @@ final class ProductionEnvironmentValidator
         string $environmentName,
         array &$errors,
         bool $requirePrivate = false,
+        bool $requirePublic = false,
+        bool $requirePersistent = false,
     ): void {
         $disk = config($configKey);
         $configuration = config("filesystems.disks.{$disk}");
@@ -126,6 +128,22 @@ final class ProductionEnvironmentValidator
             $this->require(
                 ($configuration['visibility'] ?? null) !== 'public',
                 "{$environmentName} must use private storage.",
+                $errors,
+            );
+        }
+
+        if ($requirePublic && is_array($configuration)) {
+            $this->require(
+                ($configuration['browser_accessible'] ?? false) === true,
+                "{$environmentName} must provide browser-accessible URLs.",
+                $errors,
+            );
+        }
+
+        if ($requirePersistent && is_array($configuration)) {
+            $this->require(
+                ($configuration['persistent'] ?? false) === true,
+                "{$environmentName} must use durable shared storage.",
                 $errors,
             );
         }

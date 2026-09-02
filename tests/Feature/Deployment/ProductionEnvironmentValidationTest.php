@@ -59,6 +59,20 @@ class ProductionEnvironmentValidationTest extends TestCase
             ->assertFailed();
     }
 
+    public function test_local_upload_disks_are_rejected_for_production(): void
+    {
+        $this->setSecureProductionConfiguration();
+        config([
+            'operations.filesystem_disk' => 'local',
+            'uploads.public_disk' => 'public',
+        ]);
+
+        $this->artisan('production:validate')
+            ->expectsOutputToContain('OPERATIONS_FILESYSTEM_DISK must use durable shared storage.')
+            ->expectsOutputToContain('PUBLIC_UPLOAD_DISK must use durable shared storage.')
+            ->assertFailed();
+    }
+
     private function setSecureProductionConfiguration(): void
     {
         $this->app['env'] = 'production';
@@ -82,8 +96,8 @@ class ProductionEnvironmentValidationTest extends TestCase
             'mail.from.address' => 'noreply@dancepro.example',
             'logging.default' => 'daily',
             'logging.channels.daily.level' => 'warning',
-            'operations.filesystem_disk' => 'local',
-            'contact-directory.logo_disk' => 'public',
+            'operations.filesystem_disk' => 's3',
+            'uploads.public_disk' => 's3_public_uploads',
             'downloads.cloudfront.domain' => null,
             'downloads.cloudfront.key_pair_id' => null,
             'downloads.cloudfront.private_key' => null,

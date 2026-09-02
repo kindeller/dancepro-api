@@ -17,8 +17,8 @@ This checklist tracks the 22 findings from the pre-publication audit. Update the
 | 11 | High | Deployments have no automated database backup | Resolved | Verified private database backup, checksum manifest, bounded retention and restoration guidance; `210a0af` |
 | 12 | High | Deployment health check is too permissive | Resolved | Strict production dependency checks and exact HTTPS `/up` response validation; `627070a` |
 | 13 | High | Automated test suite was red due to copy drift | Resolved - pending commit approval | “My Profile” and “Clocked out” interface copy matches its assertions; full suite green at 220 tests / 1,742 assertions. No application change was required. |
-| 14 | High | Public forms lack sufficient abuse protection | Resolved - pending commit approval | Separate booking/download limits with hashed alert context; booking honeypot and 10-minute duplicate suppression; scheduled 180-day access-log retention; 225 tests / 1,797 assertions. |
-| 15 | High | Uploaded files rely on local server storage | Pending | |
+| 14 | High | Public forms lack sufficient abuse protection | Resolved | Separate booking/download limits with hashed alert context; booking honeypot and 10-minute duplicate suppression; scheduled 180-day access-log retention; 225 tests / 1,797 assertions; `edc4a2f`. |
+| 15 | High | Uploaded files rely on local server storage | Resolved - pending commit approval | Public uploads and private operational files are configurable, production requires durable shared disks, existing public uploads have a non-destructive migration command, object-backup requirements are documented, and 227 tests / 1,814 assertions pass. |
 | 16 | Usability | Mobile admin navigation is cumbersome | Pending | |
 | 17 | Usability | Crew navigation is cramped on small phones | Pending | |
 | 18 | Maintainability | Concert logos are matched using event names | Pending | |

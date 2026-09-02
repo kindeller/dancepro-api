@@ -170,14 +170,38 @@ DOWNLOAD_CLOUDFRONT_DOMAIN
 DOWNLOAD_CLOUDFRONT_KEY_PAIR_ID
 DOWNLOAD_CLOUDFRONT_PRIVATE_KEY or DOWNLOAD_CLOUDFRONT_PRIVATE_KEY_PATH
 OPERATIONS_FILESYSTEM_DISK
+PUBLIC_UPLOAD_DISK
+AWS_PUBLIC_UPLOADS_BUCKET
+AWS_PUBLIC_UPLOADS_URL
 ```
 
-`OPERATIONS_FILESYSTEM_DISK` must use a private filesystem disk. The default
-`local` disk stores files under `storage/app/private`; do not set it to
-`public`. The deployment command first inventories existing operational files,
+In production, `OPERATIONS_FILESYSTEM_DISK` must use durable private shared
+storage and `PUBLIC_UPLOAD_DISK` must use durable public shared storage. The
+included `s3` and `s3_public_uploads` disks satisfy those application checks;
+local development continues to use `local` and `public`.
+`AWS_PUBLIC_UPLOADS_URL` should be the public CDN/CloudFront base URL. The S3
+bucket itself can remain private behind CloudFront origin access; uploads do
+not request public object ACLs.
+
+Before changing `PUBLIC_UPLOAD_DISK`, copy existing tracked logos and venue
+reference images without deleting their source copies:
+
+```bash
+php artisan uploads:migrate-public --from=public
+php artisan uploads:migrate-public --from=public --apply
+```
+
+Private crew profile photos also use `OPERATIONS_FILESYSTEM_DISK`. The
+deployment command first inventories existing operational files,
 then moves verified copies of venue maps, run sheets, crew resources and event
 attachments out of `storage/app/public`. Event logos, venue reference images
 and concert media are not changed by this command.
+
+Database backups do not contain uploaded objects. Enable bucket versioning and
+a separately managed backup or replication policy for both the public-upload
+and private-operations buckets. Test restoring database and object storage to
+the same point in time. Do not expire object versions until the documented
+retention period has elapsed.
 
 When CloudFront signing is enabled, production also requires the configured
 distribution domain, key-pair ID and private key or readable private-key path

@@ -26,6 +26,6 @@ class Venue extends Model
 
     public function referenceImageUrl(): ?string
     {
-        return $this->reference_image_path ? Storage::disk('public')->url($this->reference_image_path) : null;
+        return $this->reference_image_path ? Storage::disk(config('uploads.public_disk'))->url($this->reference_image_path) : null;
     }
 }

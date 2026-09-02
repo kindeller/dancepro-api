@@ -2,6 +2,7 @@
 
 namespace App\Features\Venues\Actions;
 
+use App\Features\Operations\Services\OperationsFileStorage;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Venues\Models\Venue;
 use App\Features\Venues\Support\VenueCatalog;
@@ -11,6 +12,8 @@ use RuntimeException;
 
 class ImportVenueCatalog
 {
+    public function __construct(private readonly OperationsFileStorage $operationsFiles) {}
+
     /** @return array{venues:int,maps:int,references:int,removed:int} */
     public function execute(string $sourceDirectory): array
     {
@@ -73,7 +76,10 @@ class ImportVenueCatalog
 
         $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
         $destination = "operations/venues/{$venue->uuid}/".($column === 'map_path' ? 'map' : 'reference').".{$extension}";
-        Storage::disk('public')->put($destination, file_get_contents($source));
+        $disk = $column === 'map_path'
+            ? $this->operationsFiles->disk()
+            : Storage::disk(config('uploads.public_disk'));
+        $disk->put($destination, file_get_contents($source));
         $venue->update([$column => $destination]);
 
         return 1;

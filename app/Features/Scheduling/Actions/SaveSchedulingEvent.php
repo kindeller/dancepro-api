@@ -24,7 +24,7 @@ class SaveSchedulingEvent
                 $event->logo_path = $data['logo']->storeAs(
                     "logos/competitions/{$event->uuid}",
                     'logo.'.$data['logo']->extension(),
-                    'public',
+                    config('uploads.public_disk'),
                 );
                 $event->save();
             }
