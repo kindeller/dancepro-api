@@ -28,11 +28,19 @@ GET  /api/auth/me
 {
   "email": "staff@example.com",
   "password": "password",
-  "device_name": "Admin app"
+  "device_name": "Admin app",
+  "two_factor_code": "123456"
 }
 ```
 
 Only active users can receive a token. The response includes a bearer token that the client must send in the `Authorization` header.
+
+When two-factor authentication is enabled for a configured account, API login
+also requires either `two_factor_code` or `recovery_code`. The two fields are
+mutually exclusive. A recovery code is consumed after one successful login.
+When two-factor authentication is enforced and the account has not completed
+setup, API login is refused until setup is completed through the web account.
+No bearer token is created before the second factor succeeds.
 
 ```text
 Authorization: Bearer <token>

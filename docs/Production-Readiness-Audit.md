@@ -30,3 +30,21 @@ This checklist tracks the 22 findings from the pre-publication audit. Update the
 ## Working rule
 
 Resolve items in numerical order unless the owner explicitly reprioritises them. A finding is only marked resolved after applicable migrations, formatting, tests, and route checks pass. Commits require explicit owner approval.
+
+## Second audit
+
+This follow-up checklist records the findings from the September 2026 full
+application re-audit. It uses its own fixed numbering and is resolved in order.
+
+| # | Priority | Finding | Status | Verification / commit |
+|---:|---|---|---|---|
+| 1 | Critical | API authentication bypasses enforced two-factor authentication | Resolved - pending commit approval | API login now requires a valid TOTP or one-time recovery code for configured accounts and refuses enforced-but-unconfigured accounts before issuing a token; 234 tests / 1,842 assertions and Pint pass. |
+| 2 | High | API tokens do not expire by default | Pending | |
+| 3 | High | A stale Vite `public/hot` file can override a production build | Pending | |
+| 4 | High | Production dependency checks omit media storage and signing paths | Pending | |
+| 5 | High | Database backups are not scheduled by the application | Pending | |
+| 6 | Medium | Public concert media endpoints have no request throttling | Pending | |
+| 7 | Medium | Replacing private operational files leaves obsolete objects behind | Pending | |
+| 8 | Medium | Standard HTTP security headers are not applied | Pending | |
+| 9 | Medium | The concert-player production bundle exceeds the build warning threshold | Pending | |
+| 10 | Medium | JavaScript-heavy workflows lack browser-level regression coverage | Pending | |

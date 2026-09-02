@@ -4,6 +4,8 @@ namespace App\Features\Auth\Controllers;
 
 use App\Features\Auth\Requests\LoginRequest;
 use App\Features\Auth\Resources\AuthUserResource;
+use App\Features\Auth\Services\ApiLoginTwoFactorGuard;
+use App\Features\Auth\Services\ApiLoginTwoFactorResult;
 use App\Features\Auth\Services\ApiTokenAbilities;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -17,8 +19,11 @@ class AuthController extends Controller
     /**
      * Issue a Sanctum API token for an active staff/admin user.
      */
-    public function login(LoginRequest $request, ApiTokenAbilities $tokenAbilities): JsonResponse
-    {
+    public function login(
+        LoginRequest $request,
+        ApiTokenAbilities $tokenAbilities,
+        ApiLoginTwoFactorGuard $twoFactor,
+    ): JsonResponse {
         /** @var User|null $user */
         $user = User::query()
             ->where('email', $request->string('email')->toString())
@@ -30,6 +35,28 @@ class AuthController extends Controller
 
         if (! $user->is_active) {
             return ApiResponse::error('This account is inactive.', status: 403);
+        }
+
+        $twoFactorResult = $twoFactor->check(
+            $user,
+            $request->string('two_factor_code')->toString() ?: null,
+            $request->string('recovery_code')->toString() ?: null,
+        );
+
+        if ($twoFactorResult === ApiLoginTwoFactorResult::SetupRequired) {
+            return ApiResponse::error(
+                'Two-factor authentication must be configured in the web account before API login.',
+                ['two_factor' => ['Setup required.']],
+                403,
+            );
+        }
+
+        if ($twoFactorResult !== ApiLoginTwoFactorResult::Passed) {
+            $message = $twoFactorResult === ApiLoginTwoFactorResult::Required
+                ? 'Two-factor authentication is required.'
+                : 'The authentication or recovery code was not valid.';
+
+            return ApiResponse::error($message, ['two_factor' => [$message]], 422);
         }
 
         $user->forceFill([

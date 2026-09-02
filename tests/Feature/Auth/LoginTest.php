@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Features\Auth\Services\TwoFactorAuthentication;
 use App\Features\Auth\Support\TokenAbility;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
 class LoginTest extends TestCase
@@ -108,6 +110,71 @@ class LoginTest extends TestCase
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
+    public function test_api_login_requires_two_factor_code_for_a_configured_user(): void
+    {
+        config()->set('security.two_factor.enabled', true);
+        $user = $this->confirmedTwoFactorUser();
+
+        $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'secret-password',
+        ])->assertUnprocessable()
+            ->assertJsonPath('message', 'Two-factor authentication is required.');
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_api_login_accepts_a_valid_two_factor_code(): void
+    {
+        config()->set('security.two_factor.enabled', true);
+        $user = $this->confirmedTwoFactorUser();
+
+        $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'secret-password',
+            'two_factor_code' => (new Google2FA)->getCurrentOtp($user->two_factor_secret),
+        ])->assertOk()->assertJsonPath('message', 'Logged in.');
+
+        $this->assertDatabaseCount('personal_access_tokens', 1);
+    }
+
+    public function test_api_login_accepts_each_recovery_code_only_once(): void
+    {
+        config()->set('security.two_factor.enabled', true);
+        [$user, $recoveryCodes] = $this->confirmedTwoFactorUser(withRecoveryCodes: true);
+
+        $credentials = [
+            'email' => $user->email,
+            'password' => 'secret-password',
+            'recovery_code' => $recoveryCodes[0],
+        ];
+
+        $this->postJson('/api/auth/login', $credentials)->assertOk();
+        $this->postJson('/api/auth/login', $credentials)
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'The authentication or recovery code was not valid.');
+
+        $this->assertDatabaseCount('personal_access_tokens', 1);
+    }
+
+    public function test_enforced_two_factor_rejects_api_login_until_setup_is_complete(): void
+    {
+        config()->set('security.two_factor.enabled', true);
+        config()->set('security.two_factor.enforced', true);
+        $user = User::factory()->staff()->create([
+            'email' => 'setup-required@example.com',
+            'password' => Hash::make('secret-password'),
+        ]);
+
+        $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'secret-password',
+        ])->assertForbidden()
+            ->assertJsonPath('message', 'Two-factor authentication must be configured in the web account before API login.');
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
     public function test_api_login_is_rate_limited_by_email_and_ip(): void
     {
         User::factory()->create([
@@ -146,5 +213,20 @@ class LoginTest extends TestCase
             'email' => 'limited-web@example.com',
             'password' => 'wrong-password',
         ])->assertTooManyRequests();
+    }
+
+    private function confirmedTwoFactorUser(bool $withRecoveryCodes = false): User|array
+    {
+        $user = User::factory()->staff()->create([
+            'email' => 'two-factor-api@example.com',
+            'password' => Hash::make('secret-password'),
+        ]);
+        $twoFactor = app(TwoFactorAuthentication::class);
+        $twoFactor->begin($user);
+        $user->refresh();
+        $recoveryCodes = $twoFactor->confirm($user, (new Google2FA)->getCurrentOtp($user->two_factor_secret));
+        $user->refresh();
+
+        return $withRecoveryCodes ? [$user, $recoveryCodes] : $user;
     }
 }
