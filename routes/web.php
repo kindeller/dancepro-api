@@ -51,9 +51,9 @@ Route::get('c/{slug}', [PublicSlugRedirectController::class, 'concert'])->name('
 Route::get('studios/{studio}', [PublicStudioController::class, 'show'])->name('studios.show');
 Route::get('concerts/{concert}', [PublicConcertController::class, 'show'])->name('concerts.show');
 Route::post('concerts/{concert}/unlock', [PublicConcertController::class, 'unlock'])->middleware('throttle:10,1')->name('concerts.unlock');
-Route::get('concerts/{concert}/media/{asset}/playback', [PublicConcertController::class, 'playback'])->name('concerts.media.playback');
-Route::get('concerts/{concert}/media/{asset}', [PublicConcertController::class, 'media'])->name('concerts.media.stream');
-Route::get('concerts/{concert}/media/{asset}/download', [PublicConcertController::class, 'download'])->name('concerts.media.download');
+Route::get('concerts/{concert}/media/{asset}/playback', [PublicConcertController::class, 'playback'])->middleware('throttle:concert-playback')->name('concerts.media.playback');
+Route::get('concerts/{concert}/media/{asset}', [PublicConcertController::class, 'media'])->middleware('throttle:concert-media')->name('concerts.media.stream');
+Route::get('concerts/{concert}/media/{asset}/download', [PublicConcertController::class, 'download'])->middleware('throttle:concert-media-download')->name('concerts.media.download');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('login', [WebAuthController::class, 'create'])->name('login');

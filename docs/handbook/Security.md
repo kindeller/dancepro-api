@@ -12,6 +12,9 @@ Phase 0 establishes the security defaults for later DancePro features.
 - Password-reset link requests and reset submissions have separate rate limits.
 - Public booking submissions and download links have endpoint-specific rate
   limits. Limit events log only hashed IP/token identifiers.
+- Public concert playback lookup, media streaming and media download routes
+  have independent per-asset/IP and broader per-IP minute limits. Defaults are
+  configurable through the `CONCERT_*_RATE_LIMIT_PER_MINUTE` settings.
 - The booking form uses a honeypot and suppresses identical submissions made
   within `BOOKING_DUPLICATE_WINDOW_MINUTES` (10 minutes by default).
 - Download access records are pruned daily after

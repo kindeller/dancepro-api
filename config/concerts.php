@@ -3,6 +3,12 @@
 return [
     'booking_duplicate_window_minutes' => (int) env('BOOKING_DUPLICATE_WINDOW_MINUTES', 10),
 
+    'rate_limits' => [
+        'playback_per_minute' => (int) env('CONCERT_PLAYBACK_RATE_LIMIT_PER_MINUTE', 60),
+        'media_per_minute' => (int) env('CONCERT_MEDIA_RATE_LIMIT_PER_MINUTE', 180),
+        'download_per_minute' => (int) env('CONCERT_DOWNLOAD_RATE_LIMIT_PER_MINUTE', 20),
+    ],
+
     'playback' => [
         'signed_url_ttl_minutes' => (int) env('CONCERT_PLAYBACK_SIGNED_URL_TTL_MINUTES', 15),
 

@@ -6,6 +6,7 @@ use App\Features\Crew\Services\CrewNavigationIndicators;
 use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Downloads\Policies\DownloadLinkPolicy;
 use App\Features\Exceptions\Services\AdminExceptionOverview;
+use App\Features\Media\Models\MediaAsset;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -91,6 +92,8 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        $this->registerConcertMediaRateLimiters();
+
         Gate::policy(DownloadLink::class, DownloadLinkPolicy::class);
 
         Gate::define('viewCompetitionObjects', fn (User $user): bool => $user->canAccessAdmin());
@@ -112,5 +115,26 @@ class AppServiceProvider extends ServiceProvider
                 ? app(AdminExceptionOverview::class)->all()->where('severity', 'action')->count()
                 : 0);
         });
+    }
+
+    private function registerConcertMediaRateLimiters(): void
+    {
+        foreach ([
+            'concert-playback' => 'playback_per_minute',
+            'concert-media' => 'media_per_minute',
+            'concert-media-download' => 'download_per_minute',
+        ] as $limiterName => $configKey) {
+            RateLimiter::for($limiterName, function (Request $request) use ($limiterName, $configKey): array {
+                $limit = max(1, (int) config("concerts.rate_limits.{$configKey}"));
+                $asset = $request->route('asset');
+                $assetKey = $asset instanceof MediaAsset ? $asset->uuid : (string) $asset;
+                $assetAndIp = hash('sha256', $assetKey.'|'.$request->ip());
+
+                return [
+                    Limit::perMinute($limit)->by("{$limiterName}:{$assetAndIp}"),
+                    Limit::perMinute($limit * 4)->by("{$limiterName}-ip:{$request->ip()}"),
+                ];
+            });
+        }
     }
 }

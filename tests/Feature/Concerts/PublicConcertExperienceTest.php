@@ -181,6 +181,26 @@ class PublicConcertExperienceTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_public_concert_media_endpoints_are_rate_limited_independently(): void
+    {
+        Storage::fake('local');
+        config([
+            'concerts.playback.cloudfront.domain' => null,
+            'concerts.rate_limits.playback_per_minute' => 1,
+            'concerts.rate_limits.media_per_minute' => 1,
+            'concerts.rate_limits.download_per_minute' => 1,
+        ]);
+
+        [$concert, , $asset] = $this->createVideoAsset();
+        Storage::disk('local')->put($asset->storage_key, 'video-content');
+
+        foreach (['playback', 'stream', 'download'] as $endpoint) {
+            $url = route("concerts.media.{$endpoint}", [$concert, $asset]);
+            $this->get($url)->assertSuccessful();
+            $this->get($url)->assertTooManyRequests();
+        }
+    }
+
     /**
      * @return array{Concert, MediaCollection, MediaAsset}
      */
