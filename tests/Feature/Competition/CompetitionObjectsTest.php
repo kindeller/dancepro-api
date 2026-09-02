@@ -85,6 +85,36 @@ class CompetitionObjectsTest extends TestCase
             ->assertJsonPath('message', 'Unauthenticated.');
     }
 
+    public function test_customer_and_crew_users_cannot_list_competition_objects(): void
+    {
+        foreach ([User::factory()->customer()->create(), User::factory()->crew()->create()] as $user) {
+            Sanctum::actingAs($user);
+
+            $this->getJson('/api/competitions/objects')
+                ->assertForbidden()
+                ->assertJsonPath('success', false)
+                ->assertJsonPath('message', 'Unauthorised.');
+        }
+    }
+
+    public function test_inactive_staff_user_cannot_list_competition_objects(): void
+    {
+        Sanctum::actingAs(User::factory()->staff()->inactive()->create());
+
+        $this->getJson('/api/competitions/objects')
+            ->assertForbidden();
+    }
+
+    public function test_active_admin_user_can_list_competition_objects(): void
+    {
+        Storage::fake('s3_competitions');
+        Sanctum::actingAs(User::factory()->admin()->create());
+
+        $this->getJson('/api/competitions/objects')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+    }
+
     public function test_unsafe_prefixes_are_rejected(): void
     {
         Sanctum::actingAs(User::factory()->create());

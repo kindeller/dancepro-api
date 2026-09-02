@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Features\Crew\Services\CrewNavigationIndicators;
-use App\Features\Customers\Support\UserType;
 use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Downloads\Policies\DownloadLinkPolicy;
 use App\Features\Exceptions\Services\AdminExceptionOverview;
@@ -30,11 +29,11 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::policy(DownloadLink::class, DownloadLinkPolicy::class);
 
-        Gate::define('viewCompetitionObjects', fn ($user): bool => $user->is_active);
-        Gate::define('manageStudios', fn (User $user): bool => $this->isStaff($user));
-        Gate::define('manageConcerts', fn (User $user): bool => $this->isStaff($user));
-        Gate::define('manageCrew', fn (User $user): bool => $this->isStaff($user));
-        Gate::define('manageScheduling', fn (User $user): bool => $this->isStaff($user));
+        Gate::define('viewCompetitionObjects', fn (User $user): bool => $user->canAccessAdmin());
+        Gate::define('manageStudios', fn (User $user): bool => $user->canAccessAdmin());
+        Gate::define('manageConcerts', fn (User $user): bool => $user->canAccessAdmin());
+        Gate::define('manageCrew', fn (User $user): bool => $user->canAccessAdmin());
+        Gate::define('manageScheduling', fn (User $user): bool => $user->canAccessAdmin());
 
         View::composer('layouts.crew', function (ViewContract $view): void {
             $user = auth()->user();
@@ -49,10 +48,5 @@ class AppServiceProvider extends ServiceProvider
                 ? app(AdminExceptionOverview::class)->all()->where('severity', 'action')->count()
                 : 0);
         });
-    }
-
-    private function isStaff(User $user): bool
-    {
-        return $user->is_active && in_array($user->type, [UserType::Staff->value, UserType::Admin->value], true);
     }
 }

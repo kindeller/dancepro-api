@@ -61,6 +61,41 @@ class DownloadLinksTest extends TestCase
             ->assertJsonPath('message', 'Unauthenticated.');
     }
 
+    public function test_customer_and_crew_users_cannot_manage_download_links(): void
+    {
+        $downloadLink = DownloadLink::factory()->create();
+
+        foreach ([User::factory()->customer()->create(), User::factory()->crew()->create()] as $user) {
+            Sanctum::actingAs($user);
+
+            $this->getJson('/api/download-links')->assertForbidden();
+            $this->postJson('/api/download-links', ['keys' => ['folder/new-file.mp4']])->assertForbidden();
+            $this->getJson('/api/download-links/'.$downloadLink->uuid)->assertForbidden();
+            $this->patchJson('/api/download-links/'.$downloadLink->uuid.'/revoke')->assertForbidden();
+            $this->getJson('/api/download-links/'.$downloadLink->uuid.'/accesses')->assertForbidden();
+        }
+
+        $this->assertDatabaseCount('download_links', 1);
+        $this->assertNull($downloadLink->fresh()->revoked_at);
+    }
+
+    public function test_inactive_staff_user_cannot_manage_download_links(): void
+    {
+        Sanctum::actingAs(User::factory()->staff()->inactive()->create());
+
+        $this->getJson('/api/download-links')->assertForbidden();
+        $this->postJson('/api/download-links', ['keys' => ['folder/file.mp4']])->assertForbidden();
+    }
+
+    public function test_active_admin_user_can_manage_download_links(): void
+    {
+        Sanctum::actingAs(User::factory()->admin()->create());
+
+        $this->postJson('/api/download-links', ['keys' => ['folder/file.mp4']])
+            ->assertCreated()
+            ->assertJsonPath('success', true);
+    }
+
     public function test_duplicate_keys_are_deduplicated_after_normalisation(): void
     {
         Sanctum::actingAs(User::factory()->create());

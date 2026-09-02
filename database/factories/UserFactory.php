@@ -30,6 +30,7 @@ class UserFactory extends Factory
             'email' => fake()->unique()->safeEmail(),
             'type' => 'staff',
             'is_active' => true,
+            'is_admin' => true,
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
@@ -58,16 +59,21 @@ class UserFactory extends Factory
 
     public function staff(): static
     {
-        return $this->state(fn () => ['type' => UserType::Staff->value]);
+        return $this->state(fn () => ['type' => UserType::Staff->value, 'is_admin' => true]);
+    }
+
+    public function admin(): static
+    {
+        return $this->state(fn () => ['type' => UserType::Admin->value, 'is_admin' => true]);
     }
 
     public function customer(): static
     {
-        return $this->state(fn () => ['type' => UserType::Customer->value]);
+        return $this->state(fn () => ['type' => UserType::Customer->value, 'is_admin' => false]);
     }
 
     public function crew(): static
     {
-        return $this->state(fn () => ['type' => UserType::Crew->value, 'onboarding_completed_at' => now()]);
+        return $this->state(fn () => ['type' => UserType::Crew->value, 'is_admin' => false, 'onboarding_completed_at' => now()]);
     }
 }

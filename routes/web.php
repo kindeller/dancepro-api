@@ -83,7 +83,7 @@ Route::get('book-your-concert', [PublicConcertBookingController::class, 'create'
 Route::post('book-your-concert', [PublicConcertBookingController::class, 'store'])->name('concert-bookings.store');
 Route::get('book-your-concert/thanks', [PublicConcertBookingController::class, 'thanks'])->name('concert-bookings.thanks');
 
-Route::middleware(['auth', 'two-factor.required'])
+Route::middleware(['auth', 'admin.required', 'two-factor.required'])
     ->prefix('admin')
     ->name('admin.')
     ->group(function (): void {
@@ -174,7 +174,7 @@ Route::middleware(['auth', 'two-factor.required'])
         Route::patch('download-links/{downloadLink}/revoke', [AdminDownloadLinkController::class, 'revoke'])->name('download-links.revoke');
     });
 
-Route::middleware(['auth', 'two-factor.required', 'crew.onboarded'])->prefix('crew')->name('crew.')->group(function (): void {
+Route::middleware(['auth', 'crew.required', 'two-factor.required', 'crew.onboarded'])->prefix('crew')->name('crew.')->group(function (): void {
     Route::get('training', [CrewTrainingController::class, 'index'])->name('training.index');
     Route::get('training/{trainingCourse}', [CrewTrainingController::class, 'show'])->name('training.show');
     Route::post('training/{trainingCourse}/modules/{module}/complete', [CrewTrainingController::class, 'complete'])->name('training.modules.complete');

@@ -1,7 +1,9 @@
 <?php
 
+use App\Features\Auth\Middleware\RequireAdminAccess;
 use App\Features\Auth\Middleware\RequireTwoFactorAuthentication;
 use App\Features\Crew\Middleware\RequireCompletedCrewOnboarding;
+use App\Features\Crew\Middleware\RequireCrewAccess;
 use App\Shared\Responses\ApiResponse;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -24,7 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'admin.required' => RequireAdminAccess::class,
             'two-factor.required' => RequireTwoFactorAuthentication::class,
+            'crew.required' => RequireCrewAccess::class,
             'crew.onboarded' => RequireCompletedCrewOnboarding::class,
         ]);
         $middleware->encryptCookies(except: [

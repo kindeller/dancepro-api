@@ -3,7 +3,6 @@
 namespace App\Features\Scheduling\Actions;
 
 use App\Features\Crew\Models\CrewProfile;
-use App\Features\Customers\Support\UserType;
 use App\Features\Scheduling\Models\CrewNotification;
 use App\Features\Scheduling\Models\SchedulingShiftAssignment;
 use App\Features\Scheduling\Models\ShiftCoverRequest;
@@ -51,7 +50,7 @@ class AcceptShiftCoverRequest
             foreach ($otherRecipients as $other) {
                 $this->notify($other->crewProfile->user_id, 'Cover request filled', "The {$assignment->shift->schedulingEvent->name} cover request has been filled by another crew member.");
             }
-            User::query()->where('is_active', true)->whereIn('type', [UserType::Staff->value, UserType::Admin->value])->each(function (User $user) use ($assignment, $originalCrew, $replacement): void {
+            User::query()->where('is_active', true)->where('is_admin', true)->each(function (User $user) use ($assignment, $originalCrew, $replacement): void {
                 $this->notify($user->id, 'Crew cover completed', "{$replacement->preferred_name} replaced {$originalCrew->preferred_name} for {$assignment->shift->schedulingEvent->name} on {$assignment->shift->shift_date->format('D j M')}.");
             });
 

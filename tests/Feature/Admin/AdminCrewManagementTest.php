@@ -77,6 +77,7 @@ class AdminCrewManagementTest extends TestCase
         ]);
         $this->actingAs($staff)->get(route('admin.crew.edit', $crewProfile))
             ->assertOk()
+            ->assertSee('Admin access')
             ->assertSee('Time with DancePro')
             ->assertSee('Role qualifications')
             ->assertSee('Working With Children Check')
@@ -110,6 +111,42 @@ class AdminCrewManagementTest extends TestCase
         $this->assertSame('approved', $crewProfile->roleQualifications->first()->status->value);
         $this->assertSame(1, $crewProfile->vehicles()->count());
         $this->assertSame('Black', $crewProfile->vehicles()->first()->colour);
+    }
+
+    public function test_admin_can_grant_and_remove_full_admin_access_for_a_crew_member(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $crewProfile = CrewProfile::factory()->for(User::factory()->crew())->create([
+            'preferred_name' => 'Alex Admin',
+            'phone' => '0400 000 001',
+            'commencement_date' => '2020-08-29',
+        ]);
+
+        $payload = [
+            'preferred_name' => 'Alex Admin',
+            'email' => $crewProfile->user->email,
+            'phone' => '0400 000 001',
+            'commencement_date' => '2020-08-29',
+            'is_active' => '1',
+            'is_admin' => '1',
+        ];
+
+        $this->actingAs($admin)
+            ->put(route('admin.crew.update', $crewProfile), $payload)
+            ->assertRedirect();
+
+        $crewUser = $crewProfile->user->refresh();
+        $this->assertTrue($crewUser->is_admin);
+        $this->assertTrue($crewUser->canAccessAdmin());
+        $this->assertFalse($crewUser->canAccessCrew());
+
+        $this->actingAs($admin)
+            ->put(route('admin.crew.update', $crewProfile), [...$payload, 'is_admin' => '0'])
+            ->assertRedirect();
+
+        $crewUser->refresh();
+        $this->assertFalse($crewUser->is_admin);
+        $this->assertTrue($crewUser->canAccessCrew());
     }
 
     public function test_staff_can_edit_roles_and_update_crew_qualifications_from_the_matrix(): void

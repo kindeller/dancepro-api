@@ -26,6 +26,7 @@ class SaveCrewProfileRequest extends FormRequest
 
         $this->merge([
             'is_active' => $this->boolean('is_active'),
+            'is_admin' => $this->boolean('is_admin'),
             'qualifications' => $qualifications,
             'vehicles' => $vehicles,
         ]);
@@ -45,6 +46,7 @@ class SaveCrewProfileRequest extends FormRequest
             'jacket_size' => ['nullable', 'string', 'max:50'],
             'commencement_date' => ['required', 'date', 'before_or_equal:today'],
             'is_active' => ['required', 'boolean'],
+            'is_admin' => ['required', 'boolean'],
             'date_of_birth' => ['nullable', 'date', 'before:today'],
             'address_line_1' => ['nullable', 'string', 'max:255'],
             'address_line_2' => ['nullable', 'string', 'max:255'],

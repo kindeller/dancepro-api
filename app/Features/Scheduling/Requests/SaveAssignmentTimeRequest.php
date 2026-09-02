@@ -8,7 +8,8 @@ class SaveAssignmentTimeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        return ($this->user()?->canAccessCrew() ?? false)
+            || ($this->user()?->canAccessAdmin() ?? false);
     }
 
     public function rules(): array

@@ -8,7 +8,7 @@ class PreviewCrewInvoiceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->crewProfile !== null;
+        return $this->user()?->canAccessCrew() ?? false;
     }
 
     public function rules(): array

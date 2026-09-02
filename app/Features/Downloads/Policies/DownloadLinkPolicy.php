@@ -9,21 +9,21 @@ class DownloadLinkPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->is_active;
+        return $user->canAccessAdmin();
     }
 
     public function view(User $user, DownloadLink $downloadLink): bool
     {
-        return $user->is_active;
+        return $user->canAccessAdmin();
     }
 
     public function create(User $user): bool
     {
-        return $user->is_active;
+        return $user->canAccessAdmin();
     }
 
     public function revoke(User $user, DownloadLink $downloadLink): bool
     {
-        return $user->is_active;
+        return $user->canAccessAdmin();
     }
 }

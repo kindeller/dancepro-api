@@ -8,7 +8,7 @@ class SignCrewContractRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->is_active && $this->user()?->crewProfile !== null;
+        return $this->user()?->canAccessCrew() ?? false;
     }
 
     public function rules(): array

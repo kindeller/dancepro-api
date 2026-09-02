@@ -21,6 +21,7 @@ class InviteCrewMember
                 'password' => Str::random(48),
                 'type' => UserType::Crew->value,
                 'is_active' => true,
+                'is_admin' => false,
             ]);
 
             return CrewProfile::query()->create([

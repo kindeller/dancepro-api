@@ -21,6 +21,7 @@ class SaveCrewProfile
                 'email' => $data['email'],
                 'type' => UserType::Crew->value,
                 'is_active' => $data['is_active'],
+                'is_admin' => $data['is_admin'],
             ]);
 
             if (! $user->exists) {

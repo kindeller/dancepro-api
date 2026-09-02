@@ -8,7 +8,7 @@ class StoreChatMessageRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->canAccessCrew() ?? false;
     }
 
     public function rules(): array

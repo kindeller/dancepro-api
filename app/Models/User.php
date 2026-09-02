@@ -20,7 +20,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'is_active', 'type', 'last_login_at', 'last_seen_at', 'invitation_sent_at', 'onboarding_completed_at'])]
+#[Fillable(['name', 'email', 'password', 'is_active', 'is_admin', 'type', 'last_login_at', 'last_seen_at', 'invitation_sent_at', 'onboarding_completed_at'])]
 #[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
 class User extends Authenticatable
 {
@@ -29,7 +29,20 @@ class User extends Authenticatable
 
     public function homeRouteName(): string
     {
-        return $this->type === UserType::Crew->value ? 'crew.availability.index' : 'admin.dashboard';
+        return $this->canAccessAdmin() ? 'admin.dashboard' : 'crew.availability.index';
+    }
+
+    public function canAccessAdmin(): bool
+    {
+        return $this->is_active && $this->is_admin;
+    }
+
+    public function canAccessCrew(): bool
+    {
+        return $this->is_active
+            && $this->crewProfile !== null
+            && $this->type === UserType::Crew->value
+            && ! $this->is_admin;
     }
 
     public function customerProfile(): HasOne
@@ -69,6 +82,7 @@ class User extends Authenticatable
             'invitation_sent_at' => 'datetime',
             'onboarding_completed_at' => 'datetime',
             'is_active' => 'boolean',
+            'is_admin' => 'boolean',
             'last_login_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'password' => 'hashed',

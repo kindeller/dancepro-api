@@ -8,7 +8,7 @@ class ToggleChecklistItemRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->is_active ?? false;
+        return $this->user()?->canAccessCrew() ?? false;
     }
 
     protected function prepareForValidation(): void

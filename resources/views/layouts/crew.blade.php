@@ -28,7 +28,6 @@
         .user-profile-link { display:inline-flex; align-items:center; gap:6px; padding:5px 7px; border-radius:5px; color:#dce9ee; font-size:12px; font-weight:800; text-decoration:none; white-space:nowrap; }
         .user-profile-link:hover,.user-profile-link.active { background:#153b4d; color:white; }
         .user-profile-link svg { width:15px; height:15px; flex:0 0 15px; }
-        .admin-return { min-height:0; padding:5px 8px; border:1px solid #65bfe2; background:#153b4d; color:white; font-size:10px; white-space:nowrap; }
         main { max-width:980px; margin:auto; padding:24px 20px 50px; }
         section { margin-top:24px; }
         .card { margin-bottom:10px; padding:16px; border:1px solid var(--line); border-radius:8px; background:white; box-shadow:0 2px 7px rgba(18,45,57,.04); }
@@ -293,9 +292,6 @@
                 @endif
             </nav>
             <div class="user-menu">
-                @can('manageScheduling')
-                    <a class="button admin-return" href="{{ route('admin.dashboard') }}">Back to Admin</a>
-                @endcan
                 <a class="user-profile-link {{ request()->routeIs('crew.profile.*') ? 'active' : '' }}" href="{{ route('crew.profile.edit') }}" title="Open My Profile" aria-label="Open My Profile for {{ auth()->user()?->name }}">
                     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>
                     <span>{{ auth()->user()?->name }}</span>

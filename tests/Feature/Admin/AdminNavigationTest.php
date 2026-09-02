@@ -111,19 +111,12 @@ class AdminNavigationTest extends TestCase
         }
     }
 
-    public function test_staff_crew_member_can_return_to_admin_from_their_hub(): void
+    public function test_admin_does_not_access_the_personal_crew_hub(): void
     {
         $staff = User::factory()->staff()->create(['name' => 'Morgan Vale']);
         CrewProfile::factory()->for($staff)->create();
 
         $this->actingAs($staff)->get(route('crew.availability.index'))
-            ->assertOk()
-            ->assertSee('My Timesheets')
-            ->assertSee('Back to Admin')
-            ->assertSee('user-profile-link', false)
-            ->assertSee('Morgan Vale')
-            ->assertSee(route('crew.profile.edit'), false)
-            ->assertDontSee('Log out')
-            ->assertSee(route('admin.dashboard'), false);
+            ->assertForbidden();
     }
 }
