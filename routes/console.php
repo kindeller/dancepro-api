@@ -2,6 +2,7 @@
 
 use App\Features\Contacts\Actions\ExportContactDirectory;
 use App\Features\Contacts\Actions\ImportContactDirectory;
+use App\Features\Deployment\Services\ProductionEnvironmentValidator;
 use App\Features\Operations\Actions\SecureExistingInternalDocuments;
 use App\Features\Venues\Actions\ImportVenueCatalog;
 use Illuminate\Foundation\Inspiring;
@@ -10,6 +11,23 @@ use Illuminate\Support\Facades\Artisan;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('production:validate', function (ProductionEnvironmentValidator $validator): int {
+    $errors = $validator->errors();
+
+    if ($errors === []) {
+        $this->info('Production environment validation passed.');
+
+        return self::SUCCESS;
+    }
+
+    $this->error('Production environment validation failed:');
+    foreach ($errors as $error) {
+        $this->line(" - {$error}");
+    }
+
+    return self::FAILURE;
+})->purpose('Refuse deployment when production configuration is unsafe or incomplete');
 
 Artisan::command('venues:import {source?}', function (ImportVenueCatalog $import): int {
     $source = $this->argument('source') ?: storage_path('app/private/imports/venue-maps');

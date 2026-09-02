@@ -4,6 +4,8 @@ Phase 0 establishes the security defaults for later DancePro features.
 
 - Secrets must stay in `.env` and must not be committed.
 - API authentication uses Laravel Sanctum bearer tokens.
+- Sanctum tokens use explicit abilities; wildcard abilities are not issued.
+- Sensitive API routes enforce token abilities in addition to current user permissions.
 - Passwords are hashed through Laravel's password hashing cast/factory helpers.
 - Inactive users cannot log in.
 - Browser and API login attempts are rate limited by hashed email/IP and by IP.

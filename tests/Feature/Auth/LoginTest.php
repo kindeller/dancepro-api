@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Features\Auth\Support\TokenAbility;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -38,7 +39,33 @@ class LoginTest extends TestCase
             ]);
 
         $this->assertDatabaseCount('personal_access_tokens', 1);
+        $this->assertDatabaseHas('personal_access_tokens', [
+            'tokenable_id' => $user->id,
+            'abilities' => json_encode([
+                TokenAbility::AccountRead->value,
+                TokenAbility::CompetitionObjectsRead->value,
+                TokenAbility::DownloadLinksManage->value,
+            ]),
+        ]);
         $this->assertNotNull($user->fresh()->last_login_at);
+    }
+
+    public function test_non_admin_token_receives_only_the_account_read_ability(): void
+    {
+        $user = User::factory()->crew()->create([
+            'email' => 'crew@example.com',
+            'password' => Hash::make('secret-password'),
+        ]);
+
+        $this->postJson('/api/auth/login', [
+            'email' => $user->email,
+            'password' => 'secret-password',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('personal_access_tokens', [
+            'tokenable_id' => $user->id,
+            'abilities' => json_encode([TokenAbility::AccountRead->value]),
+        ]);
     }
 
     public function test_login_rejects_invalid_credentials(): void

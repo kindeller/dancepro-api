@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Downloads;
 
+use App\Features\Auth\Support\TokenAbility;
 use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Downloads\Services\DownloadUrlSigner;
 use App\Features\Downloads\Support\DownloadLinkStatus;
@@ -19,7 +20,7 @@ class DownloadLinksTest extends TestCase
 
     public function test_authenticated_user_can_create_download_links(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), [TokenAbility::DownloadLinksManage->value]);
 
         $response = $this->postJson('/api/download-links', [
             'keys' => ['folder/file.mp4'],
@@ -66,7 +67,7 @@ class DownloadLinksTest extends TestCase
         $downloadLink = DownloadLink::factory()->create();
 
         foreach ([User::factory()->customer()->create(), User::factory()->crew()->create()] as $user) {
-            Sanctum::actingAs($user);
+            Sanctum::actingAs($user, [TokenAbility::DownloadLinksManage->value]);
 
             $this->getJson('/api/download-links')->assertForbidden();
             $this->postJson('/api/download-links', ['keys' => ['folder/new-file.mp4']])->assertForbidden();
@@ -81,7 +82,7 @@ class DownloadLinksTest extends TestCase
 
     public function test_inactive_staff_user_cannot_manage_download_links(): void
     {
-        Sanctum::actingAs(User::factory()->staff()->inactive()->create());
+        Sanctum::actingAs(User::factory()->staff()->inactive()->create(), [TokenAbility::DownloadLinksManage->value]);
 
         $this->getJson('/api/download-links')->assertForbidden();
         $this->postJson('/api/download-links', ['keys' => ['folder/file.mp4']])->assertForbidden();
@@ -89,16 +90,23 @@ class DownloadLinksTest extends TestCase
 
     public function test_active_admin_user_can_manage_download_links(): void
     {
-        Sanctum::actingAs(User::factory()->admin()->create());
+        Sanctum::actingAs(User::factory()->admin()->create(), [TokenAbility::DownloadLinksManage->value]);
 
         $this->postJson('/api/download-links', ['keys' => ['folder/file.mp4']])
             ->assertCreated()
             ->assertJsonPath('success', true);
     }
 
+    public function test_admin_token_without_the_download_link_ability_cannot_manage_links(): void
+    {
+        Sanctum::actingAs(User::factory()->admin()->create(), [TokenAbility::AccountRead->value]);
+
+        $this->getJson('/api/download-links')->assertForbidden();
+    }
+
     public function test_duplicate_keys_are_deduplicated_after_normalisation(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), [TokenAbility::DownloadLinksManage->value]);
 
         $response = $this->postJson('/api/download-links', [
             'keys' => ['folder//file.mp4', 'folder/file.mp4'],
@@ -115,7 +123,7 @@ class DownloadLinksTest extends TestCase
 
     public function test_unsafe_keys_are_rejected(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), [TokenAbility::DownloadLinksManage->value]);
 
         $response = $this->postJson('/api/download-links', [
             'keys' => ['../private/file.mp4'],
@@ -132,7 +140,7 @@ class DownloadLinksTest extends TestCase
 
     public function test_created_link_stores_token_hash_but_not_raw_token(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        Sanctum::actingAs(User::factory()->create(), [TokenAbility::DownloadLinksManage->value]);
 
         $response = $this->postJson('/api/download-links', [
             'keys' => ['folder/file.mp4'],
@@ -274,7 +282,7 @@ class DownloadLinksTest extends TestCase
     public function test_revoke_endpoint_updates_link_status(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, [TokenAbility::DownloadLinksManage->value]);
 
         $downloadLink = DownloadLink::factory()->create([
             'generated_by_user_id' => $user->id,

@@ -375,6 +375,9 @@ printf 'Frontend build manifest: verified\n'
 log "Clear old Laravel caches"
 php artisan optimize:clear
 
+log "Validate production environment"
+php artisan production:validate
+
 log "Review database migration status"
 php artisan migrate:status
 

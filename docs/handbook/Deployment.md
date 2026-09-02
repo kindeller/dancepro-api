@@ -166,6 +166,9 @@ CLOUDFRONT_CONCERT_COOKIE_DOMAIN
 DOWNLOAD_ALLOWED_DISKS
 DOWNLOAD_DEFAULT_DISK
 DOWNLOAD_SIGNED_URL_TTL_MINUTES
+DOWNLOAD_CLOUDFRONT_DOMAIN
+DOWNLOAD_CLOUDFRONT_KEY_PAIR_ID
+DOWNLOAD_CLOUDFRONT_PRIVATE_KEY or DOWNLOAD_CLOUDFRONT_PRIVATE_KEY_PATH
 OPERATIONS_FILESYSTEM_DISK
 ```
 
@@ -197,7 +200,39 @@ A missing region will prevent Laravel from constructing the AWS S3 client.
 
 # Deployment Validation
 
-Following deployment, validate:
+Before placing a production instance online, run:
+
+```bash
+php artisan production:validate
+```
+
+The command exits unsuccessfully when a critical production setting is unsafe
+or missing. The deployment script runs it after installing the new code and
+clearing stale caches, before migrations or reopening the site.
+
+The production `.env` must provide all of the following:
+
+- `APP_ENV=production`, `APP_DEBUG=false`, an application key and the public
+  HTTPS `APP_URL`.
+- Encrypted, HTTP-only, HTTPS-only sessions stored in a shared persistent
+  backend such as the database or Redis.
+- Enabled and enforced two-factor authentication for staff accounts.
+- A production database, persistent cache and asynchronous queue connection.
+- A real outbound mail transport and sender address.
+- A non-debug production log channel.
+- Valid configured disks for private operational files and directory logos.
+
+Local filesystem disks are valid only when the server's `storage` directory is
+on durable backed-up storage. Moving uploads to shared object storage is tracked
+separately and should be completed before horizontal scaling.
+
+Download CloudFront signer values are optional until that delivery path is
+enabled. If any signer value is supplied, validation requires the distribution
+domain, key-pair ID, and either the private key or its runtime path. The command
+checks configuration only; it does not read, display or modify media or signing
+keys.
+
+Following deployment, also inspect:
 
 ```bash
 php artisan about

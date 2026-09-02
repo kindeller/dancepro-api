@@ -13,6 +13,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
@@ -27,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin.required' => RequireAdminAccess::class,
+            'abilities' => CheckAbilities::class,
             'two-factor.required' => RequireTwoFactorAuthentication::class,
             'crew.required' => RequireCrewAccess::class,
             'crew.onboarded' => RequireCompletedCrewOnboarding::class,

@@ -1,6 +1,7 @@
 <?php
 
 use App\Features\Auth\Controllers\AuthController;
+use App\Features\Auth\Support\TokenAbility;
 use App\Features\Competition\Controllers\CompetitionObjectController;
 use App\Features\Concerts\Controllers\PublicConcertApiController;
 use App\Features\Downloads\Controllers\DownloadLinkController;
@@ -15,16 +16,19 @@ Route::prefix('auth')->group(function (): void {
 
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('logout', [AuthController::class, 'logout']);
-        Route::get('me', [AuthController::class, 'me']);
+        Route::get('me', [AuthController::class, 'me'])->middleware('abilities:'.TokenAbility::AccountRead->value);
     });
 });
 
 Route::middleware('auth:sanctum')->group(function (): void {
-    Route::get('competitions/objects', [CompetitionObjectController::class, 'index']);
+    Route::get('competitions/objects', [CompetitionObjectController::class, 'index'])
+        ->middleware('abilities:'.TokenAbility::CompetitionObjectsRead->value);
 
-    Route::get('download-links', [DownloadLinkController::class, 'index']);
-    Route::post('download-links', [DownloadLinkController::class, 'store']);
-    Route::get('download-links/{downloadLink}', [DownloadLinkController::class, 'show']);
-    Route::patch('download-links/{downloadLink}/revoke', [DownloadLinkController::class, 'revoke']);
-    Route::get('download-links/{downloadLink}/accesses', [DownloadLinkController::class, 'accesses']);
+    Route::middleware('abilities:'.TokenAbility::DownloadLinksManage->value)->group(function (): void {
+        Route::get('download-links', [DownloadLinkController::class, 'index']);
+        Route::post('download-links', [DownloadLinkController::class, 'store']);
+        Route::get('download-links/{downloadLink}', [DownloadLinkController::class, 'show']);
+        Route::patch('download-links/{downloadLink}/revoke', [DownloadLinkController::class, 'revoke']);
+        Route::get('download-links/{downloadLink}/accesses', [DownloadLinkController::class, 'accesses']);
+    });
 });

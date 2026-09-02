@@ -4,6 +4,7 @@ namespace App\Features\Auth\Controllers;
 
 use App\Features\Auth\Requests\LoginRequest;
 use App\Features\Auth\Resources\AuthUserResource;
+use App\Features\Auth\Services\ApiTokenAbilities;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Shared\Responses\ApiResponse;
@@ -16,7 +17,7 @@ class AuthController extends Controller
     /**
      * Issue a Sanctum API token for an active staff/admin user.
      */
-    public function login(LoginRequest $request): JsonResponse
+    public function login(LoginRequest $request, ApiTokenAbilities $tokenAbilities): JsonResponse
     {
         /** @var User|null $user */
         $user = User::query()
@@ -38,7 +39,7 @@ class AuthController extends Controller
 
         $token = $user->createToken(
             name: $request->string('device_name', 'dancepro-api')->toString(),
-            abilities: ['*'],
+            abilities: $tokenAbilities->for($user),
         );
 
         return ApiResponse::success('Logged in.', [

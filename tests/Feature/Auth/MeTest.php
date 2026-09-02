@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Features\Auth\Support\TokenAbility;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -15,7 +16,7 @@ class MeTest extends TestCase
     {
         $user = User::factory()->create();
 
-        Sanctum::actingAs($user);
+        Sanctum::actingAs($user, [TokenAbility::AccountRead->value]);
 
         $response = $this->getJson('/api/auth/me');
 

@@ -38,6 +38,15 @@ Only active users can receive a token. The response includes a bearer token that
 Authorization: Bearer <token>
 ```
 
+Tokens use explicit least-privilege abilities:
+
+- All active users receive `account:read` for `GET /api/auth/me`.
+- Active admins additionally receive `competition-objects:read` and
+  `download-links:manage`.
+- Sensitive API routes check the relevant token ability as well as the user's
+  current database permissions. No newly issued token receives the wildcard
+  `*` ability.
+
 Browser and API login submissions share two rate limits: five attempts per
 minute for an email-address/IP combination and 30 attempts per minute for an IP
 address. The email portion of the limiter key is hashed before it is cached.
