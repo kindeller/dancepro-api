@@ -15,7 +15,7 @@ This checklist tracks the 22 findings from the pre-publication audit. Update the
 | 9 | High | Production environment defaults and validation are unsafe | Resolved | Deployment-blocking configuration validation and documentation; existing media remains unchanged; `93dc93f` |
 | 10 | High | Storage failures can be silent | Resolved - pending commit approval | All application disks throw and report failures; browser and API writes receive explicit retryable errors; regression coverage added. |
 | 11 | High | Deployments have no automated database backup | Resolved - pending commit approval | Deployment now creates and verifies a private compressed MySQL/MariaDB dump before migrations, records a SHA-256 manifest, applies bounded retention, and documents isolated restoration drills. |
-| 12 | High | Deployment health check is too permissive | Pending | |
+| 12 | High | Deployment health check is too permissive | Resolved - pending commit approval | Deployment verifies database, cache, queue, private storage and mail dependencies, then requires an exact JSON success response from the production HTTPS `/up` endpoint without following redirects. |
 | 13 | High | Automated test suite was red due to copy drift | Pending recheck | Current suite passed while resolving item 3 |
 | 14 | High | Public forms lack sufficient abuse protection | Pending | |
 | 15 | High | Uploaded files rely on local server storage | Pending | |

@@ -66,6 +66,7 @@ class ProductionEnvironmentValidationTest extends TestCase
             'app.debug' => false,
             'app.key' => 'base64:test-key',
             'app.url' => 'https://dancepro.example',
+            'deployment.healthcheck_url' => 'https://dancepro.example/up',
             'security.two_factor.enabled' => true,
             'security.two_factor.enforced' => true,
             'session.secure' => true,

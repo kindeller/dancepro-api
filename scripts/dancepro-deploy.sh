@@ -8,9 +8,6 @@
 # Dry run:
 #   dancepro-deploy --dry-run
 #
-# Optional health check override:
-#   HEALTHCHECK_URL="http://127.0.0.1/health" dancepro-deploy
-#
 # This script:
 #   - validates the repository, branch, origin remote and production environment
 #   - validates its own tracked state and the complete Git working tree
@@ -39,7 +36,7 @@ BRANCH="master"
 REMOTE="origin"
 EXPECTED_REMOTE_URL="https://github.com/kindeller/dancepro-api.git"
 SCRIPT_RELATIVE_PATH="scripts/dancepro-deploy.sh"
-HEALTHCHECK_URL="${HEALTHCHECK_URL:-http://127.0.0.1}"
+HEALTHCHECK_URL=""
 DEPLOY_LOG_DIR="$APP_DIR/storage/logs/deployments"
 
 DRY_RUN=false
@@ -67,9 +64,6 @@ Options:
               the working tree, application state, database, caches or services.
   --help      Show this help text.
 
-Environment:
-  HEALTHCHECK_URL   Override the default health check URL.
-                    Default: $HEALTHCHECK_URL
 EOF
 }
 
@@ -174,7 +168,7 @@ printf 'Mode:          %s\n' "$([[ "$DRY_RUN" == true ]] && echo "DRY RUN" || ec
 printf 'Started:       %s UTC\n' "$(date -u +'%Y-%m-%d %H:%M:%S')"
 printf 'Application:   %s\n' "$APP_DIR"
 printf 'Branch:        %s/%s\n' "$REMOTE" "$BRANCH"
-printf 'Health check:  %s\n' "$HEALTHCHECK_URL"
+printf 'Health check:  %s\n' "${HEALTHCHECK_URL:-configured APP_URL/up}"
 printf 'Log file:      %s\n' "$DEPLOY_LOG_FILE"
 
 log "Preflight validation"
@@ -375,6 +369,11 @@ php artisan optimize:clear
 log "Validate production environment"
 php artisan production:validate
 
+HEALTHCHECK_URL="$(php artisan production:healthcheck-url --no-ansi)"
+
+[[ "$HEALTHCHECK_URL" == https://*/up ]] || \
+    fail "Health check must use the production HTTPS /up endpoint: $HEALTHCHECK_URL"
+
 log "Create verified database backup"
 php artisan database:backup --prune
 
@@ -450,6 +449,7 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 
 php artisan about --only=environment
+php artisan production:check-dependencies
 
 log "Return application to service"
 php artisan up
@@ -460,18 +460,23 @@ HEALTHCHECK_DELAY_SECONDS=2
 HEALTHCHECK_OK=false
 
 for ((attempt=1; attempt<=HEALTHCHECK_ATTEMPTS; attempt++)); do
-    HTTP_STATUS="$(curl \
+    HEALTHCHECK_RESPONSE="$(curl \
         --silent \
         --show-error \
-        --output /dev/null \
-        --write-out '%{http_code}' \
+        --proto '=https' \
+        --max-redirs 0 \
+        --header 'Accept: application/json' \
+        --write-out $'\n%{http_code}' \
         --max-time 10 \
         "$HEALTHCHECK_URL" || true)"
+
+    HTTP_STATUS="${HEALTHCHECK_RESPONSE##*$'\n'}"
+    HTTP_BODY="${HEALTHCHECK_RESPONSE%$'\n'*}"
 
     printf 'Attempt %d/%d: HTTP %s\n' \
         "$attempt" "$HEALTHCHECK_ATTEMPTS" "${HTTP_STATUS:-000}"
 
-    if [[ "$HTTP_STATUS" =~ ^(200|204|301|302)$ ]]; then
+    if [[ "$HTTP_STATUS" == "200" && "$HTTP_BODY" == '{"status":"up"}' ]]; then
         HEALTHCHECK_OK=true
         break
     fi

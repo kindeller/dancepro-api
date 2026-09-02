@@ -44,6 +44,14 @@ final class ProductionEnvironmentValidator
             'DATABASE_BACKUP_RETENTION_DAYS must be greater than zero.',
             $errors,
         );
+        $healthcheckUrl = (string) config('deployment.healthcheck_url');
+        $this->require(
+            parse_url($healthcheckUrl, PHP_URL_SCHEME) === 'https'
+                && parse_url($healthcheckUrl, PHP_URL_HOST) === parse_url($appUrl, PHP_URL_HOST)
+                && parse_url($healthcheckUrl, PHP_URL_PATH) === '/up',
+            'DEPLOY_HEALTHCHECK_URL must be the production HTTPS /up URL on the APP_URL host.',
+            $errors,
+        );
         $this->require(
             ! in_array(config('cache.default'), ['array', 'null'], true),
             'CACHE_STORE must use a persistent store.',

@@ -220,6 +220,8 @@ The production `.env` must provide all of the following:
 - A production database, persistent cache and asynchronous queue connection.
 - Automated database backups enabled with a positive retention period and a
   working `mysqldump`-compatible executable.
+- `DEPLOY_HEALTHCHECK_URL` set to the production HTTPS `/up` URL on the same
+  host as `APP_URL`.
 - A real outbound mail transport and sender address.
 - A non-debug production log channel.
 - Valid configured disks for private operational files and directory logos.
@@ -267,6 +269,17 @@ Following deployment, also inspect:
 ```bash
 php artisan about
 ```
+
+Immediately before reopening the application, deployment runs
+`production:check-dependencies`. This performs a database query, cache
+write/read/delete cycle, private-storage write/read/delete probe, mail transport
+construction, and queue backend query. No email or job is sent. A failed check
+leaves the application in maintenance mode.
+
+After reopening, `curl` is restricted to HTTPS, does not follow redirects, and
+must receive status 200 with the exact JSON body `{"status":"up"}` from `/up`.
+A login page, redirect, wrong virtual host, or generic successful page cannot
+pass this check.
 
 Also confirm `public/build/manifest.json` exists and that the public concert
 player loads without a missing-manifest or missing-asset error.
