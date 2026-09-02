@@ -4,6 +4,7 @@ use App\Features\Auth\Middleware\RequireAdminAccess;
 use App\Features\Auth\Middleware\RequireTwoFactorAuthentication;
 use App\Features\Crew\Middleware\RequireCompletedCrewOnboarding;
 use App\Features\Crew\Middleware\RequireCrewAccess;
+use App\Shared\Middleware\AddSecurityHeaders;
 use App\Shared\Responses\ApiResponse;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -27,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(AddSecurityHeaders::class);
         $middleware->alias([
             'admin.required' => RequireAdminAccess::class,
             'abilities' => CheckAbilities::class,
