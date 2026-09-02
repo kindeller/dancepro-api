@@ -38,8 +38,8 @@ application re-audit. It uses its own fixed numbering and is resolved in order.
 
 | # | Priority | Finding | Status | Verification / commit |
 |---:|---|---|---|---|
-| 1 | Critical | API authentication bypasses enforced two-factor authentication | Resolved - pending commit approval | API login now requires a valid TOTP or one-time recovery code for configured accounts and refuses enforced-but-unconfigured accounts before issuing a token; 234 tests / 1,842 assertions and Pint pass. |
-| 2 | High | API tokens do not expire by default | Pending | |
+| 1 | Critical | API authentication bypasses enforced two-factor authentication | Resolved | API login now requires a valid TOTP or one-time recovery code for configured accounts and refuses enforced-but-unconfigured accounts before issuing a token; 234 tests / 1,842 assertions and Pint pass; `735da0c`. |
+| 2 | High | API tokens do not expire by default | Resolved - pending commit approval | New API tokens have an explicit seven-day expiry by default, the API reports `expires_at`, expired tokens are rejected, and production validation permits only 1-43,200 minutes; 235 tests / 1,846 assertions and Pint pass. |
 | 3 | High | A stale Vite `public/hot` file can override a production build | Pending | |
 | 4 | High | Production dependency checks omit media storage and signing paths | Pending | |
 | 5 | High | Database backups are not scheduled by the application | Pending | |

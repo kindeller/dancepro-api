@@ -64,14 +64,17 @@ class AuthController extends Controller
             'last_seen_at' => now(),
         ])->save();
 
+        $expiresAt = now()->addMinutes((int) config('sanctum.expiration'));
         $token = $user->createToken(
             name: $request->string('device_name', 'dancepro-api')->toString(),
             abilities: $tokenAbilities->for($user),
+            expiresAt: $expiresAt,
         );
 
         return ApiResponse::success('Logged in.', [
             'token' => $token->plainTextToken,
             'token_type' => 'Bearer',
+            'expires_at' => $expiresAt->toIso8601String(),
             'user' => new AuthUserResource($user),
         ]);
     }

@@ -36,6 +36,7 @@ class LoginTest extends TestCase
             ->assertJsonStructure([
                 'data' => [
                     'token',
+                    'expires_at',
                     'user' => ['id', 'name', 'email', 'is_active'],
                 ],
             ]);
@@ -49,7 +50,22 @@ class LoginTest extends TestCase
                 TokenAbility::DownloadLinksManage->value,
             ]),
         ]);
+        $this->assertNotNull($user->tokens()->firstOrFail()->expires_at);
         $this->assertNotNull($user->fresh()->last_login_at);
+    }
+
+    public function test_expired_api_token_cannot_authenticate(): void
+    {
+        config()->set('sanctum.expiration', 60);
+        $user = User::factory()->create();
+        $token = $user->createToken(
+            name: 'Expired token',
+            expiresAt: now()->subMinute(),
+        );
+
+        $this->withToken($token->plainTextToken)
+            ->getJson('/api/auth/me')
+            ->assertUnauthorized();
     }
 
     public function test_non_admin_token_receives_only_the_account_read_ability(): void

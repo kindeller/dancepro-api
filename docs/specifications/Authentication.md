@@ -33,7 +33,9 @@ GET  /api/auth/me
 }
 ```
 
-Only active users can receive a token. The response includes a bearer token that the client must send in the `Authorization` header.
+Only active users can receive a token. The response includes a bearer token,
+its ISO 8601 `expires_at` value, and the authenticated user. The client must
+send the token in the `Authorization` header.
 
 When two-factor authentication is enabled for a configured account, API login
 also requires either `two_factor_code` or `recovery_code`. The two fields are
@@ -41,6 +43,11 @@ mutually exclusive. A recovery code is consumed after one successful login.
 When two-factor authentication is enforced and the account has not completed
 setup, API login is refused until setup is completed through the web account.
 No bearer token is created before the second factor succeeds.
+
+API tokens expire after `SANCTUM_EXPIRATION` minutes. The default is 10,080
+minutes (seven days), and production validation rejects missing, non-positive,
+or greater-than-30-day values. Clients must return the user to login when a
+token expires; refresh tokens are not currently issued.
 
 ```text
 Authorization: Bearer <token>

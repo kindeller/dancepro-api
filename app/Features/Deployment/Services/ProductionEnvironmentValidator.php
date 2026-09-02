@@ -36,6 +36,12 @@ final class ProductionEnvironmentValidator
 
         $this->require(config('security.two_factor.enabled') === true, 'TWO_FACTOR_ENABLED must be true.', $errors);
         $this->require(config('security.two_factor.enforced') === true, 'TWO_FACTOR_ENFORCED must be true.', $errors);
+        $tokenExpiration = (int) config('sanctum.expiration');
+        $this->require(
+            $tokenExpiration > 0 && $tokenExpiration <= 43200,
+            'SANCTUM_EXPIRATION must be between 1 and 43200 minutes.',
+            $errors,
+        );
 
         $this->require(config('database.default') !== 'sqlite', 'DB_CONNECTION must use the production database.', $errors);
         $this->require(config('backups.database.enabled') === true, 'DATABASE_BACKUP_ENABLED must be true.', $errors);

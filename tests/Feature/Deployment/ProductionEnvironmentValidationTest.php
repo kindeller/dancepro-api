@@ -15,6 +15,7 @@ class ProductionEnvironmentValidationTest extends TestCase
             'app.url' => 'http://localhost',
             'security.two_factor.enabled' => false,
             'security.two_factor.enforced' => false,
+            'sanctum.expiration' => null,
             'session.secure' => false,
             'session.encrypt' => false,
             'session.driver' => 'array',
@@ -31,6 +32,7 @@ class ProductionEnvironmentValidationTest extends TestCase
             ->expectsOutputToContain('APP_DEBUG must be false.')
             ->expectsOutputToContain('APP_URL must be the public HTTPS application URL.')
             ->expectsOutputToContain('TWO_FACTOR_ENFORCED must be true.')
+            ->expectsOutputToContain('SANCTUM_EXPIRATION must be between 1 and 43200 minutes.')
             ->expectsOutputToContain('MAIL_MAILER must use a real outbound mail transport.')
             ->assertFailed();
     }
@@ -83,6 +85,7 @@ class ProductionEnvironmentValidationTest extends TestCase
             'deployment.healthcheck_url' => 'https://dancepro.example/up',
             'security.two_factor.enabled' => true,
             'security.two_factor.enforced' => true,
+            'sanctum.expiration' => 10080,
             'session.secure' => true,
             'session.http_only' => true,
             'session.encrypt' => true,
