@@ -18,7 +18,7 @@ class EventCommunicationTest extends TestCase
 
     public function test_admin_can_post_an_announcement_for_assigned_crew_to_acknowledge(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
         $staff = User::factory()->staff()->create();
         [$crewUser, $assignment, $event] = $this->publishedAssignment();
         $unassignedCrew = User::factory()->crew()->create();
@@ -31,7 +31,7 @@ class EventCommunicationTest extends TestCase
         ])->assertRedirect();
 
         $message = EventMessage::query()->firstOrFail();
-        Storage::disk('public')->assertExists($message->attachment_path);
+        Storage::disk('local')->assertExists($message->attachment_path);
         $this->assertDatabaseHas('crew_notifications', ['user_id' => $crewUser->id, 'type' => 'event_announcement']);
         $this->assertDatabaseMissing('crew_notifications', ['user_id' => $unassignedCrew->id, 'type' => 'event_announcement']);
 

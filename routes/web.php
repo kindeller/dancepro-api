@@ -30,6 +30,7 @@ use App\Features\Operations\Controllers\AdminHubDashboardController;
 use App\Features\Operations\Controllers\AdminOperationsController;
 use App\Features\Operations\Controllers\CrewEventCommunicationController;
 use App\Features\Operations\Controllers\CrewOperationsController;
+use App\Features\Operations\Controllers\InternalDocumentController;
 use App\Features\Scheduling\Controllers\AdminEventTypeController;
 use App\Features\Scheduling\Controllers\AdminPaymentController;
 use App\Features\Scheduling\Controllers\AdminSchedulingEventController;
@@ -82,6 +83,13 @@ Route::middleware('auth')->group(function (): void {
 Route::get('book-your-concert', [PublicConcertBookingController::class, 'create'])->name('concert-bookings.create');
 Route::post('book-your-concert', [PublicConcertBookingController::class, 'store'])->name('concert-bookings.store');
 Route::get('book-your-concert/thanks', [PublicConcertBookingController::class, 'thanks'])->name('concert-bookings.thanks');
+
+Route::middleware(['auth', 'two-factor.required'])->prefix('internal-documents')->name('internal-documents.')->group(function (): void {
+    Route::get('resources/{resource}', [InternalDocumentController::class, 'resource'])->name('resources.show');
+    Route::get('venues/{venue}/map', [InternalDocumentController::class, 'venueMap'])->name('venues.map');
+    Route::get('events/{schedulingEvent}/programme', [InternalDocumentController::class, 'programme'])->name('events.programme');
+    Route::get('messages/{message}/attachment', [InternalDocumentController::class, 'messageAttachment'])->name('messages.attachment');
+});
 
 Route::middleware(['auth', 'admin.required', 'two-factor.required'])
     ->prefix('admin')
@@ -150,6 +158,7 @@ Route::middleware(['auth', 'admin.required', 'two-factor.required'])
         Route::get('crew-management/resources', [AdminOperationsController::class, 'resources'])->name('crew-management.resources');
         Route::get('event-management/checklists', [AdminOperationsController::class, 'checklists'])->name('event-management.checklists');
         Route::post('operations/resources', [AdminOperationsController::class, 'storeResource'])->name('operations.resources.store');
+        Route::get('operations/resources/{resource}/file', [InternalDocumentController::class, 'resource'])->name('operations.resources.file');
         Route::put('operations/resources/{resource}', [AdminOperationsController::class, 'updateResource'])->name('operations.resources.update');
         Route::post('operations/checklists', [AdminOperationsController::class, 'storeChecklist'])->name('operations.checklists.store');
         Route::put('operations/checklists/{template}', [AdminOperationsController::class, 'updateChecklist'])->name('operations.checklists.update');
@@ -201,6 +210,7 @@ Route::middleware(['auth', 'crew.required', 'two-factor.required', 'crew.onboard
     Route::get('contracts/{crewContract}', [CrewContractController::class, 'show'])->name('contracts.show');
     Route::post('contracts/{crewContract}/sign', [CrewContractController::class, 'sign'])->name('contracts.sign');
     Route::get('help', [CrewOperationsController::class, 'help'])->name('help.index');
+    Route::get('help/resources/{resource}/file', [InternalDocumentController::class, 'resource'])->name('help.resources.file');
     Route::get('assignments/{assignment}', [CrewOperationsController::class, 'assignment'])->name('assignments.show');
     Route::put('assignments/{assignment}/checklist/{item}', [CrewOperationsController::class, 'toggle'])->name('assignments.checklist.toggle');
     Route::post('assignments/{assignment}/messages', [CrewEventCommunicationController::class, 'store'])->name('assignments.messages.store');

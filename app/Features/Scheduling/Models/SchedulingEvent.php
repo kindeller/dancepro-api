@@ -63,7 +63,7 @@ class SchedulingEvent extends Model
 
     public function programmeUrl(): ?string
     {
-        return $this->programme_path ? Storage::disk('public')->url($this->programme_path) : null;
+        return $this->programme_path ? route('internal-documents.events.programme', $this) : null;
     }
 
     public function rosterIsReady(): bool

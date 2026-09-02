@@ -31,6 +31,8 @@ The production server should provide:
 
 - PHP 8.3+
 - Composer
+- Node.js 20.19+ or 22.12+
+- npm 10+
 - Apache
 - Git
 - MySQL
@@ -55,7 +57,13 @@ composer install \
     --optimize-autoloader \
     --no-interaction
 
+npm ci --include=dev --no-audit --no-fund
+npm run build
+
 php artisan migrate --force
+
+php artisan operations:secure-documents
+php artisan operations:secure-documents --apply --force
 
 php artisan optimize:clear
 
@@ -63,6 +71,11 @@ php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 ```
+
+The generated `public/build` directory is intentionally not committed. Every
+deployment rebuilds it from `package-lock.json`, removes any stale Vite hot-file,
+and stops before reopening the application unless the manifest contains the
+concert-player entry point.
 
 If queue workers are used:
 
@@ -153,7 +166,15 @@ CLOUDFRONT_CONCERT_COOKIE_DOMAIN
 DOWNLOAD_ALLOWED_DISKS
 DOWNLOAD_DEFAULT_DISK
 DOWNLOAD_SIGNED_URL_TTL_MINUTES
+OPERATIONS_FILESYSTEM_DISK
 ```
+
+`OPERATIONS_FILESYSTEM_DISK` must use a private filesystem disk. The default
+`local` disk stores files under `storage/app/private`; do not set it to
+`public`. The deployment command first inventories existing operational files,
+then moves verified copies of venue maps, run sheets, crew resources and event
+attachments out of `storage/app/public`. Event logos, venue reference images
+and concert media are not changed by this command.
 
 When CloudFront signing is enabled, production also requires the configured
 distribution domain, key-pair ID and private key or readable private-key path
@@ -181,6 +202,9 @@ Following deployment, validate:
 ```bash
 php artisan about
 ```
+
+Also confirm `public/build/manifest.json` exists and that the public concert
+player loads without a missing-manifest or missing-asset error.
 
 Verify:
 

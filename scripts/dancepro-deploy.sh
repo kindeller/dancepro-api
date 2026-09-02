@@ -22,7 +22,9 @@
 #   - enters Laravel maintenance mode using a pre-rendered maintenance page
 #   - performs a fast-forward-only update
 #   - installs locked production dependencies when Composer files changed
+#   - installs locked frontend dependencies and creates a verified Vite build
 #   - reviews and optionally runs pending migrations
+#   - moves tracked operational documents out of public storage
 #   - rebuilds Laravel caches
 #   - verifies the public storage symlink
 #   - reloads PHP-FPM when available
@@ -186,8 +188,21 @@ cd "$APP_DIR"
 command -v git >/dev/null 2>&1 || fail "Git is not installed."
 command -v php >/dev/null 2>&1 || fail "PHP is not installed."
 command -v composer >/dev/null 2>&1 || fail "Composer is not installed."
+command -v node >/dev/null 2>&1 || fail "Node.js is not installed. Node 20.19+ or 22.12+ is required."
+command -v npm >/dev/null 2>&1 || fail "npm is not installed. npm 10+ is required."
 command -v curl >/dev/null 2>&1 || fail "curl is not installed."
 command -v systemctl >/dev/null 2>&1 || fail "systemctl is not available."
+
+NODE_VERSION="$(node --version | sed 's/^v//')"
+NODE_MAJOR="${NODE_VERSION%%.*}"
+NODE_REMAINDER="${NODE_VERSION#*.}"
+NODE_MINOR="${NODE_REMAINDER%%.*}"
+if ! { [[ "$NODE_MAJOR" -eq 20 && "$NODE_MINOR" -ge 19 ]] || [[ "$NODE_MAJOR" -eq 22 && "$NODE_MINOR" -ge 12 ]] || [[ "$NODE_MAJOR" -gt 22 ]]; }; then
+    fail "Unsupported Node.js version $NODE_VERSION. Install Node 20.19+ or 22.12+."
+fi
+
+NPM_MAJOR="$(npm --version | cut -d. -f1)"
+[[ "$NPM_MAJOR" -ge 10 ]] || fail "Unsupported npm version $(npm --version). Install npm 10+."
 
 [[ -f artisan ]] || fail "Laravel artisan file was not found."
 [[ -f .env ]] || fail "The production .env file is missing."
@@ -348,6 +363,15 @@ else
     printf 'Skipping composer install.\n'
 fi
 
+log "Build frontend assets"
+rm -f "$APP_DIR/public/hot"
+npm ci --include=dev --no-audit --no-fund
+npm run build
+[[ -s public/build/manifest.json ]] || fail "Vite did not create public/build/manifest.json."
+grep -q 'resources/js/concert-player.js' public/build/manifest.json || \
+    fail "The Vite manifest does not contain the concert player entry point."
+printf 'Frontend build manifest: verified\n'
+
 log "Clear old Laravel caches"
 php artisan optimize:clear
 
@@ -369,6 +393,10 @@ else
         printf 'Skipping migrations.\n'
     fi
 fi
+
+log "Secure internal operational documents"
+php artisan operations:secure-documents
+php artisan operations:secure-documents --apply --force
 
 log "Rebuild production caches"
 php artisan config:cache

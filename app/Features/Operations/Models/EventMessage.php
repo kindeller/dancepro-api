@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Storage;
 
 #[Fillable(['uuid', 'scheduling_event_id', 'author_user_id', 'message_type', 'body', 'attachment_path', 'attachment_name', 'attachment_mime'])]
 class EventMessage extends Model
@@ -33,7 +32,7 @@ class EventMessage extends Model
 
     public function attachmentUrl(): ?string
     {
-        return $this->attachment_path ? Storage::disk('public')->url($this->attachment_path) : null;
+        return $this->attachment_path ? route('internal-documents.messages.attachment', $this) : null;
     }
 
     public function isAnnouncement(): bool

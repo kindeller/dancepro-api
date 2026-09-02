@@ -3,6 +3,7 @@
 namespace App\Features\Operations\Actions;
 
 use App\Features\Operations\Models\EventMessage;
+use App\Features\Operations\Services\OperationsFileStorage;
 use App\Features\Scheduling\Models\CrewNotification;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
@@ -11,10 +12,12 @@ use Illuminate\Support\Facades\DB;
 
 class PostEventMessage
 {
+    public function __construct(private readonly OperationsFileStorage $files) {}
+
     public function execute(SchedulingEvent $event, User $author, string $type, ?string $body, ?UploadedFile $attachment): EventMessage
     {
         return DB::transaction(function () use ($event, $author, $type, $body, $attachment): EventMessage {
-            $path = $attachment?->store('event-communications/'.$event->uuid, 'public');
+            $path = $attachment ? $this->files->store($attachment, 'event-communications/'.$event->uuid) : null;
             $message = $event->messages()->create([
                 'author_user_id' => $author->id,
                 'message_type' => $type,

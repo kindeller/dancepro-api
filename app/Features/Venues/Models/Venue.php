@@ -21,7 +21,7 @@ class Venue extends Model
 
     public function mapUrl(): ?string
     {
-        return $this->map_path ? Storage::disk('public')->url($this->map_path) : null;
+        return $this->map_path ? route('internal-documents.venues.map', $this) : null;
     }
 
     public function referenceImageUrl(): ?string

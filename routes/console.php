@@ -2,6 +2,7 @@
 
 use App\Features\Contacts\Actions\ExportContactDirectory;
 use App\Features\Contacts\Actions\ImportContactDirectory;
+use App\Features\Operations\Actions\SecureExistingInternalDocuments;
 use App\Features\Venues\Actions\ImportVenueCatalog;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -47,3 +48,22 @@ Artisan::command('contacts:import {archive=imports/contact-directory.zip} {--app
 
     return self::SUCCESS;
 })->purpose('Validate or import a private studio and competition contact archive');
+
+Artisan::command('operations:secure-documents {--apply} {--force}', function (SecureExistingInternalDocuments $secure): int {
+    if ($this->option('apply') && app()->environment('production') && ! $this->option('force')) {
+        $this->error('Production changes require both --apply and --force after a successful dry-run.');
+
+        return self::FAILURE;
+    }
+
+    $summary = $secure->execute((bool) $this->option('apply'));
+    $verb = $summary['applied'] ? 'Secured' : 'Found';
+    $this->info("{$verb} {$summary['tracked']} tracked internal document(s): {$summary['public']} public, {$summary['already_private']} already private and {$summary['missing']} missing.");
+    if ($summary['applied']) {
+        $this->info("Moved {$summary['moved']} document(s) to private storage and removed their verified public copies.");
+    } else {
+        $this->warn('Dry-run only. Run again with --apply to move files. Production also requires --force.');
+    }
+
+    return $summary['missing'] > 0 ? self::FAILURE : self::SUCCESS;
+})->purpose('Move tracked operational documents out of public storage');

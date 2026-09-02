@@ -21,7 +21,7 @@ class EventOperationsTest extends TestCase
 
     public function test_admin_can_upload_reusable_resources_venue_map_and_event_programme(): void
     {
-        Storage::fake('public');
+        Storage::fake('local');
         $staff = User::factory()->staff()->create();
         $venue = Venue::query()->create(['name' => 'Example Theatre']);
         $event = SchedulingEvent::query()->create(['name' => 'Example Event', 'event_type' => 'competition', 'event_date' => now()->addMonth()]);
@@ -38,19 +38,19 @@ class EventOperationsTest extends TestCase
             'file' => UploadedFile::fake()->create('videography.pdf', 200, 'application/pdf'),
         ])->assertRedirect();
         $resource = OperationalResource::query()->firstOrFail();
-        Storage::disk('public')->assertExists($resource->file_path);
+        Storage::disk('local')->assertExists($resource->file_path);
 
         $this->actingAs($staff)->put(route('admin.venues.map.update', $venue), [
             'map' => UploadedFile::fake()->image('venue.jpg', 1600, 900),
         ])->assertRedirect();
-        Storage::disk('public')->assertExists($venue->refresh()->map_path);
+        Storage::disk('local')->assertExists($venue->refresh()->map_path);
 
         $this->actingAs($staff)->put(route('admin.scheduling-events.operations.update', $event), [
             'crew_brief' => 'Meet beside the loading dock.', 'team_leader_notes' => 'Collect the key.',
             'programme' => UploadedFile::fake()->create('programme.pdf', 100, 'application/pdf'),
         ])->assertRedirect();
         $this->assertSame('Meet beside the loading dock.', $event->refresh()->crew_brief);
-        Storage::disk('public')->assertExists($event->programme_path);
+        Storage::disk('local')->assertExists($event->programme_path);
     }
 
     public function test_resources_and_pre_start_checks_can_target_a_managed_event_type(): void
