@@ -103,18 +103,6 @@
         });
     });
 
-    const status = document.getElementById('copy-status');
-    document.querySelectorAll('[data-copy-emails]').forEach(button => button.addEventListener('click', async event => {
-        event.stopPropagation();
-        try {
-            await navigator.clipboard.writeText(button.dataset.copyEmails);
-            status.textContent = 'Email addresses copied';
-        } catch (_) {
-            status.textContent = 'Could not copy email addresses';
-        }
-        status.classList.add('visible');
-        window.setTimeout(() => status.classList.remove('visible'), 1800);
-    }));
 })();
 </script>
 @endpush

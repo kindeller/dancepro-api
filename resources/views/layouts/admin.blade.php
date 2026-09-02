@@ -793,6 +793,46 @@
         </main>
     </div>
     <script>
+        const copyTextWithFallback = async text => {
+            if (navigator.clipboard?.writeText) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return;
+                } catch (_) {
+                    // Clipboard access can be blocked outside a secure context.
+                }
+            }
+
+            const field = document.createElement('textarea');
+            field.value = text;
+            field.setAttribute('readonly', '');
+            field.style.cssText = 'position:fixed;left:-9999px;opacity:0';
+            document.body.appendChild(field);
+            field.select();
+            const copied = document.execCommand('copy');
+            field.remove();
+
+            if (! copied) throw new Error('Copy command was rejected');
+        };
+
+        document.addEventListener('click', async event => {
+            const button = event.target.closest('[data-copy-emails]');
+            if (! button) return;
+
+            event.stopPropagation();
+            const status = document.getElementById('copy-status');
+            try {
+                await copyTextWithFallback(button.dataset.copyEmails);
+                if (status) status.textContent = 'Email addresses copied';
+            } catch (_) {
+                if (status) status.textContent = 'Could not copy email addresses';
+            }
+            if (status) {
+                status.classList.add('visible');
+                window.setTimeout(() => status.classList.remove('visible'), 1800);
+            }
+        });
+
         (() => {
             const sidebar = document.querySelector('.sidebar');
             const toggle = document.querySelector('.mobile-nav-toggle');

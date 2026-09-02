@@ -48,6 +48,15 @@ class AdminNavigationTest extends TestCase
             ->assertSee("window.matchMedia('(min-width: 901px)')", false);
     }
 
+    public function test_admin_layout_provides_a_clipboard_fallback(): void
+    {
+        $this->actingAs(User::factory()->staff()->create())
+            ->get(route('admin.studios.index'))
+            ->assertOk()
+            ->assertSee('navigator.clipboard?.writeText', false)
+            ->assertSee("document.execCommand('copy')", false);
+    }
+
     public function test_event_management_pages_share_event_tabs(): void
     {
         $staff = User::factory()->staff()->create();
