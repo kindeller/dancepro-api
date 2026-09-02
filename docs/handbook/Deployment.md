@@ -308,8 +308,11 @@ php artisan about
 Immediately before reopening the application, deployment runs
 `production:check-dependencies`. This performs a database query, cache
 write/read/delete cycle, private-storage write/read/delete probe, mail transport
-construction, and queue backend query. No email or job is sent. A failed check
-leaves the application in maintenance mode.
+construction, and queue backend query. It also verifies list/read access to the
+competition, current concert and legacy concert media disks, then parses the
+configured concert CloudFront private key. Download CloudFront signing is
+checked when configured. Storage media is not changed, and no email or job is
+sent. A failed check leaves the application in maintenance mode.
 
 After reopening, `curl` is restricted to HTTPS, does not follow redirects, and
 must receive status 200 with the exact JSON body `{"status":"up"}` from `/up`.
