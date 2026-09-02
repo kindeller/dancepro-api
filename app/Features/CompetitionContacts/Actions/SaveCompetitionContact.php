@@ -38,7 +38,7 @@ class SaveCompetitionContact
                 $contact->logo_path = $data['logo']->storeAs(
                     "logos/competition-contacts/{$contact->uuid}",
                     'logo.'.$data['logo']->extension(),
-                    'public',
+                    config('contact-directory.logo_disk'),
                 );
                 $contact->save();
             }
