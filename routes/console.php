@@ -74,6 +74,12 @@ Artisan::command('downloads:prune-accesses', function (PruneDownloadAccesses $pr
 })->purpose('Remove download access records beyond the configured retention period');
 
 Schedule::command('downloads:prune-accesses')->daily()->withoutOverlapping();
+Schedule::command('database:backup --prune')
+    ->dailyAt((string) config('backups.database.schedule_time'))
+    ->timezone((string) config('app.timezone'))
+    ->when(fn (): bool => (bool) config('backups.database.enabled'))
+    ->withoutOverlapping(180)
+    ->onOneServer();
 
 Artisan::command('uploads:migrate-public {--from=public} {--apply}', function (MigratePublicUploads $migrate): int {
     $summary = $migrate->execute((string) $this->option('from'), (bool) $this->option('apply'));

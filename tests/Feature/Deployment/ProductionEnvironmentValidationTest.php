@@ -110,6 +110,7 @@ class ProductionEnvironmentValidationTest extends TestCase
             'database.default' => 'mysql',
             'backups.database.enabled' => true,
             'backups.database.retention_days' => 30,
+            'backups.database.schedule_time' => '02:00',
             'cache.default' => 'database',
             'queue.default' => 'database',
             'mail.default' => 'smtp',

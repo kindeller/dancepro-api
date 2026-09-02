@@ -55,6 +55,11 @@ final class ProductionEnvironmentValidator
             'DATABASE_BACKUP_RETENTION_DAYS must be greater than zero.',
             $errors,
         );
+        $this->require(
+            preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', (string) config('backups.database.schedule_time')) === 1,
+            'DATABASE_BACKUP_SCHEDULE_TIME must use 24-hour HH:MM format.',
+            $errors,
+        );
         $healthcheckUrl = (string) config('deployment.healthcheck_url');
         $this->require(
             parse_url($healthcheckUrl, PHP_URL_SCHEME) === 'https'

@@ -285,7 +285,11 @@ Set `DATABASE_BACKUP_ENABLED=true` in production. The server must provide the
 configured `DATABASE_BACKUP_DUMP_BINARY` (normally `mysqldump`), and the backup
 directory must itself be included in encrypted off-server backups. Retention
 only removes expired files matching the command's managed `dancepro-*.sql.gz`
-name; the default is 30 days.
+name; the default is 30 days. The application also schedules
+`database:backup --prune` daily at `DATABASE_BACKUP_SCHEDULE_TIME` (02:00 by
+default, in `APP_TIMEZONE`). It uses overlap and single-server locks, so the
+production scheduler must run once per minute and the shared cache must support
+atomic locks.
 
 An operator can recheck an archive without exposing its contents:
 

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Deployment;
 
 use App\Features\Deployment\Services\DatabaseBackup;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Exception\ProcessFailedException;
 use Tests\TestCase;
@@ -85,6 +86,18 @@ class DatabaseBackupTest extends TestCase
         $this->assertFileDoesNotExist($expired);
         $this->assertFileDoesNotExist($expired.'.json');
         $this->assertFileExists($unmanaged);
+    }
+
+    public function test_daily_backup_is_scheduled_with_overlap_and_single_server_protection(): void
+    {
+        $event = collect(app(Schedule::class)->events())
+            ->first(fn ($event): bool => str_contains($event->command ?? '', 'database:backup --prune'));
+
+        $this->assertNotNull($event);
+        $this->assertSame('0 2 * * *', $event->expression);
+        $this->assertSame(config('app.timezone'), $event->timezone);
+        $this->assertTrue($event->withoutOverlapping);
+        $this->assertTrue($event->onOneServer);
     }
 
     private function fakeDumpExecutable(bool $success): string

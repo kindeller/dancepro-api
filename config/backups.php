@@ -7,5 +7,6 @@ return [
         'retention_days' => (int) env('DATABASE_BACKUP_RETENTION_DAYS', 30),
         'dump_binary' => env('DATABASE_BACKUP_DUMP_BINARY', 'mysqldump'),
         'timeout_seconds' => (int) env('DATABASE_BACKUP_TIMEOUT_SECONDS', 900),
+        'schedule_time' => env('DATABASE_BACKUP_SCHEDULE_TIME', '02:00'),
     ],
 ];
