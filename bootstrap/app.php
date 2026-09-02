@@ -14,6 +14,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
+use League\Flysystem\UnableToWriteFile;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
@@ -102,5 +103,22 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return ApiResponse::error('Resource not found.', status: 404);
+        });
+
+        $exceptions->render(function (UnableToWriteFile $exception, Request $request) {
+            if ($request->is('api/*')) {
+                return ApiResponse::error(
+                    'File storage is temporarily unavailable. Please try again.',
+                    status: 503,
+                );
+            }
+
+            if (! $request->isMethodSafe()) {
+                return back()
+                    ->withInput($request->except(['password', 'password_confirmation']))
+                    ->withErrors(['file' => 'The file could not be saved. Please try again.']);
+            }
+
+            return null;
         });
     })->create();
