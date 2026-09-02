@@ -44,6 +44,11 @@ The production `.env` file is maintained only on the server.
 
 It must never be committed to Git.
 
+The production `APP_KEY` must also have a separately controlled recovery copy,
+and database restoration must be tested with that matching key. Follow
+[Sensitive Data Retention and Key Recovery](Sensitive-Data-Retention-and-Key-Recovery.md)
+before generating, recovering or rotating an encryption key.
+
 ---
 
 # Deployment Steps

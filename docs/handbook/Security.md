@@ -32,6 +32,7 @@ Phase 0 establishes the security defaults for later DancePro features.
 ## Related Documentation
 
 - [Authentication](Authentication.md)
+- [Sensitive Data Retention and Key Recovery](Sensitive-Data-Retention-and-Key-Recovery.md)
 - [API Guidelines](API-Guidelines.md)
 - [AWS](AWS.md)
 - [Competition Downloads Specification](../specifications/Competition-Downloads.md)
