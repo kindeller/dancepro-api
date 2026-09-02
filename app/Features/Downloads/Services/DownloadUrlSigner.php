@@ -3,8 +3,8 @@
 namespace App\Features\Downloads\Services;
 
 use App\Features\Downloads\Models\DownloadLink;
+use Aws\CloudFront\UrlSigner;
 use Illuminate\Support\Facades\Storage;
-use RuntimeException;
 
 class DownloadUrlSigner
 {
@@ -40,27 +40,10 @@ class DownloadUrlSigner
             implode('/', array_map('rawurlencode', explode('/', $downloadLink->storage_key))),
         );
 
-        $policy = json_encode([
-            'Statement' => [[
-                'Resource' => $resourceUrl,
-                'Condition' => [
-                    'DateLessThan' => ['AWS:EpochTime' => $expiresAt],
-                ],
-            ]],
-        ], JSON_UNESCAPED_SLASHES);
-
-        $signature = '';
-        $privateKey = openssl_pkey_get_private($this->privateKey());
-
-        if ($policy === false || $privateKey === false || openssl_sign($policy, $signature, $privateKey, OPENSSL_ALGO_SHA1) === false) {
-            throw new RuntimeException('Unable to sign download URL.');
-        }
-
-        return $resourceUrl.'?'.http_build_query([
-            'Expires' => $expiresAt,
-            'Signature' => $this->cloudFrontEncode($signature),
-            'Key-Pair-Id' => config('downloads.cloudfront.key_pair_id'),
-        ], '', '&', PHP_QUERY_RFC3986);
+        return (new UrlSigner(
+            (string) config('downloads.cloudfront.key_pair_id'),
+            (string) $this->privateKey(),
+        ))->getSignedUrl($resourceUrl, $expiresAt);
     }
 
     private function contentDisposition(DownloadLink $downloadLink): string
@@ -90,14 +73,5 @@ class DownloadUrlSigner
         }
 
         return file_get_contents($path) ?: null;
-    }
-
-    private function cloudFrontEncode(string $value): string
-    {
-        return strtr(base64_encode($value), [
-            '+' => '-',
-            '=' => '_',
-            '/' => '~',
-        ]);
     }
 }

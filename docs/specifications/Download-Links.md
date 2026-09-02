@@ -110,6 +110,10 @@ Behaviour:
   short-lived signed URL, and redirect.
 - S3 temporary URLs are generated with `Content-Disposition: attachment` so
   supported browsers download files instead of previewing playable media inline.
+- When CloudFront download settings are configured, URLs are generated with the
+  AWS SDK canned-policy signer and contain the matching `Expires`, `Signature`
+  and `Key-Pair-Id` parameters. If those settings are absent, the existing S3
+  temporary-URL path remains in use.
 
 ### Management
 
