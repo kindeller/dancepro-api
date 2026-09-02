@@ -10,6 +10,7 @@ use App\Features\Crew\Models\CrewRole;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Scheduling\Support\AvailabilityRoundStatus;
 use App\Features\Scheduling\Support\SchedulingEventType;
+use App\Features\Studios\Models\Studio;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -17,11 +18,11 @@ use Illuminate\Validation\ValidationException;
 
 class ApproveConcertBooking
 {
-    public function execute(ConcertBooking $booking, User $reviewedBy, ?string $note): ConcertBooking
+    public function execute(ConcertBooking $booking, User $reviewedBy, ?string $note, ?Studio $studio = null): ConcertBooking
     {
-        return DB::transaction(function () use ($booking, $reviewedBy, $note): ConcertBooking {
+        return DB::transaction(function () use ($booking, $reviewedBy, $note, $studio): ConcertBooking {
             foreach ($booking->items->where('approval_status', 'pending') as $item) {
-                $this->approveItem($item, $reviewedBy);
+                $this->approveItem($item, $reviewedBy, $studio);
             }
 
             $booking->update(['internal_review_note' => $note]);
@@ -30,13 +31,13 @@ class ApproveConcertBooking
         });
     }
 
-    public function approveItem(ConcertBookingItem $item, User $reviewedBy): SchedulingEvent
+    public function approveItem(ConcertBookingItem $item, User $reviewedBy, ?Studio $studio = null): SchedulingEvent
     {
         if ($item->approval_status !== 'pending') {
             throw ValidationException::withMessages(['events' => 'Only pending events can be approved.']);
         }
 
-        return DB::transaction(function () use ($item, $reviewedBy): SchedulingEvent {
+        return DB::transaction(function () use ($item, $reviewedBy, $studio): SchedulingEvent {
             $booking = $item->booking;
             $venue = $item->venue;
             if (! $venue) {
@@ -47,6 +48,7 @@ class ApproveConcertBooking
             }
             $event = SchedulingEvent::query()->create([
                 'venue_id' => $venue->id,
+                'studio_id' => $studio?->id,
                 'event_type_definition_id' => $item->event_type_definition_id,
                 'name' => $booking->studio_name,
                 'event_type' => SchedulingEventType::Concert,

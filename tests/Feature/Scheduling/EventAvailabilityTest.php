@@ -7,6 +7,7 @@ use App\Features\Crew\Models\CrewRole;
 use App\Features\Scheduling\Models\CrewNotification;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Scheduling\Support\ShiftPeriod;
+use App\Features\Studios\Models\Studio;
 use App\Features\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,6 +18,28 @@ use Tests\TestCase;
 class EventAvailabilityTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_concert_logo_uses_linked_studio_even_when_event_name_changes(): void
+    {
+        Storage::fake('public');
+        $studio = Studio::factory()->create(['name' => 'Original Studio', 'logo_path' => 'logos/studios/original/logo.jpg']);
+        Storage::disk('public')->put($studio->logo_path, 'logo');
+        $user = User::factory()->crew()->create();
+        CrewProfile::factory()->for($user)->create();
+        $event = SchedulingEvent::query()->create([
+            'studio_id' => $studio->id,
+            'name' => 'Renamed End of Year Concert',
+            'event_type' => 'concert',
+            'event_date' => now()->addMonth(),
+            'availability_status' => 'open',
+            'availability_deadline' => now()->addWeek(),
+        ]);
+        $event->shifts()->create(['shift_date' => $event->event_date]);
+
+        $this->actingAs($user)->get(route('crew.availability.index'))
+            ->assertOk()
+            ->assertSee($studio->logoUrl(), false);
+    }
 
     public function test_administrator_creates_separate_morning_and_afternoon_shifts(): void
     {

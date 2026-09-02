@@ -95,9 +95,11 @@ class ConcertBookingWorkflowTest extends TestCase
         $this->post(route('concert-bookings.store'), $this->bookingData());
         $booking = ConcertBooking::query()->firstOrFail();
         $staff = User::factory()->staff()->create();
+        $studio = Studio::factory()->create(['name' => 'Fictional Dance Academy']);
 
         $this->actingAs($staff)->post(route('admin.concert-bookings.approve', $booking), [
             'internal_review_note' => 'Details checked by phone.',
+            'studio_uuid' => $studio->uuid,
         ])->assertRedirect();
 
         $booking->refresh();
@@ -105,6 +107,7 @@ class ConcertBookingWorkflowTest extends TestCase
         $this->assertDatabaseCount('scheduling_events', 2);
         $this->assertSame(2, SchedulingEvent::query()->where('availability_status', 'draft')->count());
         $this->assertSame(2, SchedulingEvent::query()->where('name', 'Fictional Dance Academy')->count());
+        $this->assertSame(2, SchedulingEvent::query()->where('studio_id', $studio->id)->count());
         $this->assertSame(0, SchedulingEvent::query()->whereHas('shifts', fn ($query) => $query->whereNotNull('period'))->count());
         $this->assertDatabaseCount('scheduling_event_role_requirements', 4);
         $dressRehearsal = $booking->items()->where('item_type', 'dress_rehearsal')->firstOrFail()->schedulingEvent;

@@ -101,7 +101,10 @@ class AdminConcertBookingController extends Controller
     {
         /** @var User $staff */
         $staff = $request->user();
-        $approveBooking->execute($concertBooking, $staff, $request->string('internal_review_note')->toString() ?: null);
+        $studio = $request->validated('studio_uuid')
+            ? Studio::query()->where('uuid', $request->validated('studio_uuid'))->firstOrFail()
+            : null;
+        $approveBooking->execute($concertBooking, $staff, $request->string('internal_review_note')->toString() ?: null, $studio);
 
         return back()->with('status', 'Booking approved and draft scheduling events created. Availability remains closed.');
     }

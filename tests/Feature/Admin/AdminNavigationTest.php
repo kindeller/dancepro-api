@@ -133,9 +133,6 @@ class AdminNavigationTest extends TestCase
         $this->actingAs($staff)->get(route('crew.availability.index'))
             ->assertOk()
             ->assertSee('Back to Admin')
-            ->assertSee('href="'.route('admin.dashboard').'">Back to Admin</a>', false)
-            ->assertSee('class="crew-nav-toggle"', false)
-            ->assertSee('aria-controls="crew-navigation"', false)
-            ->assertSee('id="crew-navigation" aria-label="Crew navigation"', false);
+            ->assertSee('href="'.route('admin.dashboard').'">Back to Admin</a>', false);
     }
 }

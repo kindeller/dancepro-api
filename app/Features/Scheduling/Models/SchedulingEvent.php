@@ -7,6 +7,7 @@ use App\Features\CompetitionContacts\Models\CompetitionContact;
 use App\Features\Operations\Models\EventMessage;
 use App\Features\Scheduling\Support\AvailabilityRoundStatus;
 use App\Features\Scheduling\Support\SchedulingEventType;
+use App\Features\Studios\Models\Studio;
 use App\Features\Venues\Models\Venue;
 use App\Shared\Models\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['uuid', 'venue_id', 'competition_contact_id', 'event_type_definition_id', 'name', 'organiser_name', 'organiser_email', 'organiser_phone', 'logo_path', 'event_type', 'event_date', 'availability_status', 'availability_deadline', 'roster_status', 'roster_published_at', 'admin_notes', 'crew_brief', 'team_leader_notes', 'programme_path'])]
+#[Fillable(['uuid', 'venue_id', 'studio_id', 'competition_contact_id', 'event_type_definition_id', 'name', 'organiser_name', 'organiser_email', 'organiser_phone', 'logo_path', 'event_type', 'event_date', 'availability_status', 'availability_deadline', 'roster_status', 'roster_published_at', 'admin_notes', 'crew_brief', 'team_leader_notes', 'programme_path'])]
 class SchedulingEvent extends Model
 {
     use HasPublicUuid;
@@ -24,6 +25,11 @@ class SchedulingEvent extends Model
     public function venue(): BelongsTo
     {
         return $this->belongsTo(Venue::class);
+    }
+
+    public function studio(): BelongsTo
+    {
+        return $this->belongsTo(Studio::class);
     }
 
     public function competitionContact(): BelongsTo

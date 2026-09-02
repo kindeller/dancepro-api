@@ -16,7 +16,6 @@ use App\Features\Scheduling\Models\ShiftCoverRequestRecipient;
 use App\Features\Scheduling\Requests\RecordAvailabilityResponseRequest;
 use App\Features\Scheduling\Support\AvailabilityRoundStatus;
 use App\Features\Scheduling\Support\SchedulingEventType;
-use App\Features\Studios\Models\Studio;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
@@ -34,7 +33,7 @@ class CrewAvailabilityController extends Controller
         $events = SchedulingEvent::query()
             ->where('availability_status', AvailabilityRoundStatus::Open)
             ->where('availability_deadline', '>=', now())
-            ->with(['venue', 'shifts' => fn ($query) => $query->with([
+            ->with(['venue', 'studio', 'shifts' => fn ($query) => $query->with([
                 'availabilityResponses' => fn ($query) => $query->where('crew_profile_id', $crewProfile->id),
                 'assignments' => fn ($query) => $query->where('crew_profile_id', $crewProfile->id)->where('status', 'published'),
             ])])
@@ -60,6 +59,7 @@ class CrewAvailabilityController extends Controller
                 'shift.assignments.timeEntry',
                 'shift.assignments.crewProfile.user',
                 'shift.schedulingEvent.venue',
+                'shift.schedulingEvent.studio',
                 'shift.schedulingEvent.concertBookingItem.booking',
             ])
             ->get()
@@ -115,12 +115,11 @@ class CrewAvailabilityController extends Controller
 
             return $shiftDate !== null && ($shiftDate->isToday() || $shiftDate->isFuture());
         })->values();
-        $studiosByName = Studio::query()->whereNotNull('logo_path')->get()->keyBy(fn (Studio $studio): string => mb_strtolower(trim($studio->name)));
         $displayEvents = $events->concat($assignments->map(fn (SchedulingShiftAssignment $assignment) => $assignment->shift->schedulingEvent))->unique('id');
-        $eventLogoUrls = $displayEvents->mapWithKeys(function (SchedulingEvent $event) use ($studiosByName): array {
+        $eventLogoUrls = $displayEvents->mapWithKeys(function (SchedulingEvent $event): array {
             $logoUrl = $event->logoUrl();
             if ($event->event_type === SchedulingEventType::Concert) {
-                $logoUrl = $studiosByName->get(mb_strtolower(trim($event->name)))?->logoUrl();
+                $logoUrl = $event->studio?->logoUrl() ?? $logoUrl;
             }
 
             return [$event->uuid => $logoUrl];

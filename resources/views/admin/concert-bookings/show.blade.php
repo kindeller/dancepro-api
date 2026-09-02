@@ -112,6 +112,7 @@
 @if($booking->status->value === 'pending')
 <form method="POST" action="{{ route('admin.concert-bookings.approve', $booking) }}" class="card card-pad" style="margin-top:20px">
     @csrf
+    @if($contactReview['studio'])<input type="hidden" name="studio_uuid" value="{{ $contactReview['studio']->uuid }}">@endif
     <h2>Approve booking</h2>
     @if($booking->items->contains(fn ($item) => $item->approval_status === 'pending' && !$item->venue_id))
         <div class="error">Resolve every proposed venue above before approving this booking.</div>
