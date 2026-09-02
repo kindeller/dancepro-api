@@ -71,6 +71,10 @@
             text-transform: uppercase;
         }
 
+        .mobile-nav-toggle {
+            display: none;
+        }
+
         .brand-mark {
             width: 34px;
             height: 34px;
@@ -630,7 +634,60 @@
             }
 
             .sidebar {
-                position: static;
+                position: sticky;
+                z-index: 20;
+                top: 0;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                min-height: 64px;
+                width: 100vw;
+                min-width: 0;
+                padding: 12px 18px;
+                box-shadow: 0 8px 24px rgba(16, 24, 32, .18);
+            }
+
+            .brand {
+                min-width: 0;
+                margin: 0;
+            }
+
+            .brand span {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            .mobile-nav-toggle {
+                display: inline-flex;
+                flex: none;
+                min-width: 44px;
+                min-height: 44px;
+                border: 1px solid rgba(255, 255, 255, .32);
+                background: transparent;
+                padding: 8px 12px;
+            }
+
+            .mobile-nav-toggle:hover {
+                background: rgba(10, 160, 219, .2);
+            }
+
+            .nav {
+                position: absolute;
+                top: 100%;
+                right: 0;
+                left: 0;
+                display: none;
+                max-height: calc(100vh - 64px);
+                overflow-y: auto;
+                overscroll-behavior: contain;
+                padding: 10px 18px 18px;
+                background: var(--brand-dark);
+                box-shadow: 0 18px 30px rgba(16, 24, 32, .22);
+            }
+
+            .sidebar[data-mobile-open="true"] .nav {
+                display: grid;
             }
 
             .stats,
@@ -654,7 +711,11 @@
                 <span>DancePro Admin</span>
             </div>
 
-            <nav class="nav" aria-label="Admin navigation">
+            <button class="mobile-nav-toggle" type="button" aria-expanded="false" aria-controls="admin-navigation">
+                <span class="mobile-nav-label">Menu</span>
+            </button>
+
+            <nav class="nav" id="admin-navigation" aria-label="Admin navigation">
                 @if(auth()->user()?->crewProfile)
                     <a href="{{ route('crew.availability.index') }}">My Hub</a>
                 @endif
@@ -731,6 +792,43 @@
             </div>
         </main>
     </div>
+    <script>
+        (() => {
+            const sidebar = document.querySelector('.sidebar');
+            const toggle = document.querySelector('.mobile-nav-toggle');
+            const navigation = document.getElementById('admin-navigation');
+
+            if (! sidebar || ! toggle || ! navigation) return;
+
+            const close = () => {
+                sidebar.dataset.mobileOpen = 'false';
+                toggle.setAttribute('aria-expanded', 'false');
+                toggle.querySelector('.mobile-nav-label').textContent = 'Menu';
+            };
+
+            toggle.addEventListener('click', () => {
+                const isOpen = sidebar.dataset.mobileOpen === 'true';
+                sidebar.dataset.mobileOpen = isOpen ? 'false' : 'true';
+                toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+                toggle.querySelector('.mobile-nav-label').textContent = isOpen ? 'Menu' : 'Close';
+            });
+
+            navigation.addEventListener('click', event => {
+                if (event.target.closest('a')) close();
+            });
+
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && sidebar.dataset.mobileOpen === 'true') {
+                    close();
+                    toggle.focus();
+                }
+            });
+
+            window.matchMedia('(min-width: 901px)').addEventListener('change', event => {
+                if (event.matches) close();
+            });
+        })();
+    </script>
     @stack('scripts')
 </body>
 </html>

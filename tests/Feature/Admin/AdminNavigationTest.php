@@ -35,6 +35,19 @@ class AdminNavigationTest extends TestCase
             ->assertSee('Download Links');
     }
 
+    public function test_admin_layout_has_an_accessible_mobile_navigation_toggle(): void
+    {
+        $this->actingAs(User::factory()->staff()->create())
+            ->get(route('admin.dashboard'))
+            ->assertOk()
+            ->assertSee('class="mobile-nav-toggle"', false)
+            ->assertSee('aria-expanded="false"', false)
+            ->assertSee('aria-controls="admin-navigation"', false)
+            ->assertSee('id="admin-navigation"', false)
+            ->assertSee("event.key === 'Escape'", false)
+            ->assertSee("window.matchMedia('(min-width: 901px)')", false);
+    }
+
     public function test_event_management_pages_share_event_tabs(): void
     {
         $staff = User::factory()->staff()->create();
@@ -120,6 +133,9 @@ class AdminNavigationTest extends TestCase
         $this->actingAs($staff)->get(route('crew.availability.index'))
             ->assertOk()
             ->assertSee('Back to Admin')
-            ->assertSee('href="'.route('admin.dashboard').'">Back to Admin</a>', false);
+            ->assertSee('href="'.route('admin.dashboard').'">Back to Admin</a>', false)
+            ->assertSee('class="crew-nav-toggle"', false)
+            ->assertSee('aria-controls="crew-navigation"', false)
+            ->assertSee('id="crew-navigation" aria-label="Crew navigation"', false);
     }
 }

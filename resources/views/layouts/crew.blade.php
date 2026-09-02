@@ -17,6 +17,7 @@
         .header-inner { display:flex; align-items:center; justify-content:space-between; max-width:980px; margin:auto; padding:13px 20px; }
         .brand { display:flex; align-items:center; width:150px; height:34px; color:white; text-decoration:none; }
         .brand img { display:block; width:100%; height:100%; object-fit:contain; object-position:left center; }
+        .crew-nav-toggle { display:none; }
         .crew-nav { display:flex; align-items:center; gap:4px; margin-left:auto; margin-right:14px; }
         .crew-nav a { padding:5px 8px; border-radius:4px; color:#bcd0d9; font-size:11px; font-weight:700; text-decoration:none; }
         .crew-nav a.active { background:#153b4d; color:white; }
@@ -239,9 +240,16 @@
             .detail-grid { grid-template-columns:1fr 1fr; }
             .detail-grid > div:last-child { grid-column:1/-1; }
             .shift-action { align-items:stretch; flex-direction:column; }
-            .header-inner { flex-wrap:wrap; }
-            .crew-nav { order:3; width:100%; margin:8px 0 0; }
-            .crew-nav a { flex:1; text-align:center; }
+            .header-inner { position:relative; gap:8px; padding:10px 12px; }
+            .brand { width:120px; }
+            .crew-nav-toggle { display:inline-flex; min-height:36px; padding:7px 10px; border:1px solid #54707d; background:transparent; color:white; font-size:11px; }
+            .crew-nav { position:absolute; top:100%; right:0; left:0; display:none; max-height:calc(100vh - 54px); margin:0; padding:8px 12px 14px; overflow-y:auto; flex-direction:column; align-items:stretch; background:var(--dark); box-shadow:0 10px 22px rgba(11,32,43,.24); }
+            header[data-mobile-open="true"] .crew-nav { display:flex; }
+            .crew-nav a { min-height:38px; padding:10px 12px; text-align:left; }
+            .user-menu { margin-left:auto; gap:5px; }
+            .user-profile-link span { display:none; }
+            .admin-return { font-size:0; }
+            .admin-return::after { content:'Admin'; font-size:11px; }
             .profile-grid,.vehicle-row { grid-template-columns:1fr 1fr; }
             .invoice-overview { grid-template-columns:1fr; }
             .resource-grid { grid-template-columns:1fr; }
@@ -267,7 +275,10 @@
     <header>
         <div class="header-inner">
             <a class="brand" href="{{ route('crew.availability.index') }}" aria-label="DancePro Crew home"><img src="{{ asset('images/brand/dancepro-logo-inverse.png') }}" alt="DancePro Photography & Video"></a>
-            <nav class="crew-nav">
+            <button class="crew-nav-toggle" type="button" aria-expanded="false" aria-controls="crew-navigation">
+                <span class="crew-nav-toggle-label">Menu</span>
+            </button>
+            <nav class="crew-nav" id="crew-navigation" aria-label="Crew navigation">
                 <a class="{{ request()->routeIs('crew.availability.*', 'crew.assignments.*', 'crew.cover.*') ? 'active' : '' }}" href="{{ route('crew.availability.index') }}">
                     @if($crewNavigationIndicators['shifts'])
                         <span class="nav-indicator shifts" title="{{ $crewNavigationIndicators['shifts'] }} shift actions" aria-label="{{ $crewNavigationIndicators['shifts'] }} shift actions"></span>
@@ -309,6 +320,40 @@
     <main>@yield('content')</main>
     @stack('scripts')
     <script>
+        const crewHeader = document.querySelector('header');
+        const crewNavToggle = document.querySelector('.crew-nav-toggle');
+        const crewNavToggleLabel = document.querySelector('.crew-nav-toggle-label');
+
+        const setCrewNavigationOpen = (open) => {
+            crewHeader?.toggleAttribute('data-mobile-open', open);
+            crewNavToggle?.setAttribute('aria-expanded', String(open));
+
+            if (crewNavToggleLabel) {
+                crewNavToggleLabel.textContent = open ? 'Close' : 'Menu';
+            }
+        };
+
+        crewNavToggle?.addEventListener('click', () => {
+            setCrewNavigationOpen(crewNavToggle.getAttribute('aria-expanded') !== 'true');
+        });
+
+        document.querySelectorAll('#crew-navigation a').forEach((link) => {
+            link.addEventListener('click', () => setCrewNavigationOpen(false));
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                setCrewNavigationOpen(false);
+                crewNavToggle?.focus();
+            }
+        });
+
+        window.matchMedia('(min-width: 651px)').addEventListener('change', (event) => {
+            if (event.matches) {
+                setCrewNavigationOpen(false);
+            }
+        });
+
         const crewPagePositionKey = `dancepro-crew-position:${window.location.pathname}`;
         const savedCrewPagePosition = sessionStorage.getItem(crewPagePositionKey);
 
