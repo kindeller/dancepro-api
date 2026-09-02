@@ -39,8 +39,8 @@ application re-audit. It uses its own fixed numbering and is resolved in order.
 | # | Priority | Finding | Status | Verification / commit |
 |---:|---|---|---|---|
 | 1 | Critical | API authentication bypasses enforced two-factor authentication | Resolved | API login now requires a valid TOTP or one-time recovery code for configured accounts and refuses enforced-but-unconfigured accounts before issuing a token; 234 tests / 1,842 assertions and Pint pass; `735da0c`. |
-| 2 | High | API tokens do not expire by default | Resolved - pending commit approval | New API tokens have an explicit seven-day expiry by default, the API reports `expires_at`, expired tokens are rejected, and production validation permits only 1-43,200 minutes; 235 tests / 1,846 assertions and Pint pass. |
-| 3 | High | A stale Vite `public/hot` file can override a production build | Pending | |
+| 2 | High | API tokens do not expire by default | Resolved | New API tokens have an explicit seven-day expiry by default, the API reports `expires_at`, expired tokens are rejected, and production validation permits only 1-43,200 minutes; 235 tests / 1,846 assertions and Pint pass; `beb4f38`. |
+| 3 | High | A stale Vite `public/hot` file can override a production build | Resolved - pending commit approval | Production validation now fails while the Vite hot marker exists, the standard deploy already removes it, and the manual deployment procedure now does so explicitly; 236 tests / 1,849 assertions and Pint pass. |
 | 4 | High | Production dependency checks omit media storage and signing paths | Pending | |
 | 5 | High | Database backups are not scheduled by the application | Pending | |
 | 6 | Medium | Public concert media endpoints have no request throttling | Pending | |

@@ -14,6 +14,11 @@ final class ProductionEnvironmentValidator
         $this->require(app()->environment('production'), 'APP_ENV must be production.', $errors);
         $this->require(! config('app.debug'), 'APP_DEBUG must be false.', $errors);
         $this->require(filled(config('app.key')), 'APP_KEY must be set.', $errors);
+        $this->require(
+            ! is_file((string) config('deployment.vite_hot_file')),
+            'The Vite hot file must not exist in production. Remove public/hot and rebuild frontend assets.',
+            $errors,
+        );
 
         $appUrl = (string) config('app.url');
         $appHost = strtolower((string) parse_url($appUrl, PHP_URL_HOST));

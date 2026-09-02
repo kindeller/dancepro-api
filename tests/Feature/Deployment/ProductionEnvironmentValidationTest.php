@@ -46,6 +46,22 @@ class ProductionEnvironmentValidationTest extends TestCase
             ->assertSuccessful();
     }
 
+    public function test_stale_vite_hot_file_is_rejected(): void
+    {
+        $this->setSecureProductionConfiguration();
+        $hotFile = tempnam(sys_get_temp_dir(), 'dancepro-vite-hot-');
+        $this->assertNotFalse($hotFile);
+        config()->set('deployment.vite_hot_file', $hotFile);
+
+        try {
+            $this->artisan('production:validate')
+                ->expectsOutputToContain('The Vite hot file must not exist in production.')
+                ->assertFailed();
+        } finally {
+            unlink($hotFile);
+        }
+    }
+
     public function test_partially_configured_download_signer_is_rejected(): void
     {
         $this->setSecureProductionConfiguration();
@@ -83,6 +99,7 @@ class ProductionEnvironmentValidationTest extends TestCase
             'app.key' => 'base64:test-key',
             'app.url' => 'https://dancepro.example',
             'deployment.healthcheck_url' => 'https://dancepro.example/up',
+            'deployment.vite_hot_file' => sys_get_temp_dir().'/dancepro-no-vite-hot-file',
             'security.two_factor.enabled' => true,
             'security.two_factor.enforced' => true,
             'sanctum.expiration' => 10080,

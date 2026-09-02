@@ -63,6 +63,7 @@ composer install \
     --no-interaction
 
 npm ci --include=dev --no-audit --no-fund
+rm -f public/hot
 npm run build
 
 php artisan migrate --force
@@ -238,6 +239,11 @@ php artisan production:validate
 The command exits unsuccessfully when a critical production setting is unsafe
 or missing. The deployment script runs it after installing the new code and
 clearing stale caches, before migrations or reopening the site.
+
+Validation also refuses to proceed while `public/hot` exists. That file tells
+Laravel to load assets from a Vite development server and must be removed before
+every production build. The standard deployment script already performs this
+cleanup; manual deployments must do the same.
 
 The production `.env` must provide all of the following:
 
