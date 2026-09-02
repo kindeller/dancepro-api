@@ -38,6 +38,12 @@ final class ProductionEnvironmentValidator
         $this->require(config('security.two_factor.enforced') === true, 'TWO_FACTOR_ENFORCED must be true.', $errors);
 
         $this->require(config('database.default') !== 'sqlite', 'DB_CONNECTION must use the production database.', $errors);
+        $this->require(config('backups.database.enabled') === true, 'DATABASE_BACKUP_ENABLED must be true.', $errors);
+        $this->require(
+            (int) config('backups.database.retention_days') > 0,
+            'DATABASE_BACKUP_RETENTION_DAYS must be greater than zero.',
+            $errors,
+        );
         $this->require(
             ! in_array(config('cache.default'), ['array', 'null'], true),
             'CACHE_STORE must use a persistent store.',

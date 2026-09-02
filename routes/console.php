@@ -2,6 +2,7 @@
 
 use App\Features\Contacts\Actions\ExportContactDirectory;
 use App\Features\Contacts\Actions\ImportContactDirectory;
+use App\Features\Deployment\Services\DatabaseBackup;
 use App\Features\Deployment\Services\ProductionEnvironmentValidator;
 use App\Features\Operations\Actions\SecureExistingInternalDocuments;
 use App\Features\Venues\Actions\ImportVenueCatalog;
@@ -28,6 +29,25 @@ Artisan::command('production:validate', function (ProductionEnvironmentValidator
 
     return self::FAILURE;
 })->purpose('Refuse deployment when production configuration is unsafe or incomplete');
+
+Artisan::command('database:backup {--prune}', function (DatabaseBackup $backup): int {
+    $result = $backup->create((bool) $this->option('prune'));
+    $this->info('Verified database backup: '.$result['path']);
+    $this->line("Size: {$result['bytes']} bytes");
+    $this->line('SHA-256: '.$result['sha256']);
+    $this->line("Expired backups removed: {$result['removed']}");
+
+    return self::SUCCESS;
+})->purpose('Create and verify a private compressed database backup');
+
+Artisan::command('database:backup-verify {archive}', function (DatabaseBackup $backup): int {
+    $result = $backup->verify($this->argument('archive'));
+    $this->info('Database backup archive verified.');
+    $this->line("Size: {$result['bytes']} bytes");
+    $this->line('SHA-256: '.$result['sha256']);
+
+    return self::SUCCESS;
+})->purpose('Verify the integrity and checksum of a database backup archive');
 
 Artisan::command('venues:import {source?}', function (ImportVenueCatalog $import): int {
     $source = $this->argument('source') ?: storage_path('app/private/imports/venue-maps');

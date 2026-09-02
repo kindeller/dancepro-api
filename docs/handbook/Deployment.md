@@ -218,6 +218,8 @@ The production `.env` must provide all of the following:
   backend such as the database or Redis.
 - Enabled and enforced two-factor authentication for staff accounts.
 - A production database, persistent cache and asynchronous queue connection.
+- Automated database backups enabled with a positive retention period and a
+  working `mysqldump`-compatible executable.
 - A real outbound mail transport and sender address.
 - A non-debug production log channel.
 - Valid configured disks for private operational files and directory logos.
@@ -231,6 +233,34 @@ enabled. If any signer value is supplied, validation requires the distribution
 domain, key-pair ID, and either the private key or its runtime path. The command
 checks configuration only; it does not read, display or modify media or signing
 keys.
+
+## Database backups and restoration
+
+Every live deployment runs `php artisan database:backup --prune` after entering
+maintenance mode and before reviewing or running migrations. The command uses
+the configured MySQL/MariaDB connection, passes its password to the dump process
+through the child-process environment rather than command-line arguments, and
+creates a private gzip archive plus SHA-256 manifest beneath
+`storage/app/private/backups/database`. A failed dump, compression, or integrity
+check stops deployment and removes the incomplete artifact.
+
+Set `DATABASE_BACKUP_ENABLED=true` in production. The server must provide the
+configured `DATABASE_BACKUP_DUMP_BINARY` (normally `mysqldump`), and the backup
+directory must itself be included in encrypted off-server backups. Retention
+only removes expired files matching the command's managed `dancepro-*.sql.gz`
+name; the default is 30 days.
+
+An operator can recheck an archive without exposing its contents:
+
+```bash
+php artisan database:backup-verify storage/app/private/backups/database/dancepro-YYYY-MM-DD_HH-MM-SS-ID.sql.gz
+```
+
+At least quarterly, restore the newest archive into an isolated non-production
+MySQL instance, run migrations in status-only mode, and record the result and
+duration. Never test restoration over the live database. A Git rollback does
+not reverse migrations, so the verified pre-deployment archive is the database
+recovery point.
 
 Following deployment, also inspect:
 

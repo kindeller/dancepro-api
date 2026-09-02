@@ -32,9 +32,6 @@
 #   - performs an HTTP health check
 #   - prints rollback commands, timing and a deployment summary
 #
-# Database backups remain a separate prerequisite until the backup process
-# is automated and integrated.
-
 set -Eeuo pipefail
 
 APP_DIR="/var/www/dancepro-api"
@@ -377,6 +374,9 @@ php artisan optimize:clear
 
 log "Validate production environment"
 php artisan production:validate
+
+log "Create verified database backup"
+php artisan database:backup --prune
 
 log "Review database migration status"
 php artisan migrate:status

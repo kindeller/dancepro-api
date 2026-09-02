@@ -73,6 +73,8 @@ class ProductionEnvironmentValidationTest extends TestCase
             'session.encrypt' => true,
             'session.driver' => 'database',
             'database.default' => 'mysql',
+            'backups.database.enabled' => true,
+            'backups.database.retention_days' => 30,
             'cache.default' => 'database',
             'queue.default' => 'database',
             'mail.default' => 'smtp',
