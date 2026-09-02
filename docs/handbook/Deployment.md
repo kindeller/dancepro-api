@@ -305,6 +305,12 @@ must receive status 200 with the exact JSON body `{"status":"up"}` from `/up`.
 A login page, redirect, wrong virtual host, or generic successful page cannot
 pass this check.
 
+Before DNS cutover, complete every activation and test step in
+[Production Monitoring](Production-Monitoring.md). Monitoring remains an
+external deployment responsibility until the hosting and alerting providers are
+selected; a successful application deployment does not by itself prove alerts
+will reach the owner.
+
 Also confirm `public/build/manifest.json` exists and that the public concert
 player loads without a missing-manifest or missing-asset error.
 
