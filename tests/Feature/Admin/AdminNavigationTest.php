@@ -44,6 +44,7 @@ class AdminNavigationTest extends TestCase
             ->assertSee('aria-expanded="false"', false)
             ->assertSee('aria-controls="admin-navigation"', false)
             ->assertSee('id="admin-navigation"', false)
+            ->assertSee('data-dancepro-foundation', false)
             ->assertSee("event.key === 'Escape'", false)
             ->assertSee("window.matchMedia('(min-width: 901px)')", false);
     }
@@ -141,6 +142,7 @@ class AdminNavigationTest extends TestCase
 
         $this->actingAs($staff)->get(route('crew.availability.index'))
             ->assertOk()
+            ->assertSee('data-dancepro-foundation', false)
             ->assertSee('Back to Admin')
             ->assertSee('href="'.route('admin.dashboard').'">Back to Admin</a>', false);
     }

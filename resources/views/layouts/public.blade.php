@@ -4,10 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'DancePro' }}</title>
+    @include('layouts.partials.foundation-styles')
     <style>
         :root { --brand: #0aa0db; --ink: #101820; --muted: #66737a; --paper: #f4f8fa; --panel: #fff; --line: #dbe5e9; --accent: var(--concert-brand, #0aa0db); color-scheme: light; }
-        * { box-sizing: border-box; }
-        [hidden] { display: none !important; }
         body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; }
         a { color: inherit; }
         img { display: block; max-width: 100%; }

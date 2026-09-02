@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ $title ?? 'DancePro Admin' }}</title>
+    @include('layouts.partials.foundation-styles')
     <style>
         :root {
             color-scheme: light;
@@ -20,14 +21,6 @@
             --ok: #147a52;
             --soft: #eaf8fd;
             --shadow: 0 18px 44px rgba(16, 24, 32, .07);
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        [hidden] {
-            display: none !important;
         }
 
         body {

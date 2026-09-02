@@ -4,9 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>{{ $title ?? 'DancePro Crew' }}</title>
+    @include('layouts.partials.foundation-styles')
     <style>
         :root { --brand:#0AA0DB; --dark:#0b202b; --line:#d7e4ea; --soft:#eaf8fd; --muted:#66737a; --green:#147a52; --amber:#9a5b00; }
-        * { box-sizing:border-box; }
         body { margin:0; background:#f4f8fa; color:#141719; font:14px/1.45 Arial,sans-serif; }
         a { color:#087fae; }
         h1,h2,h3,p { margin-top:0; }
