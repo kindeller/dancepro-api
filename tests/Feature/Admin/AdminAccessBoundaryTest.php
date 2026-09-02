@@ -60,19 +60,18 @@ class AdminAccessBoundaryTest extends TestCase
 
         $this->actingAs($crewUser)
             ->get('/crew/directory')
-            ->assertOk();
+            ->assertOk()
+            ->assertDontSee('Back to Admin');
     }
 
-    public function test_inactive_crew_and_non_crew_accounts_cannot_access_crew_routes(): void
+    public function test_inactive_crew_and_non_admin_non_crew_accounts_cannot_access_crew_routes(): void
     {
         $inactiveCrew = User::factory()->crew()->inactive()->create();
         CrewProfile::factory()->for($inactiveCrew)->create();
         $customer = User::factory()->customer()->create();
         CrewProfile::factory()->for($customer)->create();
-        $admin = User::factory()->admin()->create();
-        CrewProfile::factory()->for($admin)->create();
 
-        foreach ([$inactiveCrew, $customer, $admin] as $user) {
+        foreach ([$inactiveCrew, $customer] as $user) {
             $this->actingAs($user)
                 ->get('/crew/directory')
                 ->assertForbidden();
@@ -81,6 +80,16 @@ class AdminAccessBoundaryTest extends TestCase
         $this->actingAs(User::factory()->crew()->create())
             ->get('/crew/directory')
             ->assertForbidden();
+    }
+
+    public function test_active_admin_with_a_crew_profile_can_access_crew_routes(): void
+    {
+        $admin = User::factory()->admin()->create();
+        CrewProfile::factory()->for($admin)->create();
+
+        $this->actingAs($admin)
+            ->get('/crew/directory')
+            ->assertOk();
     }
 
     public function test_every_crew_route_uses_the_crew_access_boundary(): void

@@ -138,7 +138,7 @@ class AdminCrewManagementTest extends TestCase
         $crewUser = $crewProfile->user->refresh();
         $this->assertTrue($crewUser->is_admin);
         $this->assertTrue($crewUser->canAccessAdmin());
-        $this->assertFalse($crewUser->canAccessCrew());
+        $this->assertTrue($crewUser->canAccessCrew());
 
         $this->actingAs($admin)
             ->put(route('admin.crew.update', $crewProfile), [...$payload, 'is_admin' => '0'])

@@ -19,6 +19,7 @@ class AdminNavigationTest extends TestCase
         $this->actingAs($staff)->get(route('admin.dashboard'))
             ->assertOk()
             ->assertSee('My Hub')
+            ->assertSee('href="'.route('crew.availability.index').'">My Hub</a>', false)
             ->assertSee('Hub Management')
             ->assertSee(route('admin.hub.dashboard'), false)
             ->assertSee('Exceptions')
@@ -111,12 +112,14 @@ class AdminNavigationTest extends TestCase
         }
     }
 
-    public function test_admin_does_not_access_the_personal_crew_hub(): void
+    public function test_admin_can_access_the_personal_crew_hub(): void
     {
         $staff = User::factory()->staff()->create(['name' => 'Morgan Vale']);
         CrewProfile::factory()->for($staff)->create();
 
         $this->actingAs($staff)->get(route('crew.availability.index'))
-            ->assertForbidden();
+            ->assertOk()
+            ->assertSee('Back to Admin')
+            ->assertSee('href="'.route('admin.dashboard').'">Back to Admin</a>', false);
     }
 }

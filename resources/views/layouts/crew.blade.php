@@ -25,6 +25,8 @@
         .nav-indicator.timesheets { background:#f2bd4c; }
         .nav-indicator.chat { background:#20a9df; }
         .user-menu { display:flex; align-items:center; gap:10px; }
+        .admin-return { display:inline-flex; align-items:center; min-height:30px; padding:5px 9px; border:1px solid #54707d; border-radius:5px; color:#dce9ee; font-size:11px; font-weight:800; text-decoration:none; white-space:nowrap; }
+        .admin-return:hover { border-color:#8bb5c7; background:#153b4d; color:white; }
         .user-profile-link { display:inline-flex; align-items:center; gap:6px; padding:5px 7px; border-radius:5px; color:#dce9ee; font-size:12px; font-weight:800; text-decoration:none; white-space:nowrap; }
         .user-profile-link:hover,.user-profile-link.active { background:#153b4d; color:white; }
         .user-profile-link svg { width:15px; height:15px; flex:0 0 15px; }
@@ -292,6 +294,9 @@
                 @endif
             </nav>
             <div class="user-menu">
+                @if(auth()->user()?->canAccessAdmin())
+                    <a class="admin-return" href="{{ route('admin.dashboard') }}">Back to Admin</a>
+                @endif
                 <a class="user-profile-link {{ request()->routeIs('crew.profile.*') ? 'active' : '' }}" href="{{ route('crew.profile.edit') }}" title="Open My Profile" aria-label="Open My Profile for {{ auth()->user()?->name }}">
                     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>
                     <span>{{ auth()->user()?->name }}</span>

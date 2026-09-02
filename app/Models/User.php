@@ -41,8 +41,7 @@ class User extends Authenticatable
     {
         return $this->is_active
             && $this->crewProfile !== null
-            && $this->type === UserType::Crew->value
-            && ! $this->is_admin;
+            && ($this->type === UserType::Crew->value || $this->is_admin);
     }
 
     public function customerProfile(): HasOne
