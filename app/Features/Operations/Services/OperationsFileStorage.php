@@ -28,4 +28,11 @@ class OperationsFileStorage
     {
         return $file->store($directory, $this->diskName());
     }
+
+    public function deleteReplaced(?string $previousPath, string $currentPath): void
+    {
+        if (filled($previousPath) && $previousPath !== $currentPath) {
+            $this->disk()->delete($previousPath);
+        }
+    }
 }

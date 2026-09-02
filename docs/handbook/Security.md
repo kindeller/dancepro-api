@@ -28,6 +28,9 @@ Phase 0 establishes the security defaults for later DancePro features.
 - Public download links should not expose raw database IDs.
 - Filesystem failures must be thrown and reported rather than converted into
   apparent success. File paths are only persisted after storage succeeds.
+- Replacing an operational resource, venue map or event programme deletes the
+  superseded object from the configured private operational-files disk only
+  after the new path has been stored and saved.
 - Browser storage writes show a retryable error; API writes return HTTP 503
   using the shared response envelope. Media reads otherwise retain their
   existing behaviour.

@@ -12,7 +12,9 @@ class SaveVenueMap
 
     public function execute(Venue $venue, UploadedFile $map): Venue
     {
+        $previousPath = $venue->map_path;
         $venue->update(['map_path' => $this->files->store($map, "operations/venues/{$venue->uuid}")]);
+        $this->files->deleteReplaced($previousPath, $venue->map_path);
 
         return $venue->refresh();
     }

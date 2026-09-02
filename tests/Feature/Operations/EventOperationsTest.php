@@ -39,10 +39,24 @@ class EventOperationsTest extends TestCase
         ])->assertRedirect();
         $resource = OperationalResource::query()->firstOrFail();
         Storage::disk('local')->assertExists($resource->file_path);
+        $previousResourcePath = $resource->file_path;
+        $this->actingAs($staff)->put(route('admin.operations.resources.update', $resource), [
+            'section_number' => 3, 'title' => 'Videography', 'resource_type' => 'handbook',
+            'event_type' => 'competition', 'role_code' => 'competition-videographer', 'is_active' => '1',
+            'file' => UploadedFile::fake()->create('updated-videography.pdf', 200, 'application/pdf'),
+        ])->assertRedirect();
+        Storage::disk('local')->assertMissing($previousResourcePath);
+        Storage::disk('local')->assertExists($resource->refresh()->file_path);
 
         $this->actingAs($staff)->put(route('admin.venues.map.update', $venue), [
             'map' => UploadedFile::fake()->image('venue.jpg', 1600, 900),
         ])->assertRedirect();
+        Storage::disk('local')->assertExists($venue->refresh()->map_path);
+        $previousMapPath = $venue->map_path;
+        $this->actingAs($staff)->put(route('admin.venues.map.update', $venue), [
+            'map' => UploadedFile::fake()->image('updated-venue.jpg', 1600, 900),
+        ])->assertRedirect();
+        Storage::disk('local')->assertMissing($previousMapPath);
         Storage::disk('local')->assertExists($venue->refresh()->map_path);
 
         $this->actingAs($staff)->put(route('admin.scheduling-events.operations.update', $event), [
@@ -51,6 +65,12 @@ class EventOperationsTest extends TestCase
         ])->assertRedirect();
         $this->assertSame('Meet beside the loading dock.', $event->refresh()->crew_brief);
         Storage::disk('local')->assertExists($event->programme_path);
+        $previousProgrammePath = $event->programme_path;
+        $this->actingAs($staff)->put(route('admin.scheduling-events.operations.update', $event), [
+            'programme' => UploadedFile::fake()->create('updated-programme.pdf', 100, 'application/pdf'),
+        ])->assertRedirect();
+        Storage::disk('local')->assertMissing($previousProgrammePath);
+        Storage::disk('local')->assertExists($event->refresh()->programme_path);
     }
 
     public function test_resources_and_pre_start_checks_can_target_a_managed_event_type(): void
