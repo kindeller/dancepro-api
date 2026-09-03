@@ -11,12 +11,14 @@ use App\Features\Crew\Controllers\CrewMobileDashboardController;
 use App\Features\Crew\Controllers\CrewMobileDirectoryController;
 use App\Features\Crew\Controllers\CrewMobileProfileController;
 use App\Features\Downloads\Controllers\DownloadLinkController;
+use App\Features\Operations\Controllers\CrewMobileDocumentController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentActionController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentController;
 use App\Features\Scheduling\Controllers\CrewMobileAvailabilityController;
 use App\Features\Scheduling\Controllers\CrewMobileNotificationController;
 use App\Features\Scheduling\Controllers\CrewMobileTimeController;
 use App\Features\Timesheets\Controllers\CrewMobileFinancialController;
+use App\Features\Training\Controllers\CrewMobileTrainingController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('throttle:public-catalogue')->group(function (): void {
@@ -73,6 +75,11 @@ Route::prefix('v1')->middleware([
         Route::post('assignments/{assignment}/clock-in', [CrewMobileTimeController::class, 'clockIn'])->middleware('api.idempotency');
         Route::post('assignments/{assignment}/clock-out', [CrewMobileTimeController::class, 'finish'])->middleware('api.idempotency');
         Route::put('assignments/{assignment}/time', [CrewMobileTimeController::class, 'update'])->middleware('api.idempotency');
+        Route::get('documents', [CrewMobileDocumentController::class, 'index']);
+        Route::post('documents/{document}/download', [CrewMobileDocumentController::class, 'download']);
+        Route::get('documents/{document}/content', [CrewMobileDocumentController::class, 'content'])
+            ->middleware('signed')->name('api.v1.documents.content');
+        Route::get('training', CrewMobileTrainingController::class);
     });
 });
 

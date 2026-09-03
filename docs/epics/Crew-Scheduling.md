@@ -306,6 +306,14 @@ Section 7 is app-native Help & Support; the supplied handbook retains sections
 the administrator Resources & Checklists page so incomplete concert material can
 be added later without a code change.
 
+The versioned crew API exposes active private resources as offline-sync metadata
+with byte size, MIME type, SHA-256 checksum and modification time. Storage paths
+are never returned. A download request issues a five-minute signed application
+URL which still requires the crew bearer token, rechecks that the resource is
+active and streams from the configured private disk with `no-store` caching.
+Published training available to the crew member is returned with enrolment,
+due-date and calculated module-progress status.
+
 Each scheduling event has one communication thread shared by administrators and
 its published crew. Ordinary messages support operational questions, issue
 reports and image/document attachments. Important administrator announcements

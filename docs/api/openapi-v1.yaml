@@ -614,7 +614,7 @@ paths:
     get:
       tags: [Documents]
       operationId: listDocuments
-      x-implementation-status: planned
+      x-implementation-status: available
       summary: Return authorised operational document metadata for offline sync
       parameters:
         - name: updated_since
@@ -640,7 +640,7 @@ paths:
     post:
       tags: [Documents]
       operationId: createDocumentDownload
-      x-implementation-status: planned
+      x-implementation-status: available
       summary: Issue a short-lived URL for one currently authorised document
       parameters:
         - $ref: '#/components/parameters/DocumentId'
@@ -662,7 +662,7 @@ paths:
     get:
       tags: [Training]
       operationId: listTraining
-      x-implementation-status: planned
+      x-implementation-status: available
       responses:
         '200':
           description: Assigned training returned.
