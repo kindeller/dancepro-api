@@ -2,8 +2,11 @@
 
 namespace App\Features\Crew\Controllers;
 
+use App\Features\Auth\Actions\RotateUserPassword;
+use App\Features\Auth\Resources\CrewMobileUserResource;
 use App\Features\Crew\Actions\RefreshCrewOnboardingStatus;
 use App\Features\Crew\Actions\UpdateOwnCrewProfile;
+use App\Features\Crew\Requests\ChangeOwnPasswordRequest;
 use App\Features\Crew\Requests\UpdateCrewMobileProfileRequest;
 use App\Features\Crew\Resources\CrewMobileProfileResource;
 use App\Features\Crew\Services\CrewOnboardingStatus;
@@ -29,8 +32,26 @@ class CrewMobileProfileController extends Controller
 
         return ApiResponse::success('Crew profile updated.', [
             'profile' => new CrewMobileProfileResource($profile->load(['user', 'vehicles'])),
+            'user' => new CrewMobileUserResource($request->user()->refresh()),
             'onboarding_complete' => $status['complete'],
             'onboarding_missing' => $status['missing'],
+        ]);
+    }
+
+    public function changePassword(ChangeOwnPasswordRequest $request, RotateUserPassword $rotatePassword): JsonResponse
+    {
+        $currentTokenId = $request->user()->currentAccessToken()?->getKey();
+        $rotatePassword->execute(
+            $request->user(),
+            $request->string('password')->toString(),
+            preserveTokenId: is_numeric($currentTokenId) ? (int) $currentTokenId : null,
+        );
+
+        return ApiResponse::success('Password changed.', [
+            'user' => new CrewMobileUserResource($request->user()->refresh()),
+            'session_policy' => $currentTokenId === null
+                ? 'all_api_sessions_revoked'
+                : 'current_mobile_session_preserved_other_api_sessions_revoked',
         ]);
     }
 }

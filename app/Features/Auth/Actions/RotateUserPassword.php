@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 
 class RotateUserPassword
 {
-    public function execute(User $user, string $password, bool $verifyEmail = false): User
+    public function execute(User $user, string $password, bool $verifyEmail = false, ?int $preserveTokenId = null): User
     {
         $attributes = [
             'password' => $password,
@@ -19,7 +19,9 @@ class RotateUserPassword
         }
 
         $user->forceFill($attributes)->save();
-        $user->tokens()->delete();
+        $user->tokens()
+            ->when($preserveTokenId !== null, fn ($query) => $query->whereKeyNot($preserveTokenId))
+            ->delete();
 
         return $user;
     }

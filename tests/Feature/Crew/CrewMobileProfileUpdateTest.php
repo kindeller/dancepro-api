@@ -27,6 +27,13 @@ class CrewMobileProfileUpdateTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.profile.preferred_name', 'Morgan')
             ->assertJsonPath('data.profile.address.suburb', 'Perth')
+            ->assertJsonPath('data.profile.shirt_size', 'M')
+            ->assertJsonPath('data.profile.jacket_size', 'L')
+            ->assertJsonPath('data.profile.date_of_birth', '1990-04-12')
+            ->assertJsonPath('data.profile.dietary_requirements', 'Vegetarian')
+            ->assertJsonPath('data.profile.medical_information', 'Allergic to bee stings')
+            ->assertJsonPath('data.profile.abn', '98765432109')
+            ->assertJsonPath('data.user.email', 'morgan@example.com')
             ->assertJsonPath('data.onboarding_complete', true)
             ->assertJsonPath('data.onboarding_missing', []);
 
@@ -101,6 +108,44 @@ class CrewMobileProfileUpdateTest extends TestCase
         $this->assertSame($profile->id, $this->app['auth']->user()->crewProfile->id);
     }
 
+    public function test_mobile_password_change_preserves_current_token_and_revokes_other_api_sessions(): void
+    {
+        $user = User::factory()->crew()->create([
+            'password' => Hash::make('secret-password'),
+            'onboarding_completed_at' => now(),
+        ]);
+        CrewProfile::factory()->for($user)->create();
+        $current = $user->createToken('crew-mobile:iphone', [TokenAbility::CrewMobile->value]);
+        $other = $user->createToken('crew-mobile:ipad', [TokenAbility::CrewMobile->value]);
+
+        $this->withToken($current->plainTextToken)
+            ->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->putJson('/api/v1/profile/password', [
+                'current_password' => 'secret-password',
+                'password' => 'new-secret-password',
+                'password_confirmation' => 'new-secret-password',
+            ])->assertOk()
+            ->assertJsonPath('data.session_policy', 'current_mobile_session_preserved_other_api_sessions_revoked');
+
+        $this->assertTrue(Hash::check('new-secret-password', $user->refresh()->password));
+        $this->assertDatabaseHas('personal_access_tokens', ['id' => $current->accessToken->id]);
+        $this->assertDatabaseMissing('personal_access_tokens', ['id' => $other->accessToken->id]);
+        $this->withToken($current->plainTextToken)->getJson('/api/v1/profile')->assertOk();
+    }
+
+    public function test_mobile_password_change_validates_current_password_and_confirmation(): void
+    {
+        $this->authenticatedCrew();
+
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->putJson('/api/v1/profile/password', [
+                'current_password' => 'wrong-password',
+                'password' => 'new-secret-password',
+                'password_confirmation' => 'different-password',
+            ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['current_password', 'password']);
+    }
+
     /** @return array{User, CrewProfile} */
     private function authenticatedCrew(bool $incomplete = false): array
     {
@@ -126,6 +171,12 @@ class CrewMobileProfileUpdateTest extends TestCase
             'legal_name' => 'Morgan Vale',
             'email' => 'morgan@example.com',
             'phone' => '0400 111 222',
+            'shirt_size' => 'M',
+            'jacket_size' => 'L',
+            'date_of_birth' => '1990-04-12',
+            'dietary_requirements' => 'Vegetarian',
+            'medical_information' => 'Allergic to bee stings',
+            'abn' => '98765432109',
             'address' => [
                 'line_1' => '1 Test Street', 'line_2' => null, 'suburb' => 'Perth',
                 'state' => 'WA', 'postcode' => '6000',

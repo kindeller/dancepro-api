@@ -507,6 +507,38 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /profile/password:
+    put:
+      tags: [Profile]
+      operationId: changePassword
+      x-implementation-status: available
+      summary: Change the current password and revoke every other API session
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, password, password_confirmation]
+              properties:
+                current_password:
+                  type: string
+                  format: password
+                password:
+                  type: string
+                  format: password
+                password_confirmation:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Refreshed user and applied session policy returned.
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /chats:
     get:
       tags: [Chat]
@@ -1600,6 +1632,19 @@ components:
           format: email
         phone:
           type: string
+        shirt_size:
+          type: [string, 'null']
+        jacket_size:
+          type: [string, 'null']
+        date_of_birth:
+          type: [string, 'null']
+          format: date
+        dietary_requirements:
+          type: [string, 'null']
+        medical_information:
+          type: [string, 'null']
+        abn:
+          type: [string, 'null']
         address:
           $ref: '#/components/schemas/Address'
         emergency_contact:
@@ -1633,6 +1678,24 @@ components:
         phone:
           type: string
           maxLength: 50
+        shirt_size:
+          type: [string, 'null']
+          maxLength: 50
+        jacket_size:
+          type: [string, 'null']
+          maxLength: 50
+        date_of_birth:
+          type: [string, 'null']
+          format: date
+        dietary_requirements:
+          type: [string, 'null']
+          maxLength: 5000
+        medical_information:
+          type: [string, 'null']
+          maxLength: 5000
+        abn:
+          type: [string, 'null']
+          maxLength: 30
         address:
           $ref: '#/components/schemas/Address'
         emergency_contact:
@@ -1658,21 +1721,47 @@ components:
           maxItems: 10
           description: Omit to preserve existing vehicles; send an empty array to remove all vehicles.
           items:
-            type: object
-            required: [make, model, registration]
-            additionalProperties: true
+            $ref: '#/components/schemas/CrewVehicle'
     ProfileUpdateResult:
       type: object
-      required: [profile, onboarding_complete, onboarding_missing]
+      required: [profile, user, onboarding_complete, onboarding_missing]
       properties:
         profile:
           $ref: '#/components/schemas/CrewProfile'
+        user:
+          $ref: '#/components/schemas/CurrentUser'
         onboarding_complete:
           type: boolean
         onboarding_missing:
           type: array
           items:
             type: string
+    CrewVehicle:
+      type: object
+      required: [make, model, registration]
+      properties:
+        id:
+          type: [string, 'null']
+          format: uuid
+          description: Returned as id; send the same value as uuid when updating an existing vehicle.
+        uuid:
+          type: [string, 'null']
+          format: uuid
+        make:
+          type: string
+          maxLength: 100
+        model:
+          type: string
+          maxLength: 100
+        registration:
+          type: string
+          maxLength: 30
+        colour:
+          type: [string, 'null']
+          maxLength: 50
+        notes:
+          type: [string, 'null']
+          maxLength: 1000
     PaymentDetailsUpdate:
       type: object
       properties:

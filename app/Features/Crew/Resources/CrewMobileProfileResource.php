@@ -16,6 +16,12 @@ class CrewMobileProfileResource extends JsonResource
             'legal_name' => $this->legal_name,
             'email' => $this->user->email,
             'phone' => $this->phone,
+            'shirt_size' => $this->shirt_size,
+            'jacket_size' => $this->jacket_size,
+            'date_of_birth' => $this->date_of_birth,
+            'dietary_requirements' => $this->dietary_requirements,
+            'medical_information' => $this->medical_information,
+            'abn' => $this->abn,
             'address' => [
                 'line_1' => $this->address_line_1,
                 'line_2' => $this->address_line_2,

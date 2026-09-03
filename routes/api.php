@@ -57,6 +57,8 @@ Route::prefix('v1')->middleware([
     Route::get('profile', [CrewMobileProfileController::class, 'show']);
     Route::put('profile', [CrewMobileProfileController::class, 'update'])
         ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
+    Route::put('profile/password', [CrewMobileProfileController::class, 'changePassword'])
+        ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
     Route::get('contracts', [CrewMobileContractController::class, 'index']);
     Route::post('contracts/{contract}/sign', [CrewMobileContractController::class, 'sign'])
         ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
