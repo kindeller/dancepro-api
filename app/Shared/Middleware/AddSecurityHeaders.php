@@ -21,6 +21,11 @@ final class AddSecurityHeaders
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'camera=(), geolocation=(), microphone=()');
 
+        if ($request->is('api/v1', 'api/v1/*')) {
+            $response->headers->set('Cache-Control', 'no-store, private');
+            $response->headers->set('Pragma', 'no-cache');
+        }
+
         if (config('security.content_security_policy.enabled')) {
             $header = config('security.content_security_policy.report_only')
                 ? 'Content-Security-Policy-Report-Only'

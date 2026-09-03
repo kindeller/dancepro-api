@@ -6,6 +6,8 @@ Phase 0 establishes the security defaults for later DancePro features.
 - API authentication uses Laravel Sanctum bearer tokens.
 - Sanctum tokens use explicit abilities; wildcard abilities are not issued.
 - Sensitive API routes enforce token abilities in addition to current user permissions.
+- Versioned mobile API responses use `Cache-Control: no-store, private` and
+  `Pragma: no-cache` to prevent shared HTTP caches retaining crew data.
 - Passwords are hashed through Laravel's password hashing cast/factory helpers.
 - Inactive users cannot log in.
 - Browser and API login attempts are rate limited by hashed email/IP and by IP.
@@ -46,6 +48,7 @@ Phase 0 establishes the security defaults for later DancePro features.
 ## Related Documentation
 
 - [Authentication](Authentication.md)
+- [Mobile Security Verification](Mobile-Security-Verification.md)
 - [Sensitive Data Retention and Key Recovery](Sensitive-Data-Retention-and-Key-Recovery.md)
 - [API Guidelines](API-Guidelines.md)
 - [AWS](AWS.md)

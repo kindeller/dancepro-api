@@ -4,7 +4,9 @@ namespace App\Features\Auth\Controllers;
 
 use App\Features\Auth\Actions\IssueCrewMobileToken;
 use App\Features\Auth\Requests\CrewMobileLoginRequest;
+use App\Features\Auth\Requests\RevokeCrewMobileDeviceRequest;
 use App\Features\Auth\Resources\CrewMobileUserResource;
+use App\Features\Auth\Services\CrewMobileDevices;
 use App\Features\Auth\Support\CrewMobileLoginStatus;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -66,5 +68,17 @@ class CrewMobileAuthController extends Controller
         $request->user()?->currentAccessToken()?->delete();
 
         return ApiResponse::success('Logged out.');
+    }
+
+    public function devices(Request $request, CrewMobileDevices $devices): JsonResponse
+    {
+        return ApiResponse::success('Mobile devices returned.', $devices->for($request->user()));
+    }
+
+    public function revokeDevice(RevokeCrewMobileDeviceRequest $request, string $device, CrewMobileDevices $devices): JsonResponse
+    {
+        abort_unless(preg_match('/^[a-f0-9]{64}$/', $device) === 1 && $devices->revoke($request->user(), $device), 404);
+
+        return ApiResponse::success('Mobile device access revoked.');
     }
 }

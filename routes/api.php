@@ -42,6 +42,9 @@ Route::prefix('v1/auth')->group(function (): void {
     Route::middleware(['auth:sanctum', 'abilities:'.TokenAbility::CrewMobile->value, 'api.crew.active'])->group(function (): void {
         Route::post('logout', [CrewMobileAuthController::class, 'logout']);
         Route::get('me', [CrewMobileAuthController::class, 'me']);
+        Route::get('devices', [CrewMobileAuthController::class, 'devices']);
+        Route::delete('devices/{device}', [CrewMobileAuthController::class, 'revokeDevice'])
+            ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
     });
 });
 

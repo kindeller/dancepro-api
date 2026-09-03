@@ -23,6 +23,8 @@ GET  /api/auth/me
 POST /api/v1/auth/login
 POST /api/v1/auth/logout
 GET  /api/v1/auth/me
+GET  /api/v1/auth/devices
+DELETE /api/v1/auth/devices/{device}
 ```
 
 ## Login
@@ -86,6 +88,13 @@ Crew mobile tokens:
 - are replaced when the same account logs in again with the same device name;
 - are checked against current active Crew access on every request; and
 - are stored by the app only in the platform secure credential store.
+
+Authenticated crew can list their mobile sessions without exposing bearer
+tokens or internal database identifiers. Revoking a session requires the
+account password, an idempotency key and an opaque session identifier. A user
+cannot discover or revoke another user's session. This provides a lost-device
+response without requiring database access, although an administrator can also
+deactivate Crew access to invalidate every mobile request immediately.
 
 There is intentionally no refresh-token flow. Expired credentials require a
 fresh password and, where configured, two-factor login. When enforced two-factor

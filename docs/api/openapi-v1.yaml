@@ -81,6 +81,63 @@ paths:
                         $ref: '#/components/schemas/CurrentUser'
         '401':
           $ref: '#/components/responses/Unauthenticated'
+  /auth/devices:
+    get:
+      tags: [Authentication]
+      operationId: listMobileDevices
+      x-implementation-status: available
+      summary: List the current crew member's mobile sessions
+      responses:
+        '200':
+          description: Mobile sessions returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MobileDevice'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /auth/devices/{device}:
+    delete:
+      tags: [Authentication]
+      operationId: revokeMobileDevice
+      x-implementation-status: available
+      summary: Revoke one of the current crew member's mobile sessions
+      parameters:
+        - name: device
+          in: path
+          required: true
+          description: Opaque device-session identifier returned by the device list.
+          schema:
+            type: string
+            pattern: '^[a-f0-9]{64}$'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          $ref: '#/components/responses/EmptySuccess'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /dashboard:
     get:
       tags: [Dashboard]
@@ -895,6 +952,24 @@ components:
             type: string
         two_factor_enabled:
           type: boolean
+    MobileDevice:
+      type: object
+      required: [id, name, current, last_used_at, expires_at]
+      properties:
+        id:
+          type: string
+          description: Opaque device-session identifier; this is not a database or bearer-token identifier.
+          pattern: '^[a-f0-9]{64}$'
+        name:
+          type: string
+        current:
+          type: boolean
+        last_used_at:
+          type: [string, 'null']
+          format: date-time
+        expires_at:
+          type: [string, 'null']
+          format: date-time
     Dashboard:
       type: object
       required: [next_assignment, unread_notifications, unread_chats, pending_availability, pending_invoices]
