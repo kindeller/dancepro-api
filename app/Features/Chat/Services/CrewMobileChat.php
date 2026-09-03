@@ -3,6 +3,7 @@
 namespace App\Features\Chat\Services;
 
 use App\Features\Chat\Models\DirectChatConversation;
+use App\Features\Operations\Models\EventMessage;
 use App\Features\Operations\Models\EventMessageRead;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
@@ -69,7 +70,18 @@ class CrewMobileChat
         $chat->participants()->updateExistingPivot($user->id, ['last_read_at' => $message->created_at]);
     }
 
-    public function messageResource(Model $message): array
+    public function attachment(User $user, string $chatUuid, string $messageUuid): EventMessage
+    {
+        [$kind, $chat] = $this->resolve($user, $chatUuid);
+        abort_unless($kind === 'event', 404);
+
+        return $chat->messages()
+            ->where('uuid', $messageUuid)
+            ->whereNotNull('attachment_path')
+            ->firstOrFail();
+    }
+
+    public function messageResource(Model $message, string $chatUuid): array
     {
         $profile = $message->author?->crewProfile;
 
@@ -82,7 +94,14 @@ class CrewMobileChat
                 'profile_photo_url' => null,
             ],
             'body' => (string) $message->body,
-            'attachment' => null,
+            'attachment' => $message instanceof EventMessage && filled($message->attachment_path) ? [
+                'name' => $message->attachment_name ?: basename($message->attachment_path),
+                'mime_type' => $message->attachment_mime,
+                'download_url' => route('api.v1.chats.attachments.show', [
+                    'chatId' => $chatUuid,
+                    'message' => $message->uuid,
+                ]),
+            ] : null,
             'created_at' => $message->created_at->toIso8601String(),
         ];
     }

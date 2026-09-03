@@ -510,6 +510,35 @@ paths:
           $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/RateLimited'
+  /chats/{chat}/messages/{message}/attachment:
+    get:
+      tags: [Chat]
+      operationId: downloadChatAttachment
+      x-implementation-status: available
+      summary: Download an attachment from an event chat accessible to the current crew member
+      parameters:
+        - $ref: '#/components/parameters/ChatId'
+        - name: message
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Private attachment content.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: private, no-store
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
   /chats/{chat}/read:
     put:
       tags: [Chat]
@@ -1529,7 +1558,7 @@ components:
           type: string
         attachment:
           oneOf:
-            - $ref: '#/components/schemas/Document'
+            - $ref: '#/components/schemas/ChatAttachment'
             - type: 'null'
         created_at:
           type: string
@@ -1548,6 +1577,18 @@ components:
           type: [string, 'null']
         profile_photo_url:
           type: [string, 'null']
+    ChatAttachment:
+      type: object
+      required: [name, mime_type, download_url]
+      description: Present only for event-chat attachments. Initial mobile support is download-only.
+      properties:
+        name:
+          type: string
+        mime_type:
+          type: [string, 'null']
+        download_url:
+          type: string
+          format: uri
           format: uri
     Notification:
       type: object

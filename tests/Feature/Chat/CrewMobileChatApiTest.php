@@ -12,6 +12,7 @@ use App\Features\Scheduling\Models\CrewNotification;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -74,6 +75,42 @@ class CrewMobileChatApiTest extends TestCase
 
         [$outsider] = $this->authenticatedCrew();
         $this->getJson('/api/v1/chats/'.$conversation->uuid.'/messages')->assertNotFound();
+    }
+
+    public function test_assigned_crew_can_discover_and_download_private_event_chat_attachments(): void
+    {
+        Storage::fake('local');
+        config(['operations.filesystem_disk' => 'local']);
+        [, $profile] = $this->authenticatedCrew();
+        $event = $this->assignedEvent($profile);
+        $author = User::factory()->staff()->create();
+        $path = 'event-communications/'.$event->uuid.'/brief.pdf';
+        Storage::disk('local')->put($path, 'private briefing');
+        $message = EventMessage::query()->create([
+            'scheduling_event_id' => $event->id,
+            'author_user_id' => $author->id,
+            'message_type' => 'discussion',
+            'body' => 'Please read this.',
+            'attachment_path' => $path,
+            'attachment_name' => 'Event brief.pdf',
+            'attachment_mime' => 'application/pdf',
+        ]);
+
+        $downloadUrl = '/api/v1/chats/'.$event->uuid.'/messages/'.$message->uuid.'/attachment';
+        $this->getJson('/api/v1/chats/'.$event->uuid.'/messages')
+            ->assertOk()
+            ->assertJsonPath('data.0.attachment.name', 'Event brief.pdf')
+            ->assertJsonPath('data.0.attachment.mime_type', 'application/pdf')
+            ->assertJsonPath('data.0.attachment.download_url', url($downloadUrl));
+
+        $download = $this->get($downloadUrl)
+            ->assertOk()
+            ->assertHeader('cache-control', 'no-store, private')
+            ->assertHeader('content-disposition', 'attachment; filename="Event brief.pdf"');
+        $this->assertSame('private briefing', $download->streamedContent());
+
+        $this->authenticatedCrew();
+        $this->get($downloadUrl)->assertNotFound();
     }
 
     public function test_crew_can_start_an_idempotent_direct_chat_from_a_directory_profile(): void

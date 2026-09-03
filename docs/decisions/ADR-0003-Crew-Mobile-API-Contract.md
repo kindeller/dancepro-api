@@ -37,6 +37,9 @@ already used by media and download workflows and must not be disrupted.
   be finalised with token and onboarding behavior.
 - Offline documents use short-lived authorised downloads plus checksums. The
   app must delete cached private files on sign-out or access revocation.
+- Existing event-chat attachments are exposed through bearer-authenticated,
+  event-scoped private downloads. Uploading chat attachments and direct-chat
+  attachments are deferred from the initial mobile release.
 - Crew members can review and password-confirm revocation of their own mobile
   sessions using opaque identifiers. Device session responses never expose
   bearer tokens or internal token IDs.

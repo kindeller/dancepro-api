@@ -10,10 +10,12 @@ use App\Features\Chat\Requests\StoreChatMessageRequest;
 use App\Features\Chat\Services\CrewMobileChat;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Operations\Actions\PostEventMessage;
+use App\Features\Operations\Services\OperationsFileStorage;
 use App\Http\Controllers\Controller;
 use App\Shared\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CrewMobileChatController extends Controller
 {
@@ -50,7 +52,9 @@ class CrewMobileChatController extends Controller
         $result = $chat->messages($request->user(), $chatId, $limit);
         $page = $result['page'];
 
-        return ApiResponse::success('Messages returned.', collect($page->items())->map($chat->messageResource(...)), meta: [
+        return ApiResponse::success('Messages returned.', collect($page->items())->map(
+            fn ($message): array => $chat->messageResource($message, $chatId)
+        ), meta: [
             'next_cursor' => $page->nextCursor()?->encode(),
             'has_more' => $page->hasMorePages(),
         ]);
@@ -64,7 +68,20 @@ class CrewMobileChatController extends Controller
             : $postDirect->execute($conversation, $request->user(), $request->string('body')->toString());
         $message->load('author.crewProfile');
 
-        return ApiResponse::success('Message created.', $chat->messageResource($message), 201);
+        return ApiResponse::success('Message created.', $chat->messageResource($message, $chatId), 201);
+    }
+
+    public function attachment(Request $request, string $chatId, string $message, CrewMobileChat $chat, OperationsFileStorage $files): StreamedResponse
+    {
+        $attachment = $chat->attachment($request->user(), $chatId, $message);
+        abort_unless($files->disk()->exists($attachment->attachment_path), 404);
+
+        return $files->disk()->response(
+            $attachment->attachment_path,
+            $attachment->attachment_name ?: basename($attachment->attachment_path),
+            ['Cache-Control' => 'private, no-store'],
+            'attachment',
+        );
     }
 
     public function read(MarkChatReadRequest $request, string $chatId, CrewMobileChat $chat): JsonResponse
