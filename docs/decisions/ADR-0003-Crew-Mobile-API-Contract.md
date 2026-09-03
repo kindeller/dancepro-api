@@ -22,6 +22,8 @@ already used by media and download workflows and must not be disrupted.
 - Collection endpoints use cursor pagination with a maximum page size of 100.
 - State-changing operations that can be retried by a mobile client require an
   `Idempotency-Key` UUID.
+- Training course detail requests are read-only. Starting a course is an
+  explicit idempotent action rather than a side effect of opening its content.
 - Idempotency records are scoped to the authenticated user. An identical retry
   replays the encrypted stored response, while reuse for a different method,
   target or request body is rejected. Records expire after 24 hours by default

@@ -33,6 +33,59 @@ class CrewMobileTrainingApiTest extends TestCase
         $this->assertStringNotContainsString('SECRET-CALL', $response->getContent());
         $this->assertStringNotContainsString('correct_answer', $response->getContent());
         $this->assertStringNotContainsString('Use the safety call.', $response->getContent());
+        $this->assertDatabaseHas('training_enrolments', [
+            'training_course_id' => $course->id,
+            'crew_profile_id' => $profile->id,
+            'status' => 'assigned',
+            'started_at' => null,
+        ]);
+    }
+
+    public function test_starting_a_course_is_an_explicit_idempotent_action(): void
+    {
+        [, $profile] = $this->authenticatedCrew();
+        [$course] = $this->assignedAssessment($profile);
+        $key = (string) Str::uuid();
+
+        $response = $this->withHeader('Idempotency-Key', $key)
+            ->postJson('/api/v1/training/'.$course->uuid.'/start')
+            ->assertOk()
+            ->assertJsonPath('data.status', 'in_progress');
+
+        $this->withHeader('Idempotency-Key', $key)
+            ->postJson('/api/v1/training/'.$course->uuid.'/start')
+            ->assertOk()
+            ->assertHeader('Idempotency-Replayed', 'true')
+            ->assertExactJson($response->json());
+
+        $this->assertDatabaseHas('training_enrolments', [
+            'training_course_id' => $course->id,
+            'crew_profile_id' => $profile->id,
+            'status' => 'in_progress',
+        ]);
+        $this->assertDatabaseCount('training_enrolments', 1);
+    }
+
+    public function test_reading_an_available_unassigned_course_does_not_create_an_enrolment(): void
+    {
+        $this->authenticatedCrew();
+        $course = TrainingCourse::query()->create([
+            'title' => 'General induction',
+            'status' => 'published',
+        ]);
+        $section = $course->sections()->create(['title' => 'Welcome']);
+        $section->modules()->create([
+            'training_course_id' => $course->id,
+            'title' => 'Introduction',
+            'module_type' => 'text',
+        ]);
+
+        $this->getJson('/api/v1/training/'.$course->uuid)
+            ->assertOk()
+            ->assertJsonPath('data.status', 'available')
+            ->assertJsonPath('data.sections.0.modules.0.progress.completed', false);
+
+        $this->assertDatabaseCount('training_enrolments', 0);
     }
 
     public function test_crew_can_complete_modules_and_receive_permitted_assessment_feedback(): void

@@ -800,7 +800,7 @@ paths:
       tags: [Training]
       operationId: getTrainingCourse
       x-implementation-status: available
-      summary: Return an available course with its sections, modules and current progress
+      summary: Return an available course with its sections, modules and current progress without changing enrolment state
       parameters:
         - $ref: '#/components/parameters/TrainingCourseId'
       responses:
@@ -817,6 +817,31 @@ paths:
                         $ref: '#/components/schemas/TrainingCourseDetail'
         '404':
           $ref: '#/components/responses/NotFound'
+  /training/{course}/start:
+    post:
+      tags: [Training]
+      operationId: startTrainingCourse
+      x-implementation-status: available
+      summary: Start an available or assigned training course
+      parameters:
+        - $ref: '#/components/parameters/TrainingCourseId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Course started and refreshed course progress returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TrainingCourseDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
   /training/{course}/modules/{module}/complete:
     post:
       tags: [Training]

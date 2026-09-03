@@ -64,6 +64,12 @@ HTTP method, request target and exact request body.
 The native client must generate a new key for each intended operation and retain
 that same key until the operation either succeeds or is deliberately abandoned.
 
+## Read Requests
+
+`GET` requests must not create records or advance workflow state. For example,
+`GET /api/v1/training/{course}` only returns course content and current progress;
+the client uses `POST /api/v1/training/{course}/start` to begin the course.
+
 ## Related Documentation
 
 - [Authentication Handbook](Authentication.md)

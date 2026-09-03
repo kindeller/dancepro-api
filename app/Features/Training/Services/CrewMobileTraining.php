@@ -17,25 +17,20 @@ class CrewMobileTraining
         return $this->available->for($profile)->firstWhere('id', $course->id) ?? abort(404);
     }
 
-    public function enrolment(CrewProfile $profile, TrainingCourse $course): TrainingEnrolment
+    public function enrolment(CrewProfile $profile, TrainingCourse $course): ?TrainingEnrolment
     {
-        $enrolment = TrainingEnrolment::query()->firstOrCreate(
-            ['training_course_id' => $course->id, 'crew_profile_id' => $profile->id],
-            ['status' => 'in_progress', 'started_at' => now()],
-        );
-
-        if ($enrolment->status === 'assigned') {
-            $enrolment->update(['status' => 'in_progress', 'started_at' => $enrolment->started_at ?? now()]);
-        }
-
-        return $enrolment->load('moduleProgress');
+        return TrainingEnrolment::query()
+            ->where('training_course_id', $course->id)
+            ->where('crew_profile_id', $profile->id)
+            ->with('moduleProgress')
+            ->first();
     }
 
-    public function detail(TrainingCourse $course, TrainingEnrolment $enrolment): array
+    public function detail(TrainingCourse $course, ?TrainingEnrolment $enrolment): array
     {
         $course->loadMissing('sections.modules');
         $attempts = TrainingAssessmentAttempt::query()
-            ->where('training_enrolment_id', $enrolment->id)
+            ->when($enrolment, fn ($query) => $query->where('training_enrolment_id', $enrolment->id), fn ($query) => $query->whereRaw('1 = 0'))
             ->orderByDesc('attempt_number')->get()->unique('training_module_id')->keyBy('training_module_id');
 
         return [
@@ -44,9 +39,9 @@ class CrewMobileTraining
             'description' => $course->description,
             'estimated_minutes' => $course->estimated_minutes,
             'required' => $course->is_required,
-            'status' => $enrolment->status,
-            'due_at' => $enrolment->due_at?->startOfDay()->toIso8601String(),
-            'completed_at' => $enrolment->completed_at?->toIso8601String(),
+            'status' => $enrolment?->status ?? 'available',
+            'due_at' => $enrolment?->due_at?->startOfDay()->toIso8601String(),
+            'completed_at' => $enrolment?->completed_at?->toIso8601String(),
             'sections' => $course->sections->map(fn ($section): array => [
                 'title' => $section->title,
                 'description' => $section->description,
@@ -55,9 +50,9 @@ class CrewMobileTraining
         ];
     }
 
-    private function module(TrainingModule $module, TrainingEnrolment $enrolment, ?TrainingAssessmentAttempt $attempt): array
+    private function module(TrainingModule $module, ?TrainingEnrolment $enrolment, ?TrainingAssessmentAttempt $attempt): array
     {
-        $progress = $enrolment->moduleProgress->firstWhere('training_module_id', $module->id);
+        $progress = $enrolment?->moduleProgress->firstWhere('training_module_id', $module->id);
         $settings = $module->settings ?? [];
         $assessment = data_get($settings, 'assessment', []);
         $showFeedback = (bool) ($assessment['show_feedback'] ?? false);
