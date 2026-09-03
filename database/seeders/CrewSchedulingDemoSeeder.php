@@ -27,6 +27,7 @@ class CrewSchedulingDemoSeeder extends Seeder
         }
 
         $staff = User::query()->where('email', 'staff@dancepro.test')->firstOrFail();
+        $staff->update(['is_admin' => true, 'onboarding_completed_at' => now()]);
         $roles = $this->roles();
         $crew = $this->crew($roles, $staff);
         $this->contract($staff, $crew);
@@ -62,7 +63,15 @@ class CrewSchedulingDemoSeeder extends Seeder
         foreach ($definitions as $key => [$name, $email, $phone, $shirt, $jacket, $years, $roleCodes, $vehicle]) {
             $user = $key === 'owner'
                 ? $staff
-                : User::withTrashed()->updateOrCreate(['email' => $email], ['name' => $name, 'type' => UserType::Crew->value, 'password' => self::PASSWORD, 'is_active' => $key !== 'lauren', 'email_verified_at' => now()->subYear(), 'deleted_at' => null]);
+                : User::withTrashed()->updateOrCreate(['email' => $email], [
+                    'name' => $name,
+                    'type' => UserType::Crew->value,
+                    'password' => self::PASSWORD,
+                    'is_active' => $key !== 'lauren',
+                    'email_verified_at' => now()->subYear(),
+                    'onboarding_completed_at' => now()->subYear(),
+                    'deleted_at' => null,
+                ]);
             $profile = CrewProfile::withTrashed()->updateOrCreate(['user_id' => $user->id], [
                 'legal_name' => $name, 'preferred_name' => strtok($name, ' '), 'phone' => $phone,
                 'shirt_size' => $shirt, 'jacket_size' => $jacket,

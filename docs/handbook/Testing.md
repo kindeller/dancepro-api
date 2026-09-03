@@ -11,12 +11,13 @@ signing, Competition object browsing, the Concert/media domain, public Concert
 access, staff studio/concert management, local demonstration data and
 maintenance behavior.
 
-Playwright regression tests exercise the public booking form and Concert
-playlist in desktop and mobile Chromium. They use Sail's dedicated `testing`
-MySQL database, which is recreated and populated with fictional
-local-development data before each run. The normal development database is not
-modified. Production-like S3 or CloudFront delivery still requires separate
-playback, seeking and failure-state validation.
+Playwright regression tests exercise the public booking form, Concert playlist,
+admin and crew login boundaries, Admin-to-My-Hub navigation and booking contact
+review in desktop and mobile Chromium. They use Sail's dedicated `testing` MySQL
+database, which is recreated and populated with fictional local-development data
+before each run. The normal development database is not modified. Production-like
+S3 or CloudFront delivery still requires separate playback, seeking and
+failure-state validation.
 
 ## Scope
 
@@ -64,7 +65,8 @@ Current Concert production-readiness coverage should include:
 - Existing password, approval, availability, playlist and download behavior
   does not regress.
 - Automated desktop and mobile Chromium checks for booking-form conditional
-  fields and Concert playlist selection.
+  fields, Concert playlist selection, role-based hub access and booking contact
+  review.
 - Manual checks for playback, seeking, fullscreen item transitions, final-item
   behavior and production delivery failures.
 
