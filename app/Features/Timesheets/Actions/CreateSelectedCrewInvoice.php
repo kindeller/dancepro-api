@@ -44,4 +44,11 @@ class CreateSelectedCrewInvoice
             return $invoice->load(['crewProfile', 'lines', 'schedulingEvent']);
         });
     }
+
+    public function executeForAssignments(CrewProfile $crew, array $assignmentUuids, string $style, ?int $startingNumber): CrewInvoice
+    {
+        $entryIds = $this->selection->resolveAssignmentUuids($crew, $assignmentUuids)['entries']->modelKeys();
+
+        return $this->execute($crew, $entryIds, $style, $startingNumber);
+    }
 }

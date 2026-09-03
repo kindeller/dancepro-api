@@ -14,6 +14,7 @@ tags:
   - name: Authentication
   - name: Dashboard
   - name: Assignments
+  - name: Cover Requests
   - name: Availability
   - name: Directory
   - name: Profile
@@ -299,6 +300,94 @@ paths:
       responses:
         '200':
           description: Corrected time state returned.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /assignments/{assignment}/finish-team:
+    post:
+      tags: [Timesheets]
+      operationId: finishAssignmentTeam
+      x-implementation-status: available
+      summary: Record one competition team's finish time as its team leader
+      parameters:
+        - $ref: '#/components/parameters/AssignmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actual_finish_at]
+              properties:
+                actual_finish_at:
+                  type: string
+                optional_note:
+                  type: [string, 'null']
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Number of unfinished team assignments updated.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /cover-requests:
+    get:
+      tags: [Cover Requests]
+      operationId: listCoverRequests
+      x-implementation-status: available
+      summary: List cover requests sent to or created by the current crew member
+      responses:
+        '200':
+          description: Sent and received cover requests returned.
+  /assignments/{assignment}/cover-requests:
+    post:
+      tags: [Cover Requests]
+      operationId: createCoverRequest
+      x-implementation-status: available
+      parameters:
+        - $ref: '#/components/parameters/AssignmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipients]
+              properties:
+                recipients:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items:
+                    type: string
+                    format: uuid
+                message:
+                  type: [string, 'null']
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Created cover request returned.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /cover-requests/{coverRequest}/accept:
+    post:
+      tags: [Cover Requests]
+      operationId: acceptCoverRequest
+      x-implementation-status: available
+      parameters:
+        - $ref: '#/components/parameters/CoverRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Accepted request and replacement assignment identifier returned.
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
@@ -657,6 +746,25 @@ paths:
                           $ref: '#/components/schemas/Timesheet'
                       meta:
                         $ref: '#/components/schemas/CursorMeta'
+  /timesheets/external-invoice:
+    post:
+      tags: [Timesheets]
+      operationId: recordExternalInvoice
+      x-implementation-status: available
+      summary: Mark selected completed assignments as invoiced outside DancePro
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignmentInvoiceSelection'
+      responses:
+        '200':
+          description: Number of timesheets marked as externally invoiced.
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /invoices:
     get:
       tags: [Timesheets]
@@ -681,6 +789,43 @@ paths:
                           $ref: '#/components/schemas/InvoiceSummary'
                       meta:
                         $ref: '#/components/schemas/CursorMeta'
+    post:
+      tags: [Timesheets]
+      operationId: createInvoice
+      x-implementation-status: available
+      summary: Create and submit an invoice using the validated website grouping rules
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceRequest'
+      responses:
+        '201':
+          description: Submitted invoice returned with payment details redacted.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /invoices/preview:
+    post:
+      tags: [Timesheets]
+      operationId: previewInvoice
+      x-implementation-status: available
+      summary: Validate a selection and return server-calculated invoice lines and totals
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceRequest'
+      responses:
+        '200':
+          description: Calculated invoice preview returned.
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /invoices/{invoice}:
     get:
       tags: [Timesheets]
@@ -702,6 +847,22 @@ paths:
                         $ref: '#/components/schemas/InvoiceDetail'
         '404':
           $ref: '#/components/responses/NotFound'
+  /invoices/{invoice}/download:
+    post:
+      tags: [Timesheets]
+      operationId: downloadInvoice
+      x-implementation-status: available
+      summary: Generate an immutable private PDF and issue a five-minute signed download
+      parameters:
+        - $ref: '#/components/parameters/InvoiceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Temporary URL, expiry, byte size and SHA-256 checksum returned.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /contracts:
     get:
       tags: [Contracts]
@@ -943,6 +1104,13 @@ components:
         format: uuid
     AssignmentId:
       name: assignment
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CoverRequestId:
+      name: coverRequest
       in: path
       required: true
       schema:
@@ -1250,6 +1418,10 @@ components:
           enum: [draft, published, cancelled]
         acknowledged:
           type: boolean
+        time:
+          $ref: '#/components/schemas/AssignmentTime'
+        permissions:
+          $ref: '#/components/schemas/AssignmentPermissions'
         version:
           type: string
           description: Opaque value used to detect stale acknowledgements.
@@ -1277,6 +1449,32 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/Document'
+    AssignmentTime:
+      type: object
+      required: [actual_clock_in_at, actual_finish_at, optional_note, locked]
+      properties:
+        actual_clock_in_at:
+          type: [string, 'null']
+          format: date-time
+        actual_finish_at:
+          type: [string, 'null']
+          format: date-time
+        optional_note:
+          type: [string, 'null']
+        locked:
+          type: boolean
+    AssignmentPermissions:
+      type: object
+      required: [can_clock_in, can_clock_out, can_edit_time, can_finish_team]
+      properties:
+        can_clock_in:
+          type: boolean
+        can_clock_out:
+          type: boolean
+        can_edit_time:
+          type: boolean
+        can_finish_team:
+          type: boolean
     Venue:
       type: object
       required: [id, name]
@@ -1622,6 +1820,31 @@ components:
           const: direct
         title:
           type: string
+    AssignmentInvoiceSelection:
+      type: object
+      required: [assignment_ids]
+      properties:
+        assignment_ids:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+    CreateInvoiceRequest:
+      allOf:
+        - $ref: '#/components/schemas/AssignmentInvoiceSelection'
+        - type: object
+          required: [invoice_style]
+          properties:
+            invoice_style:
+              type: string
+              enum: [classic, minimal, modern]
+            starting_invoice_number:
+              type: [integer, 'null']
+              minimum: 1
+              maximum: 999999999
     Timesheet:
       type: object
       required: [id, assignment_id, event_name, event_date, status]

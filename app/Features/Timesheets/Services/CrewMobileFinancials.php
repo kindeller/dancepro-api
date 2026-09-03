@@ -81,6 +81,39 @@ class CrewMobileFinancials
         ];
     }
 
+    public function invoicePreview(array $selection, string $style, ?int $startingNumber): array
+    {
+        $entries = $selection['entries'];
+        $previews = $selection['previews'];
+
+        return [
+            'invoice_style' => $style,
+            'starting_invoice_number' => $startingNumber,
+            'event_type' => $selection['eventType'],
+            'event_name' => $selection['event']?->name,
+            'subtotal' => $this->money($previews->sum('base')),
+            'allowance_total' => $this->money($previews->sum('allowanceTotal')),
+            'total' => $this->money($previews->sum('total')),
+            'lines' => $entries->map(function ($entry) use ($previews): array {
+                $assignment = $entry->assignment;
+                $preview = $previews[$entry->id];
+
+                return [
+                    'assignment_id' => $assignment->uuid,
+                    'event' => $assignment->shift->schedulingEvent->name,
+                    'date' => $assignment->shift->shift_date->toDateString(),
+                    'role' => $assignment->role->name,
+                    'start' => $preview['payableStart']?->toIso8601String(),
+                    'finish' => $preview['payableFinish']?->toIso8601String(),
+                    'hours' => $preview['hours'],
+                    'base_amount' => $this->money($preview['base']),
+                    'allowance_amount' => $this->money($preview['allowanceTotal']),
+                    'line_total' => $this->money($preview['total']),
+                ];
+            })->values(),
+        ];
+    }
+
     public function timesheetResource(SchedulingShiftAssignment $assignment): array
     {
         $entry = $assignment->timeEntry;

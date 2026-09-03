@@ -64,4 +64,22 @@ class CrewInvoiceSelection
 
         return compact('entries', 'previews', 'eventType', 'event');
     }
+
+    public function resolveAssignmentUuids(CrewProfile $crew, array $assignmentUuids): array
+    {
+        $uuids = collect($assignmentUuids)->unique()->values();
+        $entryIds = SchedulingShiftAssignment::query()
+            ->where('crew_profile_id', $crew->id)
+            ->whereIn('uuid', $uuids)
+            ->whereHas('timeEntry')
+            ->with('timeEntry')
+            ->get()
+            ->pluck('timeEntry.id');
+
+        if ($entryIds->count() !== $uuids->count()) {
+            throw ValidationException::withMessages(['assignment_ids' => 'Select valid pending timesheets from your own account.']);
+        }
+
+        return $this->resolve($crew, $entryIds->all());
+    }
 }

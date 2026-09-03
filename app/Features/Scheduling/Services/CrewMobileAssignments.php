@@ -25,7 +25,7 @@ class CrewMobileAssignments
     public function findFor(CrewProfile $profile, SchedulingShiftAssignment $assignment): SchedulingShiftAssignment
     {
         $assignment = $this->query($profile)
-            ->with('shift.assignments.crewProfile.user')
+            ->with(['shift.assignments.crewProfile.user', 'shift.assignments.timeEntry'])
             ->whereKey($assignment->id)
             ->firstOrFail();
 
@@ -48,6 +48,6 @@ class CrewMobileAssignments
             ->join('scheduling_shifts', 'scheduling_shifts.id', '=', 'scheduling_shift_assignments.scheduling_shift_id')
             ->where('scheduling_shift_assignments.crew_profile_id', $profile->id)
             ->where('scheduling_shift_assignments.status', 'published')
-            ->with(['role', 'shift.schedulingEvent.venue']);
+            ->with(['role', 'timeEntry', 'shift.schedulingEvent.venue']);
     }
 }

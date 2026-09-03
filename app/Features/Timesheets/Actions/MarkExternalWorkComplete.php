@@ -18,4 +18,12 @@ class MarkExternalWorkComplete
 
         return $entries->count();
     }
+
+    public function executeForAssignments(CrewProfile $crew, array $assignmentUuids): int
+    {
+        $entries = $this->selection->resolveAssignmentUuids($crew, $assignmentUuids)['entries'];
+        AssignmentTimeEntry::query()->whereKey($entries->modelKeys())->update(['approval_status' => 'externally_invoiced']);
+
+        return $entries->count();
+    }
 }

@@ -11,6 +11,18 @@ class CrewAssignmentResource extends JsonResource
     public function toArray(Request $request): array
     {
         $event = $this->shift->schedulingEvent;
+        $timeEntry = $this->timeEntry;
+        $locked = $timeEntry?->locked_at !== null;
+        $hasClockIn = $timeEntry?->actual_clock_in_at !== null;
+        $hasFinish = $timeEntry?->actual_finish_at !== null;
+        $clockOutIsAvailable = $hasClockIn
+            || ($this->shift->posted_arrival_at?->copy()->addHours(2)->isPast() ?? false);
+        $canFinishTeam = $this->is_team_leader
+            && $event->event_type->value === 'competition'
+            && $this->shift->relationLoaded('assignments')
+            && $this->shift->assignments->where('status', 'published')->contains(
+                fn ($assignment): bool => $assignment->timeEntry?->actual_finish_at === null,
+            );
 
         return [
             'id' => $this->uuid,
@@ -23,6 +35,18 @@ class CrewAssignmentResource extends JsonResource
             'estimated_finish_at' => $this->shift->estimated_finish_at?->toIso8601String(),
             'status' => $this->status,
             'acknowledged' => $this->acknowledgement_status === 'acknowledged',
+            'time' => [
+                'actual_clock_in_at' => $timeEntry?->actual_clock_in_at?->toIso8601String(),
+                'actual_finish_at' => $timeEntry?->actual_finish_at?->toIso8601String(),
+                'optional_note' => $timeEntry?->optional_note,
+                'locked' => $locked,
+            ],
+            'permissions' => [
+                'can_clock_in' => ! $locked && ! $hasClockIn,
+                'can_clock_out' => ! $locked && ! $hasFinish && $clockOutIsAvailable,
+                'can_edit_time' => ! $locked,
+                'can_finish_team' => ! $locked && $canFinishTeam,
+            ],
             'version' => optional($this->published_at)->toIso8601String() ?? (string) $this->updated_at->getTimestamp(),
         ];
     }

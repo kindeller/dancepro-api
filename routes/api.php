@@ -15,6 +15,7 @@ use App\Features\Operations\Controllers\CrewMobileDocumentController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentActionController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentController;
 use App\Features\Scheduling\Controllers\CrewMobileAvailabilityController;
+use App\Features\Scheduling\Controllers\CrewMobileCoverRequestController;
 use App\Features\Scheduling\Controllers\CrewMobileNotificationController;
 use App\Features\Scheduling\Controllers\CrewMobileTimeController;
 use App\Features\Timesheets\Controllers\CrewMobileFinancialController;
@@ -64,6 +65,9 @@ Route::prefix('v1')->middleware([
         Route::get('dashboard', CrewMobileDashboardController::class);
         Route::get('assignments', [CrewMobileAssignmentController::class, 'index']);
         Route::get('assignments/{assignment}', [CrewMobileAssignmentController::class, 'show']);
+        Route::get('cover-requests', [CrewMobileCoverRequestController::class, 'index']);
+        Route::post('assignments/{assignment}/cover-requests', [CrewMobileCoverRequestController::class, 'store'])->middleware('api.idempotency');
+        Route::post('cover-requests/{coverRequest}/accept', [CrewMobileCoverRequestController::class, 'accept'])->middleware('api.idempotency');
         Route::put('assignments/{assignment}/acknowledgement', [CrewMobileAssignmentActionController::class, 'acknowledge'])->middleware('api.idempotency');
         Route::put('assignments/{assignment}/checklist-items/{item}', [CrewMobileAssignmentActionController::class, 'checklist'])->middleware('api.idempotency');
         Route::get('availability', [CrewMobileAvailabilityController::class, 'index']);
@@ -80,10 +84,17 @@ Route::prefix('v1')->middleware([
         Route::put('notifications/{notification}/read', [CrewMobileNotificationController::class, 'read']);
         Route::get('timesheets', [CrewMobileFinancialController::class, 'timesheets']);
         Route::get('invoices', [CrewMobileFinancialController::class, 'invoices']);
+        Route::post('invoices/preview', [CrewMobileFinancialController::class, 'previewInvoice'])->middleware('api.idempotency');
+        Route::post('invoices', [CrewMobileFinancialController::class, 'createInvoice'])->middleware('api.idempotency');
+        Route::post('timesheets/external-invoice', [CrewMobileFinancialController::class, 'markExternalInvoice'])->middleware('api.idempotency');
         Route::get('invoices/{invoice}', [CrewMobileFinancialController::class, 'invoice']);
+        Route::post('invoices/{invoice}/download', [CrewMobileFinancialController::class, 'downloadInvoice'])->middleware('api.idempotency');
+        Route::get('invoices/{invoice}/content', [CrewMobileFinancialController::class, 'invoiceContent'])
+            ->middleware('signed')->name('api.v1.invoices.content');
         Route::post('assignments/{assignment}/clock-in', [CrewMobileTimeController::class, 'clockIn'])->middleware('api.idempotency');
         Route::post('assignments/{assignment}/clock-out', [CrewMobileTimeController::class, 'finish'])->middleware('api.idempotency');
         Route::put('assignments/{assignment}/time', [CrewMobileTimeController::class, 'update'])->middleware('api.idempotency');
+        Route::post('assignments/{assignment}/finish-team', [CrewMobileTimeController::class, 'finishTeam'])->middleware('api.idempotency');
         Route::get('documents', [CrewMobileDocumentController::class, 'index']);
         Route::post('documents/{document}/download', [CrewMobileDocumentController::class, 'download']);
         Route::get('documents/{document}/content', [CrewMobileDocumentController::class, 'content'])

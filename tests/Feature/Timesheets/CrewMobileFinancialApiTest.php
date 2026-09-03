@@ -7,10 +7,12 @@ use App\Features\Crew\Models\CrewContract;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Crew\Support\CrewContractStatus;
+use App\Features\Scheduling\Models\PayRate;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Timesheets\Models\CrewInvoice;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -108,6 +110,96 @@ class CrewMobileFinancialApiTest extends TestCase
             ->assertOk()->assertJsonCount(2, 'data')->assertJsonMissing(['id' => $invoiced->uuid]);
         $this->getJson('/api/v1/timesheets?from=2026-01-02&to=2026-01-01')->assertUnprocessable();
         $this->getJson('/api/v1/timesheets?status=unknown')->assertUnprocessable();
+    }
+
+    public function test_crew_can_preview_and_create_an_invoice_with_assignment_uuids(): void
+    {
+        [, $profile] = $this->authenticatedCrew();
+        $profile->update([
+            'legal_name' => 'Alex Example', 'abn' => '12345678901',
+            'bank_account_name' => 'Alex Example', 'bank_name' => 'Test Bank',
+            'bank_bsb' => '123-456', 'bank_account_number' => '12345678',
+        ]);
+        $assignment = $this->assignment($profile, today()->subDay());
+        $date = $assignment->shift->shift_date->toDateString();
+        $assignment->timeEntry()->create([
+            'actual_clock_in_at' => "{$date} 08:00:00",
+            'actual_finish_at' => "{$date} 10:00:00",
+        ]);
+        PayRate::query()->create([
+            'rate_key' => 'competition_hourly', 'name' => 'Competition hourly',
+            'calculation_type' => 'hourly', 'amount' => 50, 'is_superable' => true,
+            'effective_from' => today()->subYear(),
+        ]);
+        $payload = [
+            'assignment_ids' => [$assignment->uuid],
+            'invoice_style' => 'modern',
+            'starting_invoice_number' => 42,
+        ];
+
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/invoices/preview', $payload)->assertOk()
+            ->assertJsonPath('data.lines.0.assignment_id', $assignment->uuid)
+            ->assertJsonPath('data.total', '100.00');
+        $created = $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/invoices', $payload)->assertCreated()
+            ->assertJsonPath('data.invoice_number', '42')
+            ->assertJsonPath('data.total', '100.00');
+
+        $this->assertDatabaseHas('crew_invoices', ['uuid' => $created->json('data.id'), 'crew_profile_id' => $profile->id]);
+        $this->assertNotNull($assignment->timeEntry()->firstOrFail()->invoiceLine);
+    }
+
+    public function test_crew_can_mark_external_invoice_and_securely_download_own_pdf(): void
+    {
+        Storage::fake('local');
+        [, $profile] = $this->authenticatedCrew();
+        $external = $this->assignment($profile, today()->subDays(2));
+        $externalDate = $external->shift->shift_date->toDateString();
+        $external->timeEntry()->create(['actual_clock_in_at' => "{$externalDate} 08:00:00", 'actual_finish_at' => "{$externalDate} 10:00:00"]);
+        PayRate::query()->create([
+            'rate_key' => 'competition_hourly', 'name' => 'Competition hourly',
+            'calculation_type' => 'hourly', 'amount' => 50, 'is_superable' => true,
+            'effective_from' => today()->subYear(),
+        ]);
+
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/timesheets/external-invoice', ['assignment_ids' => [$external->uuid]])
+            ->assertOk()->assertJsonPath('data.updated_count', 1);
+        $this->assertSame('externally_invoiced', $external->timeEntry()->firstOrFail()->approval_status);
+
+        $invoice = CrewInvoice::query()->create([
+            'crew_profile_id' => $profile->id, 'source' => 'dancepro', 'invoice_number' => '18',
+            'invoice_style' => 'modern', 'issuer_snapshot' => [
+                'legal_name' => 'Alex Example', 'address_line_1' => '1 Test Street', 'address_line_2' => null,
+                'suburb' => 'Perth', 'state' => 'WA', 'postcode' => '6000', 'phone' => '0400 000 000',
+                'abn' => '12345678901', 'bank_account_name' => 'Alex', 'bank_name' => 'Test Bank',
+                'bank_bsb' => '123-456', 'bank_account_number' => '12345678',
+            ],
+            'period_start' => $externalDate, 'period_end' => $externalDate, 'status' => 'pending_payment',
+            'subtotal' => 100, 'allowance_total' => 0, 'total' => 100, 'superable_total' => 100,
+            'submitted_at' => now(),
+        ]);
+        $invoice->lines()->create([
+            'assignment_time_entry_id' => $external->timeEntry()->firstOrFail()->id,
+            'snapshot' => ['event' => 'Competition', 'date' => $externalDate, 'role' => 'Videographer', 'start' => '8:00 am', 'finish' => '10:00 am', 'hours' => 2, 'rate' => 50],
+            'base_amount' => 100, 'allowance_amount' => 0, 'line_total' => 100,
+        ]);
+
+        $download = $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/invoices/'.$invoice->uuid.'/download')->assertOk()
+            ->assertJsonPath('data.checksum', fn ($value) => is_string($value) && strlen($value) === 64);
+        $url = $download->json('data.url');
+        $path = parse_url($url, PHP_URL_PATH).'?'.parse_url($url, PHP_URL_QUERY);
+        $this->get($path)->assertOk()->assertHeader('content-type', 'application/pdf');
+
+        $otherInvoice = CrewInvoice::query()->create([
+            'crew_profile_id' => $this->completeProfile()->id, 'source' => 'dancepro',
+            'period_start' => $externalDate, 'period_end' => $externalDate, 'status' => 'pending_payment',
+            'subtotal' => 1, 'allowance_total' => 0, 'total' => 1, 'superable_total' => 1,
+        ]);
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/invoices/'.$otherInvoice->uuid.'/download')->assertNotFound();
     }
 
     public function test_crew_can_list_and_securely_sign_an_active_contract_during_onboarding(): void
