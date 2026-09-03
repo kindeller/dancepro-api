@@ -99,6 +99,17 @@ showing when initial onboarding was completed. Future non-onboarding mobile
 routes must require current readiness while the profile and contract endpoints
 remain accessible.
 
+The first read-only mobile routes enforce these rules as follows:
+
+- `GET /api/v1/profile` remains available during onboarding.
+- Dashboard, assignment and directory routes require current onboarding
+  readiness and return a structured `403` onboarding error otherwise.
+- Assignment lookups use public UUIDs and return `404` when the assignment does
+  not belong to the authenticated crew member.
+- Directory responses contain active crew, studios and competitions only.
+- Profile payment identifiers are redacted to their final four characters;
+  administrator notes and unrelated financial data are never returned.
+
 ## Password Reset
 
 Browser password-reset link requests are limited to three per minute for an

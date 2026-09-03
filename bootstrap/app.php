@@ -2,6 +2,7 @@
 
 use App\Features\Auth\Middleware\RequireActiveCrewApiAccess;
 use App\Features\Auth\Middleware\RequireAdminAccess;
+use App\Features\Auth\Middleware\RequireCurrentCrewOnboarding;
 use App\Features\Auth\Middleware\RequireTwoFactorAuthentication;
 use App\Features\Crew\Middleware\RequireCompletedCrewOnboarding;
 use App\Features\Crew\Middleware\RequireCrewAccess;
@@ -35,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin.required' => RequireAdminAccess::class,
             'api.crew.active' => RequireActiveCrewApiAccess::class,
+            'api.crew.onboarded' => RequireCurrentCrewOnboarding::class,
             'abilities' => CheckAbilities::class,
             'two-factor.required' => RequireTwoFactorAuthentication::class,
             'crew.required' => RequireCrewAccess::class,

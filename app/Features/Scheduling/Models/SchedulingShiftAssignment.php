@@ -5,15 +5,18 @@ namespace App\Features\Scheduling\Models;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Operations\Models\AssignmentChecklistCompletion;
+use App\Shared\Models\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['scheduling_shift_id', 'crew_role_id', 'crew_profile_id', 'is_team_leader', 'status', 'acknowledgement_status', 'published_at', 'notified_at', 'acknowledged_at'])]
+#[Fillable(['uuid', 'scheduling_shift_id', 'crew_role_id', 'crew_profile_id', 'is_team_leader', 'status', 'acknowledgement_status', 'published_at', 'notified_at', 'acknowledged_at'])]
 class SchedulingShiftAssignment extends Model
 {
+    use HasPublicUuid;
+
     public function shift(): BelongsTo
     {
         return $this->belongsTo(SchedulingShift::class, 'scheduling_shift_id');

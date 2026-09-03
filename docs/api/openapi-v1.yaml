@@ -85,7 +85,7 @@ paths:
     get:
       tags: [Dashboard]
       operationId: crewDashboard
-      x-implementation-status: planned
+      x-implementation-status: available
       summary: Return the compact My Hub dashboard
       responses:
         '200':
@@ -105,7 +105,7 @@ paths:
     get:
       tags: [Assignments]
       operationId: listAssignments
-      x-implementation-status: planned
+      x-implementation-status: available
       summary: List assignments visible to the current crew member
       parameters:
         - $ref: '#/components/parameters/Cursor'
@@ -129,7 +129,7 @@ paths:
     get:
       tags: [Assignments]
       operationId: showAssignment
-      x-implementation-status: planned
+      x-implementation-status: available
       summary: Return an assignment owned by the current crew member
       parameters:
         - $ref: '#/components/parameters/AssignmentId'
@@ -239,7 +239,7 @@ paths:
     get:
       tags: [Directory]
       operationId: directory
-      x-implementation-status: planned
+      x-implementation-status: available
       summary: Return active crew, studios, and competitions permitted in My Crew
       responses:
         '200':
@@ -257,7 +257,7 @@ paths:
     get:
       tags: [Profile]
       operationId: showProfile
-      x-implementation-status: planned
+      x-implementation-status: available
       responses:
         '200':
           description: Own profile returned.
@@ -991,9 +991,11 @@ components:
                 type: string
               role:
                 type: [string, 'null']
-              email:
-                type: [string, 'null']
-                format: email
+              emails:
+                type: array
+                items:
+                  type: string
+                  format: email
               phone:
                 type: [string, 'null']
     CrewProfile:
