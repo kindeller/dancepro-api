@@ -65,6 +65,8 @@ composer install \
 npm ci --include=dev --no-audit --no-fund
 rm -f public/hot
 npm run build
+npm prune --omit=dev --no-audit --no-fund
+npm ls --omit=dev --depth=0
 
 php artisan migrate --force
 
@@ -81,7 +83,12 @@ php artisan view:cache
 The generated `public/build` directory is intentionally not committed. Every
 deployment rebuilds it from `package-lock.json`, removes any stale Vite hot-file,
 and stops before reopening the application unless the manifest contains the
-concert-player entry point.
+concert-player entry point. Composer always reconciles the production `vendor`
+directory against `composer.lock`, even when the Composer files did not change,
+so a missing or incomplete dependency directory cannot silently survive a
+deployment. Frontend development dependencies are installed only for the Vite
+build and pruned after the manifest is verified; runtime dependencies remain in
+`node_modules`.
 
 If queue workers are used:
 

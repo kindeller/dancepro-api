@@ -18,8 +18,9 @@
 #   - logs the complete deployment
 #   - enters Laravel maintenance mode using a pre-rendered maintenance page
 #   - performs a fast-forward-only update
-#   - installs locked production dependencies when Composer files changed
-#   - installs locked frontend dependencies and creates a verified Vite build
+#   - reconciles locked production PHP dependencies on every deployment
+#   - installs locked frontend dependencies, creates a verified Vite build and
+#     removes build-only Node.js packages
 #   - reviews and optionally runs pending migrations
 #   - moves tracked operational documents out of public storage
 #   - rebuilds Laravel caches
@@ -343,16 +344,11 @@ git pull --ff-only "$REMOTE" "$BRANCH"
 
 log "Production dependencies"
 
-if [[ "$COMPOSER_CHANGED" == true ]]; then
-    composer install \
-        --no-dev \
-        --optimize-autoloader \
-        --no-interaction \
-        --prefer-dist
-else
-    printf 'composer.json and composer.lock are unchanged.\n'
-    printf 'Skipping composer install.\n'
-fi
+composer install \
+    --no-dev \
+    --optimize-autoloader \
+    --no-interaction \
+    --prefer-dist
 
 log "Build frontend assets"
 rm -f "$APP_DIR/public/hot"
@@ -362,6 +358,10 @@ npm run build
 grep -q 'resources/js/concert-player.js' public/build/manifest.json || \
     fail "The Vite manifest does not contain the concert player entry point."
 printf 'Frontend build manifest: verified\n'
+
+log "Remove build-only Node.js dependencies"
+npm prune --omit=dev --no-audit --no-fund
+npm ls --omit=dev --depth=0
 
 log "Clear old Laravel caches"
 php artisan optimize:clear
