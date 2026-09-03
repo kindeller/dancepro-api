@@ -31,7 +31,7 @@ paths:
       tags: [Authentication]
       security: []
       operationId: login
-      x-implementation-status: planned
+      x-implementation-status: available
       summary: Authenticate an active crew member and issue device credentials
       requestBody:
         required: true
@@ -54,7 +54,7 @@ paths:
     post:
       tags: [Authentication]
       operationId: logout
-      x-implementation-status: planned
+      x-implementation-status: available
       summary: Revoke the current device credentials
       responses:
         '200':
@@ -65,7 +65,7 @@ paths:
     get:
       tags: [Authentication]
       operationId: currentUser
-      x-implementation-status: planned
+      x-implementation-status: available
       summary: Return the authenticated crew identity and capabilities
       responses:
         '200':
@@ -775,7 +775,7 @@ components:
           $ref: '#/components/schemas/CurrentUser'
     CurrentUser:
       type: object
-      required: [id, name, email, capabilities]
+      required: [id, name, email, capabilities, onboarding_complete, onboarding_missing, two_factor_enabled]
       properties:
         id:
           type: string
@@ -793,6 +793,11 @@ components:
             enum: [crew]
         onboarding_complete:
           type: boolean
+        onboarding_missing:
+          type: array
+          description: Opaque requirement keys used to route the app to profile or contract completion.
+          items:
+            type: string
         two_factor_enabled:
           type: boolean
     Dashboard:

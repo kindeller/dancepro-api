@@ -1,6 +1,7 @@
 <?php
 
 use App\Features\Auth\Controllers\AuthController;
+use App\Features\Auth\Controllers\CrewMobileAuthController;
 use App\Features\Auth\Support\TokenAbility;
 use App\Features\Competition\Controllers\CompetitionObjectController;
 use App\Features\Concerts\Controllers\PublicConcertApiController;
@@ -19,6 +20,15 @@ Route::prefix('auth')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me'])->middleware('abilities:'.TokenAbility::AccountRead->value);
+    });
+});
+
+Route::prefix('v1/auth')->group(function (): void {
+    Route::post('login', [CrewMobileAuthController::class, 'login'])->middleware('throttle:login');
+
+    Route::middleware(['auth:sanctum', 'abilities:'.TokenAbility::CrewMobile->value, 'api.crew.active'])->group(function (): void {
+        Route::post('logout', [CrewMobileAuthController::class, 'logout']);
+        Route::get('me', [CrewMobileAuthController::class, 'me']);
     });
 });
 

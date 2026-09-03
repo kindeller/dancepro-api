@@ -12,12 +12,17 @@ behaviour and user state rather than only stable handbook guidance.
 Baseline authentication endpoints are defined for login, logout, and returning
 the current authenticated user.
 
+Crew mobile authentication is also available under the versioned API.
+
 ## Endpoints
 
 ```text
 POST /api/auth/login
 POST /api/auth/logout
 GET  /api/auth/me
+POST /api/v1/auth/login
+POST /api/v1/auth/logout
+GET  /api/v1/auth/me
 ```
 
 ## Login
@@ -65,6 +70,34 @@ Tokens use explicit least-privilege abilities:
 Browser and API login submissions share two rate limits: five attempts per
 minute for an email-address/IP combination and 30 attempts per minute for an IP
 address. The email portion of the limiter key is hashed before it is cached.
+
+### Crew mobile login
+
+The `/api/v1/auth/*` endpoints are reserved for the Crew app. Login requires an
+active account with Crew access and a required device name. An incomplete crew
+member may authenticate so the app can provide the profile and contract steps
+needed to finish onboarding. The login and current-user responses include
+`onboarding_complete` and opaque `onboarding_missing` requirement keys.
+
+Crew mobile tokens:
+
+- contain only the `crew-mobile` ability;
+- expire after `MOBILE_TOKEN_EXPIRATION` minutes, seven days by default;
+- are replaced when the same account logs in again with the same device name;
+- are checked against current active Crew access on every request; and
+- are stored by the app only in the platform secure credential store.
+
+There is intentionally no refresh-token flow. Expired credentials require a
+fresh password and, where configured, two-factor login. When enforced two-factor
+setup has not been completed, the user must configure it through the secure web
+account before the app can issue a token.
+
+Onboarding readiness returned to the app is derived from the current required
+profile fields and active contract signatures. It can therefore become false if
+a new active contract needs signing without erasing the historical timestamp
+showing when initial onboarding was completed. Future non-onboarding mobile
+routes must require current readiness while the profile and contract endpoints
+remain accessible.
 
 ## Password Reset
 

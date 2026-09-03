@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'mobile_token_expiration' => (int) env('MOBILE_TOKEN_EXPIRATION', 10080),
+
     'two_factor' => [
         'enabled' => (bool) env('TWO_FACTOR_ENABLED', false),
         'enforced' => (bool) env('TWO_FACTOR_ENFORCED', false),

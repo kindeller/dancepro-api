@@ -47,6 +47,12 @@ final class ProductionEnvironmentValidator
             'SANCTUM_EXPIRATION must be between 1 and 43200 minutes.',
             $errors,
         );
+        $mobileTokenExpiration = (int) config('security.mobile_token_expiration');
+        $this->require(
+            $mobileTokenExpiration > 0 && $mobileTokenExpiration <= 43200,
+            'MOBILE_TOKEN_EXPIRATION must be between 1 and 43200 minutes.',
+            $errors,
+        );
 
         $this->require(config('database.default') !== 'sqlite', 'DB_CONNECTION must use the production database.', $errors);
         $this->require(config('backups.database.enabled') === true, 'DATABASE_BACKUP_ENABLED must be true.', $errors);
