@@ -13,7 +13,11 @@ test('admin can enter My Hub and return to Admin', async ({ page }) => {
     await signIn(page, 'staff@dancepro.test');
 
     await expect(page).toHaveURL(/\/admin$/);
-    await page.getByRole('link', { name: 'My Hub', exact: true }).click();
+    const myHubLink = page.getByRole('link', { name: 'My Hub', exact: true });
+    if (!await myHubLink.isVisible()) {
+        await page.getByRole('button', { name: 'Menu' }).click();
+    }
+    await myHubLink.click();
     await expect(page).toHaveURL(/\/crew\/availability$/);
     await expect(page.getByRole('link', { name: 'Back to Admin' })).toBeVisible();
 });
