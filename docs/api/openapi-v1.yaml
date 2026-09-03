@@ -389,8 +389,11 @@ paths:
     put:
       tags: [Profile]
       operationId: updateProfile
-      x-implementation-status: planned
+      x-implementation-status: available
       summary: Update permitted fields on the current crew profile
+      description: Supplying payment_details requires the current account password.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -408,7 +411,11 @@ paths:
                   - type: object
                     properties:
                       data:
-                        $ref: '#/components/schemas/CrewProfile'
+                        $ref: '#/components/schemas/ProfileUpdateResult'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '422':
           $ref: '#/components/responses/ValidationError'
   /chats:
@@ -1203,8 +1210,7 @@ components:
           format: date-time
     ProfileUpdateRequest:
       type: object
-      description: Full validation rules will be finalised with mobile onboarding and step-up authentication.
-      required: [preferred_name, email, phone, address]
+      required: [preferred_name, email, phone, address, compliance]
       properties:
         preferred_name:
           type: string
@@ -1222,6 +1228,57 @@ components:
           $ref: '#/components/schemas/Address'
         emergency_contact:
           $ref: '#/components/schemas/EmergencyContact'
+        compliance:
+          type: object
+          required: [working_with_children_number, working_with_children_expiry]
+          properties:
+            working_with_children_number:
+              type: string
+              maxLength: 100
+            working_with_children_expiry:
+              type: string
+              format: date
+        payment_details:
+          $ref: '#/components/schemas/PaymentDetailsUpdate'
+        password:
+          type: string
+          format: password
+          description: Required whenever payment_details is supplied.
+        vehicles:
+          type: array
+          maxItems: 10
+          description: Omit to preserve existing vehicles; send an empty array to remove all vehicles.
+          items:
+            type: object
+            required: [make, model, registration]
+            additionalProperties: true
+    ProfileUpdateResult:
+      type: object
+      required: [profile, onboarding_complete, onboarding_missing]
+      properties:
+        profile:
+          $ref: '#/components/schemas/CrewProfile'
+        onboarding_complete:
+          type: boolean
+        onboarding_missing:
+          type: array
+          items:
+            type: string
+    PaymentDetailsUpdate:
+      type: object
+      properties:
+        account_name:
+          type: [string, 'null']
+          maxLength: 255
+        bank_name:
+          type: [string, 'null']
+          maxLength: 255
+        bsb:
+          type: [string, 'null']
+          maxLength: 20
+        account_number:
+          type: [string, 'null']
+          maxLength: 30
     Address:
       type: object
       properties:

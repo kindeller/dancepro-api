@@ -20,15 +20,17 @@ class UpdateOwnCrewProfile
                 'working_with_children_number', 'working_with_children_expiry',
             ])->all())->save();
 
-            $keptVehicleIds = [];
-            foreach ($data['vehicles'] ?? [] as $vehicleData) {
-                $vehicle = filled($vehicleData['uuid'] ?? null)
-                    ? $crewProfile->vehicles()->where('uuid', $vehicleData['uuid'])->firstOrFail()
-                    : $crewProfile->vehicles()->make();
-                $vehicle->fill(collect($vehicleData)->except('uuid')->all())->save();
-                $keptVehicleIds[] = $vehicle->getKey();
+            if (array_key_exists('vehicles', $data)) {
+                $keptVehicleIds = [];
+                foreach ($data['vehicles'] as $vehicleData) {
+                    $vehicle = filled($vehicleData['uuid'] ?? null)
+                        ? $crewProfile->vehicles()->where('uuid', $vehicleData['uuid'])->firstOrFail()
+                        : $crewProfile->vehicles()->make();
+                    $vehicle->fill(collect($vehicleData)->except('uuid')->all())->save();
+                    $keptVehicleIds[] = $vehicle->getKey();
+                }
+                $crewProfile->vehicles()->whereNotIn('id', $keptVehicleIds)->delete();
             }
-            $crewProfile->vehicles()->whereNotIn('id', $keptVehicleIds)->delete();
 
             return $crewProfile->refresh();
         });

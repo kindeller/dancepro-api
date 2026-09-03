@@ -108,6 +108,13 @@ showing when initial onboarding was completed. Future non-onboarding mobile
 routes must require current readiness while the profile and contract endpoints
 remain accessible.
 
+`PUT /api/v1/profile` lets an authenticated crew member complete or update only
+their own permitted profile fields. The operation requires an idempotency key.
+Supplying payment details additionally requires the current account password;
+responses always return only redacted payment identifiers. Omitting `vehicles`
+preserves the current vehicle list, while explicitly sending an empty list
+removes it.
+
 The first read-only mobile routes enforce these rules as follows:
 
 - `GET /api/v1/profile` remains available during onboarding.
