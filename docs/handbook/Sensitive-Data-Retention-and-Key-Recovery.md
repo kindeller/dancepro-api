@@ -30,6 +30,7 @@ The following is the production baseline pending owner/accountant confirmation:
 | Driver licence, Working With Children and first-aid details | While required for an active role, then no later than 90 days after the relationship ends unless a statutory, insurance or incident requirement applies | Remove values and associated files |
 | Crew profile photograph and ordinary contact details | While the account or working relationship is active, then review at offboarding and remove within 90 days unless required for an outstanding record | Delete stored file and clear profile values |
 | Studio and competition contacts and booking snapshots | While the relationship is active, then review after 2 years without a booking or contact | Delete or de-identify when no longer needed |
+| Chat messages and notification content | While operationally useful, then review no later than 2 years after the related event or latest conversation activity | Delete when no longer required, subject to any legal hold or documented business-record obligation |
 | Authentication sessions, API tokens and recovery credentials | Revoke immediately when access ends; retain no plaintext recovery codes | Revoke/delete and invalidate active sessions |
 | Download-access records | 180 days by default | Daily scheduled pruning using `DOWNLOAD_ACCESS_RETENTION_DAYS` |
 | Application logs | 90 days maximum unless needed for an active security investigation | Expire automatically; redact personal data at collection |
@@ -51,6 +52,9 @@ When crew access ends, an administrator must:
    values into the audit note.
 
 Studio and competition contacts receive a similar annual inactivity review.
+Communication records receive an annual review until an approved, report-only
+pruning workflow has been tested. They must not be retained indefinitely merely
+because automated disposal is not yet enabled.
 
 ## Laravel Encryption Key Custody
 

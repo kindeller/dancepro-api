@@ -41,6 +41,8 @@ These controls are covered by feature tests and must remain part of the normal
   builds. Record a deliberate decision before introducing certificate pinning.
 - Keep push-notification payloads minimal; fetch sensitive message content only
   after authenticated app launch and respect lock-screen privacy settings.
+- Do not offer high-sensitivity fields such as bank, identity, medical, password
+  or token values as shareable chat content, and warn users not to send them.
 - Do not place bank, invoice, chat, contract or contact data in crash reports,
   notification previews, URLs, screenshots, clipboard history or debug logs.
 - A biometric app lock may protect local access but does not replace server

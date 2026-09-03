@@ -49,6 +49,11 @@ complete in the private deployment record.
 - [ ] Public uploads and private operational files use durable backed-up storage.
 - [ ] Object-storage versioning and backup/replication are active.
 - [ ] A verified off-server database backup is created at least daily.
+- [ ] Production database storage, snapshots and every backup destination are
+  encrypted at rest; any database connection crossing a host or network
+  boundary uses authenticated TLS.
+- [ ] Database and backup access is least privilege and its administrative
+  access logs are enabled and retained under the approved policy.
 - [ ] An isolated restore of database, object storage and the matching `APP_KEY`
   has succeeded using [Sensitive Data Retention and Key Recovery](Sensitive-Data-Retention-and-Key-Recovery.md).
 

@@ -35,6 +35,10 @@ are returned as not found to avoid disclosing private conversations.
 Mobile notification read state can be updated idempotently, with ownership
 checked on every request and inaccessible notification UUIDs returned as not
 found.
+Chat and notification content uses the infrastructure encryption, access,
+logging and retention controls accepted in ADR-0004. High-sensitivity payment,
+identity, medical and compliance fields retain Laravel application encryption
+and must not be copied into communications.
 Offline document MIME type, byte size and SHA-256 checksum are persisted when a
 resource file is uploaded or replaced. Legacy resources calculate and retain
 this metadata on first access, avoiding repeated full-file reads during later

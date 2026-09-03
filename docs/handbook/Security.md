@@ -35,6 +35,13 @@ Phase 0 establishes the security defaults for later DancePro features.
 - Authorization logic should use policies rather than controller conditionals.
 - Private S3 buckets and CloudFront/S3 signing should remain server-side only.
 - AWS credentials must never be exposed to a client application.
+- Chat and notification text uses infrastructure-level encryption at rest under
+  [ADR-0004](../decisions/ADR-0004-Communication-Data-Encryption.md). Production
+  database storage, snapshots and backups must be encrypted, remote database
+  connections must use authenticated TLS, and communication bodies must not be
+  written to logs.
+- Passwords, tokens, full payment details, identity-document numbers and medical
+  information must not be sent through chat or notification content.
 - Public download links should not expose raw database IDs.
 - Filesystem failures must be thrown and reported rather than converted into
   apparent success. File paths are only persisted after storage succeeds.
