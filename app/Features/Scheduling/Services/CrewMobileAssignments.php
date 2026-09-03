@@ -3,12 +3,15 @@
 namespace App\Features\Scheduling\Services;
 
 use App\Features\Crew\Models\CrewProfile;
+use App\Features\Operations\Services\ChecklistItemsForAssignment;
 use App\Features\Scheduling\Models\SchedulingShiftAssignment;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Database\Eloquent\Builder;
 
 class CrewMobileAssignments
 {
+    public function __construct(private readonly ChecklistItemsForAssignment $checklistItems) {}
+
     public function paginate(CrewProfile $profile, string $scope, int $limit): CursorPaginator
     {
         return $this->query($profile)
@@ -21,8 +24,19 @@ class CrewMobileAssignments
 
     public function findFor(CrewProfile $profile, SchedulingShiftAssignment $assignment): SchedulingShiftAssignment
     {
-        return $this->query($profile)
+        $assignment = $this->query($profile)
             ->with('shift.assignments.crewProfile.user')
+            ->whereKey($assignment->id)
+            ->firstOrFail();
+
+        $assignment->setRelation('mobileChecklist', $this->checklistItems->get($assignment));
+
+        return $assignment;
+    }
+
+    public function findOwned(CrewProfile $profile, SchedulingShiftAssignment $assignment): SchedulingShiftAssignment
+    {
+        return $this->query($profile)
             ->whereKey($assignment->id)
             ->firstOrFail();
     }

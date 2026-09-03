@@ -2,7 +2,7 @@
 
 namespace App\Features\Operations\Controllers;
 
-use App\Features\Operations\Models\AssignmentChecklistCompletion;
+use App\Features\Operations\Actions\UpdateAssignmentChecklistItem;
 use App\Features\Operations\Models\ChecklistTemplate;
 use App\Features\Operations\Models\ChecklistTemplateItem;
 use App\Features\Operations\Models\OperationalResource;
@@ -41,14 +41,10 @@ class CrewOperationsController extends Controller
         return view('crew.operations.assignment', compact('assignment', 'event', 'templates', 'resources'));
     }
 
-    public function toggle(ToggleChecklistItemRequest $request, SchedulingShiftAssignment $assignment, ChecklistTemplateItem $item): JsonResponse|RedirectResponse
+    public function toggle(ToggleChecklistItemRequest $request, SchedulingShiftAssignment $assignment, ChecklistTemplateItem $item, UpdateAssignmentChecklistItem $updateItem): JsonResponse|RedirectResponse
     {
         $this->authoriseAssignment($request, $assignment);
-        abort_unless($this->itemApplies($assignment, $item), 404);
-        AssignmentChecklistCompletion::query()->updateOrCreate(
-            ['scheduling_shift_assignment_id' => $assignment->id, 'checklist_template_item_id' => $item->id],
-            ['completed_by_user_id' => $request->user()->id, 'completed_at' => $request->boolean('completed') ? now() : null],
-        );
+        $updateItem->execute($assignment, $item, $request->user(), $request->boolean('completed'));
 
         return $request->expectsJson() ? response()->json(['success' => true]) : back()->with('status', 'Checklist updated.');
     }
@@ -56,17 +52,5 @@ class CrewOperationsController extends Controller
     private function authoriseAssignment(Request $request, SchedulingShiftAssignment $assignment): void
     {
         abort_unless($assignment->crew_profile_id === $request->user()?->crewProfile?->id && $assignment->status === 'published', 403);
-    }
-
-    private function itemApplies(SchedulingShiftAssignment $assignment, ChecklistTemplateItem $item): bool
-    {
-        $item->loadMissing('template');
-        $assignment->loadMissing(['role', 'shift.schedulingEvent']);
-
-        return $item->template->is_active
-            && ($item->template->event_type === null || ($item->template->event_type_definition_id !== null
-                ? $item->template->event_type_definition_id === $assignment->shift->schedulingEvent->event_type_definition_id
-                : $item->template->event_type === $assignment->shift->schedulingEvent->event_type->value))
-            && OperationalRoleCodes::matches($item->template->role_code, $assignment->role->code);
     }
 }

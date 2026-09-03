@@ -9,7 +9,9 @@ use App\Features\Crew\Controllers\CrewMobileDashboardController;
 use App\Features\Crew\Controllers\CrewMobileDirectoryController;
 use App\Features\Crew\Controllers\CrewMobileProfileController;
 use App\Features\Downloads\Controllers\DownloadLinkController;
+use App\Features\Scheduling\Controllers\CrewMobileAssignmentActionController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentController;
+use App\Features\Scheduling\Controllers\CrewMobileAvailabilityController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('throttle:public-catalogue')->group(function (): void {
@@ -47,6 +49,10 @@ Route::prefix('v1')->middleware([
         Route::get('dashboard', CrewMobileDashboardController::class);
         Route::get('assignments', [CrewMobileAssignmentController::class, 'index']);
         Route::get('assignments/{assignment}', [CrewMobileAssignmentController::class, 'show']);
+        Route::put('assignments/{assignment}/acknowledgement', [CrewMobileAssignmentActionController::class, 'acknowledge'])->middleware('api.idempotency');
+        Route::put('assignments/{assignment}/checklist-items/{item}', [CrewMobileAssignmentActionController::class, 'checklist'])->middleware('api.idempotency');
+        Route::get('availability', [CrewMobileAvailabilityController::class, 'index']);
+        Route::put('availability/{shift}', [CrewMobileAvailabilityController::class, 'update'])->middleware('api.idempotency');
         Route::get('directory', CrewMobileDirectoryController::class);
     });
 });

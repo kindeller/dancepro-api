@@ -29,7 +29,9 @@ class CrewAssignmentDetailResource extends CrewAssignmentResource
                 'phone' => $assignment->crewProfile->phone,
                 'profile_photo_url' => null,
             ])->values(),
-            'checklist' => [],
+            'checklist' => $this->resource->relationLoaded('mobileChecklist')
+                ? $this->resource->getRelation('mobileChecklist')
+                : [],
             'documents' => [],
         ];
     }

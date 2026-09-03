@@ -151,7 +151,7 @@ paths:
     put:
       tags: [Assignments]
       operationId: acknowledgeAssignment
-      x-implementation-status: planned
+      x-implementation-status: available
       summary: Acknowledge the current published assignment version
       parameters:
         - $ref: '#/components/parameters/AssignmentId'
@@ -167,7 +167,7 @@ paths:
     put:
       tags: [Assignments]
       operationId: updateChecklistItem
-      x-implementation-status: planned
+      x-implementation-status: available
       parameters:
         - $ref: '#/components/parameters/AssignmentId'
         - $ref: '#/components/parameters/ChecklistItemId'
@@ -191,7 +191,7 @@ paths:
     get:
       tags: [Availability]
       operationId: listAvailabilityRequests
-      x-implementation-status: planned
+      x-implementation-status: available
       responses:
         '200':
           description: Availability requests returned.
@@ -210,7 +210,7 @@ paths:
     put:
       tags: [Availability]
       operationId: updateAvailability
-      x-implementation-status: planned
+      x-implementation-status: available
       parameters:
         - $ref: '#/components/parameters/ShiftId'
         - $ref: '#/components/parameters/IdempotencyKey'

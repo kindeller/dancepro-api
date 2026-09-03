@@ -447,6 +447,13 @@ event. Published allocations are also excluded defensively from Availability.
 Private pencil assignments do not hide an open request because crew cannot see
 or act on those draft roster choices.
 
+The versioned crew API exposes the same rules through availability list/update,
+assignment acknowledgement and assignment checklist endpoints. Mutating mobile
+requests require a UUID `Idempotency-Key`; the actions set an explicit target
+state so safely retried requests cannot duplicate a response or completion.
+Ownership and published-status checks are always enforced on the server,
+irrespective of the assignment or shift identifier supplied by a client.
+
 Published crew can organise cover without supplying a reason. They choose one,
 multiple or all currently eligible crew and may add one personalised message;
 leaving it blank sends the generic request. Eligibility requires an active user,
