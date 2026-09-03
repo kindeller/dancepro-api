@@ -1,5 +1,6 @@
 <?php
 
+use App\Features\Auth\Actions\PruneApiIdempotencyRecords;
 use App\Features\Contacts\Actions\ExportContactDirectory;
 use App\Features\Contacts\Actions\ImportContactDirectory;
 use App\Features\Deployment\Actions\MigratePublicUploads;
@@ -73,7 +74,14 @@ Artisan::command('downloads:prune-accesses', function (PruneDownloadAccesses $pr
     return self::SUCCESS;
 })->purpose('Remove download access records beyond the configured retention period');
 
+Artisan::command('api:prune-idempotency', function (PruneApiIdempotencyRecords $prune): int {
+    $this->info('Removed '.$prune->execute().' expired API idempotency record(s).');
+
+    return self::SUCCESS;
+})->purpose('Remove expired mobile API idempotency records');
+
 Schedule::command('downloads:prune-accesses')->daily()->withoutOverlapping();
+Schedule::command('api:prune-idempotency')->hourly()->withoutOverlapping()->onOneServer();
 Schedule::command('database:backup --prune')
     ->dailyAt((string) config('backups.database.schedule_time'))
     ->timezone((string) config('app.timezone'))

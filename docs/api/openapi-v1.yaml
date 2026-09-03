@@ -883,6 +883,7 @@ components:
       name: Idempotency-Key
       in: header
       required: true
+      description: "Reuse the same UUID only when retrying the exact same operation. Replayed responses include `Idempotency-Replayed: true`; conflicting or in-progress reuse returns HTTP 409."
       schema:
         type: string
         format: uuid

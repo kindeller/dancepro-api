@@ -2,6 +2,7 @@
 
 return [
     'mobile_token_expiration' => (int) env('MOBILE_TOKEN_EXPIRATION', 10080),
+    'idempotency_retention_hours' => (int) env('API_IDEMPOTENCY_RETENTION_HOURS', 24),
 
     'two_factor' => [
         'enabled' => (bool) env('TWO_FACTOR_ENABLED', false),

@@ -32,6 +32,7 @@ The following is the production baseline pending owner/accountant confirmation:
 | Studio and competition contacts and booking snapshots | While the relationship is active, then review after 2 years without a booking or contact | Delete or de-identify when no longer needed |
 | Chat messages and notification content | While operationally useful, then review no later than 2 years after the related event or latest conversation activity | Delete when no longer required, subject to any legal hold or documented business-record obligation |
 | Authentication sessions, API tokens and recovery credentials | Revoke immediately when access ends; retain no plaintext recovery codes | Revoke/delete and invalidate active sessions |
+| Encrypted mobile idempotency responses | 24 hours by default | Hourly scheduled pruning using `API_IDEMPOTENCY_RETENTION_HOURS` |
 | Download-access records | 180 days by default | Daily scheduled pruning using `DOWNLOAD_ACCESS_RETENTION_DAYS` |
 | Application logs | 90 days maximum unless needed for an active security investigation | Expire automatically; redact personal data at collection |
 | Database and object-storage backups | 30 days unless the production backup policy records a different approved period | Expire automatically; never selectively alter immutable backups |

@@ -40,9 +40,20 @@ class CrewMobileChatApiTest extends TestCase
         $this->putJson('/api/v1/chats/'.$event->uuid.'/read', ['through_message' => $message->uuid])->assertOk();
         $this->assertDatabaseHas('event_message_reads', ['event_message_id' => $message->id, 'user_id' => $crew->id]);
 
-        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+        $key = (string) Str::uuid();
+        $firstPost = $this->withHeader('Idempotency-Key', $key)
             ->postJson('/api/v1/chats/'.$event->uuid.'/messages', ['body' => 'Thanks, understood.'])
             ->assertCreated()->assertJsonPath('data.body', 'Thanks, understood.');
+        $this->withHeader('Idempotency-Key', $key)
+            ->postJson('/api/v1/chats/'.$event->uuid.'/messages', ['body' => 'Thanks, understood.'])
+            ->assertCreated()->assertHeader('Idempotency-Replayed', 'true')
+            ->assertExactJson($firstPost->json());
+        $this->assertSame(2, $event->messages()->count());
+
+        $this->withHeader('Idempotency-Key', $key)
+            ->postJson('/api/v1/chats/'.$event->uuid.'/messages', ['body' => 'A different message.'])
+            ->assertConflict();
+        $this->assertSame(2, $event->messages()->count());
     }
 
     public function test_direct_chat_is_private_and_supports_message_read_state(): void

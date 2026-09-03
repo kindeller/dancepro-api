@@ -22,6 +22,10 @@ already used by media and download workflows and must not be disrupted.
 - Collection endpoints use cursor pagination with a maximum page size of 100.
 - State-changing operations that can be retried by a mobile client require an
   `Idempotency-Key` UUID.
+- Idempotency records are scoped to the authenticated user. An identical retry
+  replays the encrypted stored response, while reuse for a different method,
+  target or request body is rejected. Records expire after 24 hours by default
+  and are pruned hourly.
 - A resource outside the current user's scope is returned as not found so the
   API does not disclose its existence.
 - Dates and timestamps use ISO 8601; timestamps include an offset and are stored

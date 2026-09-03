@@ -40,13 +40,19 @@ class CrewMobileTrainingApiTest extends TestCase
         [, $profile] = $this->authenticatedCrew();
         [$course, $module] = $this->assignedAssessment($profile);
 
-        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+        $failedAttemptKey = (string) Str::uuid();
+        $failedResponse = $this->withHeader('Idempotency-Key', $failedAttemptKey)
             ->postJson('/api/v1/training/'.$course->uuid.'/modules/'.$module->uuid.'/complete', [
                 'answers' => ['wrong'],
             ])->assertOk()
             ->assertJsonPath('data.status', 'in_progress')
             ->assertJsonPath('data.sections.0.modules.0.progress.attempts', 1)
             ->assertJsonPath('data.sections.0.modules.0.progress.latest_assessment.results.0.feedback', 'Use the safety call.');
+        $this->withHeader('Idempotency-Key', $failedAttemptKey)
+            ->postJson('/api/v1/training/'.$course->uuid.'/modules/'.$module->uuid.'/complete', [
+                'answers' => ['wrong'],
+            ])->assertOk()->assertHeader('Idempotency-Replayed', 'true')->assertExactJson($failedResponse->json());
+        $this->assertDatabaseCount('training_assessment_attempts', 1);
 
         $this->withHeader('Idempotency-Key', (string) Str::uuid())
             ->postJson('/api/v1/training/'.$course->uuid.'/modules/'.$module->uuid.'/complete', [
