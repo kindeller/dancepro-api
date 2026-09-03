@@ -31,6 +31,9 @@ history, posting and message-bounded read state. It also exposes only the
 authenticated crew member's notifications. Event membership and direct-chat
 participation are checked for every read and write, and inaccessible chat UUIDs
 are returned as not found to avoid disclosing private conversations.
+Mobile notification read state can be updated idempotently, with ownership
+checked on every request and inaccessible notification UUIDs returned as not
+found.
 
 Phase 0 repository inspection and integration design is complete. The first
 scheduling foundation now includes crew profiles, clothing sizes, calculated

@@ -78,6 +78,29 @@ class CrewMobileChatApiTest extends TestCase
             ->assertJsonMissing(['title' => 'Private']);
     }
 
+    public function test_crew_can_idempotently_mark_only_their_notification_as_read(): void
+    {
+        [$crew] = $this->authenticatedCrew();
+        $other = User::factory()->crew()->create();
+        $notification = CrewNotification::query()->create([
+            'user_id' => $crew->id, 'type' => 'shift', 'title' => 'Your shift', 'message' => 'Review it.',
+        ]);
+        $privateNotification = CrewNotification::query()->create([
+            'user_id' => $other->id, 'type' => 'shift', 'title' => 'Private', 'message' => 'Not yours.',
+        ]);
+
+        $this->putJson('/api/v1/notifications/'.$notification->uuid.'/read')
+            ->assertOk()->assertJsonPath('message', 'Notification marked as read.');
+        $readAt = $notification->fresh()->read_at;
+        $this->assertNotNull($readAt);
+
+        $this->putJson('/api/v1/notifications/'.$notification->uuid.'/read')->assertOk();
+        $this->assertTrue($readAt->equalTo($notification->fresh()->read_at));
+
+        $this->putJson('/api/v1/notifications/'.$privateNotification->uuid.'/read')->assertNotFound();
+        $this->assertNull($privateNotification->fresh()->read_at);
+    }
+
     /** @return array{User, CrewProfile} */
     private function authenticatedCrew(): array
     {

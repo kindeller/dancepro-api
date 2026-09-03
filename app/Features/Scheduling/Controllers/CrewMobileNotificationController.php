@@ -2,7 +2,9 @@
 
 namespace App\Features\Scheduling\Controllers;
 
+use App\Features\Scheduling\Actions\MarkCrewNotificationRead;
 use App\Features\Scheduling\Models\CrewNotification;
+use App\Features\Scheduling\Requests\MarkCrewNotificationReadRequest;
 use App\Http\Controllers\Controller;
 use App\Shared\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -29,5 +31,12 @@ class CrewMobileNotificationController extends Controller
             'next_cursor' => $page->nextCursor()?->encode(),
             'has_more' => $page->hasMorePages(),
         ]);
+    }
+
+    public function read(MarkCrewNotificationReadRequest $request, CrewNotification $notification, MarkCrewNotificationRead $markRead): JsonResponse
+    {
+        $markRead->execute($request->user(), $notification);
+
+        return ApiResponse::success('Notification marked as read.');
     }
 }

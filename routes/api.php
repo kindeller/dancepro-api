@@ -74,6 +74,7 @@ Route::prefix('v1')->middleware([
         Route::post('chats/{chatId}/messages', [CrewMobileChatController::class, 'store'])->middleware('api.idempotency');
         Route::put('chats/{chatId}/read', [CrewMobileChatController::class, 'read']);
         Route::get('notifications', CrewMobileNotificationController::class);
+        Route::put('notifications/{notification}/read', [CrewMobileNotificationController::class, 'read']);
         Route::get('timesheets', [CrewMobileFinancialController::class, 'timesheets']);
         Route::get('invoices', [CrewMobileFinancialController::class, 'invoices']);
         Route::get('invoices/{invoice}', [CrewMobileFinancialController::class, 'invoice']);

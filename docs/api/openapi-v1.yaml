@@ -555,6 +555,19 @@ paths:
                           $ref: '#/components/schemas/Notification'
                       meta:
                         $ref: '#/components/schemas/CursorMeta'
+  /notifications/{notification}/read:
+    put:
+      tags: [Notifications]
+      operationId: markNotificationRead
+      x-implementation-status: available
+      summary: Idempotently mark one notification belonging to the authenticated crew member as read
+      parameters:
+        - $ref: '#/components/parameters/NotificationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/EmptySuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /timesheets:
     get:
       tags: [Timesheets]
@@ -883,6 +896,13 @@ components:
         format: uuid
     TrainingModuleId:
       name: module
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    NotificationId:
+      name: notification
       in: path
       required: true
       schema:
