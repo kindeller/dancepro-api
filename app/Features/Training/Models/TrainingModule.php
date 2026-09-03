@@ -2,14 +2,17 @@
 
 namespace App\Features\Training\Models;
 
+use App\Shared\Models\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['training_course_id', 'training_section_id', 'title', 'module_type', 'content', 'video_url', 'quiz_question', 'quiz_options', 'correct_option', 'settings', 'sort_order'])]
+#[Fillable(['uuid', 'training_course_id', 'training_section_id', 'title', 'module_type', 'content', 'video_url', 'quiz_question', 'quiz_options', 'correct_option', 'settings', 'sort_order'])]
 class TrainingModule extends Model
 {
+    use HasPublicUuid;
+
     public function course(): BelongsTo
     {
         return $this->belongsTo(TrainingCourse::class, 'training_course_id');

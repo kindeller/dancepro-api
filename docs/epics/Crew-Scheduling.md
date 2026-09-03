@@ -73,6 +73,10 @@ claim an email or phone notification was automatically sent.
 Courses linked to a crew role may explicitly award that role qualification on
 successful completion. This is opt-in per course; ordinary role-targeted
 learning does not silently change a crew member's qualifications.
+A crew member can open available course content and complete its modules through
+the versioned mobile API. Course responses include current progress and the most
+recent permitted assessment feedback, but never expose quiz or assessment answer
+keys. Course and module access is scoped to the authenticated crew member.
 A course may be a single quick equipment update or a larger sequence for new
 crew and role training. Updated learning is issued as a linked renewal course
 rather than expiring or overwriting the original completion.

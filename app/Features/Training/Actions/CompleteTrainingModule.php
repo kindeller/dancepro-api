@@ -19,6 +19,11 @@ class CompleteTrainingModule
     {
         return DB::transaction(function () use ($enrolment, $module, $data): string {
             $progress = $enrolment->moduleProgress()->lockForUpdate()->firstOrNew(['training_module_id' => $module->id]);
+
+            if ($progress->completed_at !== null) {
+                return 'Module already completed.';
+            }
+
             $nextAttempt = $progress->attempts + 1;
             $selected = $data['selected_option'] ?? null;
             $evaluation = null;

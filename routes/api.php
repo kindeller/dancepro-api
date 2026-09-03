@@ -85,6 +85,9 @@ Route::prefix('v1')->middleware([
         Route::get('documents/{document}/content', [CrewMobileDocumentController::class, 'content'])
             ->middleware('signed')->name('api.v1.documents.content');
         Route::get('training', CrewMobileTrainingController::class);
+        Route::get('training/{course}', [CrewMobileTrainingController::class, 'show']);
+        Route::post('training/{course}/modules/{module}/complete', [CrewMobileTrainingController::class, 'complete'])
+            ->middleware('api.idempotency');
     });
 });
 

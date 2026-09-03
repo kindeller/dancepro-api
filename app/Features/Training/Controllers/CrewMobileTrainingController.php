@@ -2,8 +2,12 @@
 
 namespace App\Features\Training\Controllers;
 
+use App\Features\Training\Actions\CompleteTrainingModule;
 use App\Features\Training\Models\TrainingCourse;
+use App\Features\Training\Models\TrainingModule;
+use App\Features\Training\Requests\CompleteTrainingModuleRequest;
 use App\Features\Training\Services\AvailableTrainingCourses;
+use App\Features\Training\Services\CrewMobileTraining;
 use App\Http\Controllers\Controller;
 use App\Shared\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -28,5 +32,23 @@ class CrewMobileTrainingController extends Controller
         });
 
         return ApiResponse::success('Training returned.', $courses);
+    }
+
+    public function show(Request $request, TrainingCourse $course, CrewMobileTraining $training): JsonResponse
+    {
+        $course = $training->course($request->user()->crewProfile, $course);
+        $enrolment = $training->enrolment($request->user()->crewProfile, $course);
+
+        return ApiResponse::success('Training course returned.', $training->detail($course, $enrolment));
+    }
+
+    public function complete(CompleteTrainingModuleRequest $request, TrainingCourse $course, TrainingModule $module, CrewMobileTraining $training, CompleteTrainingModule $complete): JsonResponse
+    {
+        $course = $training->course($request->user()->crewProfile, $course);
+        abort_unless($module->training_course_id === $course->id, 404);
+        $enrolment = $training->enrolment($request->user()->crewProfile, $course);
+        $message = $complete->execute($enrolment, $module, $request->validated());
+
+        return ApiResponse::success($message, $training->detail($course->refresh(), $enrolment->refresh()->load('moduleProgress')));
     }
 }

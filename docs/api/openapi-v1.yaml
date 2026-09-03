@@ -741,6 +741,69 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/TrainingCourse'
+  /training/{course}:
+    get:
+      tags: [Training]
+      operationId: getTrainingCourse
+      x-implementation-status: available
+      summary: Return an available course with its sections, modules and current progress
+      parameters:
+        - $ref: '#/components/parameters/TrainingCourseId'
+      responses:
+        '200':
+          description: Training course returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TrainingCourseDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /training/{course}/modules/{module}/complete:
+    post:
+      tags: [Training]
+      operationId: completeTrainingModule
+      x-implementation-status: available
+      summary: Record an eligible crew member's module completion or assessment attempt
+      parameters:
+        - $ref: '#/components/parameters/TrainingCourseId'
+        - $ref: '#/components/parameters/TrainingModuleId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                selected_option:
+                  type: [integer, 'null']
+                  minimum: 0
+                  maximum: 99
+                answers:
+                  type: [array, 'null']
+                  maxItems: 100
+                  items: {}
+      responses:
+        '200':
+          description: Module result recorded and refreshed course progress returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TrainingCourseDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
 components:
   securitySchemes:
     bearerAuth:
@@ -806,6 +869,20 @@ components:
         format: uuid
     DocumentId:
       name: document
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TrainingCourseId:
+      name: course
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TrainingModuleId:
+      name: module
       in: path
       required: true
       schema:
@@ -1519,6 +1596,75 @@ components:
           type: integer
           minimum: 0
           maximum: 100
+    TrainingCourseDetail:
+      type: object
+      required: [id, title, required, status, sections]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: [string, 'null']
+        estimated_minutes:
+          type: [integer, 'null']
+          minimum: 0
+        required:
+          type: boolean
+        status:
+          type: string
+        due_at:
+          type: [string, 'null']
+          format: date-time
+        completed_at:
+          type: [string, 'null']
+          format: date-time
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrainingSection'
+    TrainingSection:
+      type: object
+      required: [title, modules]
+      properties:
+        title:
+          type: string
+        description:
+          type: [string, 'null']
+        modules:
+          type: array
+          items:
+            $ref: '#/components/schemas/TrainingModule'
+    TrainingModule:
+      type: object
+      required: [id, title, type, items, progress]
+      description: Quiz and assessment answer keys are never returned to the client.
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        type:
+          type: string
+        content:
+          type: [string, 'null']
+        media_url:
+          type: [string, 'null']
+        button_label:
+          type: [string, 'null']
+        confirmation_text:
+          type: [string, 'null']
+        items:
+          type: array
+          items: {}
+        quiz:
+          type: [object, 'null']
+        assessment:
+          type: [object, 'null']
+        progress:
+          type: object
     CursorMeta:
       type: object
       required: [next_cursor, has_more]
