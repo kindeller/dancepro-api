@@ -26,6 +26,11 @@ chat. An empty event chat appears automatically in **Upcoming** from seven days
 before its first shift; event chats with messages remain available afterward.
 Crew can start private direct conversations with other active crew without
 exposing personal contact details. Opening a chat records its messages as read.
+The versioned crew API provides the same inbox filters, cursor-paginated message
+history, posting and message-bounded read state. It also exposes only the
+authenticated crew member's notifications. Event membership and direct-chat
+participation are checked for every read and write, and inaccessible chat UUIDs
+are returned as not found to avoid disclosing private conversations.
 
 Phase 0 repository inspection and integration design is complete. The first
 scheduling foundation now includes crew profiles, clothing sizes, calculated

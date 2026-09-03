@@ -299,7 +299,7 @@ paths:
     get:
       tags: [Chat]
       operationId: listChats
-      x-implementation-status: planned
+      x-implementation-status: available
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
@@ -329,7 +329,7 @@ paths:
     get:
       tags: [Chat]
       operationId: listChatMessages
-      x-implementation-status: planned
+      x-implementation-status: available
       parameters:
         - $ref: '#/components/parameters/ChatId'
         - $ref: '#/components/parameters/Cursor'
@@ -355,7 +355,7 @@ paths:
     post:
       tags: [Chat]
       operationId: postChatMessage
-      x-implementation-status: planned
+      x-implementation-status: available
       parameters:
         - $ref: '#/components/parameters/ChatId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -391,7 +391,7 @@ paths:
     put:
       tags: [Chat]
       operationId: markChatRead
-      x-implementation-status: planned
+      x-implementation-status: available
       parameters:
         - $ref: '#/components/parameters/ChatId'
       requestBody:
@@ -412,7 +412,7 @@ paths:
     get:
       tags: [Notifications]
       operationId: listNotifications
-      x-implementation-status: planned
+      x-implementation-status: available
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
@@ -1115,7 +1115,7 @@ components:
           type: string
           format: uuid
         author:
-          $ref: '#/components/schemas/DirectoryPerson'
+          $ref: '#/components/schemas/ChatAuthor'
         body:
           type: string
         attachment:
@@ -1125,6 +1125,21 @@ components:
         created_at:
           type: string
           format: date-time
+    ChatAuthor:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: [string, 'null']
+          format: uuid
+          description: Null for a staff author who has no crew profile.
+        name:
+          type: string
+        phone:
+          type: [string, 'null']
+        profile_photo_url:
+          type: [string, 'null']
+          format: uri
     Notification:
       type: object
       required: [id, type, title, message, created_at, read]
