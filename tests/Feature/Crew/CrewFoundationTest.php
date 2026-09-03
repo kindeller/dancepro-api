@@ -196,6 +196,9 @@ class CrewFoundationTest extends TestCase
     {
         $user = User::factory()->crew()->create(['password' => 'current-password']);
         CrewProfile::factory()->for($user)->create();
+        $tokenName = 'existing-device';
+        $user->createToken($tokenName);
+        $rememberToken = $user->remember_token;
 
         $this->actingAs($user)->put(route('crew.profile.password'), [
             'current_password' => 'incorrect-password',
@@ -210,5 +213,11 @@ class CrewFoundationTest extends TestCase
             'password_confirmation' => 'new-secure-password',
         ])->assertRedirect()->assertSessionHas('status');
         $this->assertTrue(Hash::check('new-secure-password', $user->refresh()->password));
+        $this->assertNotSame($rememberToken, $user->remember_token);
+        $this->assertDatabaseMissing('personal_access_tokens', [
+            'tokenable_id' => $user->id,
+            'name' => $tokenName,
+        ]);
+        $this->get(route('crew.profile.edit'))->assertOk();
     }
 }

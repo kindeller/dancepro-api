@@ -2,15 +2,14 @@
 
 namespace App\Features\Auth\Controllers;
 
+use App\Features\Auth\Actions\RotateUserPassword;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rules;
 use Illuminate\View\View;
 
@@ -38,7 +37,7 @@ class PasswordResetController extends Controller
         ]);
     }
 
-    public function reset(Request $request): RedirectResponse
+    public function reset(Request $request, RotateUserPassword $rotatePassword): RedirectResponse
     {
         $validated = $request->validate([
             'token' => ['required'],
@@ -48,13 +47,8 @@ class PasswordResetController extends Controller
         ]);
         $resetUser = null;
         $credentials = collect($validated)->only(['email', 'password', 'password_confirmation', 'token'])->all();
-        $status = Password::reset($credentials, function (User $user, string $password) use (&$resetUser): void {
-            $user->forceFill([
-                'password' => Hash::make($password),
-                'remember_token' => Str::random(60),
-                'email_verified_at' => $user->email_verified_at ?? now(),
-            ])->save();
-            $resetUser = $user;
+        $status = Password::reset($credentials, function (User $user, string $password) use (&$resetUser, $rotatePassword): void {
+            $resetUser = $rotatePassword->execute($user, $password, verifyEmail: true);
             event(new PasswordReset($user));
         });
 

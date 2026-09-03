@@ -2,6 +2,7 @@
 
 namespace App\Features\Crew\Controllers;
 
+use App\Features\Auth\Actions\RotateUserPassword;
 use App\Features\Crew\Actions\RefreshCrewOnboardingStatus;
 use App\Features\Crew\Actions\UpdateOwnCrewProfile;
 use App\Features\Crew\Models\CrewContract;
@@ -12,7 +13,6 @@ use App\Features\Crew\Support\CrewContractStatus;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 class CrewProfileController extends Controller
@@ -41,9 +41,9 @@ class CrewProfileController extends Controller
             : ($wasIncomplete ? 'Profile saved. Please review and sign the required contracts below.' : 'Your profile has been updated.'));
     }
 
-    public function changePassword(ChangeOwnPasswordRequest $request): RedirectResponse
+    public function changePassword(ChangeOwnPasswordRequest $request, RotateUserPassword $rotatePassword): RedirectResponse
     {
-        $request->user()->update(['password' => Hash::make($request->string('password')->toString())]);
+        $rotatePassword->execute($request->user(), $request->string('password')->toString());
 
         return back()->with('status', 'Your password has been changed.');
     }

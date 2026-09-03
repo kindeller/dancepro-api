@@ -5,6 +5,7 @@ namespace Tests\Feature\Auth;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
@@ -17,6 +18,10 @@ class PasswordResetTest extends TestCase
     {
         Notification::fake();
         $user = User::factory()->create(['email' => 'reset@dancepro.test', 'password' => 'old-password']);
+        $tokenName = 'existing-device';
+        $user->createToken($tokenName);
+        $rememberToken = $user->remember_token;
+        $existingSessionPasswordHash = Auth::guard()->hashPasswordForCookie($user->password);
         $token = null;
 
         $this->get(route('password.request'))->assertOk()->assertSee('Reset your password');
@@ -36,6 +41,16 @@ class PasswordResetTest extends TestCase
         ])->assertRedirect(route('login'))->assertSessionHas('status');
 
         $this->assertTrue(Hash::check('new-secure-password', $user->refresh()->password));
+        $this->assertNotSame($rememberToken, $user->remember_token);
+        $this->assertDatabaseMissing('personal_access_tokens', [
+            'tokenable_id' => $user->id,
+            'name' => $tokenName,
+        ]);
+
+        $this->withSession([
+            Auth::guard()->getName() => $user->id,
+            'password_hash_'.Auth::getDefaultDriver() => $existingSessionPasswordHash,
+        ])->get(route('account.security'))->assertRedirect(route('login'));
     }
 
     public function test_reset_request_does_not_reveal_whether_an_email_exists(): void
