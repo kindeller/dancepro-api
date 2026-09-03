@@ -39,6 +39,9 @@ class EventOperationsTest extends TestCase
         ])->assertRedirect();
         $resource = OperationalResource::query()->firstOrFail();
         Storage::disk('local')->assertExists($resource->file_path);
+        $this->assertSame('application/pdf', $resource->file_mime_type);
+        $this->assertSame(Storage::disk('local')->size($resource->file_path), $resource->file_size);
+        $this->assertSame(hash('sha256', Storage::disk('local')->get($resource->file_path)), $resource->file_checksum);
         $previousResourcePath = $resource->file_path;
         $this->actingAs($staff)->put(route('admin.operations.resources.update', $resource), [
             'section_number' => 3, 'title' => 'Videography', 'resource_type' => 'handbook',
@@ -47,6 +50,7 @@ class EventOperationsTest extends TestCase
         ])->assertRedirect();
         Storage::disk('local')->assertMissing($previousResourcePath);
         Storage::disk('local')->assertExists($resource->refresh()->file_path);
+        $this->assertSame(hash('sha256', Storage::disk('local')->get($resource->file_path)), $resource->file_checksum);
 
         $this->actingAs($staff)->put(route('admin.venues.map.update', $venue), [
             'map' => UploadedFile::fake()->image('venue.jpg', 1600, 900),

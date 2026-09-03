@@ -8,7 +8,10 @@ use Illuminate\Support\Collection;
 
 class CrewMobileDocuments
 {
-    public function __construct(private readonly OperationsFileStorage $files) {}
+    public function __construct(
+        private readonly OperationsFileStorage $files,
+        private readonly OperationalDocumentMetadata $metadata,
+    ) {}
 
     public function list(?string $updatedSince): Collection
     {
@@ -31,26 +34,18 @@ class CrewMobileDocuments
     public function metadata(OperationalResource $resource): array
     {
         $resource = $this->authorised($resource);
+        if (! filled($resource->file_mime_type) || $resource->file_size === null || ! filled($resource->file_checksum)) {
+            $resource->fill($this->metadata->forPath($resource->file_path))->save();
+        }
 
         return [
             'id' => $resource->uuid,
             'title' => $resource->title,
-            'mime_type' => $this->files->disk()->mimeType($resource->file_path) ?: 'application/octet-stream',
-            'bytes' => $this->files->disk()->size($resource->file_path),
-            'checksum' => $this->checksum($resource->file_path),
+            'mime_type' => $resource->file_mime_type,
+            'bytes' => $resource->file_size,
+            'checksum' => $resource->file_checksum,
             'updated_at' => $resource->updated_at->toIso8601String(),
             'offline_allowed' => true,
         ];
-    }
-
-    private function checksum(string $path): string
-    {
-        $stream = $this->files->disk()->readStream($path);
-        abort_if($stream === false, 404);
-        $hash = hash_init('sha256');
-        hash_update_stream($hash, $stream);
-        fclose($stream);
-
-        return hash_final($hash);
     }
 }

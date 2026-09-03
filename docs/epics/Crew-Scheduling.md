@@ -35,6 +35,10 @@ are returned as not found to avoid disclosing private conversations.
 Mobile notification read state can be updated idempotently, with ownership
 checked on every request and inaccessible notification UUIDs returned as not
 found.
+Offline document MIME type, byte size and SHA-256 checksum are persisted when a
+resource file is uploaded or replaced. Legacy resources calculate and retain
+this metadata on first access, avoiding repeated full-file reads during later
+mobile synchronisation.
 
 Phase 0 repository inspection and integration design is complete. The first
 scheduling foundation now includes crew profiles, clothing sizes, calculated

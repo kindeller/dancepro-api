@@ -33,6 +33,15 @@ class CrewMobileOfflineApiTest extends TestCase
             ->assertJsonPath('data.0.id', $resource->uuid)
             ->assertJsonPath('data.0.bytes', strlen('private handbook contents'))
             ->assertJsonPath('data.0.checksum', hash('sha256', 'private handbook contents'));
+        $resource->refresh();
+        $this->assertSame(strlen('private handbook contents'), $resource->file_size);
+        $this->assertSame(hash('sha256', 'private handbook contents'), $resource->file_checksum);
+
+        Storage::disk('local')->put('operations/guide.pdf', 'changed after metadata was recorded');
+        $this->getJson('/api/v1/documents')->assertOk()
+            ->assertJsonPath('data.0.bytes', strlen('private handbook contents'))
+            ->assertJsonPath('data.0.checksum', hash('sha256', 'private handbook contents'));
+        Storage::disk('local')->put('operations/guide.pdf', 'private handbook contents');
         $this->assertStringNotContainsString('operations/guide.pdf', $response->getContent());
 
         $url = $this->postJson('/api/v1/documents/'.$resource->uuid.'/download')->assertOk()->json('data.url');
