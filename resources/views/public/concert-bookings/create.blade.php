@@ -19,7 +19,7 @@
 </div>
 <button class="button" type="submit" style="margin-top:20px">Submit booking request</button></form></div></section>
 @endsection
-@push('scripts')<script>
+@push('scripts')<script nonce="{{ request()->attributes->get('csp_nonce') }}">
 function configureVenueRow(row){const select=row.querySelector('.venue-select');const fields=row.querySelector('.other-venue-fields');const address=row.querySelector('.selected-venue-address');const inputs=fields.querySelectorAll('input');const update=()=>{const other=select.value==='other';fields.hidden=!other;inputs.forEach(input=>input.required=other);address.textContent=!other&&select.selectedOptions[0]?.dataset.address?select.selectedOptions[0].dataset.address:'';};select.addEventListener('change',update);update();}
 document.querySelectorAll('.booking-item').forEach(configureVenueRow);
 document.getElementById('add-booking-item').addEventListener('click',()=>{const box=document.getElementById('booking-items');const index=box.querySelectorAll('.booking-item').length;box.insertAdjacentHTML('beforeend',document.getElementById('booking-item-template').innerHTML.replaceAll('__INDEX__',index));configureVenueRow(box.lastElementChild);});

@@ -76,7 +76,7 @@
         </div>
     </form>
 
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         (() => {
             const keysInput = document.getElementById('download-link-keys');
 

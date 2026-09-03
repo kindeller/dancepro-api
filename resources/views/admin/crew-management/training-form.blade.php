@@ -35,7 +35,7 @@ $sectionRows = old('sections', $savedSections ?: [['title'=>'Course content','bl
 <style>.training-section{border-left:4px solid #0aa4d8}.training-block{background:#f8fbfc}.drag-handle,.question-drag-handle{cursor:grab;font-size:20px;margin-right:8px}.training-section.dragging,.training-block.dragging,.assessment-question.dragging{opacity:.45}.add-block,.add-question{justify-self:start}.assessment-fields{padding:14px;border:1px solid #cde2eb;border-radius:7px;background:#eef8fc}.assessment-question{background:white}</style>
 @endpush
 @push('scripts')
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
 const sections=document.getElementById('sections'),blockTemplate=document.getElementById('block-template').innerHTML,questionTemplate=document.getElementById('question-template').innerHTML;
 function updateQuestion(question){const type=question.querySelector('.question-type').value;question.querySelector('.question-options').hidden=!['single_choice','multiple_choice','ordering'].includes(type);question.querySelector('.question-correct-single').hidden=type!=='single_choice';question.querySelector('.question-correct-multiple').hidden=type!=='multiple_choice';question.querySelector('.question-correct-value').hidden=!['true_false','short_answer','number'].includes(type)}
 function bindQuestion(question){question.querySelector('.question-type').addEventListener('change',()=>updateQuestion(question));question.querySelector('.remove-question').addEventListener('click',()=>question.remove());question.addEventListener('dragstart',e=>{e.stopPropagation();question.classList.add('dragging')});question.addEventListener('dragend',()=>question.classList.remove('dragging'));updateQuestion(question)}

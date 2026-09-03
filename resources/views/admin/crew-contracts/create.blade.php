@@ -28,7 +28,7 @@
 
 @push('scripts')
 <style>.contract-toolbar{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border:1px solid var(--line);border-bottom:0;border-radius:4px 4px 0 0;background:#f4f8fa}.contract-toolbar button{min-height:30px;padding:4px 8px;background:white;color:var(--ink);border:1px solid var(--line)}.contract-editor{min-height:430px;padding:18px;border:1px solid var(--line);border-radius:0 0 4px 4px;background:white;line-height:1.6;overflow:auto}.contract-editor:focus{outline:2px solid #8bd8f4;outline-offset:-2px}.contract-editor h2,.contract-editor h3{margin-top:1.2em}</style>
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
     const contractForm = document.querySelector('form[action="{{ route('admin.crew-contracts.store') }}"]');
     const contractEditor = document.getElementById('contract-editor');
     const contractContent = document.getElementById('contract-content');

@@ -15,5 +15,5 @@
 @endsection
 
 @push('scripts')
-<script>const selectAll=document.getElementById('select-all');const eventCheckboxes=[...document.querySelectorAll('.event-checkbox')];selectAll?.addEventListener('change',()=>eventCheckboxes.forEach(checkbox=>checkbox.checked=selectAll.checked));</script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">const selectAll=document.getElementById('select-all');const eventCheckboxes=[...document.querySelectorAll('.event-checkbox')];selectAll?.addEventListener('change',()=>eventCheckboxes.forEach(checkbox=>checkbox.checked=selectAll.checked));</script>
 @endpush

@@ -308,7 +308,7 @@
     @if($errors->any())<div class="notice">{{ $errors->first() }}</div>@endif
     <main>@yield('content')</main>
     @stack('scripts')
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         const crewPagePositionKey = `dancepro-crew-position:${window.location.pathname}`;
         const savedCrewPagePosition = sessionStorage.getItem(crewPagePositionKey);
 

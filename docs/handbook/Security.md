@@ -23,8 +23,12 @@ Phase 0 establishes the security defaults for later DancePro features.
 - Protected API routes must use `auth:sanctum`.
 - Every application response sets MIME-sniffing, same-origin framing,
   referrer and browser-feature restrictions. Production HTTPS responses also
-  set a one-year HSTS policy. CSP is deferred until the current inline scripts
-  and styles can be nonce- or hash-based without breaking existing pages.
+  set a one-year HSTS policy.
+- Content Security Policy is enabled in report-only mode by default. Inline
+  script elements carry per-request nonces, while current inline styles and
+  event-handler attributes remain explicitly allowed. Review browser reports
+  and external media/embed requirements before setting `CSP_REPORT_ONLY=false`
+  to enforce the policy. `CSP_ENABLED=false` is an emergency rollback only.
 - Non-trivial input must use Form Requests.
 - Authorization logic should use policies rather than controller conditionals.
 - Private S3 buckets and CloudFront/S3 signing should remain server-side only.

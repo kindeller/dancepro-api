@@ -130,7 +130,7 @@
     </main>
 
     @if ($expiresAt)
-        <script>
+        <script nonce="{{ request()->attributes->get('csp_nonce') }}">
             (() => {
                 const expiry = document.querySelector('time[datetime]');
 

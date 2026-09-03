@@ -95,7 +95,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
     const venueMapDialog = document.getElementById('venue-map-dialog');
     const venueMapDialogImage = venueMapDialog.querySelector('img');
     const venueMapDialogTitle = document.getElementById('venue-map-dialog-title');

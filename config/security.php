@@ -6,4 +6,9 @@ return [
         'enforced' => (bool) env('TWO_FACTOR_ENFORCED', false),
         'issuer' => env('TWO_FACTOR_ISSUER', 'DancePro Crew'),
     ],
+
+    'content_security_policy' => [
+        'enabled' => (bool) env('CSP_ENABLED', true),
+        'report_only' => (bool) env('CSP_REPORT_ONLY', true),
+    ],
 ];

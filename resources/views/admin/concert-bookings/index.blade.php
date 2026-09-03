@@ -61,7 +61,7 @@
 @endsection
 
 @push('scripts')
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         const selectAll = document.getElementById('select-all');
         const eventCheckboxes = [...document.querySelectorAll('.event-checkbox')];
         const action = document.getElementById('bulk-action');

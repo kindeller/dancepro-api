@@ -141,7 +141,7 @@
 @endpush
 
 @push('scripts')
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
     const passwordDialog = document.getElementById('password-dialog');
     document.getElementById('open-password-dialog')?.addEventListener('click', () => passwordDialog.showModal());
     document.getElementById('close-password-dialog')?.addEventListener('click', () => passwordDialog.close());
@@ -152,7 +152,7 @@
 
 @if(config('services.google_maps.browser_key'))
 @push('scripts')
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
     window.initialiseCrewAddressSearch = async function () {
         const mount = document.getElementById('crew-address-search');
         if (!mount) return;
@@ -181,6 +181,6 @@
         });
     };
 </script>
-<script async src="https://maps.googleapis.com/maps/api/js?key={{ urlencode(config('services.google_maps.browser_key')) }}&amp;loading=async&amp;callback=initialiseCrewAddressSearch"></script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}" async src="https://maps.googleapis.com/maps/api/js?key={{ urlencode(config('services.google_maps.browser_key')) }}&amp;loading=async&amp;callback=initialiseCrewAddressSearch"></script>
 @endpush
 @endif

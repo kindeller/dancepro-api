@@ -202,7 +202,7 @@
 
     </div>
 
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         (() => {
             const body = document.getElementById('competition-objects-body');
             const card = document.getElementById('competition-objects-card');

@@ -27,5 +27,5 @@
 @endsection
 
 @push('scripts')
-<script>const selectAll=document.getElementById('select-all-cover');if(selectAll){const recipients=[...document.querySelectorAll('.cover-recipient')];selectAll.addEventListener('change',()=>recipients.forEach(box=>box.checked=selectAll.checked));recipients.forEach(box=>box.addEventListener('change',()=>selectAll.checked=recipients.every(item=>item.checked)));}</script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">const selectAll=document.getElementById('select-all-cover');if(selectAll){const recipients=[...document.querySelectorAll('.cover-recipient')];selectAll.addEventListener('change',()=>recipients.forEach(box=>box.checked=selectAll.checked));recipients.forEach(box=>box.addEventListener('change',()=>selectAll.checked=recipients.every(item=>item.checked)));}</script>
 @endpush

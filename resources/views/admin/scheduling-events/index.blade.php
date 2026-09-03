@@ -189,7 +189,7 @@
 @endsection
 
 @push('scripts')
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
     const spreadsheetStateKey = `dancepro-schedule-position:${window.location.pathname}`;
     const spreadsheet = document.querySelector('.availability-sheet');
     const spreadsheetShell = document.querySelector('.availability-table-shell');

@@ -63,7 +63,7 @@
 </template>
 
 @push('scripts')
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
 (() => {
     const rows = document.getElementById('studio-contact-rows');
     const template = document.getElementById('studio-contact-template');

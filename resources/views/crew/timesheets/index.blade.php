@@ -35,7 +35,7 @@
 </section>
 @endsection
 @push('scripts')
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
 const selectors=[...document.querySelectorAll('.timesheet-selector')];
 const actions=document.getElementById('invoice-actions');
 function syncSelection(changed){

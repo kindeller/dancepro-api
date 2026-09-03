@@ -42,5 +42,5 @@
             </table>
         </div>
     </form>
-    <script>document.getElementById('select-all')?.addEventListener('change',event=>document.querySelectorAll('input[name="crew_profile_ids[]"]:not([disabled])').forEach(input=>input.checked=event.target.checked));</script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">document.getElementById('select-all')?.addEventListener('change',event=>document.querySelectorAll('input[name="crew_profile_ids[]"]:not([disabled])').forEach(input=>input.checked=event.target.checked));</script>
 @endsection

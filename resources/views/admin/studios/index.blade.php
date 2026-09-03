@@ -90,7 +90,7 @@
 @endpush
 
 @push('scripts')
-<script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
 (() => {
     const isControl = target => target.closest('[data-row-control], a, button, input, select, textarea, label, form');
     document.querySelectorAll('.studio-row').forEach(row => {

@@ -785,7 +785,7 @@
             </div>
         </main>
     </div>
-    <script>
+    <script nonce="{{ request()->attributes->get('csp_nonce') }}">
         const copyTextWithFallback = async text => {
             if (navigator.clipboard?.writeText) {
                 try {
