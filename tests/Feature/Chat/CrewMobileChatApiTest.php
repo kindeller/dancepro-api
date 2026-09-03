@@ -65,6 +65,43 @@ class CrewMobileChatApiTest extends TestCase
         $this->getJson('/api/v1/chats/'.$conversation->uuid.'/messages')->assertNotFound();
     }
 
+    public function test_crew_can_start_an_idempotent_direct_chat_from_a_directory_profile(): void
+    {
+        [$sender] = $this->authenticatedCrew();
+        $recipient = User::factory()->crew()->create();
+        $recipientProfile = CrewProfile::factory()->for($recipient)->create(['preferred_name' => 'Morgan']);
+
+        $first = $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/chats/direct', ['recipient_profile_uuid' => $recipientProfile->uuid])
+            ->assertOk()
+            ->assertJsonPath('data.kind', 'direct')
+            ->assertJsonPath('data.title', 'Morgan');
+
+        $second = $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/chats/direct', ['recipient_profile_uuid' => $recipientProfile->uuid])
+            ->assertOk();
+
+        $this->assertSame($first->json('data.id'), $second->json('data.id'));
+        $this->assertDatabaseCount('direct_chat_conversations', 1);
+        $this->assertDatabaseHas('direct_chat_participants', ['user_id' => $sender->id]);
+        $this->assertDatabaseHas('direct_chat_participants', ['user_id' => $recipient->id]);
+    }
+
+    public function test_crew_cannot_start_a_direct_chat_with_themselves_or_inactive_crew(): void
+    {
+        [$sender, $senderProfile] = $this->authenticatedCrew();
+
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/chats/direct', ['recipient_profile_uuid' => $senderProfile->uuid])
+            ->assertUnprocessable();
+
+        $inactive = User::factory()->crew()->create(['is_active' => false]);
+        $inactiveProfile = CrewProfile::factory()->for($inactive)->create();
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/chats/direct', ['recipient_profile_uuid' => $inactiveProfile->uuid])
+            ->assertUnprocessable();
+    }
+
     public function test_notifications_are_cursor_paginated_and_limited_to_current_user(): void
     {
         [$crew] = $this->authenticatedCrew();

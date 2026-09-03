@@ -531,6 +531,39 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/EmptySuccess'
+  /chats/direct:
+    post:
+      tags: [Chat]
+      operationId: startDirectChat
+      x-implementation-status: available
+      summary: Start or return the existing private chat with an active crew directory member
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [recipient_profile_uuid]
+              properties:
+                recipient_profile_uuid:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Direct chat is ready.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DirectChatReference'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /notifications:
     get:
       tags: [Notifications]
@@ -1484,6 +1517,18 @@ components:
           format: date-time
         read:
           type: boolean
+    DirectChatReference:
+      type: object
+      required: [id, kind, title]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          const: direct
+        title:
+          type: string
     Timesheet:
       type: object
       required: [id, assignment_id, event_name, event_date, status]

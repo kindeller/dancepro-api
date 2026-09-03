@@ -70,6 +70,7 @@ Route::prefix('v1')->middleware([
         Route::put('availability/{shift}', [CrewMobileAvailabilityController::class, 'update'])->middleware('api.idempotency');
         Route::get('directory', CrewMobileDirectoryController::class);
         Route::get('chats', [CrewMobileChatController::class, 'index']);
+        Route::post('chats/direct', [CrewMobileChatController::class, 'start'])->middleware('api.idempotency');
         Route::get('chats/{chatId}/messages', [CrewMobileChatController::class, 'messages']);
         Route::post('chats/{chatId}/messages', [CrewMobileChatController::class, 'store'])->middleware('api.idempotency');
         Route::put('chats/{chatId}/read', [CrewMobileChatController::class, 'read']);

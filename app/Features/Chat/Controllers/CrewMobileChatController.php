@@ -3,9 +3,12 @@
 namespace App\Features\Chat\Controllers;
 
 use App\Features\Chat\Actions\PostDirectChatMessage;
+use App\Features\Chat\Actions\StartDirectChat;
 use App\Features\Chat\Requests\MarkChatReadRequest;
+use App\Features\Chat\Requests\StartDirectChatRequest;
 use App\Features\Chat\Requests\StoreChatMessageRequest;
 use App\Features\Chat\Services\CrewMobileChat;
+use App\Features\Crew\Models\CrewProfile;
 use App\Features\Operations\Actions\PostEventMessage;
 use App\Http\Controllers\Controller;
 use App\Shared\Responses\ApiResponse;
@@ -24,6 +27,20 @@ class CrewMobileChatController extends Controller
         return ApiResponse::success('Chats returned.', $result['items'], meta: [
             'next_cursor' => $result['next_cursor'],
             'has_more' => $result['has_more'],
+        ]);
+    }
+
+    public function start(StartDirectChatRequest $request, StartDirectChat $start): JsonResponse
+    {
+        $recipientProfile = CrewProfile::query()
+            ->where('uuid', $request->string('recipient_profile_uuid')->toString())
+            ->with('user')->firstOrFail();
+        $conversation = $start->execute($request->user(), $recipientProfile->user);
+
+        return ApiResponse::success('Direct chat ready.', [
+            'id' => $conversation->uuid,
+            'kind' => 'direct',
+            'title' => $recipientProfile->preferred_name ?: $recipientProfile->user->name,
         ]);
     }
 
