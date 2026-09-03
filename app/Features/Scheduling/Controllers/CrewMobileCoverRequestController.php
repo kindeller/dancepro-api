@@ -18,11 +18,12 @@ class CrewMobileCoverRequestController extends Controller
 {
     public function index(Request $request, CrewMobileCoverRequests $coverRequests): JsonResponse
     {
-        $requests = $coverRequests->for($request->user()->crewProfile);
+        $limit = min(max($request->integer('limit', 25), 1), 100);
+        $page = $coverRequests->paginate($request->user()->crewProfile, $limit);
 
-        return ApiResponse::success('Cover requests returned.', [
-            'received' => CrewCoverRequestResource::collection($requests['received']),
-            'sent' => CrewCoverRequestResource::collection($requests['sent']),
+        return ApiResponse::success('Cover requests returned.', CrewCoverRequestResource::collection($page->items()), meta: [
+            'next_cursor' => $page->nextCursor()?->encode(),
+            'has_more' => $page->hasMorePages(),
         ]);
     }
 

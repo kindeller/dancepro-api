@@ -36,11 +36,9 @@ class CrewMobileContractController extends Controller
             ->first();
         $signature ??= $sign->execute($profile, $contract, $request->string('signed_name')->toString(), $request->ip(), $request->userAgent());
         $refresh->execute($profile->refresh());
+        $contract->load(['signatures' => fn ($query) => $query->where('crew_profile_id', $profile->id)]);
 
-        return ApiResponse::success('Contract signed.', [
-            'id' => $contract->uuid,
-            'signed_at' => $signature->signed_at->toIso8601String(),
-        ]);
+        return ApiResponse::success('Contract signed.', $this->resource($contract, $profile));
     }
 
     private function resource(CrewContract $contract, CrewProfile $profile): array
@@ -54,6 +52,7 @@ class CrewMobileContractController extends Controller
             'status' => $contract->status->value,
             'content' => $contract->content,
             'signed_at' => $signature?->signed_at?->toIso8601String(),
+            'allowed_actions' => $signature === null ? ['sign'] : [],
         ];
     }
 }

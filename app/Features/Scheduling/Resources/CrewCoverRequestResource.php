@@ -14,6 +14,7 @@ class CrewCoverRequestResource extends JsonResource
         $recipient = $this->recipients->firstWhere('crew_profile_id', $profile->id);
         $assignment = $this->assignment;
         $event = $assignment->shift->schedulingEvent;
+        $canAccept = $recipient?->status === 'pending' && $this->status === 'open';
 
         return [
             'id' => $this->uuid,
@@ -42,6 +43,7 @@ class CrewCoverRequestResource extends JsonResource
                     'responded_at' => $item->responded_at?->toIso8601String(),
                 ])->values()
                 : null,
+            'allowed_actions' => $canAccept ? ['accept'] : [],
         ];
     }
 }

@@ -36,7 +36,10 @@ class CrewMobileSchedulingActionsTest extends TestCase
 
         $this->withHeader('Idempotency-Key', (string) Str::uuid())
             ->putJson('/api/v1/availability/'.$shift->uuid, ['status' => 'available', 'note' => 'Available early.'])
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonPath('data.shift_id', $shift->uuid)
+            ->assertJsonPath('data.status', 'available')
+            ->assertJsonPath('data.allowed_actions.0', 'update');
         $this->assertDatabaseHas('crew_availability_responses', [
             'crew_profile_id' => $profile->id, 'scheduling_shift_id' => $shift->id,
             'status' => 'available', 'note' => 'Available early.',
@@ -51,7 +54,9 @@ class CrewMobileSchedulingActionsTest extends TestCase
 
         $this->withHeader('Idempotency-Key', (string) Str::uuid())
             ->putJson('/api/v1/assignments/'.$own->uuid.'/acknowledgement')
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonPath('data.id', $own->uuid)
+            ->assertJsonPath('data.acknowledged', true);
         $this->assertSame('acknowledged', $own->refresh()->acknowledgement_status);
 
         $this->withHeader('Idempotency-Key', (string) Str::uuid())
@@ -76,7 +81,9 @@ class CrewMobileSchedulingActionsTest extends TestCase
 
         $this->withHeader('Idempotency-Key', (string) Str::uuid())
             ->putJson('/api/v1/assignments/'.$assignment->uuid.'/checklist-items/'.$item->uuid, ['completed' => true])
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonPath('data.id', $assignment->uuid)
+            ->assertJsonPath('data.checklist.0.completed', true);
         $this->assertDatabaseHas('assignment_checklist_completions', [
             'scheduling_shift_assignment_id' => $assignment->id,
             'checklist_template_item_id' => $item->id,

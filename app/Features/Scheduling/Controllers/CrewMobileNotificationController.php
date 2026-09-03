@@ -17,15 +17,7 @@ class CrewMobileNotificationController extends Controller
         $limit = min(max($request->integer('limit', 25), 1), 100);
         $page = CrewNotification::query()->where('user_id', $request->user()->id)
             ->latest('id')->cursorPaginate($limit);
-        $items = collect($page->items())->map(fn (CrewNotification $notification): array => [
-            'id' => $notification->uuid,
-            'type' => $notification->type,
-            'title' => $notification->title,
-            'message' => $notification->message,
-            'deep_link' => null,
-            'created_at' => $notification->created_at->toIso8601String(),
-            'read' => $notification->read_at !== null,
-        ]);
+        $items = collect($page->items())->map(fn (CrewNotification $notification): array => $this->resource($notification));
 
         return ApiResponse::success('Notifications returned.', $items, meta: [
             'next_cursor' => $page->nextCursor()?->encode(),
@@ -33,10 +25,24 @@ class CrewMobileNotificationController extends Controller
         ]);
     }
 
+    private function resource(CrewNotification $notification): array
+    {
+        return [
+            'id' => $notification->uuid,
+            'type' => $notification->type,
+            'title' => $notification->title,
+            'message' => $notification->message,
+            'deep_link' => null,
+            'created_at' => $notification->created_at->toIso8601String(),
+            'read' => $notification->read_at !== null,
+            'allowed_actions' => $notification->read_at === null ? ['mark_read'] : [],
+        ];
+    }
+
     public function read(MarkCrewNotificationReadRequest $request, CrewNotification $notification, MarkCrewNotificationRead $markRead): JsonResponse
     {
         $markRead->execute($request->user(), $notification);
 
-        return ApiResponse::success('Notification marked as read.');
+        return ApiResponse::success('Notification marked as read.', $this->resource($notification->refresh()));
     }
 }

@@ -48,6 +48,6 @@ class CrewMobileAssignments
             ->join('scheduling_shifts', 'scheduling_shifts.id', '=', 'scheduling_shift_assignments.scheduling_shift_id')
             ->where('scheduling_shift_assignments.crew_profile_id', $profile->id)
             ->where('scheduling_shift_assignments.status', 'published')
-            ->with(['role', 'timeEntry', 'shift.schedulingEvent.venue']);
+            ->with(['role', 'timeEntry', 'coverRequests', 'shift.schedulingEvent.venue']);
     }
 }

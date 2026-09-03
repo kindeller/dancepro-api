@@ -4,17 +4,20 @@ namespace App\Features\Scheduling\Services;
 
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Scheduling\Models\ShiftCoverRequest;
-use Illuminate\Support\Collection;
+use Illuminate\Contracts\Pagination\CursorPaginator;
 
 class CrewMobileCoverRequests
 {
-    /** @return array{received: Collection<int, ShiftCoverRequest>, sent: Collection<int, ShiftCoverRequest>} */
-    public function for(CrewProfile $profile): array
+    public function paginate(CrewProfile $profile, int $limit): CursorPaginator
     {
-        return [
-            'received' => ShiftCoverRequest::query()->whereHas('recipients', fn ($query) => $query->where('crew_profile_id', $profile->id))->with($this->relations())->latest()->get(),
-            'sent' => ShiftCoverRequest::query()->where('requested_by_crew_profile_id', $profile->id)->with($this->relations())->latest()->get(),
-        ];
+        return ShiftCoverRequest::query()
+            ->where(function ($query) use ($profile): void {
+                $query->where('requested_by_crew_profile_id', $profile->id)
+                    ->orWhereHas('recipients', fn ($recipients) => $recipients->where('crew_profile_id', $profile->id));
+            })
+            ->with($this->relations())
+            ->latest('id')
+            ->cursorPaginate($limit);
     }
 
     public function findVisible(CrewProfile $profile, ShiftCoverRequest $coverRequest): ShiftCoverRequest

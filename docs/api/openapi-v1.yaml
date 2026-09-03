@@ -341,9 +341,12 @@ paths:
       operationId: listCoverRequests
       x-implementation-status: available
       summary: List cover requests sent to or created by the current crew member
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
       responses:
         '200':
-          description: Sent and received cover requests returned.
+          description: Cover requests returned newest first with direction on each record.
   /assignments/{assignment}/cover-requests:
     post:
       tags: [Cover Requests]
@@ -1470,7 +1473,7 @@ components:
               $ref: '#/components/schemas/CursorMeta'
     AssignmentSummary:
       type: object
-      required: [id, event_name, event_type, role, shift_date, status, acknowledged]
+      required: [id, event_name, event_type, role, shift_date, status, acknowledged, allowed_actions]
       properties:
         id:
           type: string
@@ -1503,6 +1506,12 @@ components:
           $ref: '#/components/schemas/AssignmentTime'
         permissions:
           $ref: '#/components/schemas/AssignmentPermissions'
+        allowed_actions:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [acknowledge, clock_in, clock_out, edit_time, finish_team, request_cover]
         version:
           type: string
           description: Opaque value used to detect stale acknowledgements.
@@ -1583,7 +1592,7 @@ components:
           format: date-time
     AvailabilityRequest:
       type: object
-      required: [shift_id, event_name, shift_date, status, locked]
+      required: [shift_id, event_name, shift_date, status, locked, allowed_actions]
       properties:
         shift_id:
           type: string
@@ -1603,6 +1612,12 @@ components:
           type: [string, 'null']
         locked:
           type: boolean
+        allowed_actions:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [update]
     Directory:
       type: object
       required: [crew, studios, competitions]
@@ -1965,7 +1980,7 @@ components:
           format: uri
     Notification:
       type: object
-      required: [id, type, title, message, created_at, read]
+      required: [id, type, title, message, created_at, read, allowed_actions]
       properties:
         id:
           type: string
@@ -1983,6 +1998,12 @@ components:
           format: date-time
         read:
           type: boolean
+        allowed_actions:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [mark_read]
     DirectChatReference:
       type: object
       required: [id, kind, title]
@@ -2084,7 +2105,7 @@ components:
               $ref: '#/components/schemas/RedactedPaymentDetails'
     Contract:
       type: object
-      required: [id, name, version, status, content]
+      required: [id, name, version, status, content, allowed_actions]
       properties:
         id:
           type: string
@@ -2100,6 +2121,12 @@ components:
         signed_at:
           type: [string, 'null']
           format: date-time
+        allowed_actions:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [sign]
     Document:
       type: object
       required: [id, title, mime_type, bytes, checksum, updated_at, offline_allowed]

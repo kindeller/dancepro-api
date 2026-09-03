@@ -231,7 +231,11 @@ class CrewMobileChatApiTest extends TestCase
         ]);
 
         $this->putJson('/api/v1/notifications/'.$notification->uuid.'/read')
-            ->assertOk()->assertJsonPath('message', 'Notification marked as read.');
+            ->assertOk()
+            ->assertJsonPath('message', 'Notification marked as read.')
+            ->assertJsonPath('data.id', $notification->uuid)
+            ->assertJsonPath('data.read', true)
+            ->assertJsonPath('data.allowed_actions', []);
         $readAt = $notification->fresh()->read_at;
         $this->assertNotNull($readAt);
 

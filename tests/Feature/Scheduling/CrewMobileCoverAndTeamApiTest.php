@@ -36,13 +36,16 @@ class CrewMobileCoverAndTeamApiTest extends TestCase
 
         $coverId = $created->json('data.id');
         $this->getJson('/api/v1/cover-requests')->assertOk()
-            ->assertJsonPath('data.sent.0.id', $coverId)
-            ->assertJsonPath('data.received', []);
+            ->assertJsonPath('data.0.id', $coverId)
+            ->assertJsonPath('data.0.direction', 'sent')
+            ->assertJsonPath('meta.has_more', false);
 
         Sanctum::actingAs($replacementUser, [TokenAbility::CrewMobile->value]);
         $this->getJson('/api/v1/cover-requests')->assertOk()
-            ->assertJsonPath('data.received.0.id', $coverId)
-            ->assertJsonPath('data.received.0.requester.id', $owner->uuid);
+            ->assertJsonPath('data.0.id', $coverId)
+            ->assertJsonPath('data.0.direction', 'received')
+            ->assertJsonPath('data.0.requester.id', $owner->uuid)
+            ->assertJsonPath('data.0.allowed_actions.0', 'accept');
         $this->withHeader('Idempotency-Key', (string) Str::uuid())
             ->postJson('/api/v1/cover-requests/'.$coverId.'/accept')->assertOk()
             ->assertJsonPath('data.assignment_id', $assignment->uuid)
@@ -65,7 +68,7 @@ class CrewMobileCoverAndTeamApiTest extends TestCase
 
         Sanctum::actingAs($unrelatedUser, [TokenAbility::CrewMobile->value]);
         $this->getJson('/api/v1/cover-requests')->assertOk()
-            ->assertJsonPath('data.received', [])->assertJsonPath('data.sent', []);
+            ->assertJsonPath('data', []);
         $this->withHeader('Idempotency-Key', (string) Str::uuid())
             ->postJson('/api/v1/cover-requests/'.$coverId.'/accept')->assertNotFound();
     }

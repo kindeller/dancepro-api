@@ -23,6 +23,18 @@ class CrewAssignmentResource extends JsonResource
             && $this->shift->assignments->where('status', 'published')->contains(
                 fn ($assignment): bool => $assignment->timeEntry?->actual_finish_at === null,
             );
+        $canRequestCover = ! $locked
+            && ! $hasClockIn
+            && ! $this->shift->shift_date->lt(today())
+            && (! $this->relationLoaded('coverRequests') || $this->coverRequests->where('status', 'open')->isEmpty());
+        $allowedActions = collect([
+            'acknowledge' => $this->acknowledgement_status !== 'acknowledged',
+            'clock_in' => ! $locked && ! $hasClockIn,
+            'clock_out' => ! $locked && ! $hasFinish && $clockOutIsAvailable,
+            'edit_time' => ! $locked,
+            'finish_team' => ! $locked && $canFinishTeam,
+            'request_cover' => $canRequestCover,
+        ])->filter()->keys()->values();
 
         return [
             'id' => $this->uuid,
@@ -47,6 +59,7 @@ class CrewAssignmentResource extends JsonResource
                 'can_edit_time' => ! $locked,
                 'can_finish_team' => ! $locked && $canFinishTeam,
             ],
+            'allowed_actions' => $allowedActions,
             'version' => optional($this->published_at)->toIso8601String() ?? (string) $this->updated_at->getTimestamp(),
         ];
     }

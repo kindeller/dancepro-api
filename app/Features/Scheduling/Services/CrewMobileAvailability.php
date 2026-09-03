@@ -22,19 +22,29 @@ class CrewMobileAvailability
             ->orderBy('event_date')->get()
             ->flatMap(fn (SchedulingEvent $event) => $event->shifts
                 ->filter(fn (SchedulingShift $shift): bool => $shift->assignments->isEmpty())
-                ->map(function (SchedulingShift $shift) use ($event): array {
-                    $response = $shift->availabilityResponses->first();
-
-                    return [
-                        'shift_id' => $shift->uuid,
-                        'event_name' => $event->name,
-                        'shift_date' => $shift->shift_date->toDateString(),
-                        'deadline' => $event->availability_deadline?->toIso8601String(),
-                        'status' => $response?->status?->value,
-                        'note' => $response?->note,
-                        'locked' => $response?->locked_at !== null,
-                    ];
-                }))
+                ->map(fn (SchedulingShift $shift): array => $this->resource($shift, $shift->availabilityResponses->first())))
             ->values();
+    }
+
+    public function findFor(CrewProfile $profile, SchedulingShift $shift): array
+    {
+        $shift->loadMissing('schedulingEvent');
+        $response = $shift->availabilityResponses()->where('crew_profile_id', $profile->id)->first();
+
+        return $this->resource($shift, $response);
+    }
+
+    private function resource(SchedulingShift $shift, mixed $response): array
+    {
+        return [
+            'shift_id' => $shift->uuid,
+            'event_name' => $shift->schedulingEvent->name,
+            'shift_date' => $shift->shift_date->toDateString(),
+            'deadline' => $shift->schedulingEvent->availability_deadline?->toIso8601String(),
+            'status' => $response?->status?->value,
+            'note' => $response?->note,
+            'locked' => $response?->locked_at !== null,
+            'allowed_actions' => $response?->locked_at === null ? ['update'] : [],
+        ];
     }
 }

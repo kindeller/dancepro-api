@@ -18,10 +18,11 @@ class CrewMobileAvailabilityController extends Controller
         return ApiResponse::success('Availability requests returned.', $availability->for($request->user()->crewProfile));
     }
 
-    public function update(RecordAvailabilityResponseRequest $request, SchedulingShift $shift, RecordAvailabilityResponse $record): JsonResponse
+    public function update(RecordAvailabilityResponseRequest $request, SchedulingShift $shift, RecordAvailabilityResponse $record, CrewMobileAvailability $availability): JsonResponse
     {
-        $record->execute($request->user()->crewProfile, $shift, $request->validated());
+        $profile = $request->user()->crewProfile;
+        $record->execute($profile, $shift, $request->validated());
 
-        return ApiResponse::success('Availability saved.');
+        return ApiResponse::success('Availability saved.', $availability->findFor($profile, $shift));
     }
 }
