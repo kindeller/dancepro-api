@@ -74,10 +74,13 @@ Route::middleware('guest')->group(function (): void {
 });
 Route::middleware('auth')->group(function (): void {
     Route::get('account/security', [TwoFactorController::class, 'settings'])->name('account.security');
-    Route::post('account/security/two-factor', [TwoFactorController::class, 'begin'])->name('two-factor.begin');
+    Route::post('account/security/two-factor', [TwoFactorController::class, 'begin'])
+        ->middleware('throttle:sensitive-auth')->name('two-factor.begin');
     Route::post('account/security/two-factor/confirm', [TwoFactorController::class, 'confirm'])->middleware('throttle:6,1')->name('two-factor.confirm');
-    Route::post('account/security/two-factor/recovery-codes', [TwoFactorController::class, 'recoveryCodes'])->name('two-factor.recovery-codes');
-    Route::delete('account/security/two-factor', [TwoFactorController::class, 'disable'])->name('two-factor.disable');
+    Route::post('account/security/two-factor/recovery-codes', [TwoFactorController::class, 'recoveryCodes'])
+        ->middleware('throttle:sensitive-auth')->name('two-factor.recovery-codes');
+    Route::delete('account/security/two-factor', [TwoFactorController::class, 'disable'])
+        ->middleware('throttle:sensitive-auth')->name('two-factor.disable');
 });
 
 Route::get('book-your-concert', [PublicConcertBookingController::class, 'create'])->name('concert-bookings.create');
@@ -206,9 +209,11 @@ Route::middleware(['auth', 'crew.required', 'two-factor.required', 'crew.onboard
     Route::post('assignments/{assignment}/acknowledge', [CrewAvailabilityController::class, 'acknowledge'])->name('assignments.acknowledge');
     Route::get('profile', [CrewProfileController::class, 'edit'])->name('profile.edit');
     Route::put('profile', [CrewProfileController::class, 'update'])->name('profile.update');
-    Route::put('profile/password', [CrewProfileController::class, 'changePassword'])->name('profile.password');
+    Route::put('profile/password', [CrewProfileController::class, 'changePassword'])
+        ->middleware('throttle:sensitive-auth')->name('profile.password');
     Route::get('contracts/{crewContract}', [CrewContractController::class, 'show'])->name('contracts.show');
-    Route::post('contracts/{crewContract}/sign', [CrewContractController::class, 'sign'])->name('contracts.sign');
+    Route::post('contracts/{crewContract}/sign', [CrewContractController::class, 'sign'])
+        ->middleware('throttle:sensitive-auth')->name('contracts.sign');
     Route::get('help', [CrewOperationsController::class, 'help'])->name('help.index');
     Route::get('help/resources/{resource}/file', [InternalDocumentController::class, 'resource'])->name('help.resources.file');
     Route::get('assignments/{assignment}', [CrewOperationsController::class, 'assignment'])->name('assignments.show');

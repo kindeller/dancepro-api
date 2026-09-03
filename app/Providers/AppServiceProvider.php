@@ -59,6 +59,15 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('sensitive-auth', function (Request $request): array {
+            $userAndIp = hash('sha256', ($request->user()?->getAuthIdentifier() ?? 'guest').'|'.$request->ip());
+
+            return [
+                Limit::perMinute(5)->by('sensitive-auth:'.$userAndIp),
+                Limit::perHour(30)->by('sensitive-auth-ip:'.$request->ip()),
+            ];
+        });
+
         RateLimiter::for('concert-booking', function (Request $request): array {
             $emailAndIp = hash('sha256', mb_strtolower($request->string('contact_email')->toString()).'|'.$request->ip());
             $response = function (Request $request, array $headers) {
