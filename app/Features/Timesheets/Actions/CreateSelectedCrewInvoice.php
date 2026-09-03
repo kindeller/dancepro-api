@@ -5,6 +5,7 @@ namespace App\Features\Timesheets\Actions;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Timesheets\Models\CrewInvoice;
 use App\Features\Timesheets\Services\CrewInvoiceSelection;
+use App\Features\Timesheets\Support\InvoiceIssuerSnapshot;
 use Illuminate\Support\Facades\DB;
 
 class CreateSelectedCrewInvoice
@@ -22,6 +23,7 @@ class CreateSelectedCrewInvoice
                 'crew_profile_id' => $crew->id,
                 'scheduling_event_id' => $selection['event']?->id,
                 'source' => 'dancepro', 'invoice_style' => $style,
+                'issuer_snapshot' => InvoiceIssuerSnapshot::fromCrewProfile($crew),
                 'period_start' => $dates->first(), 'period_end' => $dates->last(),
                 'status' => 'pending_payment', 'submitted_at' => now(),
                 'subtotal' => $previews->sum('base'), 'allowance_total' => $previews->sum('allowanceTotal'),

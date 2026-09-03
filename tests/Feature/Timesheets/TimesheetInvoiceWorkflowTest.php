@@ -47,6 +47,8 @@ class TimesheetInvoiceWorkflowTest extends TestCase
         $invoice = CrewInvoice::query()->firstOrFail();
         $this->assertSame('200.00', $invoice->total);
         $this->assertSame('pending_payment', $invoice->status);
+        $this->assertSame('12345678', $invoice->issuer_snapshot['bank_account_number']);
+        $this->assertStringNotContainsString('12345678', $invoice->getRawOriginal('issuer_snapshot'));
         $this->assertFalse($otherEntry->invoiceLine()->exists(), 'A separate competition must not be combined into this invoice.');
         $this->actingAs($crewUser)->get(route('crew.timesheets.index'))->assertOk()->assertSee('status-pill attention', false)->assertSee('Pending payment');
         $this->actingAs($crewUser)->get(route('crew.timesheets.invoices.show', $invoice))->assertOk()->assertSee('Invoice 37')->assertSee('Pending payment')->assertDontSee('Pending_payment');
@@ -65,6 +67,47 @@ class TimesheetInvoiceWorkflowTest extends TestCase
         $this->assertNotNull($invoice->invoice_number);
         $this->assertSame('37', $invoice->invoice_number);
         $this->assertSame(38, $profile->refresh()->next_invoice_number);
+    }
+
+    public function test_issued_invoice_keeps_the_original_identity_and_payment_details(): void
+    {
+        $crewUser = User::factory()->crew()->create();
+        $profile = CrewProfile::factory()->for($crewUser)->create([
+            'legal_name' => 'Original Name', 'phone' => '0400 111 111', 'address_line_1' => '1 Original Street',
+            'suburb' => 'Perth', 'state' => 'WA', 'postcode' => '6000', 'abn' => '11 111 111 111',
+            'bank_account_name' => 'Original Account', 'bank_name' => 'Original Bank',
+            'bank_bsb' => '111-222', 'bank_account_number' => '11112222',
+        ]);
+        $role = CrewRole::query()->firstOrCreate(['code' => 'competition-videographer'], ['name' => 'Videographer', 'event_type' => 'competition', 'is_active' => true]);
+        $date = now()->subDay()->toDateString();
+        $event = SchedulingEvent::query()->create(['name' => 'Snapshot Competition', 'event_type' => 'competition', 'event_date' => $date]);
+        $assignment = $event->shifts()->create(['shift_date' => $date])->assignments()->create([
+            'crew_profile_id' => $profile->id, 'crew_role_id' => $role->id, 'status' => 'published',
+        ]);
+        $entry = $assignment->timeEntry()->create([
+            'actual_clock_in_at' => "$date 08:00:00", 'payable_start_at' => "$date 08:00:00", 'actual_finish_at' => "$date 10:00:00",
+        ]);
+        app(SavePayRateVersion::class)->execute(['rate_key' => 'competition_hourly', 'amount' => 50, 'effective_from' => now()->subYear()->toDateString(), 'is_superable' => true]);
+
+        $this->actingAs($crewUser)->post(route('crew.timesheets.invoices.accept'), [
+            'entry_ids' => [$entry->id], 'starting_invoice_number' => 1, 'invoice_style' => 'classic',
+        ])->assertRedirect();
+        $invoice = CrewInvoice::query()->firstOrFail();
+
+        $profile->update([
+            'legal_name' => 'Changed Name', 'bank_name' => 'Changed Bank',
+            'bank_bsb' => '999-999', 'bank_account_number' => '99999999',
+        ]);
+
+        $this->actingAs($crewUser)->get(route('crew.timesheets.invoices.print', $invoice))
+            ->assertOk()
+            ->assertSee('Original Name')
+            ->assertSee('Original Bank')
+            ->assertSee('111-222')
+            ->assertSee('11112222')
+            ->assertDontSee('Changed Name')
+            ->assertDontSee('Changed Bank')
+            ->assertDontSee('99999999');
     }
 
     public function test_crew_can_mark_emailed_concert_invoice_work_complete_without_storing_it(): void

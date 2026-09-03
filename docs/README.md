@@ -8,6 +8,7 @@ It should explain why decisions were made and how the system is intended to work
 
 ```text
 docs/
+├── api/
 ├── handbook/
 ├── epics/
 ├── specifications/
@@ -34,6 +35,8 @@ Start with:
 - [DancePro V1 S3 Structure](handbook/V1-S3-Structure.md)
 - [Concert Streaming AWS Setup Handoff](handbook/Concert-Streaming-AWS-Setup-Handoff.md)
 - [Concert Streaming AWS ChatGPT Prompt](handbook/Concert-Streaming-AWS-ChatGPT-Prompt.md)
+- [Crew Mobile API v1 contract](api/openapi-v1.yaml)
+- [ADR-0003: Crew Mobile API Contract](decisions/ADR-0003-Crew-Mobile-API-Contract.md)
 - [Brand Style](handbook/Brand-Style.md)
 - [Security](handbook/Security.md)
 - [Production Launch Checklist](handbook/Production-Launch-Checklist.md)
@@ -100,6 +103,7 @@ Current records:
 - [Crew Scheduling - Phase 0 Integration Plan](decisions/DancePro-Crew-Scheduling-Phase-0-Integration-Plan.md)
 - [ADR-0001 - Generic Downloads Bounded Context](decisions/ADR-0001-Generic-Downloads-Bounded-Context.md)
 - [ADR-0002 - Concert Media Storage and Playback](decisions/ADR-0002-Concert-Media-Storage-and-Playback.md)
+- [ADR-0003 - Crew Mobile API Contract](decisions/ADR-0003-Crew-Mobile-API-Contract.md)
 
 ## Documentation Principle
 

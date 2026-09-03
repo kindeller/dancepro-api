@@ -242,6 +242,9 @@ Crew explicitly select the pending records they want to invoice. Selecting a
 competition selects all pending records for that crew member and competition,
 and prevents it being combined with any concert or another competition. Concert
 records may be combined for weekend, fortnightly, monthly or seasonal invoicing.
+Every app-generated invoice stores an encrypted, immutable snapshot of the
+contractor identity, address, ABN and bank details used when it was issued.
+Later profile changes therefore do not alter historical payment instructions.
 Every app-generated invoice line stores an immutable snapshot of the event,
 role, hours, applicable rate and calculated amounts.
 

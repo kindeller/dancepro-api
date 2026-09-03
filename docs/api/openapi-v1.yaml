@@ -1,0 +1,1272 @@
+openapi: 3.1.0
+info:
+  title: DancePro Crew Mobile API
+  version: 1.0.0-draft
+  description: |
+    Contract for the native Crew Hub application. All operations in this file
+    are planned until their `x-implementation-status` is changed to `available`.
+    Existing unversioned media and download APIs are outside this contract and
+    remain backwards compatible.
+servers:
+  - url: https://api.example.invalid/api/v1
+    description: Replace with the production HTTPS origin at deployment.
+tags:
+  - name: Authentication
+  - name: Dashboard
+  - name: Assignments
+  - name: Availability
+  - name: Directory
+  - name: Profile
+  - name: Chat
+  - name: Notifications
+  - name: Timesheets
+  - name: Contracts
+  - name: Documents
+  - name: Training
+security:
+  - bearerAuth: []
+paths:
+  /auth/login:
+    post:
+      tags: [Authentication]
+      security: []
+      operationId: login
+      x-implementation-status: planned
+      summary: Authenticate an active crew member and issue device credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/AuthenticationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      operationId: logout
+      x-implementation-status: planned
+      summary: Revoke the current device credentials
+      responses:
+        '200':
+          $ref: '#/components/responses/EmptySuccess'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /auth/me:
+    get:
+      tags: [Authentication]
+      operationId: currentUser
+      x-implementation-status: planned
+      summary: Return the authenticated crew identity and capabilities
+      responses:
+        '200':
+          description: Current user returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CurrentUser'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      operationId: crewDashboard
+      x-implementation-status: planned
+      summary: Return the compact My Hub dashboard
+      responses:
+        '200':
+          description: Dashboard returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Dashboard'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /assignments:
+    get:
+      tags: [Assignments]
+      operationId: listAssignments
+      x-implementation-status: planned
+      summary: List assignments visible to the current crew member
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [upcoming, past, all]
+            default: upcoming
+      responses:
+        '200':
+          description: Assignments returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssignmentCollectionEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+  /assignments/{assignment}:
+    get:
+      tags: [Assignments]
+      operationId: showAssignment
+      x-implementation-status: planned
+      summary: Return an assignment owned by the current crew member
+      parameters:
+        - $ref: '#/components/parameters/AssignmentId'
+      responses:
+        '200':
+          description: Assignment returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AssignmentDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /assignments/{assignment}/acknowledgement:
+    put:
+      tags: [Assignments]
+      operationId: acknowledgeAssignment
+      x-implementation-status: planned
+      summary: Acknowledge the current published assignment version
+      parameters:
+        - $ref: '#/components/parameters/AssignmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          $ref: '#/components/responses/EmptySuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /assignments/{assignment}/checklist-items/{item}:
+    put:
+      tags: [Assignments]
+      operationId: updateChecklistItem
+      x-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/AssignmentId'
+        - $ref: '#/components/parameters/ChecklistItemId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [completed]
+              properties:
+                completed:
+                  type: boolean
+      responses:
+        '200':
+          $ref: '#/components/responses/EmptySuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /availability:
+    get:
+      tags: [Availability]
+      operationId: listAvailabilityRequests
+      x-implementation-status: planned
+      responses:
+        '200':
+          description: Availability requests returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AvailabilityRequest'
+  /availability/{shift}:
+    put:
+      tags: [Availability]
+      operationId: updateAvailability
+      x-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/ShiftId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [available, unavailable]
+                note:
+                  type: [string, 'null']
+                  maxLength: 2000
+      responses:
+        '200':
+          $ref: '#/components/responses/EmptySuccess'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /directory:
+    get:
+      tags: [Directory]
+      operationId: directory
+      x-implementation-status: planned
+      summary: Return active crew, studios, and competitions permitted in My Crew
+      responses:
+        '200':
+          description: Directory returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Directory'
+  /profile:
+    get:
+      tags: [Profile]
+      operationId: showProfile
+      x-implementation-status: planned
+      responses:
+        '200':
+          description: Own profile returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CrewProfile'
+    put:
+      tags: [Profile]
+      operationId: updateProfile
+      x-implementation-status: planned
+      summary: Update permitted fields on the current crew profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdateRequest'
+      responses:
+        '200':
+          description: Profile updated.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CrewProfile'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /chats:
+    get:
+      tags: [Chat]
+      operationId: listChats
+      x-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - name: filter
+          in: query
+          schema:
+            type: string
+            enum: [all, unread, upcoming, events, direct]
+            default: all
+      responses:
+        '200':
+          description: Chats returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ChatSummary'
+                      meta:
+                        $ref: '#/components/schemas/CursorMeta'
+  /chats/{chat}/messages:
+    get:
+      tags: [Chat]
+      operationId: listChatMessages
+      x-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/ChatId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Messages returned newest first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ChatMessage'
+                      meta:
+                        $ref: '#/components/schemas/CursorMeta'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Chat]
+      operationId: postChatMessage
+      x-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/ChatId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body:
+                  type: string
+                  minLength: 1
+                  maxLength: 5000
+      responses:
+        '201':
+          description: Message created.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ChatMessage'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /chats/{chat}/read:
+    put:
+      tags: [Chat]
+      operationId: markChatRead
+      x-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/ChatId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [through_message]
+              properties:
+                through_message:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/EmptySuccess'
+  /notifications:
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      x-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Notifications returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Notification'
+                      meta:
+                        $ref: '#/components/schemas/CursorMeta'
+  /timesheets:
+    get:
+      tags: [Timesheets]
+      operationId: listTimesheets
+      x-implementation-status: planned
+      responses:
+        '200':
+          description: Timesheets and invoice readiness returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Timesheet'
+  /invoices:
+    get:
+      tags: [Timesheets]
+      operationId: listInvoices
+      x-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Own invoices returned without full bank account values.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/InvoiceSummary'
+                      meta:
+                        $ref: '#/components/schemas/CursorMeta'
+  /invoices/{invoice}:
+    get:
+      tags: [Timesheets]
+      operationId: showInvoice
+      x-implementation-status: planned
+      parameters:
+        - $ref: '#/components/parameters/InvoiceId'
+      responses:
+        '200':
+          description: Own invoice returned. Payment details remain redacted.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/InvoiceDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /contracts:
+    get:
+      tags: [Contracts]
+      operationId: listContracts
+      x-implementation-status: planned
+      responses:
+        '200':
+          description: Contracts relevant to the current crew member returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Contract'
+  /documents:
+    get:
+      tags: [Documents]
+      operationId: listDocuments
+      x-implementation-status: planned
+      summary: Return authorised operational document metadata for offline sync
+      parameters:
+        - name: updated_since
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Document metadata returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Document'
+  /documents/{document}/download:
+    post:
+      tags: [Documents]
+      operationId: createDocumentDownload
+      x-implementation-status: planned
+      summary: Issue a short-lived URL for one currently authorised document
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Download URL issued.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TemporaryDownload'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /training:
+    get:
+      tags: [Training]
+      operationId: listTraining
+      x-implementation-status: planned
+      responses:
+        '200':
+          description: Assigned training returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TrainingCourse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum
+      description: Store credentials only in the platform secure credential store.
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: [string, 'null']
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AssignmentId:
+      name: assignment
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ShiftId:
+      name: shift
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ChecklistItemId:
+      name: item
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ChatId:
+      name: chat
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    InvoiceId:
+      name: invoice
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DocumentId:
+      name: document
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    AuthenticationResponse:
+      description: Authentication succeeded.
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/SuccessEnvelope'
+              - type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Authentication'
+    EmptySuccess:
+      description: Operation completed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SuccessEnvelope'
+    Unauthenticated:
+      description: Missing, expired, or invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Forbidden:
+      description: The account cannot perform this operation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    NotFound:
+      description: Resource not found or not visible to this account.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    Conflict:
+      description: Resource state changed; refresh before retrying.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    ValidationError:
+      description: Request validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+    RateLimited:
+      description: Too many requests.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+  schemas:
+    SuccessEnvelope:
+      type: object
+      required: [success, message, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        message:
+          type: string
+        data: {}
+        meta:
+          type: object
+          additionalProperties: true
+    ErrorEnvelope:
+      type: object
+      required: [success, message, errors]
+      properties:
+        success:
+          type: boolean
+          const: false
+        message:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    LoginRequest:
+      type: object
+      required: [email, password, device_name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        device_name:
+          type: string
+          maxLength: 255
+        two_factor_code:
+          type: [string, 'null']
+          pattern: '^\d{6}$'
+        recovery_code:
+          type: [string, 'null']
+          maxLength: 255
+    Authentication:
+      type: object
+      required: [token, token_type, expires_at, user]
+      properties:
+        token:
+          type: string
+          writeOnly: true
+        token_type:
+          type: string
+          const: Bearer
+        expires_at:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/CurrentUser'
+    CurrentUser:
+      type: object
+      required: [id, name, email, capabilities]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        capabilities:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [crew]
+        onboarding_complete:
+          type: boolean
+        two_factor_enabled:
+          type: boolean
+    Dashboard:
+      type: object
+      required: [next_assignment, unread_notifications, unread_chats, pending_availability, pending_invoices]
+      properties:
+        next_assignment:
+          oneOf:
+            - $ref: '#/components/schemas/AssignmentSummary'
+            - type: 'null'
+        unread_notifications:
+          type: integer
+          minimum: 0
+        unread_chats:
+          type: integer
+          minimum: 0
+        pending_availability:
+          type: integer
+          minimum: 0
+        pending_invoices:
+          type: integer
+          minimum: 0
+    AssignmentCollectionEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/AssignmentSummary'
+            meta:
+              $ref: '#/components/schemas/CursorMeta'
+    AssignmentSummary:
+      type: object
+      required: [id, event_name, event_type, role, shift_date, status, acknowledged]
+      properties:
+        id:
+          type: string
+          format: uuid
+        event_name:
+          type: string
+        event_type:
+          type: string
+          enum: [competition, concert]
+        role:
+          type: string
+        shift_date:
+          type: string
+          format: date
+        arrival_at:
+          type: [string, 'null']
+          format: date-time
+        starts_at:
+          type: [string, 'null']
+          format: date-time
+        estimated_finish_at:
+          type: [string, 'null']
+          format: date-time
+        status:
+          type: string
+          enum: [draft, published, cancelled]
+        acknowledged:
+          type: boolean
+        version:
+          type: string
+          description: Opaque value used to detect stale acknowledgements.
+    AssignmentDetail:
+      allOf:
+        - $ref: '#/components/schemas/AssignmentSummary'
+        - type: object
+          properties:
+            venue:
+              $ref: '#/components/schemas/Venue'
+            crew_brief:
+              type: [string, 'null']
+            team_leader_notes:
+              type: [string, 'null']
+              description: Present only for the assigned team leader.
+            checklist:
+              type: array
+              items:
+                $ref: '#/components/schemas/ChecklistItem'
+            team:
+              type: array
+              items:
+                $ref: '#/components/schemas/DirectoryPerson'
+            documents:
+              type: array
+              items:
+                $ref: '#/components/schemas/Document'
+    Venue:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: [string, 'null']
+    ChecklistItem:
+      type: object
+      required: [id, instruction, completed]
+      properties:
+        id:
+          type: string
+          format: uuid
+        instruction:
+          type: string
+        completed:
+          type: boolean
+        completed_at:
+          type: [string, 'null']
+          format: date-time
+    AvailabilityRequest:
+      type: object
+      required: [shift_id, event_name, shift_date, status, locked]
+      properties:
+        shift_id:
+          type: string
+          format: uuid
+        event_name:
+          type: string
+        shift_date:
+          type: string
+          format: date
+        deadline:
+          type: [string, 'null']
+          format: date-time
+        status:
+          type: [string, 'null']
+          enum: [available, unavailable, null]
+        note:
+          type: [string, 'null']
+        locked:
+          type: boolean
+    Directory:
+      type: object
+      required: [crew, studios, competitions]
+      properties:
+        crew:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectoryPerson'
+        studios:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectoryOrganisation'
+        competitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DirectoryOrganisation'
+    DirectoryPerson:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        phone:
+          type: [string, 'null']
+          description: Present only where the existing Crew directory permits it.
+        profile_photo_url:
+          type: [string, 'null']
+          format: uri
+    DirectoryOrganisation:
+      type: object
+      required: [id, code, name, contacts]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: [string, 'null']
+        name:
+          type: string
+        logo_url:
+          type: [string, 'null']
+          format: uri
+        contacts:
+          type: array
+          items:
+            type: object
+            required: [name]
+            properties:
+              name:
+                type: string
+              role:
+                type: [string, 'null']
+              email:
+                type: [string, 'null']
+                format: email
+              phone:
+                type: [string, 'null']
+    CrewProfile:
+      type: object
+      required: [id, preferred_name, email, phone]
+      properties:
+        id:
+          type: string
+          format: uuid
+        preferred_name:
+          type: string
+        legal_name:
+          type: [string, 'null']
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        address:
+          $ref: '#/components/schemas/Address'
+        emergency_contact:
+          $ref: '#/components/schemas/EmergencyContact'
+        payment_details:
+          $ref: '#/components/schemas/RedactedPaymentDetails'
+        compliance:
+          type: object
+          additionalProperties: true
+        vehicles:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        updated_at:
+          type: string
+          format: date-time
+    ProfileUpdateRequest:
+      type: object
+      description: Full validation rules will be finalised with mobile onboarding and step-up authentication.
+      required: [preferred_name, email, phone, address]
+      properties:
+        preferred_name:
+          type: string
+          maxLength: 255
+        legal_name:
+          type: [string, 'null']
+          maxLength: 255
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          maxLength: 50
+        address:
+          $ref: '#/components/schemas/Address'
+        emergency_contact:
+          $ref: '#/components/schemas/EmergencyContact'
+    Address:
+      type: object
+      properties:
+        line_1:
+          type: [string, 'null']
+        line_2:
+          type: [string, 'null']
+        suburb:
+          type: [string, 'null']
+        state:
+          type: [string, 'null']
+        postcode:
+          type: [string, 'null']
+    EmergencyContact:
+      type: object
+      properties:
+        name:
+          type: [string, 'null']
+        relationship:
+          type: [string, 'null']
+        phone:
+          type: [string, 'null']
+    RedactedPaymentDetails:
+      type: object
+      properties:
+        account_name:
+          type: [string, 'null']
+        bank_name:
+          type: [string, 'null']
+        bsb_last_four:
+          type: [string, 'null']
+        account_number_last_four:
+          type: [string, 'null']
+        complete:
+          type: boolean
+    ChatSummary:
+      type: object
+      required: [id, kind, title, unread_count, activity_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [event, direct]
+        title:
+          type: string
+        latest_message_preview:
+          type: [string, 'null']
+        unread_count:
+          type: integer
+          minimum: 0
+        activity_at:
+          type: string
+          format: date-time
+    ChatMessage:
+      type: object
+      required: [id, author, body, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        author:
+          $ref: '#/components/schemas/DirectoryPerson'
+        body:
+          type: string
+        attachment:
+          oneOf:
+            - $ref: '#/components/schemas/Document'
+            - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+    Notification:
+      type: object
+      required: [id, type, title, message, created_at, read]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        deep_link:
+          type: [string, 'null']
+        created_at:
+          type: string
+          format: date-time
+        read:
+          type: boolean
+    Timesheet:
+      type: object
+      required: [id, assignment_id, event_name, event_date, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        assignment_id:
+          type: string
+          format: uuid
+        event_name:
+          type: string
+        event_date:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [draft, ready_to_invoice, invoiced, externally_invoiced]
+        total:
+          type: [string, 'null']
+          pattern: '^\d+\.\d{2}$'
+    InvoiceSummary:
+      type: object
+      required: [id, invoice_number, status, total, submitted_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_number:
+          type: string
+        status:
+          type: string
+          enum: [draft, pending_payment, approved, exported, paid]
+        total:
+          type: string
+          pattern: '^\d+\.\d{2}$'
+        submitted_at:
+          type: string
+          format: date-time
+        paid_at:
+          type: [string, 'null']
+          format: date-time
+    InvoiceDetail:
+      allOf:
+        - $ref: '#/components/schemas/InvoiceSummary'
+        - type: object
+          properties:
+            lines:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            payment_details:
+              $ref: '#/components/schemas/RedactedPaymentDetails'
+    Contract:
+      type: object
+      required: [id, name, version, status, content]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        version:
+          type: string
+        status:
+          type: string
+        content:
+          type: string
+        signed_at:
+          type: [string, 'null']
+          format: date-time
+    Document:
+      type: object
+      required: [id, title, mime_type, bytes, checksum, updated_at, offline_allowed]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        mime_type:
+          type: string
+        bytes:
+          type: integer
+          minimum: 0
+        checksum:
+          type: string
+          description: SHA-256 checksum used to validate and invalidate offline copies.
+        updated_at:
+          type: string
+          format: date-time
+        offline_allowed:
+          type: boolean
+    TemporaryDownload:
+      type: object
+      required: [url, expires_at, checksum]
+      properties:
+        url:
+          type: string
+          format: uri
+        expires_at:
+          type: string
+          format: date-time
+        checksum:
+          type: string
+    TrainingCourse:
+      type: object
+      required: [id, title, status, progress]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        status:
+          type: string
+        due_at:
+          type: [string, 'null']
+          format: date-time
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+    CursorMeta:
+      type: object
+      required: [next_cursor, has_more]
+      properties:
+        next_cursor:
+          type: [string, 'null']
+        has_more:
+          type: boolean
