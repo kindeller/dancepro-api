@@ -15,10 +15,12 @@ class PublicConcertApiController extends Controller
 {
     public function studios(): JsonResponse
     {
+        $limit = max(1, (int) config('concerts.public_api.studio_limit'));
         $studios = Studio::query()
             ->where('status', StudioStatus::Active)
             ->whereHas('concerts', fn (Builder $query) => $this->available($query))
             ->orderBy('name')
+            ->limit($limit + 1)
             ->get()
             ->map(fn (Studio $studio) => [
                 'uuid' => $studio->uuid,
@@ -27,20 +29,27 @@ class PublicConcertApiController extends Controller
                 'cover_image_url' => $studio->cover_image_url,
                 'brand_color' => $studio->brand_color,
             ]);
+        $truncated = $studios->count() > $limit;
 
-        return ApiResponse::success('Studios returned.', $studios);
+        return ApiResponse::success('Studios returned.', $studios->take($limit)->values(), meta: [
+            'limit' => $limit,
+            'truncated' => $truncated,
+        ]);
     }
 
     public function studio(Studio $studio): JsonResponse
     {
         abort_unless($studio->status === StudioStatus::Active, 404);
 
+        $limit = max(1, (int) config('concerts.public_api.concert_limit_per_studio'));
         $concerts = $this->available($studio->concerts()->getQuery())
             ->orderByDesc('event_date')
+            ->limit($limit + 1)
             ->get()
             ->map(fn (Concert $concert) => $this->concertData($concert));
 
         abort_if($concerts->isEmpty(), 404);
+        $truncated = $concerts->count() > $limit;
 
         return ApiResponse::success('Studio concerts returned.', [
             'studio' => [
@@ -50,7 +59,10 @@ class PublicConcertApiController extends Controller
                 'cover_image_url' => $studio->cover_image_url,
                 'brand_color' => $studio->brand_color,
             ],
-            'concerts' => $concerts,
+            'concerts' => $concerts->take($limit)->values(),
+        ], meta: [
+            'limit' => $limit,
+            'truncated' => $truncated,
         ]);
     }
 

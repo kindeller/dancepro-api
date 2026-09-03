@@ -92,6 +92,11 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('public-catalogue', function (Request $request): Limit {
+            return Limit::perMinute(max(1, (int) config('concerts.public_api.rate_limit_per_minute')))
+                ->by('public-catalogue:'.$request->ip());
+        });
+
         $this->registerConcertMediaRateLimiters();
 
         Gate::policy(DownloadLink::class, DownloadLinkPolicy::class);

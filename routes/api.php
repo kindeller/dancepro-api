@@ -7,9 +7,11 @@ use App\Features\Concerts\Controllers\PublicConcertApiController;
 use App\Features\Downloads\Controllers\DownloadLinkController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('studios', [PublicConcertApiController::class, 'studios']);
-Route::get('studios/{studio}', [PublicConcertApiController::class, 'studio']);
-Route::get('concerts/{concert}', [PublicConcertApiController::class, 'concert']);
+Route::middleware('throttle:public-catalogue')->group(function (): void {
+    Route::get('studios', [PublicConcertApiController::class, 'studios']);
+    Route::get('studios/{studio}', [PublicConcertApiController::class, 'studio']);
+    Route::get('concerts/{concert}', [PublicConcertApiController::class, 'concert']);
+});
 
 Route::prefix('auth')->group(function (): void {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');

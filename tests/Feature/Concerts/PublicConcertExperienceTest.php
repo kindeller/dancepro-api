@@ -32,6 +32,48 @@ class PublicConcertExperienceTest extends TestCase
             ->assertDontSee('Hidden Dance');
     }
 
+    public function test_public_catalogue_api_preserves_its_data_shape_and_caps_large_results(): void
+    {
+        config()->set('concerts.public_api.studio_limit', 2);
+        foreach (['Alpha Dance', 'Bravo Dance', 'Charlie Dance'] as $name) {
+            Concert::factory()->published()->for(Studio::factory()->create(['name' => $name]))->create();
+        }
+
+        $this->getJson('/api/studios')
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.name', 'Alpha Dance')
+            ->assertJsonPath('data.1.name', 'Bravo Dance')
+            ->assertJsonPath('meta.limit', 2)
+            ->assertJsonPath('meta.truncated', true);
+    }
+
+    public function test_public_catalogue_api_is_rate_limited_by_ip_address(): void
+    {
+        config()->set('concerts.public_api.rate_limit_per_minute', 2);
+
+        $this->getJson('/api/studios')->assertOk();
+        $this->getJson('/api/studios')->assertOk();
+        $this->getJson('/api/studios')->assertTooManyRequests();
+    }
+
+    public function test_public_studio_api_caps_concerts_without_changing_the_response_shape(): void
+    {
+        config()->set('concerts.public_api.concert_limit_per_studio', 2);
+        $studio = Studio::factory()->create();
+        Concert::factory()->published()->for($studio)->create(['event_date' => '2026-01-01']);
+        Concert::factory()->published()->for($studio)->create(['event_date' => '2026-02-01']);
+        Concert::factory()->published()->for($studio)->create(['event_date' => '2026-03-01']);
+
+        $this->getJson('/api/studios/'.$studio->uuid)
+            ->assertOk()
+            ->assertJsonCount(2, 'data.concerts')
+            ->assertJsonPath('data.concerts.0.event_date', '2026-03-01')
+            ->assertJsonPath('data.concerts.1.event_date', '2026-02-01')
+            ->assertJsonPath('meta.limit', 2)
+            ->assertJsonPath('meta.truncated', true);
+    }
+
     public function test_password_and_student_name_unlock_a_concert_for_the_session(): void
     {
         $concert = Concert::factory()->published()->create(['access_password_hash' => 'dance123']);

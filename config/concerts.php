@@ -9,6 +9,12 @@ return [
         'download_per_minute' => (int) env('CONCERT_DOWNLOAD_RATE_LIMIT_PER_MINUTE', 20),
     ],
 
+    'public_api' => [
+        'rate_limit_per_minute' => (int) env('PUBLIC_CATALOGUE_RATE_LIMIT_PER_MINUTE', 120),
+        'studio_limit' => (int) env('PUBLIC_CATALOGUE_STUDIO_LIMIT', 500),
+        'concert_limit_per_studio' => (int) env('PUBLIC_CATALOGUE_CONCERT_LIMIT', 250),
+    ],
+
     'playback' => [
         'signed_url_ttl_minutes' => (int) env('CONCERT_PLAYBACK_SIGNED_URL_TTL_MINUTES', 15),
 
