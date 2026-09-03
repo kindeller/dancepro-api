@@ -36,6 +36,7 @@ Start with:
 - [Concert Streaming AWS ChatGPT Prompt](handbook/Concert-Streaming-AWS-ChatGPT-Prompt.md)
 - [Brand Style](handbook/Brand-Style.md)
 - [Security](handbook/Security.md)
+- [Production Launch Checklist](handbook/Production-Launch-Checklist.md)
 
 ## Epics
 

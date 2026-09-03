@@ -336,6 +336,11 @@ external deployment responsibility until the hosting and alerting providers are
 selected; a successful application deployment does not by itself prove alerts
 will reach the owner.
 
+The final production go/no-go decision must also complete the provider-neutral
+[Production Launch Checklist](Production-Launch-Checklist.md). Keep provider
+names, account references, alert destinations and test evidence in the private
+deployment record rather than committing them to this repository.
+
 Also confirm `public/build/manifest.json` exists and that the public concert
 player loads without a missing-manifest or missing-asset error.
 
