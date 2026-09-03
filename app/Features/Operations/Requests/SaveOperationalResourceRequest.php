@@ -2,6 +2,7 @@
 
 namespace App\Features\Operations\Requests;
 
+use App\Features\Operations\Support\ExternalResourceUrl;
 use App\Features\Scheduling\Models\EventTypeDefinition;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -30,7 +31,13 @@ class SaveOperationalResourceRequest extends FormRequest
             'role_code' => ['nullable', 'string', 'max:80'],
             'summary' => ['nullable', 'string', 'max:2000'],
             'content' => ['nullable', 'string', 'max:50000'],
-            'external_url' => ['nullable', 'url', 'max:2000'],
+            'external_url' => [
+                'nullable',
+                'url',
+                'max:2000',
+                fn (string $attribute, mixed $value, \Closure $fail) => ExternalResourceUrl::isAllowed($value)
+                    ?: $fail('The external URL must use HTTPS and point to an approved public host.'),
+            ],
             'file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:102400'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],

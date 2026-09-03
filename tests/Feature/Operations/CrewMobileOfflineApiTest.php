@@ -71,6 +71,69 @@ class CrewMobileOfflineApiTest extends TestCase
         $this->get($url)->assertUnauthorized();
     }
 
+    public function test_handbook_returns_inline_link_and_optional_document_resources(): void
+    {
+        $this->authenticatedCrew();
+        Storage::fake('local');
+        Storage::disk('local')->put('operations/guide.pdf', 'guide');
+        $inline = OperationalResource::query()->create([
+            'section_number' => 2,
+            'title' => 'On site conduct',
+            'resource_type' => 'handbook',
+            'summary' => 'How crew represent DancePro.',
+            'content' => 'Arrive ready and communicate clearly.',
+            'external_url' => 'https://docs.example.com/conduct',
+            'is_active' => true,
+        ]);
+        OperationalResource::query()->create([
+            'title' => 'Private guide',
+            'resource_type' => 'cheat_sheet',
+            'file_path' => 'operations/guide.pdf',
+            'is_active' => true,
+        ]);
+        OperationalResource::query()->create([
+            'title' => 'Inactive draft',
+            'resource_type' => 'help',
+            'is_active' => false,
+        ]);
+
+        $this->getJson('/api/v1/handbook')->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.id', $inline->uuid)
+            ->assertJsonPath('data.0.section_number', 2)
+            ->assertJsonPath('data.0.type', 'handbook')
+            ->assertJsonPath('data.0.summary', 'How crew represent DancePro.')
+            ->assertJsonPath('data.0.content', 'Arrive ready and communicate clearly.')
+            ->assertJsonPath('data.0.external_url', 'https://docs.example.com/conduct')
+            ->assertJsonPath('data.0.document', null)
+            ->assertJsonPath('data.1.document.bytes', 5)
+            ->assertJsonMissing(['title' => 'Inactive draft']);
+    }
+
+    public function test_handbook_suppresses_unsafe_legacy_links(): void
+    {
+        $this->authenticatedCrew();
+        OperationalResource::query()->create([
+            'title' => 'Legacy unsafe link',
+            'resource_type' => 'help',
+            'external_url' => 'http://127.0.0.1/private',
+            'is_active' => true,
+        ]);
+
+        $this->getJson('/api/v1/handbook')->assertOk()->assertJsonPath('data.0.external_url', null);
+    }
+
+    public function test_admin_validation_rejects_unsafe_external_resource_links(): void
+    {
+        $staff = User::factory()->staff()->create();
+        $this->actingAs($staff)->post(route('admin.operations.resources.store'), [
+            'title' => 'Unsafe URL',
+            'resource_type' => 'help',
+            'external_url' => 'http://localhost/internal',
+            'is_active' => true,
+        ])->assertSessionHasErrors('external_url');
+    }
+
     public function test_document_delta_validation_and_training_are_scoped_to_available_records(): void
     {
         [, $profile] = $this->authenticatedCrew();

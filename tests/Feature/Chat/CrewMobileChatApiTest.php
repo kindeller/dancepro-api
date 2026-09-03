@@ -57,6 +57,62 @@ class CrewMobileChatApiTest extends TestCase
         $this->assertSame(2, $event->messages()->count());
     }
 
+    public function test_crew_can_idempotently_acknowledge_an_announcement_in_their_event_chat(): void
+    {
+        [$crew, $profile] = $this->authenticatedCrew();
+        $event = $this->assignedEvent($profile);
+        $message = EventMessage::query()->create([
+            'scheduling_event_id' => $event->id,
+            'author_user_id' => User::factory()->staff()->create()->id,
+            'message_type' => 'announcement',
+            'body' => 'The loading dock has changed.',
+        ]);
+
+        $this->getJson('/api/v1/chats/'.$event->uuid.'/messages')->assertOk()
+            ->assertJsonPath('data.0.acknowledgement_required', true)
+            ->assertJsonPath('data.0.acknowledged', false);
+
+        $key = (string) Str::uuid();
+        $first = $this->withHeader('Idempotency-Key', $key)
+            ->postJson('/api/v1/chats/'.$event->uuid.'/messages/'.$message->uuid.'/acknowledgement')
+            ->assertOk()
+            ->assertJsonPath('data.acknowledgement_required', true)
+            ->assertJsonPath('data.acknowledged', true);
+        $this->withHeader('Idempotency-Key', $key)
+            ->postJson('/api/v1/chats/'.$event->uuid.'/messages/'.$message->uuid.'/acknowledgement')
+            ->assertOk()->assertHeader('Idempotency-Replayed', 'true')->assertExactJson($first->json());
+        $this->assertDatabaseCount('event_message_reads', 1);
+        $this->assertDatabaseHas('event_message_reads', ['event_message_id' => $message->id, 'user_id' => $crew->id]);
+    }
+
+    public function test_crew_cannot_acknowledge_discussions_direct_messages_or_unassigned_event_messages(): void
+    {
+        [, $profile] = $this->authenticatedCrew();
+        $event = $this->assignedEvent($profile);
+        $discussion = EventMessage::query()->create([
+            'scheduling_event_id' => $event->id,
+            'author_user_id' => User::factory()->staff()->create()->id,
+            'message_type' => 'discussion',
+            'body' => 'General information.',
+        ]);
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/chats/'.$event->uuid.'/messages/'.$discussion->uuid.'/acknowledgement')
+            ->assertNotFound();
+
+        $other = User::factory()->crew()->create();
+        $otherProfile = CrewProfile::factory()->for($other)->create();
+        $privateEvent = $this->assignedEvent($otherProfile);
+        $announcement = EventMessage::query()->create([
+            'scheduling_event_id' => $privateEvent->id,
+            'author_user_id' => User::factory()->staff()->create()->id,
+            'message_type' => 'announcement',
+            'body' => 'Private event information.',
+        ]);
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/chats/'.$privateEvent->uuid.'/messages/'.$announcement->uuid.'/acknowledgement')
+            ->assertNotFound();
+    }
+
     public function test_direct_chat_is_private_and_supports_message_read_state(): void
     {
         [$sender] = $this->authenticatedCrew();

@@ -9,7 +9,9 @@ use App\Features\Chat\Requests\StartDirectChatRequest;
 use App\Features\Chat\Requests\StoreChatMessageRequest;
 use App\Features\Chat\Services\CrewMobileChat;
 use App\Features\Crew\Models\CrewProfile;
+use App\Features\Operations\Actions\AcknowledgeEventMessage;
 use App\Features\Operations\Actions\PostEventMessage;
+use App\Features\Operations\Requests\AcknowledgeEventMessageRequest;
 use App\Features\Operations\Services\OperationsFileStorage;
 use App\Http\Controllers\Controller;
 use App\Shared\Responses\ApiResponse;
@@ -89,5 +91,14 @@ class CrewMobileChatController extends Controller
         $chat->markRead($request->user(), $chatId, $request->validated('through_message'));
 
         return ApiResponse::success('Chat marked as read.');
+    }
+
+    public function acknowledge(AcknowledgeEventMessageRequest $request, string $chatId, string $message, CrewMobileChat $chat, AcknowledgeEventMessage $acknowledge): JsonResponse
+    {
+        $eventMessage = $chat->acknowledge($request->user(), $chatId, $message);
+        $acknowledge->execute($eventMessage, $request->user());
+        $eventMessage->load(['author.crewProfile', 'reads' => fn ($query) => $query->where('user_id', $request->user()->id)]);
+
+        return ApiResponse::success('Message acknowledged.', $chat->messageResource($eventMessage, $chatId));
     }
 }

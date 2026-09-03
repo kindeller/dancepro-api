@@ -32,7 +32,11 @@ class CrewMobileChat
     public function messages(User $user, string $uuid, int $limit): array
     {
         [$kind, $chat] = $this->resolve($user, $uuid);
-        $page = $chat->messages()->with('author.crewProfile')->latest('id')->cursorPaginate($limit);
+        $page = $chat->messages()->with('author.crewProfile')
+            ->when($kind === 'event', fn (Builder $query) => $query->with([
+                'reads' => fn ($readQuery) => $readQuery->where('user_id', $user->id),
+            ]))
+            ->latest('id')->cursorPaginate($limit);
 
         return ['kind' => $kind, 'chat' => $chat, 'page' => $page];
     }
@@ -102,8 +106,20 @@ class CrewMobileChat
                     'message' => $message->uuid,
                 ]),
             ] : null,
+            'acknowledgement_required' => $message instanceof EventMessage && $message->isAnnouncement(),
+            'acknowledged' => $message instanceof EventMessage && $message->isAnnouncement()
+                ? $message->reads->isNotEmpty()
+                : false,
             'created_at' => $message->created_at->toIso8601String(),
         ];
+    }
+
+    public function acknowledge(User $user, string $chatUuid, string $messageUuid): EventMessage
+    {
+        [$kind, $chat] = $this->resolve($user, $chatUuid);
+        abort_unless($kind === 'event', 404);
+
+        return $chat->messages()->where('uuid', $messageUuid)->firstOrFail();
     }
 
     private function summary(array $chat): array

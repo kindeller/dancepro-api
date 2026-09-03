@@ -12,6 +12,7 @@ use App\Features\Crew\Controllers\CrewMobileDirectoryController;
 use App\Features\Crew\Controllers\CrewMobileProfileController;
 use App\Features\Downloads\Controllers\DownloadLinkController;
 use App\Features\Operations\Controllers\CrewMobileDocumentController;
+use App\Features\Operations\Controllers\CrewMobileHandbookController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentActionController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentController;
 use App\Features\Scheduling\Controllers\CrewMobileAvailabilityController;
@@ -81,6 +82,7 @@ Route::prefix('v1')->middleware([
         Route::get('chats/{chatId}/messages/{message}/attachment', [CrewMobileChatController::class, 'attachment'])
             ->name('api.v1.chats.attachments.show');
         Route::post('chats/{chatId}/messages', [CrewMobileChatController::class, 'store'])->middleware('api.idempotency');
+        Route::post('chats/{chatId}/messages/{message}/acknowledgement', [CrewMobileChatController::class, 'acknowledge'])->middleware('api.idempotency');
         Route::put('chats/{chatId}/read', [CrewMobileChatController::class, 'read']);
         Route::get('notifications', CrewMobileNotificationController::class);
         Route::put('notifications/{notification}/read', [CrewMobileNotificationController::class, 'read']);
@@ -98,6 +100,7 @@ Route::prefix('v1')->middleware([
         Route::put('assignments/{assignment}/time', [CrewMobileTimeController::class, 'update'])->middleware('api.idempotency');
         Route::post('assignments/{assignment}/finish-team', [CrewMobileTimeController::class, 'finishTeam'])->middleware('api.idempotency');
         Route::get('documents', [CrewMobileDocumentController::class, 'index']);
+        Route::get('handbook', CrewMobileHandbookController::class);
         Route::post('documents/{document}/download', [CrewMobileDocumentController::class, 'download']);
         Route::get('documents/{document}/content', [CrewMobileDocumentController::class, 'content'])
             ->middleware('signed')->name('api.v1.documents.content');

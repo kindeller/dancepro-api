@@ -2,9 +2,9 @@
 
 namespace App\Features\Operations\Controllers;
 
+use App\Features\Operations\Actions\AcknowledgeEventMessage;
 use App\Features\Operations\Actions\PostEventMessage;
 use App\Features\Operations\Models\EventMessage;
-use App\Features\Operations\Models\EventMessageRead;
 use App\Features\Operations\Requests\StoreEventMessageRequest;
 use App\Features\Scheduling\Models\SchedulingShiftAssignment;
 use App\Http\Controllers\Controller;
@@ -28,14 +28,11 @@ class CrewEventCommunicationController extends Controller
         return back()->with('status', 'Message posted.');
     }
 
-    public function acknowledge(Request $request, SchedulingShiftAssignment $assignment, EventMessage $message): RedirectResponse
+    public function acknowledge(Request $request, SchedulingShiftAssignment $assignment, EventMessage $message, AcknowledgeEventMessage $acknowledge): RedirectResponse
     {
         $this->authoriseAssignment($request, $assignment);
         abort_unless($message->scheduling_event_id === $assignment->shift->scheduling_event_id && $message->isAnnouncement(), 404);
-        EventMessageRead::query()->updateOrCreate(
-            ['event_message_id' => $message->id, 'user_id' => $request->user()->id],
-            ['read_at' => now()],
-        );
+        $acknowledge->execute($message, $request->user());
 
         return back()->with('status', 'Announcement acknowledged.');
     }
