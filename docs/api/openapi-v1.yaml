@@ -187,6 +187,65 @@ paths:
           $ref: '#/components/responses/EmptySuccess'
         '404':
           $ref: '#/components/responses/NotFound'
+  /assignments/{assignment}/clock-in:
+    post:
+      tags: [Timesheets]
+      operationId: clockInAssignment
+      x-implementation-status: available
+      parameters:
+        - $ref: '#/components/parameters/AssignmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Clock-in recorded and current time state returned.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /assignments/{assignment}/clock-out:
+    post:
+      tags: [Timesheets]
+      operationId: clockOutAssignment
+      x-implementation-status: available
+      parameters:
+        - $ref: '#/components/parameters/AssignmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Clock-out recorded and current time state returned.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /assignments/{assignment}/time:
+    put:
+      tags: [Timesheets]
+      operationId: updateAssignmentTime
+      x-implementation-status: available
+      parameters:
+        - $ref: '#/components/parameters/AssignmentId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                actual_clock_in_at:
+                  type: [string, 'null']
+                actual_finish_at:
+                  type: [string, 'null']
+                optional_note:
+                  type: [string, 'null']
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Corrected time state returned.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /availability:
     get:
       tags: [Availability]
@@ -436,7 +495,7 @@ paths:
     get:
       tags: [Timesheets]
       operationId: listTimesheets
-      x-implementation-status: planned
+      x-implementation-status: available
       responses:
         '200':
           description: Timesheets and invoice readiness returned.
@@ -455,7 +514,7 @@ paths:
     get:
       tags: [Timesheets]
       operationId: listInvoices
-      x-implementation-status: planned
+      x-implementation-status: available
       parameters:
         - $ref: '#/components/parameters/Cursor'
         - $ref: '#/components/parameters/Limit'
@@ -479,7 +538,7 @@ paths:
     get:
       tags: [Timesheets]
       operationId: showInvoice
-      x-implementation-status: planned
+      x-implementation-status: available
       parameters:
         - $ref: '#/components/parameters/InvoiceId'
       responses:
@@ -500,7 +559,7 @@ paths:
     get:
       tags: [Contracts]
       operationId: listContracts
-      x-implementation-status: planned
+      x-implementation-status: available
       responses:
         '200':
           description: Contracts relevant to the current crew member returned.
@@ -515,6 +574,42 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/Contract'
+  /contracts/{contract}/sign:
+    post:
+      tags: [Contracts]
+      operationId: signContract
+      x-implementation-status: available
+      parameters:
+        - name: contract
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signed_name, accept_contract, password]
+              properties:
+                signed_name:
+                  type: string
+                  maxLength: 255
+                accept_contract:
+                  type: boolean
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          $ref: '#/components/responses/EmptySuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
   /documents:
     get:
       tags: [Documents]
@@ -1181,6 +1276,14 @@ components:
         total:
           type: [string, 'null']
           pattern: '^\d+\.\d{2}$'
+        actual_clock_in_at:
+          type: [string, 'null']
+          format: date-time
+        actual_finish_at:
+          type: [string, 'null']
+          format: date-time
+        locked:
+          type: boolean
     InvoiceSummary:
       type: object
       required: [id, invoice_number, status, total, submitted_at]
@@ -1189,7 +1292,7 @@ components:
           type: string
           format: uuid
         invoice_number:
-          type: string
+          type: [string, 'null']
         status:
           type: string
           enum: [draft, pending_payment, approved, exported, paid]
@@ -1197,7 +1300,7 @@ components:
           type: string
           pattern: '^\d+\.\d{2}$'
         submitted_at:
-          type: string
+          type: [string, 'null']
           format: date-time
         paid_at:
           type: [string, 'null']

@@ -215,6 +215,14 @@ trust based: there is no crew submission or administrator approval step.
 Administrators can monitor all completed records and see internal discrepancy
 flags without blocking normal invoicing.
 
+The versioned crew API supports owned-assignment clock-in, clock-out and manual
+time correction using the existing audited time actions. Safe retries return the
+already-recorded state, locked entries remain immutable, and another crew
+member's assignment is returned as not found. Timesheet and invoice endpoints
+only return the authenticated crew member's records. Invoice issuer snapshots
+remain encrypted at rest and API payment details expose only the last four
+digits of the BSB and account number.
+
 Live clock-in and clock-out are convenient but not mandatory, particularly for
 concerts. Every past published competition or concert assignment appears in My
 Timesheets even when one or both times were not recorded live. Missing times are
