@@ -11,10 +11,12 @@ signing, Competition object browsing, the Concert/media domain, public Concert
 access, staff studio/concert management, local demonstration data and
 maintenance behavior.
 
-Browser playback has also been manually checked on desktop and mobile across
-multiple browsers. The current playlist advances automatically without closing
-the active player. Production-like S3 or CloudFront delivery still requires
-separate playback, seeking and failure-state validation.
+Playwright regression tests exercise the public booking form and Concert
+playlist in desktop and mobile Chromium. They use Sail's dedicated `testing`
+MySQL database, which is recreated and populated with fictional
+local-development data before each run. The normal development database is not
+modified. Production-like S3 or CloudFront delivery still requires separate
+playback, seeking and failure-state validation.
 
 ## Scope
 
@@ -29,6 +31,17 @@ If routes changed, also run:
 ```bash
 sail artisan route:list
 ```
+
+For JavaScript-heavy browser workflows, install Chromium once and run:
+
+```bash
+sail npm run test:browser:install
+sail npm run test:browser
+```
+
+The browser suite builds production assets before starting Laravel and does
+not use the normal application database. Add focused browser coverage when a
+workflow depends materially on client-side state or event handling.
 
 Initial baseline coverage should include:
 
@@ -50,8 +63,10 @@ Current Concert production-readiness coverage should include:
 - Program and cover upload validation.
 - Existing password, approval, availability, playlist and download behavior
   does not regress.
-- Manual desktop and mobile checks for playback, seeking, fullscreen item
-  transitions, final-item behavior and delivery failures.
+- Automated desktop and mobile Chromium checks for booking-form conditional
+  fields and Concert playlist selection.
+- Manual checks for playback, seeking, fullscreen item transitions, final-item
+  behavior and production delivery failures.
 
 ## Links to Related Documentation
 
