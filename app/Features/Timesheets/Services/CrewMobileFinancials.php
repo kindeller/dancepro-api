@@ -7,20 +7,27 @@ use App\Features\Scheduling\Models\SchedulingShiftAssignment;
 use App\Features\Scheduling\Services\PaymentPreviewCalculator;
 use App\Features\Timesheets\Models\CrewInvoice;
 use Illuminate\Contracts\Pagination\CursorPaginator;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
 
 class CrewMobileFinancials
 {
     public function __construct(private readonly PaymentPreviewCalculator $calculator) {}
 
-    public function timesheets(CrewProfile $profile): Collection
+    public function timesheets(CrewProfile $profile, int $limit, array $filters): CursorPaginator
     {
         return SchedulingShiftAssignment::query()
-            ->where('crew_profile_id', $profile->id)->where('status', 'published')
-            ->whereHas('shift', fn ($query) => $query->whereDate('shift_date', '<=', today()))
+            ->select('scheduling_shift_assignments.*')
+            ->addSelect('scheduling_shifts.shift_date as cursor_shift_date')
+            ->join('scheduling_shifts', 'scheduling_shifts.id', '=', 'scheduling_shift_assignments.scheduling_shift_id')
+            ->where('scheduling_shift_assignments.crew_profile_id', $profile->id)
+            ->where('scheduling_shift_assignments.status', 'published')
+            ->whereDate('scheduling_shifts.shift_date', '<=', today())
+            ->when($filters['from'] ?? null, fn (Builder $query, string $from) => $query->whereDate('scheduling_shifts.shift_date', '>=', $from))
+            ->when($filters['to'] ?? null, fn (Builder $query, string $to) => $query->whereDate('scheduling_shifts.shift_date', '<=', $to))
+            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $this->filterTimesheetStatus($query, $status))
             ->with(['shift.schedulingEvent', 'role', 'allowances', 'timeEntry.invoiceLine'])
-            ->get()->sortByDesc(fn ($assignment) => $assignment->shift->shift_date)
-            ->map(fn (SchedulingShiftAssignment $assignment): array => $this->timesheetResource($assignment))->values();
+            ->orderByDesc('cursor_shift_date')->orderByDesc('scheduling_shift_assignments.id')
+            ->cursorPaginate($limit);
     }
 
     public function invoices(CrewProfile $profile, int $limit): CursorPaginator
@@ -74,7 +81,7 @@ class CrewMobileFinancials
         ];
     }
 
-    private function timesheetResource(SchedulingShiftAssignment $assignment): array
+    public function timesheetResource(SchedulingShiftAssignment $assignment): array
     {
         $entry = $assignment->timeEntry;
         $preview = $this->calculator->execute($assignment);
@@ -95,6 +102,24 @@ class CrewMobileFinancials
             'locked' => $entry?->locked_at !== null,
             'total' => $preview['total'] !== null ? $this->money($preview['total']) : null,
         ];
+    }
+
+    private function filterTimesheetStatus(Builder $query, string $status): void
+    {
+        match ($status) {
+            'invoiced' => $query->whereHas('timeEntry.invoiceLine'),
+            'externally_invoiced' => $query->whereDoesntHave('timeEntry.invoiceLine')
+                ->whereHas('timeEntry', fn (Builder $entry) => $entry->where('approval_status', 'externally_invoiced')),
+            'ready_to_invoice' => $query->whereDoesntHave('timeEntry.invoiceLine')
+                ->whereHas('timeEntry', fn (Builder $entry) => $entry
+                    ->whereNotNull('actual_clock_in_at')->whereNotNull('actual_finish_at')
+                    ->where(fn (Builder $approval) => $approval->whereNull('approval_status')->orWhere('approval_status', '!=', 'externally_invoiced'))),
+            'draft' => $query->whereDoesntHave('timeEntry.invoiceLine')
+                ->where(fn (Builder $assignment) => $assignment->whereDoesntHave('timeEntry')
+                    ->orWhereHas('timeEntry', fn (Builder $entry) => $entry
+                        ->where(fn (Builder $approval) => $approval->whereNull('approval_status')->orWhere('approval_status', '!=', 'externally_invoiced'))
+                        ->where(fn (Builder $time) => $time->whereNull('actual_clock_in_at')->orWhereNull('actual_finish_at')))),
+        };
     }
 
     private function money(mixed $amount): string

@@ -3,6 +3,7 @@
 namespace App\Features\Timesheets\Controllers;
 
 use App\Features\Timesheets\Models\CrewInvoice;
+use App\Features\Timesheets\Requests\ListCrewMobileTimesheetsRequest;
 use App\Features\Timesheets\Services\CrewMobileFinancials;
 use App\Http\Controllers\Controller;
 use App\Shared\Responses\ApiResponse;
@@ -11,9 +12,18 @@ use Illuminate\Http\Request;
 
 class CrewMobileFinancialController extends Controller
 {
-    public function timesheets(Request $request, CrewMobileFinancials $financials): JsonResponse
+    public function timesheets(ListCrewMobileTimesheetsRequest $request, CrewMobileFinancials $financials): JsonResponse
     {
-        return ApiResponse::success('Timesheets returned.', $financials->timesheets($request->user()->crewProfile));
+        $page = $financials->timesheets(
+            $request->user()->crewProfile,
+            $request->integer('limit', 25),
+            $request->validated(),
+        );
+
+        return ApiResponse::success('Timesheets returned.', collect($page->items())->map($financials->timesheetResource(...)), meta: [
+            'next_cursor' => $page->nextCursor()?->encode(),
+            'has_more' => $page->hasMorePages(),
+        ]);
     }
 
     public function invoices(Request $request, CrewMobileFinancials $financials): JsonResponse

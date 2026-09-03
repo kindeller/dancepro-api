@@ -69,6 +69,47 @@ class CrewMobileFinancialApiTest extends TestCase
         $this->getJson('/api/v1/invoices/'.$otherInvoice->uuid)->assertNotFound();
     }
 
+    public function test_timesheet_history_supports_cursor_pagination_and_date_and_status_filters(): void
+    {
+        [, $profile] = $this->authenticatedCrew();
+        $draft = $this->assignment($profile, today()->subDay());
+        $ready = $this->assignment($profile, today()->subDays(2));
+        $readyDate = $ready->shift->shift_date->toDateString();
+        $ready->timeEntry()->create(['actual_clock_in_at' => "{$readyDate} 08:00:00", 'actual_finish_at' => "{$readyDate} 10:00:00"]);
+        $invoiced = $this->assignment($profile, today()->subDays(3));
+        $invoicedDate = $invoiced->shift->shift_date->toDateString();
+        $entry = $invoiced->timeEntry()->create(['actual_clock_in_at' => "{$invoicedDate} 08:00:00", 'actual_finish_at' => "{$invoicedDate} 10:00:00"]);
+        $invoice = CrewInvoice::query()->create([
+            'crew_profile_id' => $profile->id, 'period_start' => $invoicedDate, 'period_end' => $invoicedDate,
+            'status' => 'draft', 'subtotal' => 1, 'allowance_total' => 0, 'total' => 1, 'superable_total' => 1,
+        ]);
+        $invoice->lines()->create(['assignment_time_entry_id' => $entry->id, 'snapshot' => [], 'base_amount' => 1, 'allowance_amount' => 0, 'line_total' => 1]);
+        $external = $this->assignment($profile, today()->subDays(4));
+        $externalDate = $external->shift->shift_date->toDateString();
+        $external->timeEntry()->create([
+            'actual_clock_in_at' => "{$externalDate} 08:00:00", 'actual_finish_at' => "{$externalDate} 10:00:00",
+            'approval_status' => 'externally_invoiced',
+        ]);
+
+        $firstPage = $this->getJson('/api/v1/timesheets?limit=1')->assertOk()
+            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $draft->uuid)
+            ->assertJsonPath('meta.has_more', true);
+        $cursor = urlencode($firstPage->json('meta.next_cursor'));
+        $this->getJson("/api/v1/timesheets?limit=1&cursor={$cursor}")->assertOk()
+            ->assertJsonPath('data.0.id', $ready->uuid);
+
+        $this->getJson('/api/v1/timesheets?status=ready_to_invoice')->assertOk()
+            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $ready->uuid);
+        foreach (['draft' => $draft, 'invoiced' => $invoiced, 'externally_invoiced' => $external] as $status => $expected) {
+            $this->getJson("/api/v1/timesheets?status={$status}")->assertOk()
+                ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $expected->uuid);
+        }
+        $this->getJson('/api/v1/timesheets?from='.today()->subDays(2)->toDateString().'&to='.today()->subDay()->toDateString())
+            ->assertOk()->assertJsonCount(2, 'data')->assertJsonMissing(['id' => $invoiced->uuid]);
+        $this->getJson('/api/v1/timesheets?from=2026-01-02&to=2026-01-01')->assertUnprocessable();
+        $this->getJson('/api/v1/timesheets?status=unknown')->assertUnprocessable();
+    }
+
     public function test_crew_can_list_and_securely_sign_an_active_contract_during_onboarding(): void
     {
         [$user, $profile] = $this->authenticatedCrew(false);
@@ -116,11 +157,12 @@ class CrewMobileFinancialApiTest extends TestCase
         ]);
     }
 
-    private function assignment(CrewProfile $profile)
+    private function assignment(CrewProfile $profile, mixed $date = null)
     {
+        $shiftDate = $date ?? today()->subDay();
         $role = CrewRole::query()->firstOrCreate(['code' => 'competition-videographer'], ['name' => 'Videographer', 'event_type' => 'competition', 'is_active' => true]);
-        $event = SchedulingEvent::query()->create(['name' => 'Past Event '.Str::random(4), 'event_type' => 'competition', 'event_date' => today()->subDay()]);
-        $shift = $event->shifts()->create(['shift_date' => today()->subDay(), 'period' => 'morning', 'posted_arrival_at' => now()->subDay()->setTime(8, 0)]);
+        $event = SchedulingEvent::query()->create(['name' => 'Past Event '.Str::random(4), 'event_type' => 'competition', 'event_date' => $shiftDate]);
+        $shift = $event->shifts()->create(['shift_date' => $shiftDate, 'period' => 'morning', 'posted_arrival_at' => $shiftDate->copy()->setTime(8, 0)]);
 
         return $shift->assignments()->create(['crew_profile_id' => $profile->id, 'crew_role_id' => $role->id, 'status' => 'published']);
     }

@@ -606,6 +606,12 @@ paths:
       tags: [Timesheets]
       operationId: listTimesheets
       x-implementation-status: available
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/TimesheetFrom'
+        - $ref: '#/components/parameters/TimesheetTo'
+        - $ref: '#/components/parameters/TimesheetStatus'
       responses:
         '200':
           description: Timesheets and invoice readiness returned.
@@ -620,6 +626,8 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/Timesheet'
+                      meta:
+                        $ref: '#/components/schemas/CursorMeta'
   /invoices:
     get:
       tags: [Timesheets]
@@ -941,6 +949,24 @@ components:
       schema:
         type: string
         format: uuid
+    TimesheetFrom:
+      name: from
+      in: query
+      schema:
+        type: string
+        format: date
+    TimesheetTo:
+      name: to
+      in: query
+      schema:
+        type: string
+        format: date
+    TimesheetStatus:
+      name: status
+      in: query
+      schema:
+        type: string
+        enum: [draft, ready_to_invoice, externally_invoiced, invoiced]
   responses:
     AuthenticationResponse:
       description: Authentication succeeded.

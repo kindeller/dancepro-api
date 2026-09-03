@@ -234,6 +234,9 @@ member's assignment is returned as not found. Timesheet and invoice endpoints
 only return the authenticated crew member's records. Invoice issuer snapshots
 remain encrypted at rest and API payment details expose only the last four
 digits of the BSB and account number.
+Mobile timesheet history is cursor paginated and can be narrowed by inclusive
+date range or its calculated draft, ready-to-invoice, externally invoiced or
+invoiced status.
 
 Live clock-in and clock-out are convenient but not mandatory, particularly for
 concerts. Every past published competition or concert assignment appears in My
