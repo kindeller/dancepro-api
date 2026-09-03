@@ -564,7 +564,9 @@ Application validation must ensure:
 one and only one owner is set
 ```
 
-A database check constraint may be added later after compatibility is confirmed.
+Database-level enforcement is required. MySQL-compatible databases use a check
+constraint, while SQLite uses equivalent insert and owner-update triggers because
+SQLite cannot add a named check constraint after table creation.
 
 ## 8.3 Proposed schema
 
