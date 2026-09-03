@@ -332,6 +332,11 @@ will reach the owner.
 Also confirm `public/build/manifest.json` exists and that the public concert
 player loads without a missing-manifest or missing-asset error.
 
+The concert player lazy-loads the HLS.js light build only when the browser does
+not provide native HLS playback. Keep the generated HLS chunk below Vite's
+500 kB warning threshold and retain the progressive MP4 fallback when changing
+player dependencies.
+
 Verify:
 
 - Production environment

@@ -1,5 +1,3 @@
-import Hls from 'hls.js';
-
 const player = document.querySelector('#concert-player');
 const items = [...document.querySelectorAll('.playlist-item')];
 
@@ -36,7 +34,7 @@ if (player && items.length > 0) {
         }
     }
 
-    function useHlsSource(source, autoplay) {
+    async function useHlsSource(source, autoplay, request) {
         destroyHls();
         activeFallbackUrl = source.fallback_url;
         fallbackInProgress = false;
@@ -50,6 +48,12 @@ if (player && items.length > 0) {
                 player.play().catch(() => {});
             }
 
+            return;
+        }
+
+        const { default: Hls } = await import('hls.js/light');
+
+        if (request !== playbackRequest) {
             return;
         }
 
@@ -117,7 +121,7 @@ if (player && items.length > 0) {
             }
 
             if (payload.data.format === 'hls') {
-                useHlsSource(payload.data, autoplay);
+                await useHlsSource(payload.data, autoplay, request);
             } else {
                 useProgressiveSource(payload.data.url, autoplay);
             }
