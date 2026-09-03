@@ -25,6 +25,8 @@ class FinishTeamAssignments
                 'type' => 'shift_finished_by_team_leader',
                 'title' => 'Shift finished by Team Leader',
                 'message' => 'Your finish time was recorded as '.Carbon::parse($finish)->format('g:i a').'. You can correct it if needed.',
+                'destination_type' => 'assignment',
+                'destination_id' => $assignment->uuid,
             ]);
             $finished++;
         }

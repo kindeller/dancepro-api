@@ -24,7 +24,7 @@ class PublishRoster
             foreach ($event->shifts->flatMap->assignments as $assignment) {
                 $assignment->update(['status' => 'published', 'acknowledgement_status' => 'not_acknowledged', 'acknowledged_at' => null, 'published_at' => now(), 'notified_at' => now()]);
                 $assignment->loadMissing(['crewProfile.user', 'shift', 'role']);
-                CrewNotification::query()->create(['user_id' => $assignment->crewProfile->user_id, 'type' => 'shift_allocation', 'title' => 'New shift allocation', 'message' => "{$event->name}: {$assignment->role->name} on {$assignment->shift->shift_date->format('D j M')}. Please acknowledge the shift."]);
+                CrewNotification::query()->create(['user_id' => $assignment->crewProfile->user_id, 'type' => 'shift_allocation', 'title' => 'New shift allocation', 'message' => "{$event->name}: {$assignment->role->name} on {$assignment->shift->shift_date->format('D j M')}. Please acknowledge the shift.", 'destination_type' => 'assignment', 'destination_id' => $assignment->uuid]);
                 $assignment->shift->availabilityResponses()->where('crew_profile_id', $assignment->crew_profile_id)->update(['locked_at' => now()]);
             }
             $event->update(['availability_status' => 'closed', 'roster_status' => 'published', 'roster_published_at' => now()]);

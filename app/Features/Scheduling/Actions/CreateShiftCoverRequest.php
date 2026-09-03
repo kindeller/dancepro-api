@@ -48,6 +48,8 @@ class CreateShiftCoverRequest
                     'type' => 'cover_request',
                     'title' => 'Cover requested',
                     'message' => "{$requester->preferred_name} is looking for cover for {$assignment->shift->schedulingEvent->name} on {$assignment->shift->shift_date->format('D j M')}.{$personalText}",
+                    'destination_type' => 'cover_request',
+                    'destination_id' => $coverRequest->uuid,
                 ]);
             }
 

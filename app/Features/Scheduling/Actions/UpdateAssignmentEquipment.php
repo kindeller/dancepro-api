@@ -27,7 +27,7 @@ class UpdateAssignmentEquipment
         if ($assignment->status === 'published') {
             $assignment->update(['acknowledgement_status' => 'reset_by_material_change', 'acknowledged_at' => null, 'notified_at' => now()]);
             $event->update(['roster_status' => 'changed']);
-            CrewNotification::query()->create(['user_id' => $assignment->crewProfile->user_id, 'type' => 'shift_changed', 'title' => 'Equipment responsibility updated', 'message' => "{$event->name}: your equipment or media responsibility changed. Please review and acknowledge the shift again."]);
+            CrewNotification::query()->create(['user_id' => $assignment->crewProfile->user_id, 'type' => 'shift_changed', 'title' => 'Equipment responsibility updated', 'message' => "{$event->name}: your equipment or media responsibility changed. Please review and acknowledge the shift again.", 'destination_type' => 'assignment', 'destination_id' => $assignment->uuid]);
         }
     }
 }

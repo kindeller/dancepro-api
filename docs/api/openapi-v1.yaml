@@ -20,6 +20,7 @@ tags:
   - name: Profile
   - name: Chat
   - name: Notifications
+  - name: App Configuration
   - name: Timesheets
   - name: Contracts
   - name: Documents
@@ -27,6 +28,16 @@ tags:
 security:
   - bearerAuth: []
 paths:
+  /app-config:
+    get:
+      tags: [App Configuration]
+      security: []
+      operationId: mobileAppConfig
+      x-implementation-status: available
+      summary: Return public mobile version, maintenance and support configuration
+      responses:
+        '200':
+          description: App configuration returned.
   /auth/login:
     post:
       tags: [Authentication]
@@ -51,6 +62,37 @@ paths:
           $ref: '#/components/responses/ValidationError'
         '429':
           $ref: '#/components/responses/RateLimited'
+  /push-devices:
+    post:
+      tags: [Notifications]
+      operationId: registerPushDevice
+      x-implementation-status: available
+      summary: Register or rotate the current installation's encrypted push token
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Redacted push-device registration returned.
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /push-devices/{device}:
+    delete:
+      tags: [Notifications]
+      operationId: removePushDevice
+      x-implementation-status: available
+      parameters:
+        - name: device
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          $ref: '#/components/responses/EmptySuccess'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /auth/logout:
     post:
       tags: [Authentication]
@@ -1980,7 +2022,7 @@ components:
           format: uri
     Notification:
       type: object
-      required: [id, type, title, message, created_at, read, allowed_actions]
+      required: [id, type, title, message, destination, created_at, read, allowed_actions]
       properties:
         id:
           type: string
@@ -1991,8 +2033,10 @@ components:
           type: string
         message:
           type: string
-        deep_link:
-          type: [string, 'null']
+        destination:
+          oneOf:
+            - $ref: '#/components/schemas/NotificationDestination'
+            - type: 'null'
         created_at:
           type: string
           format: date-time
@@ -2004,6 +2048,16 @@ components:
           items:
             type: string
             enum: [mark_read]
+    NotificationDestination:
+      type: object
+      required: [type, id]
+      properties:
+        type:
+          type: string
+          enum: [assignment, availability, cover_request, chat, timesheet, invoice, contract, training_course]
+        id:
+          type: [string, 'null']
+          format: uuid
     DirectChatReference:
       type: object
       required: [id, kind, title]

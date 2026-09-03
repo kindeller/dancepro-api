@@ -47,6 +47,7 @@ class UpdateEventCrewAssignment
         CrewNotification::query()->create([
             'user_id' => $assignment->crewProfile->user_id, 'type' => 'shift_allocation', 'title' => $title,
             'message' => "{$assignment->shift->schedulingEvent->name}: {$assignment->role->name} on {$assignment->shift->shift_date->format('D j M')}. Please acknowledge the shift.",
+            'destination_type' => 'assignment', 'destination_id' => $assignment->uuid,
         ]);
         $assignment->shift->availabilityResponses()->where('crew_profile_id', $assignment->crew_profile_id)->update(['locked_at' => now()]);
     }

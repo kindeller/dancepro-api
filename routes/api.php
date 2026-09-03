@@ -11,6 +11,8 @@ use App\Features\Crew\Controllers\CrewMobileDashboardController;
 use App\Features\Crew\Controllers\CrewMobileDirectoryController;
 use App\Features\Crew\Controllers\CrewMobileProfileController;
 use App\Features\Downloads\Controllers\DownloadLinkController;
+use App\Features\Notifications\Controllers\CrewMobileAppConfigController;
+use App\Features\Notifications\Controllers\CrewMobilePushDeviceController;
 use App\Features\Operations\Controllers\CrewMobileDocumentController;
 use App\Features\Operations\Controllers\CrewMobileHandbookController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentActionController;
@@ -50,6 +52,8 @@ Route::prefix('v1/auth')->group(function (): void {
     });
 });
 
+Route::get('v1/app-config', CrewMobileAppConfigController::class)->middleware('throttle:public-catalogue');
+
 Route::prefix('v1')->middleware([
     'auth:sanctum',
     'abilities:'.TokenAbility::CrewMobile->value,
@@ -61,6 +65,8 @@ Route::prefix('v1')->middleware([
     Route::put('profile/password', [CrewMobileProfileController::class, 'changePassword'])
         ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
     Route::get('contracts', [CrewMobileContractController::class, 'index']);
+    Route::post('push-devices', [CrewMobilePushDeviceController::class, 'store'])->middleware('api.idempotency');
+    Route::delete('push-devices/{device}', [CrewMobilePushDeviceController::class, 'destroy'])->middleware('api.idempotency');
     Route::post('contracts/{contract}/sign', [CrewMobileContractController::class, 'sign'])
         ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
 

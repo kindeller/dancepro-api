@@ -36,6 +36,8 @@ class PostEventMessage
                         'type' => 'event_announcement',
                         'title' => 'Important update: '.$event->name,
                         'message' => $message->body ?: 'A new event attachment needs your acknowledgement.',
+                        'destination_type' => 'chat',
+                        'destination_id' => $event->uuid,
                     ]);
                 }
             }

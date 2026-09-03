@@ -32,7 +32,7 @@ class CrewMobileNotificationController extends Controller
             'type' => $notification->type,
             'title' => $notification->title,
             'message' => $notification->message,
-            'deep_link' => null,
+            'destination' => $notification->destination(),
             'created_at' => $notification->created_at->toIso8601String(),
             'read' => $notification->read_at !== null,
             'allowed_actions' => $notification->read_at === null ? ['mark_read'] : [],

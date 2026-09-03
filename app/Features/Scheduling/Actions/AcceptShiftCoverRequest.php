@@ -45,21 +45,21 @@ class AcceptShiftCoverRequest
             $otherRecipients = $lockedRequest->recipients()->whereKeyNot($recipient->id)->with('crewProfile')->get();
             $lockedRequest->recipients()->whereKeyNot($recipient->id)->update(['status' => 'closed', 'responded_at' => now()]);
 
-            $this->notify($replacement->user_id, 'Cover confirmed', "You are now assigned to {$assignment->shift->schedulingEvent->name} on {$assignment->shift->shift_date->format('D j M')}. Please acknowledge the shift.");
-            $this->notify($originalCrew->user_id, 'Cover confirmed', "{$replacement->preferred_name} is now covering your {$assignment->shift->schedulingEvent->name} shift on {$assignment->shift->shift_date->format('D j M')}.");
+            $this->notify($replacement->user_id, 'Cover confirmed', "You are now assigned to {$assignment->shift->schedulingEvent->name} on {$assignment->shift->shift_date->format('D j M')}. Please acknowledge the shift.", $lockedRequest->uuid);
+            $this->notify($originalCrew->user_id, 'Cover confirmed', "{$replacement->preferred_name} is now covering your {$assignment->shift->schedulingEvent->name} shift on {$assignment->shift->shift_date->format('D j M')}.", $lockedRequest->uuid);
             foreach ($otherRecipients as $other) {
-                $this->notify($other->crewProfile->user_id, 'Cover request filled', "The {$assignment->shift->schedulingEvent->name} cover request has been filled by another crew member.");
+                $this->notify($other->crewProfile->user_id, 'Cover request filled', "The {$assignment->shift->schedulingEvent->name} cover request has been filled by another crew member.", $lockedRequest->uuid);
             }
-            User::query()->where('is_active', true)->where('is_admin', true)->each(function (User $user) use ($assignment, $originalCrew, $replacement): void {
-                $this->notify($user->id, 'Crew cover completed', "{$replacement->preferred_name} replaced {$originalCrew->preferred_name} for {$assignment->shift->schedulingEvent->name} on {$assignment->shift->shift_date->format('D j M')}.");
+            User::query()->where('is_active', true)->where('is_admin', true)->each(function (User $user) use ($assignment, $originalCrew, $replacement, $lockedRequest): void {
+                $this->notify($user->id, 'Crew cover completed', "{$replacement->preferred_name} replaced {$originalCrew->preferred_name} for {$assignment->shift->schedulingEvent->name} on {$assignment->shift->shift_date->format('D j M')}.", $lockedRequest->uuid);
             });
 
             return $assignment->fresh();
         });
     }
 
-    private function notify(int $userId, string $title, string $message): void
+    private function notify(int $userId, string $title, string $message, string $coverRequestUuid): void
     {
-        CrewNotification::query()->create(['user_id' => $userId, 'type' => 'cover_request', 'title' => $title, 'message' => $message]);
+        CrewNotification::query()->create(['user_id' => $userId, 'type' => 'cover_request', 'title' => $title, 'message' => $message, 'destination_type' => 'cover_request', 'destination_id' => $coverRequestUuid]);
     }
 }
