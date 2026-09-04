@@ -2,12 +2,14 @@
 
 namespace App\Features\Scheduling\Controllers;
 
-use App\Features\Operations\Services\OperationsFileStorage;
 use App\Features\Scheduling\Models\SchedulingShiftAssignment;
+use App\Features\Scheduling\Services\CrewMobileAssignmentFiles;
 use App\Features\Scheduling\Services\CrewMobileAssignments;
 use App\Http\Controllers\Controller;
+use App\Shared\Responses\ApiResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CrewMobileAssignmentFileController extends Controller
@@ -17,21 +19,32 @@ class CrewMobileAssignmentFileController extends Controller
         SchedulingShiftAssignment $assignment,
         string $kind,
         CrewMobileAssignments $assignments,
-        OperationsFileStorage $files,
+        CrewMobileAssignmentFiles $files,
     ): StreamedResponse {
         $assignment = $assignments->findOwned($request->user()->crewProfile, $assignment);
-        $event = $assignment->shift->schedulingEvent;
-        $venue = $event->venue;
 
-        [$disk, $path, $name] = match ($kind) {
-            'programme' => [$files->disk(), $event->programme_path, $event->name.' programme'],
-            'venue-map' => [$files->disk(), $venue?->map_path, ($venue?->name ?? 'Venue').' map'],
-            'venue-reference' => [Storage::disk(config('uploads.public_disk')), $venue?->reference_image_path, ($venue?->name ?? 'Venue').' reference'],
-            default => abort(404),
-        };
+        return $files->response($assignment, $kind);
+    }
 
-        abort_unless(filled($path) && $disk->exists($path), 404);
+    public function download(Request $request, SchedulingShiftAssignment $assignment, string $kind, CrewMobileAssignments $assignments, CrewMobileAssignmentFiles $files): JsonResponse
+    {
+        $assignment = $assignments->findOwned($request->user()->crewProfile, $assignment);
+        $download = $files->issue($assignment, $kind);
+        Log::info('Mobile assignment file download issued.', [
+            'user_id' => $request->user()->id,
+            'assignment_uuid' => $assignment->uuid,
+            'file_kind' => $kind,
+            'expires_at' => $download['expires_at'],
+        ]);
 
-        return $disk->response($path, $name, ['Cache-Control' => 'private, no-store'], 'inline');
+        return ApiResponse::success('Temporary assignment file download issued.', $download)
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function content(SchedulingShiftAssignment $assignment, string $kind, CrewMobileAssignmentFiles $files): StreamedResponse
+    {
+        abort_unless($assignment->status === 'published', 404);
+
+        return $files->response($assignment, $kind);
     }
 }

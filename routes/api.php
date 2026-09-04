@@ -66,6 +66,10 @@ Route::prefix('v1/auth')->group(function (): void {
 });
 
 Route::get('v1/app-config', CrewMobileAppConfigController::class)->middleware('throttle:public-catalogue');
+Route::get('v1/assignment-files/{assignment}/{kind}/content', [CrewMobileAssignmentFileController::class, 'content'])
+    ->whereIn('kind', ['programme', 'venue-map', 'venue-reference'])
+    ->middleware('signed')
+    ->name('api.v1.assignment-files.content');
 
 Route::prefix('v1')->middleware([
     'auth:sanctum',
@@ -78,6 +82,8 @@ Route::prefix('v1')->middleware([
     Route::put('profile/password', [CrewMobileProfileController::class, 'changePassword'])
         ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
     Route::get('address-search', CrewMobileAddressController::class)->middleware('throttle:address-search');
+    Route::get('address-search/{placeId}', [CrewMobileAddressController::class, 'resolve'])
+        ->middleware('throttle:address-search');
     Route::get('contracts', [CrewMobileContractController::class, 'index']);
     Route::post('push-devices', [CrewMobilePushDeviceController::class, 'store'])->middleware('api.idempotency');
     Route::delete('push-devices/{device}', [CrewMobilePushDeviceController::class, 'destroy'])->middleware('api.idempotency');
@@ -91,6 +97,10 @@ Route::prefix('v1')->middleware([
         Route::get('assignments/{assignment}/files/{kind}', CrewMobileAssignmentFileController::class)
             ->whereIn('kind', ['programme', 'venue-map', 'venue-reference'])
             ->name('api.v1.assignments.files.show');
+        Route::post('assignments/{assignment}/files/{kind}/download', [CrewMobileAssignmentFileController::class, 'download'])
+            ->whereIn('kind', ['programme', 'venue-map', 'venue-reference'])
+            ->middleware('api.idempotency')
+            ->name('api.v1.assignments.files.download');
         Route::get('cover-requests', [CrewMobileCoverRequestController::class, 'index']);
         Route::post('assignments/{assignment}/cover-requests', [CrewMobileCoverRequestController::class, 'store'])->middleware('api.idempotency');
         Route::post('cover-requests/{coverRequest}/accept', [CrewMobileCoverRequestController::class, 'accept'])->middleware('api.idempotency');
@@ -124,7 +134,8 @@ Route::prefix('v1')->middleware([
         Route::post('assignments/{assignment}/finish-team', [CrewMobileTimeController::class, 'finishTeam'])->middleware('api.idempotency');
         Route::get('documents', [CrewMobileDocumentController::class, 'index']);
         Route::get('handbook', CrewMobileHandbookController::class);
-        Route::post('documents/{document}/download', [CrewMobileDocumentController::class, 'download']);
+        Route::post('documents/{document}/download', [CrewMobileDocumentController::class, 'download'])
+            ->name('api.v1.documents.download');
         Route::get('documents/{document}/content', [CrewMobileDocumentController::class, 'content'])
             ->middleware('signed')->name('api.v1.documents.content');
         Route::get('training', CrewMobileTrainingController::class);

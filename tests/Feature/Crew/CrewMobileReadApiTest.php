@@ -15,6 +15,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -87,24 +88,61 @@ class CrewMobileReadApiTest extends TestCase
             ->assertJsonPath('data.venue.operational_notes', 'Call on arrival.')
             ->assertJsonPath('data.documents.0.title', 'Photographer checklist');
 
+        $temporaryUrls = [];
         foreach (['data.programme_url', 'data.venue.map_url', 'data.venue.reference_image_url'] as $path) {
-            $this->get($response->json($path))->assertOk()->assertHeader('cache-control', 'no-store, private');
+            $issued = $this->withHeader('Idempotency-Key', (string) Str::uuid())
+                ->postJson($response->json($path))
+                ->assertOk()
+                ->assertHeader('cache-control', 'no-store, private')
+                ->assertJsonStructure(['data' => ['url', 'expires_at', 'mime_type', 'filename']]);
+            $temporaryUrls[] = $issued->json('data.url');
+            $this->get($issued->json('data.url'))->assertOk()->assertHeader('cache-control', 'no-store, private');
         }
+        $this->get('/api/v1/assignment-files/'.$assignment->uuid.'/programme/content')->assertForbidden();
+        $this->travel(11)->minutes();
+        $this->get($temporaryUrls[0])->assertForbidden();
+        $this->travelBack();
+
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/assignments/'.$this->assignmentFor($this->completeCrew(), 'Private files', today()->addDay()->toDateString())->uuid.'/files/programme/download')
+            ->assertNotFound();
     }
 
     public function test_address_search_is_authenticated_and_restricts_provider_results_to_australia(): void
     {
-        Http::fake(['maps.googleapis.com/*' => Http::response([
-            'status' => 'OK',
-            'predictions' => [['place_id' => 'place-1', 'description' => '1 Test Street, Perth WA, Australia']],
-        ])]);
+        Http::fake(fn ($request) => str_contains($request->url(), '/place/details/')
+            ? Http::response([
+                'status' => 'OK',
+                'result' => ['address_components' => [
+                    ['long_name' => '1', 'short_name' => '1', 'types' => ['street_number']],
+                    ['long_name' => 'Test Street', 'short_name' => 'Test St', 'types' => ['route']],
+                    ['long_name' => 'Perth', 'short_name' => 'Perth', 'types' => ['locality']],
+                    ['long_name' => 'Western Australia', 'short_name' => 'WA', 'types' => ['administrative_area_level_1']],
+                    ['long_name' => '6000', 'short_name' => '6000', 'types' => ['postal_code']],
+                    ['long_name' => 'Australia', 'short_name' => 'AU', 'types' => ['country']],
+                ]],
+            ])
+            : Http::response([
+                'status' => 'OK',
+                'predictions' => [['place_id' => 'place-1', 'description' => '1 Test Street, Perth WA, Australia']],
+            ]));
         config(['services.google_maps.server_key' => 'server-secret']);
         $this->authenticatedCrew();
 
         $this->getJson('/api/v1/address-search?q=1%20Test%20Street')
             ->assertOk()
-            ->assertJsonPath('data.0.id', 'place-1');
-        Http::assertSent(fn ($request): bool => $request['components'] === 'country:au' && $request['key'] === 'server-secret');
+            ->assertJsonPath('data.0.id', 'place-1')
+            ->assertJsonPath('data.0.label', '1 Test Street, Perth WA, Australia');
+        $this->getJson('/api/v1/address-search/place-1')
+            ->assertOk()
+            ->assertJsonPath('data.label', '1 Test Street, Perth WA 6000')
+            ->assertJsonPath('data.line_1', '1 Test Street')
+            ->assertJsonPath('data.line_2', null)
+            ->assertJsonPath('data.suburb', 'Perth')
+            ->assertJsonPath('data.state', 'WA')
+            ->assertJsonPath('data.postcode', '6000');
+        Http::assertSent(fn ($request): bool => ($request->data()['components'] ?? null) === 'country:au'
+            && ($request->data()['key'] ?? null) === 'server-secret');
     }
 
     public function test_directory_contains_only_active_records_and_no_admin_notes(): void

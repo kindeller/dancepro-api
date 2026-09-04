@@ -63,6 +63,8 @@ class CrewMobileDocuments
             'checksum' => $resource->file_checksum,
             'updated_at' => $resource->updated_at->toIso8601String(),
             'offline_allowed' => true,
+            'download_url' => route('api.v1.documents.download', $resource),
+            'download_method' => 'POST',
         ];
     }
 }

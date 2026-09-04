@@ -99,7 +99,47 @@ paths:
           required: true
           schema: { type: string, minLength: 3, maxLength: 200 }
       responses:
-        '200': { description: Up to ten suggestions returned. }
+        '200':
+          description: Up to ten suggestions returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        maxItems: 10
+                        items:
+                          $ref: '#/components/schemas/AddressSuggestion'
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /address-search/{placeId}:
+    get:
+      tags: [Profile]
+      operationId: resolveAustralianAddress
+      x-implementation-status: available
+      summary: Resolve a cached Google place identifier into structured Australian address fields
+      parameters:
+        - name: placeId
+          in: path
+          required: true
+          schema: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: Structured address returned, or null when unavailable or not Australian.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/ResolvedAddress'
+                          - type: 'null'
+        '422': { $ref: '#/components/responses/ValidationError' }
         '429': { $ref: '#/components/responses/RateLimited' }
   /app-config:
     get:
@@ -320,6 +360,35 @@ paths:
                         $ref: '#/components/schemas/AssignmentDetail'
         '404':
           $ref: '#/components/responses/NotFound'
+  /assignments/{assignment}/files/{kind}/download:
+    post:
+      tags: [Assignments]
+      operationId: issueAssignmentFileDownload
+      x-implementation-status: available
+      summary: Issue a ten-minute signed URL for one file on an assignment owned by the current crew member
+      parameters:
+        - $ref: '#/components/parameters/AssignmentId'
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [programme, venue-map, venue-reference]
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Temporary assignment-file download issued.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AssignmentFileDownload'
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /assignments/{assignment}/acknowledgement:
     put:
       tags: [Assignments]
@@ -1648,6 +1717,10 @@ components:
           properties:
             venue:
               $ref: '#/components/schemas/Venue'
+            programme_url:
+              type: [string, 'null']
+              format: uri
+              description: POST this authenticated action URL with an Idempotency-Key to issue a temporary download.
             crew_brief:
               type: [string, 'null']
             team_leader_notes:
@@ -1701,6 +1774,20 @@ components:
         name:
           type: string
         address:
+          type: [string, 'null']
+        map_url:
+          type: [string, 'null']
+          format: uri
+          description: POST action URL used to issue a temporary map download.
+        reference_image_url:
+          type: [string, 'null']
+          format: uri
+          description: POST action URL used to issue a temporary reference-image download.
+        parking_notes:
+          type: [string, 'null']
+        access_notes:
+          type: [string, 'null']
+        operational_notes:
           type: [string, 'null']
     ChecklistItem:
       type: object
@@ -1970,6 +2057,30 @@ components:
     Address:
       type: object
       properties:
+        line_1:
+          type: [string, 'null']
+        line_2:
+          type: [string, 'null']
+        suburb:
+          type: [string, 'null']
+        state:
+          type: [string, 'null']
+        postcode:
+          type: [string, 'null']
+    AddressSuggestion:
+      type: object
+      required: [id, label]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+    ResolvedAddress:
+      type: object
+      required: [label, line_1, line_2, suburb, state, postcode]
+      properties:
+        label:
+          type: string
         line_1:
           type: [string, 'null']
         line_2:
@@ -2267,7 +2378,7 @@ components:
             enum: [sign]
     Document:
       type: object
-      required: [id, title, mime_type, bytes, checksum, updated_at, offline_allowed]
+      required: [id, title, mime_type, bytes, checksum, updated_at, offline_allowed, download_url, download_method]
       properties:
         id:
           type: string
@@ -2287,6 +2398,26 @@ components:
           format: date-time
         offline_allowed:
           type: boolean
+        download_url:
+          type: string
+          format: uri
+        download_method:
+          type: string
+          const: POST
+    AssignmentFileDownload:
+      type: object
+      required: [url, expires_at, mime_type, filename]
+      properties:
+        url:
+          type: string
+          format: uri
+        expires_at:
+          type: string
+          format: date-time
+        mime_type:
+          type: string
+        filename:
+          type: string
     TemporaryDownload:
       type: object
       required: [url, expires_at, checksum]
