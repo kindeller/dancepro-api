@@ -2,6 +2,7 @@
 
 namespace App\Features\Deployment\Services;
 
+use App\Features\Operations\Services\UploadMalwareScanner;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -11,6 +12,8 @@ use RuntimeException;
 
 final class ProductionDependencyCheck
 {
+    public function __construct(private readonly UploadMalwareScanner $malwareScanner) {}
+
     /** @return list<string> */
     public function run(): array
     {
@@ -63,6 +66,11 @@ final class ProductionDependencyCheck
                 ->get();
         }
         $checks[] = 'queue';
+
+        if (config('operations.malware_scan.enabled')) {
+            $this->malwareScanner->assertAvailable();
+            $checks[] = 'upload malware scanner';
+        }
 
         return $checks;
     }

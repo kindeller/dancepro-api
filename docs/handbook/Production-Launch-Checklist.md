@@ -39,6 +39,15 @@ complete in the private deployment record.
 - [ ] Two-factor authentication is enabled and enforced.
 - [ ] Google Maps and other browser-facing keys are restricted to the production
   domains.
+- [ ] `GOOGLE_MAPS_SERVER_KEY` is stored server-side, restricted to the Places
+  API and the production server egress addresses, and mobile address search is
+  smoke-tested without exposing the key to the client.
+- [ ] The mobile support and privacy URLs are public HTTPS pages containing the
+  approved production information.
+- [ ] The mobile push gateway uses a stored bearer secret, valid HTTPS and the
+  production Firebase/APNs projects; invalid-token removal is smoke-tested.
+- [ ] ClamAV or a compatible clamd service is private to the application network,
+  current, supervised and configured through `UPLOAD_MALWARE_SCAN_*`.
 - [ ] No local-development credentials or fictional demo data are present.
 
 ## Data, media and recovery
@@ -89,6 +98,8 @@ php artisan schedule:list
 - [ ] Admin and non-admin crew access boundaries pass a production smoke test.
 - [ ] Booking, studio/competition contacts, email delivery, uploads and internal
   documents pass a production smoke test.
+- [ ] A standard test upload succeeds and an EICAR test file is rejected in an
+  isolated production verification using the approved security procedure.
 - [ ] Existing competition downloads and concert playback pass desktop and
   mobile playback, seeking and expiry tests.
 - [ ] A rollback owner, rollback tag and database-recovery decision are recorded.

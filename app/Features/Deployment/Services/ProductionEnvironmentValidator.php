@@ -85,6 +85,26 @@ final class ProductionEnvironmentValidator
             $errors,
         );
 
+        $this->require(filled(config('services.google_maps.server_key')), 'GOOGLE_MAPS_SERVER_KEY must be configured for mobile address search.', $errors);
+        $this->require(
+            parse_url((string) config('mobile.push.gateway_url'), PHP_URL_SCHEME) === 'https'
+                && filled(parse_url((string) config('mobile.push.gateway_url'), PHP_URL_HOST)),
+            'MOBILE_PUSH_GATEWAY_URL must be a valid HTTPS endpoint for mobile notifications.',
+            $errors,
+        );
+        $this->require(filled(config('mobile.push.gateway_token')), 'MOBILE_PUSH_GATEWAY_TOKEN must be configured for mobile notifications.', $errors);
+        foreach (['support_url' => 'MOBILE_SUPPORT_URL', 'privacy_url' => 'MOBILE_PRIVACY_URL'] as $key => $environmentName) {
+            $url = (string) config("mobile.app.{$key}");
+            $this->require(
+                parse_url($url, PHP_URL_SCHEME) === 'https' && filled(parse_url($url, PHP_URL_HOST)),
+                "{$environmentName} must be a valid public HTTPS URL.",
+                $errors,
+            );
+        }
+        $this->require(config('operations.malware_scan.enabled') === true, 'UPLOAD_MALWARE_SCAN_ENABLED must be true.', $errors);
+        $this->require(filled(config('operations.malware_scan.host')), 'UPLOAD_MALWARE_SCAN_HOST must be configured.', $errors);
+        $this->require((int) config('operations.malware_scan.port') > 0, 'UPLOAD_MALWARE_SCAN_PORT must be valid.', $errors);
+
         $mailDriver = config('mail.default');
         $this->require(
             filled($mailDriver) && ! in_array($mailDriver, ['log', 'array'], true),

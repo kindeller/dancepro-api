@@ -9,6 +9,8 @@ use LogicException;
 
 class OperationsFileStorage
 {
+    public function __construct(private readonly UploadMalwareScanner $malwareScanner) {}
+
     public function disk(): Filesystem
     {
         return Storage::disk($this->diskName());
@@ -26,6 +28,8 @@ class OperationsFileStorage
 
     public function store(UploadedFile $file, string $directory): string
     {
+        $this->malwareScanner->scan($file);
+
         return $file->store($directory, $this->diskName());
     }
 
