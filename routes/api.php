@@ -2,6 +2,7 @@
 
 use App\Features\Auth\Controllers\AuthController;
 use App\Features\Auth\Controllers\CrewMobileAuthController;
+use App\Features\Auth\Controllers\CrewMobileSecurityController;
 use App\Features\Auth\Support\TokenAbility;
 use App\Features\Chat\Controllers\CrewMobileChatController;
 use App\Features\Competition\Controllers\CompetitionObjectController;
@@ -17,12 +18,14 @@ use App\Features\Operations\Controllers\CrewMobileDocumentController;
 use App\Features\Operations\Controllers\CrewMobileHandbookController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentActionController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentController;
+use App\Features\Scheduling\Controllers\CrewMobileAssignmentFileController;
 use App\Features\Scheduling\Controllers\CrewMobileAvailabilityController;
 use App\Features\Scheduling\Controllers\CrewMobileCoverRequestController;
 use App\Features\Scheduling\Controllers\CrewMobileNotificationController;
 use App\Features\Scheduling\Controllers\CrewMobileTimeController;
 use App\Features\Timesheets\Controllers\CrewMobileFinancialController;
 use App\Features\Training\Controllers\CrewMobileTrainingController;
+use App\Features\Venues\Controllers\CrewMobileAddressController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('throttle:public-catalogue')->group(function (): void {
@@ -42,12 +45,22 @@ Route::prefix('auth')->group(function (): void {
 
 Route::prefix('v1/auth')->group(function (): void {
     Route::post('login', [CrewMobileAuthController::class, 'login'])->middleware('throttle:login');
+    Route::post('forgot-password', [CrewMobileSecurityController::class, 'forgotPassword'])
+        ->middleware('throttle:password-reset-link');
 
     Route::middleware(['auth:sanctum', 'abilities:'.TokenAbility::CrewMobile->value, 'api.crew.active'])->group(function (): void {
         Route::post('logout', [CrewMobileAuthController::class, 'logout']);
         Route::get('me', [CrewMobileAuthController::class, 'me']);
         Route::get('devices', [CrewMobileAuthController::class, 'devices']);
         Route::delete('devices/{device}', [CrewMobileAuthController::class, 'revokeDevice'])
+            ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
+        Route::post('two-factor', [CrewMobileSecurityController::class, 'beginTwoFactor'])
+            ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
+        Route::post('two-factor/confirm', [CrewMobileSecurityController::class, 'confirmTwoFactor'])
+            ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
+        Route::post('two-factor/recovery-codes', [CrewMobileSecurityController::class, 'recoveryCodes'])
+            ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
+        Route::delete('two-factor', [CrewMobileSecurityController::class, 'disableTwoFactor'])
             ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
     });
 });
@@ -64,6 +77,7 @@ Route::prefix('v1')->middleware([
         ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
     Route::put('profile/password', [CrewMobileProfileController::class, 'changePassword'])
         ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
+    Route::get('address-search', CrewMobileAddressController::class)->middleware('throttle:address-search');
     Route::get('contracts', [CrewMobileContractController::class, 'index']);
     Route::post('push-devices', [CrewMobilePushDeviceController::class, 'store'])->middleware('api.idempotency');
     Route::delete('push-devices/{device}', [CrewMobilePushDeviceController::class, 'destroy'])->middleware('api.idempotency');
@@ -74,6 +88,9 @@ Route::prefix('v1')->middleware([
         Route::get('dashboard', CrewMobileDashboardController::class);
         Route::get('assignments', [CrewMobileAssignmentController::class, 'index']);
         Route::get('assignments/{assignment}', [CrewMobileAssignmentController::class, 'show']);
+        Route::get('assignments/{assignment}/files/{kind}', CrewMobileAssignmentFileController::class)
+            ->whereIn('kind', ['programme', 'venue-map', 'venue-reference'])
+            ->name('api.v1.assignments.files.show');
         Route::get('cover-requests', [CrewMobileCoverRequestController::class, 'index']);
         Route::post('assignments/{assignment}/cover-requests', [CrewMobileCoverRequestController::class, 'store'])->middleware('api.idempotency');
         Route::post('cover-requests/{coverRequest}/accept', [CrewMobileCoverRequestController::class, 'accept'])->middleware('api.idempotency');

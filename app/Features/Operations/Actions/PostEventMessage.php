@@ -23,7 +23,7 @@ class PostEventMessage
                 'message_type' => $type,
                 'body' => filled($body) ? trim($body) : null,
                 'attachment_path' => $path,
-                'attachment_name' => $attachment?->getClientOriginalName(),
+                'attachment_name' => $attachment ? $this->safeFilename($attachment->getClientOriginalName()) : null,
                 'attachment_mime' => $attachment?->getMimeType(),
             ]);
 
@@ -44,5 +44,13 @@ class PostEventMessage
 
             return $message;
         });
+    }
+
+    private function safeFilename(string $filename): string
+    {
+        $filename = basename(str_replace('\\', '/', $filename));
+        $filename = preg_replace('/[\x00-\x1F\x7F]/u', '', $filename) ?: 'attachment';
+
+        return mb_substr($filename, 0, 255);
     }
 }

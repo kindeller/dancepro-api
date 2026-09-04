@@ -7,6 +7,7 @@ use App\Shared\Responses\ApiResponse;
 use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,7 +29,7 @@ class RequireIdempotencyKey
         abort_unless(is_int($userId) || ctype_digit((string) $userId), 401);
         $method = strtoupper($request->method());
         $target = '/'.ltrim($request->getRequestUri(), '/');
-        $requestHash = hash('sha256', $method."\n".$target."\n".$request->getContent());
+        $requestHash = hash('sha256', $method."\n".$target."\n".$this->requestPayload($request));
         $record = $this->claim((int) $userId, $key, $method, $target, $requestHash);
 
         if (! hash_equals($record->request_hash, $requestHash)) {
@@ -66,6 +67,49 @@ class RequireIdempotencyKey
             $record->delete();
 
             throw $exception;
+        }
+    }
+
+    private function requestPayload(Request $request): string
+    {
+        if ($request->allFiles() === []) {
+            return $request->getContent();
+        }
+
+        $payload = $request->except(array_keys($request->allFiles()));
+        $this->sortRecursively($payload);
+        $files = $this->fileFingerprints($request->allFiles());
+        $this->sortRecursively($files);
+
+        return json_encode(['fields' => $payload, 'files' => $files], JSON_THROW_ON_ERROR);
+    }
+
+    private function fileFingerprints(array $files): array
+    {
+        return array_map(function (mixed $file): mixed {
+            if (is_array($file)) {
+                return $this->fileFingerprints($file);
+            }
+            if (! $file instanceof UploadedFile || ! $file->isValid()) {
+                return null;
+            }
+
+            return [
+                'name' => $file->getClientOriginalName(),
+                'mime' => $file->getMimeType(),
+                'size' => $file->getSize(),
+                'sha256' => hash_file('sha256', $file->getRealPath()),
+            ];
+        }, $files);
+    }
+
+    private function sortRecursively(array &$values): void
+    {
+        ksort($values);
+        foreach ($values as &$value) {
+            if (is_array($value)) {
+                $this->sortRecursively($value);
+            }
         }
     }
 

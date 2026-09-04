@@ -28,6 +28,79 @@ tags:
 security:
   - bearerAuth: []
 paths:
+  /auth/forgot-password:
+    post:
+      tags: [Authentication]
+      security: []
+      operationId: forgotPassword
+      x-implementation-status: available
+      summary: Send an enumeration-safe password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200': { description: Generic reset-link result returned. }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+  /auth/two-factor:
+    post:
+      tags: [Authentication]
+      operationId: beginTwoFactor
+      x-implementation-status: available
+      summary: Start two-factor setup after password confirmation
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { description: Secret and provisioning URI returned. }
+    delete:
+      tags: [Authentication]
+      operationId: disableTwoFactor
+      x-implementation-status: available
+      summary: Disable two-factor authentication and revoke other mobile sessions
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { description: Two-factor authentication disabled. }
+  /auth/two-factor/confirm:
+    post:
+      tags: [Authentication]
+      operationId: confirmTwoFactor
+      x-implementation-status: available
+      summary: Confirm a pending TOTP setup and return recovery codes once
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { description: Two-factor authentication enabled. }
+  /auth/two-factor/recovery-codes:
+    post:
+      tags: [Authentication]
+      operationId: regenerateTwoFactorRecoveryCodes
+      x-implementation-status: available
+      summary: Replace all two-factor recovery codes after password confirmation
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { description: New recovery codes returned once. }
+  /address-search:
+    get:
+      tags: [Profile]
+      operationId: searchAustralianAddresses
+      x-implementation-status: available
+      summary: Return cached Australian address suggestions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 3, maxLength: 200 }
+      responses:
+        '200': { description: Up to ten suggestions returned. }
+        '429': { $ref: '#/components/responses/RateLimited' }
   /app-config:
     get:
       tags: [App Configuration]
@@ -659,7 +732,18 @@ paths:
                 body:
                   type: string
                   minLength: 1
-                  maxLength: 5000
+                  maxLength: 10000
+          multipart/form-data:
+            schema:
+              type: object
+              description: At least one of body or attachment is required. Attachments are currently limited to event chats.
+              properties:
+                body:
+                  type: string
+                  maxLength: 10000
+                attachment:
+                  type: string
+                  format: binary
       responses:
         '201':
           description: Message created.

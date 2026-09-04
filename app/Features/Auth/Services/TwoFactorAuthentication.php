@@ -78,10 +78,17 @@ class TwoFactorAuthentication
             return null;
         }
 
-        $uri = $this->totp->getQRCodeUrl(config('security.two_factor.issuer'), $user->email, $user->two_factor_secret);
+        $uri = $this->provisioningUri($user);
         $renderer = new ImageRenderer(new RendererStyle(240, 2), new SvgImageBackEnd);
         $svg = (new Writer($renderer))->writeString($uri);
 
         return 'data:image/svg+xml;base64,'.base64_encode($svg);
+    }
+
+    public function provisioningUri(User $user): ?string
+    {
+        return filled($user->two_factor_secret)
+            ? $this->totp->getQRCodeUrl(config('security.two_factor.issuer'), $user->email, $user->two_factor_secret)
+            : null;
     }
 }

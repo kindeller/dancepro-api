@@ -12,6 +12,7 @@ use App\Features\Scheduling\Models\CrewNotification;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -167,6 +168,45 @@ class CrewMobileChatApiTest extends TestCase
 
         $this->authenticatedCrew();
         $this->get($downloadUrl)->assertNotFound();
+    }
+
+    public function test_assigned_crew_can_upload_a_private_event_chat_attachment(): void
+    {
+        Storage::fake('local');
+        config(['operations.filesystem_disk' => 'local']);
+        [, $profile] = $this->authenticatedCrew();
+        $event = $this->assignedEvent($profile);
+
+        $response = $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->post('/api/v1/chats/'.$event->uuid.'/messages', [
+                'body' => 'Attached briefing.',
+                'attachment' => UploadedFile::fake()->create('brief.pdf', 20, 'application/pdf'),
+            ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.attachment.name', 'brief.pdf')
+            ->assertJsonPath('data.attachment.mime_type', 'application/pdf');
+
+        $message = EventMessage::query()->latest('id')->firstOrFail();
+        Storage::disk('local')->assertExists($message->attachment_path);
+        $this->get($response->json('data.attachment.download_url'))->assertOk();
+    }
+
+    public function test_multipart_idempotency_rejects_a_different_attachment_for_the_same_key(): void
+    {
+        Storage::fake('local');
+        config(['operations.filesystem_disk' => 'local']);
+        [, $profile] = $this->authenticatedCrew();
+        $event = $this->assignedEvent($profile);
+        $key = (string) Str::uuid();
+
+        $this->withHeader('Idempotency-Key', $key)->post('/api/v1/chats/'.$event->uuid.'/messages', [
+            'attachment' => UploadedFile::fake()->createWithContent('first.txt', 'first'),
+        ], ['Accept' => 'application/json'])->assertCreated();
+        $this->withHeader('Idempotency-Key', $key)->post('/api/v1/chats/'.$event->uuid.'/messages', [
+            'attachment' => UploadedFile::fake()->createWithContent('second.txt', 'second'),
+        ], ['Accept' => 'application/json'])->assertConflict();
+
+        $this->assertSame(1, $event->messages()->count());
     }
 
     public function test_crew_can_start_an_idempotent_direct_chat_from_a_directory_profile(): void

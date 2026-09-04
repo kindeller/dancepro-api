@@ -7,8 +7,10 @@ use App\Features\Crew\Models\CrewProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use PragmaRX\Google2FA\Google2FA;
 use Tests\TestCase;
 
 class CrewMobileSecurityTest extends TestCase
@@ -101,6 +103,46 @@ class CrewMobileSecurityTest extends TestCase
             ->assertOk()
             ->assertHeader('cache-control', 'no-store, private')
             ->assertHeader('pragma', 'no-cache');
+    }
+
+    public function test_forgot_password_is_public_and_enumeration_safe(): void
+    {
+        Notification::fake();
+        $user = User::factory()->create();
+
+        $known = $this->postJson('/api/v1/auth/forgot-password', ['email' => $user->email])->assertOk();
+        $unknown = $this->postJson('/api/v1/auth/forgot-password', ['email' => 'missing@example.com'])->assertOk();
+
+        $this->assertSame($known->json('message'), $unknown->json('message'));
+    }
+
+    public function test_crew_can_set_up_confirm_and_manage_two_factor_authentication(): void
+    {
+        config(['security.two_factor.enabled' => true]);
+        $user = $this->completeCrewUser();
+        Sanctum::actingAs($user, [TokenAbility::CrewMobile->value]);
+
+        $setup = $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/auth/two-factor', ['password' => 'secret-password'])
+            ->assertOk()
+            ->assertJsonPath('data.recovery_codes', []);
+        $secret = $setup->json('data.secret');
+        $this->assertNotEmpty($setup->json('data.otpauth_url'));
+        $this->assertNull($user->fresh()->two_factor_confirmed_at);
+
+        $code = (new Google2FA)->getCurrentOtp($secret);
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/auth/two-factor/confirm', ['code' => $code])
+            ->assertOk()->assertJsonCount(8, 'data.recovery_codes');
+        $this->assertNotNull($user->fresh()->two_factor_confirmed_at);
+
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/auth/two-factor/recovery-codes', ['password' => 'secret-password'])
+            ->assertOk()->assertJsonCount(8, 'data.recovery_codes');
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->deleteJson('/api/v1/auth/two-factor', ['password' => 'secret-password'])
+            ->assertOk();
+        $this->assertNull($user->fresh()->two_factor_secret);
     }
 
     private function login(User $user, string $device): string

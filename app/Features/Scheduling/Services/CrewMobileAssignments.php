@@ -4,13 +4,17 @@ namespace App\Features\Scheduling\Services;
 
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Operations\Services\ChecklistItemsForAssignment;
+use App\Features\Operations\Services\CrewMobileDocuments;
 use App\Features\Scheduling\Models\SchedulingShiftAssignment;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Database\Eloquent\Builder;
 
 class CrewMobileAssignments
 {
-    public function __construct(private readonly ChecklistItemsForAssignment $checklistItems) {}
+    public function __construct(
+        private readonly ChecklistItemsForAssignment $checklistItems,
+        private readonly CrewMobileDocuments $documents,
+    ) {}
 
     public function paginate(CrewProfile $profile, string $scope, int $limit): CursorPaginator
     {
@@ -30,6 +34,7 @@ class CrewMobileAssignments
             ->firstOrFail();
 
         $assignment->setRelation('mobileChecklist', $this->checklistItems->get($assignment));
+        $assignment->setRelation('mobileDocuments', $this->documents->forAssignment($assignment));
 
         return $assignment;
     }

@@ -3,6 +3,7 @@
 namespace App\Features\Operations\Services;
 
 use App\Features\Operations\Models\OperationalResource;
+use App\Features\Scheduling\Models\SchedulingShiftAssignment;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -19,6 +20,22 @@ class CrewMobileDocuments
 
         return OperationalResource::query()->where('is_active', true)->whereNotNull('file_path')
             ->when($since, fn ($query) => $query->where('updated_at', '>=', $since))
+            ->orderBy('sort_order')->orderBy('title')->get()
+            ->filter(fn (OperationalResource $resource): bool => $this->files->disk()->exists($resource->file_path))
+            ->map(fn (OperationalResource $resource): array => $this->metadata($resource))->values();
+    }
+
+    public function forAssignment(SchedulingShiftAssignment $assignment): Collection
+    {
+        $event = $assignment->shift->schedulingEvent;
+        $eventType = $event->event_type instanceof \BackedEnum ? $event->event_type->value : $event->event_type;
+        $roleCode = $assignment->role?->code;
+
+        return OperationalResource::query()
+            ->where('is_active', true)
+            ->whereNotNull('file_path')
+            ->where(fn ($query) => $query->whereNull('event_type')->orWhere('event_type', $eventType))
+            ->where(fn ($query) => $query->whereNull('role_code')->orWhere('role_code', $roleCode))
             ->orderBy('sort_order')->orderBy('title')->get()
             ->filter(fn (OperationalResource $resource): bool => $this->files->disk()->exists($resource->file_path))
             ->map(fn (OperationalResource $resource): array => $this->metadata($resource))->values();
