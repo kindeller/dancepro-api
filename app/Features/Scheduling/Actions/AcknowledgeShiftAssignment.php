@@ -10,6 +10,11 @@ class AcknowledgeShiftAssignment
 {
     public function execute(SchedulingShiftAssignment $assignment, CrewProfile $crewProfile): void
     {
+        $assignment->loadMissing('shift.schedulingEvent');
+        if ($assignment->shift->schedulingEvent->cancelled_at !== null) {
+            throw ValidationException::withMessages(['assignment' => 'This shift has been cancelled.']);
+        }
+
         if ($assignment->crew_profile_id !== $crewProfile->id || $assignment->status !== 'published') {
             throw ValidationException::withMessages(['assignment' => 'This shift is not allocated to you.']);
         }

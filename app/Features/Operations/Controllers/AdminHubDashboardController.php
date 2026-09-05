@@ -18,6 +18,7 @@ class AdminHubDashboardController extends Controller
         Gate::authorize('manageScheduling');
 
         $upcomingEventQuery = SchedulingEvent::query()
+            ->whereNull('cancelled_at')
             ->whereBetween('event_date', [today(), today()->addDays(14)]);
         $upcomingEventCount = (clone $upcomingEventQuery)->count();
         $upcomingEvents = $upcomingEventQuery
@@ -33,6 +34,7 @@ class AdminHubDashboardController extends Controller
                 'events' => $upcomingEventCount,
                 'assignedCrew' => SchedulingShiftAssignment::query()
                     ->where('status', 'published')
+                    ->whereHas('shift.schedulingEvent', fn ($query) => $query->whereNull('cancelled_at'))
                     ->whereHas('shift', fn ($query) => $query->whereBetween('shift_date', [today(), today()->addDays(14)]))
                     ->count(),
                 'coverRequests' => ShiftCoverRequest::query()->where('status', 'open')->count(),

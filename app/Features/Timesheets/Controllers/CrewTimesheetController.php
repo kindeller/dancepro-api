@@ -24,15 +24,19 @@ class CrewTimesheetController extends Controller
         $assignments = SchedulingShiftAssignment::query()
             ->where('crew_profile_id', $profile->id)
             ->where('status', 'published')
+            ->where(fn ($query) => $query
+                ->whereHas('shift.schedulingEvent', fn ($event) => $event->whereNull('cancelled_at'))
+                ->orWhereHas('timeEntry'))
             ->whereHas('shift', fn ($query) => $query->whereDate('shift_date', '<=', today()))
             ->with(['role', 'allowances', 'shift.schedulingEvent', 'timeEntry.invoiceLine.invoice'])
             ->get()
             ->sortByDesc(fn ($assignment) => $assignment->shift->shift_date);
         $entries = $assignments->pluck('timeEntry')->filter();
-        $pendingAssignments = $assignments->filter(fn ($assignment) => ! $assignment->timeEntry?->invoiceLine && $assignment->timeEntry?->approval_status !== 'externally_invoiced');
+        $cancelledAssignments = $assignments->filter(fn ($assignment) => $assignment->shift->schedulingEvent->cancelled_at !== null && ! $assignment->timeEntry?->invoiceLine && $assignment->timeEntry?->approval_status !== 'externally_invoiced');
+        $pendingAssignments = $assignments->filter(fn ($assignment) => $assignment->shift->schedulingEvent->cancelled_at === null && ! $assignment->timeEntry?->invoiceLine && $assignment->timeEntry?->approval_status !== 'externally_invoiced');
         $completedExternal = $entries->where('approval_status', 'externally_invoiced');
 
-        return view('crew.timesheets.index', ['profile' => $profile, 'pendingAssignments' => $pendingAssignments, 'completedExternal' => $completedExternal, 'previews' => $assignments->mapWithKeys(fn ($assignment) => [$assignment->id => $calculator->execute($assignment)]), 'invoices' => CrewInvoice::query()->where('crew_profile_id', $profile->id)->with(['lines', 'schedulingEvent'])->latest()->get()]);
+        return view('crew.timesheets.index', ['profile' => $profile, 'pendingAssignments' => $pendingAssignments, 'cancelledAssignments' => $cancelledAssignments, 'completedExternal' => $completedExternal, 'previews' => $assignments->mapWithKeys(fn ($assignment) => [$assignment->id => $calculator->execute($assignment)]), 'invoices' => CrewInvoice::query()->where('crew_profile_id', $profile->id)->with(['lines', 'schedulingEvent'])->latest()->get()]);
     }
 
     public function markExternalWorkComplete(MarkExternalWorkCompleteRequest $request, MarkExternalWorkComplete $markComplete): RedirectResponse

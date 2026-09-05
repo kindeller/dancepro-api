@@ -17,6 +17,7 @@ class CrewInvoiceSelection
         $ids = collect($entryIds)->map(fn ($id) => (int) $id)->unique()->values();
         $entries = AssignmentTimeEntry::query()->whereKey($ids)
             ->whereHas('assignment', fn ($query) => $query->where('crew_profile_id', $crew->id))
+            ->whereHas('assignment.shift.schedulingEvent', fn ($query) => $query->whereNull('cancelled_at'))
             ->whereDoesntHave('invoiceLine')->where('approval_status', '!=', 'externally_invoiced')
             ->whereNotNull('actual_clock_in_at')->whereNotNull('actual_finish_at')
             ->with(['assignment.role', 'assignment.allowances', 'assignment.shift.schedulingEvent'])->get();
@@ -71,6 +72,7 @@ class CrewInvoiceSelection
         $entryIds = SchedulingShiftAssignment::query()
             ->where('crew_profile_id', $crew->id)
             ->whereIn('uuid', $uuids)
+            ->whereHas('shift.schedulingEvent', fn ($query) => $query->whereNull('cancelled_at'))
             ->whereHas('timeEntry')
             ->with('timeEntry')
             ->get()

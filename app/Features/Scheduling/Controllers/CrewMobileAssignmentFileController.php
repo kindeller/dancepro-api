@@ -21,14 +21,14 @@ class CrewMobileAssignmentFileController extends Controller
         CrewMobileAssignments $assignments,
         CrewMobileAssignmentFiles $files,
     ): StreamedResponse {
-        $assignment = $assignments->findOwned($request->user()->crewProfile, $assignment);
+        $assignment = $assignments->findFor($request->user()->crewProfile, $assignment);
 
         return $files->response($assignment, $kind);
     }
 
     public function download(Request $request, SchedulingShiftAssignment $assignment, string $kind, CrewMobileAssignments $assignments, CrewMobileAssignmentFiles $files): JsonResponse
     {
-        $assignment = $assignments->findOwned($request->user()->crewProfile, $assignment);
+        $assignment = $assignments->findFor($request->user()->crewProfile, $assignment);
         $download = $files->issue($assignment, $kind);
         Log::info('Mobile assignment file download issued.', [
             'user_id' => $request->user()->id,

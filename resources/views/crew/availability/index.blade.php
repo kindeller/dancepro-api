@@ -177,6 +177,7 @@ document.querySelectorAll('[data-prestart-checklist-url]').forEach((box) => box.
     <a class="{{ $filter === 'upcoming' ? 'active' : '' }}" href="{{ route('crew.availability.index', ['view' => 'upcoming']) }}">Upcoming</a>
     <a class="{{ $filter === 'cover' ? 'active' : '' }}" href="{{ route('crew.availability.index', ['view' => 'cover']) }}">@if($pendingCoverCount)<span class="alert-count">{{ $pendingCoverCount }}</span>@endif Cover</a>
     <a class="{{ $filter === 'completed' ? 'active' : '' }}" href="{{ route('crew.availability.index', ['view' => 'completed']) }}">Completed</a>
+    <a class="{{ $filter === 'cancelled' ? 'active' : '' }}" href="{{ route('crew.availability.index', ['view' => 'cancelled']) }}">Cancelled @if($cancelledAssignments->isNotEmpty())({{ $cancelledAssignments->count() }})@endif</a>
 </nav>
 
 @if($filter === 'availability')
@@ -206,9 +207,9 @@ document.querySelectorAll('[data-prestart-checklist-url]').forEach((box) => box.
 </section>
 @endif
 
-@if(in_array($filter,['acknowledge','upcoming','completed'],true))
+@if(in_array($filter,['acknowledge','upcoming','completed','cancelled'],true))
 <section>
-    <div class="section-heading"><div><p class="eyebrow">Schedule</p><h2>Assigned shifts</h2></div></div>
+    <div class="section-heading"><div><p class="eyebrow">Schedule</p><h2>{{ $filter === 'cancelled' ? 'Cancelled shifts' : 'Assigned shifts' }}</h2></div></div>
 
     @forelse($visibleAssignments as $assignment)
     @include('crew.availability._shift-card',['assignment'=>$assignment])
@@ -277,7 +278,7 @@ document.querySelectorAll('[data-prestart-checklist-url]').forEach((box) => box.
 </section>
 @endif
 
-@if($notifications->isNotEmpty())<section><div class="section-heading"><div><p class="eyebrow">Recent</p><h2>Updates</h2></div></div><div class="card updates-list">@foreach($notifications as $notification)<div @if(!$notification->read_at)data-notification-read-url="{{ route('crew.notifications.read',$notification) }}"@endif><strong class="notification-title">@if(!$notification->read_at)<span class="unread-dot" aria-label="Unread"></span>@endif{{ $notification->title }}</strong><p>{{ $notification->message }}</p><span class="muted">{{ $notification->created_at->diffForHumans() }}</span></div>@endforeach</div></section>@endif
+@if($notifications->isNotEmpty())<section><div class="section-heading"><div><p class="eyebrow">Recent</p><h2>Updates</h2></div></div><div class="card updates-list">@foreach($notifications as $notification)@php($notificationUrl=$notification->destination_type==='assignment'&&$notification->destination_id?route('crew.assignments.show',$notification->destination_id):null)<div @if(!$notification->read_at)data-notification-read-url="{{ route('crew.notifications.read',$notification) }}"@endif><strong class="notification-title">@if(!$notification->read_at)<span class="unread-dot" aria-label="Unread"></span>@endif{{ $notification->title }}</strong><p>{{ $notification->message }}</p><span class="muted">{{ $notification->created_at->diffForHumans() }}</span>@if($notificationUrl)<a href="{{ $notificationUrl }}" style="display:block;margin-top:7px">View shift details</a>@endif</div>@endforeach</div></section>@endif
 @endsection
 
 @push('scripts')

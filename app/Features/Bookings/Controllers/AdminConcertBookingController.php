@@ -4,17 +4,26 @@ namespace App\Features\Bookings\Controllers;
 
 use App\Features\Bookings\Actions\ApproveConcertBooking;
 use App\Features\Bookings\Actions\BulkUpdateConcertBookingItems;
+use App\Features\Bookings\Actions\CancelConcertBooking;
+use App\Features\Bookings\Actions\CancelConcertBookingItem;
 use App\Features\Bookings\Actions\CreateStudioFromBooking;
 use App\Features\Bookings\Actions\ReconcileBookingStudioContact;
 use App\Features\Bookings\Actions\ResolveConcertBookingVenue;
+use App\Features\Bookings\Actions\StoreConcertBookingProgramme;
+use App\Features\Bookings\Actions\UpdateConcertBooking;
 use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Bookings\Models\ConcertBookingItem;
 use App\Features\Bookings\Requests\BulkUpdateConcertBookingItemsRequest;
+use App\Features\Bookings\Requests\CancelConcertBookingItemRequest;
 use App\Features\Bookings\Requests\CreateStudioFromBookingRequest;
 use App\Features\Bookings\Requests\ReconcileBookingStudioContactRequest;
 use App\Features\Bookings\Requests\ResolveConcertBookingVenueRequest;
 use App\Features\Bookings\Requests\ReviewConcertBookingRequest;
+use App\Features\Bookings\Requests\StoreConcertBookingProgrammeRequest;
+use App\Features\Bookings\Requests\UpdateConcertBookingRequest;
 use App\Features\Bookings\Services\ReviewBookingStudioContact;
+use App\Features\Operations\Services\OperationsFileStorage;
+use App\Features\Scheduling\Models\EventTypeDefinition;
 use App\Features\Studios\Models\Studio;
 use App\Features\Studios\Support\StudioStatus;
 use App\Features\Venues\Models\Venue;
@@ -24,6 +33,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminConcertBookingController extends Controller
 {
@@ -34,6 +44,8 @@ class AdminConcertBookingController extends Controller
         return view('admin.concert-bookings.index', [
             'items' => ConcertBookingItem::query()
                 ->with(['booking', 'eventTypeDefinition', 'schedulingEvent'])
+                ->whereHas('booking', fn ($query) => $query->where('status', '!=', 'cancelled'))
+                ->where('approval_status', '!=', 'cancelled')
                 ->orderBy('event_date')
                 ->orderBy('starts_at')
                 ->paginate(50),
@@ -50,6 +62,7 @@ class AdminConcertBookingController extends Controller
             'venues' => Venue::query()->orderBy('name')->get(),
             'studios' => Studio::query()->orderBy('name')->get(['uuid', 'name']),
             'studioStatuses' => StudioStatus::cases(),
+            'eventTypes' => EventTypeDefinition::query()->where('system_category', 'concert')->orderBy('name')->get(),
             'contactReview' => $reviewContact->compare($concertBooking, $request->string('studio_uuid')->toString() ?: null),
         ]);
     }
@@ -126,5 +139,49 @@ class AdminConcertBookingController extends Controller
         );
 
         return back()->with('status', "{$count} event(s) updated.");
+    }
+
+    public function update(UpdateConcertBookingRequest $request, ConcertBooking $concertBooking, UpdateConcertBooking $update): RedirectResponse
+    {
+        $update->execute($concertBooking, $request->validated());
+
+        return back()->with('status', 'Booking details updated.');
+    }
+
+    public function cancel(Request $request, ConcertBooking $concertBooking, CancelConcertBooking $cancel): RedirectResponse
+    {
+        Gate::authorize('manageScheduling');
+        $cancel->execute($concertBooking, $request->user());
+
+        return redirect()->route('admin.concert-bookings.index')->with('status', 'Booking cancelled.');
+    }
+
+    public function cancelItem(CancelConcertBookingItemRequest $request, ConcertBookingItem $concertBookingItem, CancelConcertBookingItem $cancel): RedirectResponse
+    {
+        $booking = $concertBookingItem->booking;
+        $cancel->execute($concertBookingItem, $request->user());
+
+        return redirect()->route('admin.concert-bookings.show', $booking)->with('status', 'Booking event cancelled.');
+    }
+
+    public function storeProgramme(StoreConcertBookingProgrammeRequest $request, ConcertBookingItem $concertBookingItem, StoreConcertBookingProgramme $store): RedirectResponse
+    {
+        $store->execute($concertBookingItem, $request->file('programme'));
+
+        return back()->with('status', 'Event programme attached.');
+    }
+
+    public function programme(Request $request, ConcertBookingItem $concertBookingItem, OperationsFileStorage $files): StreamedResponse
+    {
+        Gate::authorize('manageScheduling');
+        abort_unless(filled($concertBookingItem->programme_path), 404);
+        abort_unless($files->disk()->exists($concertBookingItem->programme_path), 404);
+
+        return $files->disk()->response(
+            $concertBookingItem->programme_path,
+            $concertBookingItem->programme_name ?: 'programme.pdf',
+            ['Cache-Control' => 'private, no-store'],
+            'inline',
+        );
     }
 }

@@ -30,7 +30,7 @@ class SaveChecklistTemplateRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'event_type' => ['nullable', Rule::in(['competition', 'concert'])],
             'event_type_definition_id' => ['nullable', 'integer', 'exists:event_type_definitions,id'],
-            'role_code' => ['nullable', 'string', 'max:80'],
+            'role_code' => ['nullable', 'string', 'max:80', Rule::exists('crew_roles', 'code')],
             'item_lines' => ['required', 'array', 'min:1', 'max:50'],
             'item_lines.*' => ['required', 'string', 'max:2000'],
             'is_active' => ['required', 'boolean'],

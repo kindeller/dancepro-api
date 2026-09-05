@@ -92,6 +92,10 @@ class CrewMobileFinancialApiTest extends TestCase
             'actual_clock_in_at' => "{$externalDate} 08:00:00", 'actual_finish_at' => "{$externalDate} 10:00:00",
             'approval_status' => 'externally_invoiced',
         ]);
+        $cancelled = $this->assignment($profile, today()->subDays(5));
+        $cancelledDate = $cancelled->shift->shift_date->toDateString();
+        $cancelled->timeEntry()->create(['actual_clock_in_at' => "{$cancelledDate} 08:00:00", 'actual_finish_at' => "{$cancelledDate} 10:00:00"]);
+        $cancelled->shift->schedulingEvent->update(['cancelled_at' => now()]);
 
         $firstPage = $this->getJson('/api/v1/timesheets?limit=1')->assertOk()
             ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $draft->uuid)
@@ -106,6 +110,9 @@ class CrewMobileFinancialApiTest extends TestCase
             $this->getJson("/api/v1/timesheets?status={$status}")->assertOk()
                 ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $expected->uuid);
         }
+        $this->getJson('/api/v1/timesheets?status=cancelled')->assertOk()
+            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $cancelled->uuid)
+            ->assertJsonPath('data.0.cancelled', true);
         $this->getJson('/api/v1/timesheets?from='.today()->subDays(2)->toDateString().'&to='.today()->subDay()->toDateString())
             ->assertOk()->assertJsonCount(2, 'data')->assertJsonMissing(['id' => $invoiced->uuid]);
         $this->getJson('/api/v1/timesheets?from=2026-01-02&to=2026-01-01')->assertUnprocessable();

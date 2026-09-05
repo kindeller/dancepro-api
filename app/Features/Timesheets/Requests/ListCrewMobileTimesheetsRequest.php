@@ -19,7 +19,7 @@ class ListCrewMobileTimesheetsRequest extends FormRequest
             'limit' => ['nullable', 'integer', 'between:1,100'],
             'from' => ['nullable', 'date_format:Y-m-d'],
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
-            'status' => ['nullable', Rule::in(['draft', 'ready_to_invoice', 'externally_invoiced', 'invoiced'])],
+            'status' => ['nullable', Rule::in(['draft', 'ready_to_invoice', 'externally_invoiced', 'invoiced', 'cancelled'])],
         ];
     }
 }

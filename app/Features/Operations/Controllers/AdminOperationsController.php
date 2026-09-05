@@ -2,6 +2,7 @@
 
 namespace App\Features\Operations\Controllers;
 
+use App\Features\Crew\Models\CrewRole;
 use App\Features\Operations\Actions\SaveChecklistTemplate;
 use App\Features\Operations\Actions\SaveEventOperations;
 use App\Features\Operations\Actions\SaveOperationalResource;
@@ -46,6 +47,7 @@ class AdminOperationsController extends Controller
         return view('admin.operations.checklists', [
             'templates' => ChecklistTemplate::query()->with('items')->orderBy('name')->get(),
             'eventTypes' => EventTypeDefinition::query()->where('is_active', true)->orderBy('name')->get(),
+            'crewRoles' => CrewRole::query()->orderBy('name')->get(),
         ]);
     }
 

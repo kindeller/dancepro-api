@@ -55,6 +55,7 @@ class ApproveConcertBooking
                 'event_date' => $item->event_date,
                 'availability_status' => AvailabilityRoundStatus::Draft,
                 'admin_notes' => "Created from concert booking {$booking->uuid}.",
+                'programme_path' => $item->programme_path,
             ]);
             $startsAt = Carbon::parse($item->event_date->toDateString().' '.$item->starts_at);
             $finishesAt = Carbon::parse($item->event_date->toDateString().' '.$item->finishes_at);
@@ -78,7 +79,7 @@ class ApproveConcertBooking
                 'scheduling_event_id' => $event->id,
             ]);
 
-            if (! $booking->items()->where('approval_status', '!=', 'approved')->exists()) {
+            if (! $booking->items()->where('approval_status', 'pending')->exists()) {
                 $booking->update([
                     'status' => ConcertBookingStatus::Approved,
                     'reviewed_by_user_id' => $reviewedBy->id,

@@ -29,6 +29,12 @@ class CrewAssignmentDetailResource extends CrewAssignmentResource
             'programme_url' => $event->programme_path ? route('api.v1.assignments.files.download', ['assignment' => $this->uuid, 'kind' => 'programme']) : null,
             'crew_brief' => $event->crew_brief,
             'team_leader_notes' => $this->is_team_leader ? $event->team_leader_notes : null,
+            'equipment_responsibilities' => $this->equipmentResponsibilities->map(fn ($responsibility): array => [
+                'item_code' => $responsibility->item_code,
+                'is_bringing' => $responsibility->is_bringing,
+                'is_taking' => $responsibility->is_taking,
+                'notes' => $responsibility->other_notes,
+            ])->values(),
             'team' => $this->shift->assignments->where('status', 'published')->map(fn ($assignment): array => [
                 'id' => $assignment->crewProfile->uuid,
                 'name' => $assignment->crewProfile->preferred_name ?: $assignment->crewProfile->user->name,

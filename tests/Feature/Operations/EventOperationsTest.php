@@ -27,6 +27,12 @@ class EventOperationsTest extends TestCase
         $event = SchedulingEvent::query()->create(['name' => 'Example Event', 'event_type' => 'competition', 'event_date' => now()->addMonth()]);
         $event->venue()->associate($venue)->save();
 
+        $this->actingAs($staff)->get(route('admin.scheduling-events.edit', $event))
+            ->assertOk()
+            ->assertSee('Competition programme')
+            ->assertSee('One programme is shared across every shift in this competition.')
+            ->assertSee('data-programme-picker="competition-programme-upload"', false);
+
         $this->actingAs($staff)->get(route('admin.crew-management.resources'))
             ->assertOk()->assertSee('Add handbook or role resource')->assertDontSee('Add Pre-Start Checks template');
         $this->actingAs($staff)->get(route('admin.event-management.checklists'))
@@ -80,6 +86,7 @@ class EventOperationsTest extends TestCase
     public function test_resources_and_pre_start_checks_can_target_a_managed_event_type(): void
     {
         $staff = User::factory()->staff()->create();
+        $role = CrewRole::factory()->create(['name' => 'Camera Operator', 'code' => 'camera-operator']);
         $eventType = EventTypeDefinition::query()->create([
             'code' => 'dance-concert',
             'name' => 'Dance Concert',
@@ -96,9 +103,23 @@ class EventOperationsTest extends TestCase
         $this->actingAs($staff)->post(route('admin.operations.checklists.store'), [
             'name' => 'Dance concert checks',
             'event_type_definition_id' => $eventType->id,
+            'role_code' => $role->code,
             'items' => "Test camera\nCheck audio",
             'is_active' => '1',
         ])->assertRedirect();
+
+        $this->actingAs($staff)->get(route('admin.event-management.checklists'))
+            ->assertOk()
+            ->assertSee('<label>Role<select name="role_code">', false)
+            ->assertSee('<option value="camera-operator" selected>Camera Operator</option>', false)
+            ->assertDontSee('Role code');
+
+        $this->actingAs($staff)->post(route('admin.operations.checklists.store'), [
+            'name' => 'Invalid role checks',
+            'role_code' => 'not-a-managed-role',
+            'items' => 'Test camera',
+            'is_active' => '1',
+        ])->assertSessionHasErrors('role_code');
 
         $this->assertDatabaseHas('operational_resources', [
             'event_type_definition_id' => $eventType->id,
@@ -107,6 +128,7 @@ class EventOperationsTest extends TestCase
         $this->assertDatabaseHas('checklist_templates', [
             'event_type_definition_id' => $eventType->id,
             'event_type' => 'concert',
+            'role_code' => 'camera-operator',
         ]);
     }
 

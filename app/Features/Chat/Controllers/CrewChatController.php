@@ -57,6 +57,7 @@ class CrewChatController extends Controller
     public function postEvent(StoreChatMessageRequest $request, SchedulingEvent $schedulingEvent, CrewChatInbox $inbox, PostEventMessage $post): RedirectResponse
     {
         $event = $inbox->accessibleEvent($request->user(), $schedulingEvent);
+        abort_if($event->cancelled_at !== null, 422, 'This event has been cancelled. New messages are disabled.');
         $post->execute($event, $request->user(), 'discussion', $request->input('body'), $request->file('attachment'));
 
         return redirect()->route('crew.chat.event', $event);

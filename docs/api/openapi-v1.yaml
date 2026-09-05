@@ -327,7 +327,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [upcoming, past, all]
+            enum: [upcoming, past, cancelled, all]
             default: upcoming
       responses:
         '200':
@@ -564,6 +564,30 @@ paths:
           $ref: '#/components/responses/NotFound'
         '422':
           $ref: '#/components/responses/ValidationError'
+  /assignments/{assignment}/cover-candidates:
+    get:
+      tags: [Cover Requests]
+      operationId: listCoverCandidates
+      x-implementation-status: available
+      summary: List active, qualified and conflict-free crew eligible to cover the assignment
+      parameters:
+        - $ref: '#/components/parameters/AssignmentId'
+      responses:
+        '200':
+          description: Eligible candidates and their recorded availability returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CoverCandidate'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /cover-requests/{coverRequest}/accept:
     post:
       tags: [Cover Requests]
@@ -1468,7 +1492,7 @@ components:
       in: query
       schema:
         type: string
-        enum: [draft, ready_to_invoice, externally_invoiced, invoiced]
+        enum: [draft, ready_to_invoice, externally_invoiced, invoiced, cancelled]
   responses:
     AuthenticationResponse:
       description: Authentication succeeded.
@@ -1607,7 +1631,7 @@ components:
           uniqueItems: true
           items:
             type: string
-            enum: [crew]
+            enum: [crew, admin]
         onboarding_complete:
           type: boolean
         onboarding_missing:
@@ -1637,7 +1661,7 @@ components:
           format: date-time
     Dashboard:
       type: object
-      required: [next_assignment, unread_notifications, unread_chats, pending_availability, pending_invoices]
+      required: [next_assignment, unread_notifications, unread_chats, pending_availability, pending_invoices, pending_acknowledgements, pending_cover_requests, pending_timesheets]
       properties:
         next_assignment:
           oneOf:
@@ -1655,6 +1679,15 @@ components:
         pending_invoices:
           type: integer
           minimum: 0
+        pending_acknowledgements:
+          type: integer
+          minimum: 0
+        pending_cover_requests:
+          type: integer
+          minimum: 0
+        pending_timesheets:
+          type: integer
+          minimum: 0
     AssignmentCollectionEnvelope:
       allOf:
         - $ref: '#/components/schemas/SuccessEnvelope'
@@ -1668,7 +1701,7 @@ components:
               $ref: '#/components/schemas/CursorMeta'
     AssignmentSummary:
       type: object
-      required: [id, event_name, event_type, role, shift_date, status, acknowledged, allowed_actions]
+      required: [id, event_name, event_type, role, is_team_leader, shift_code, shift_date, status, cancelled, acknowledged, allowed_actions]
       properties:
         id:
           type: string
@@ -1678,8 +1711,21 @@ components:
         event_type:
           type: string
           enum: [competition, concert]
+        event_logo_url:
+          type: [string, 'null']
+          format: uri
+        event_item_title:
+          type: [string, 'null']
         role:
           type: string
+        is_team_leader:
+          type: boolean
+        shift_period:
+          type: [string, 'null']
+          enum: [morning, afternoon, null]
+        shift_code:
+          type: string
+          enum: [COMP-M, COMP-A, CON]
         shift_date:
           type: string
           format: date
@@ -1695,8 +1741,21 @@ components:
         status:
           type: string
           enum: [draft, published, cancelled]
+        cancelled:
+          type: boolean
+        cancelled_at:
+          type: [string, 'null']
+          format: date-time
         acknowledged:
           type: boolean
+        cover_request:
+          oneOf:
+            - type: object
+              required: [id, status]
+              properties:
+                id: { type: string, format: uuid }
+                status: { type: string, enum: [open] }
+            - type: 'null'
         time:
           $ref: '#/components/schemas/AssignmentTime'
         permissions:
@@ -1726,6 +1785,10 @@ components:
             team_leader_notes:
               type: [string, 'null']
               description: Present only for the assigned team leader.
+            equipment_responsibilities:
+              type: array
+              items:
+                $ref: '#/components/schemas/EquipmentResponsibility'
             checklist:
               type: array
               items:
@@ -1803,18 +1866,55 @@ components:
         completed_at:
           type: [string, 'null']
           format: date-time
+    EquipmentResponsibility:
+      type: object
+      required: [item_code, is_bringing, is_taking]
+      properties:
+        item_code:
+          type: string
+        is_bringing:
+          type: boolean
+        is_taking:
+          type: boolean
+        notes:
+          type: [string, 'null']
+    CoverCandidate:
+      type: object
+      required: [id, name, availability_status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        availability_status:
+          type: [string, 'null']
+          enum: [available, unavailable, null]
     AvailabilityRequest:
       type: object
-      required: [shift_id, event_name, shift_date, status, locked, allowed_actions]
+      required: [shift_id, event_name, venue, shift_period, shift_date, arrival_at, status, locked, allowed_actions]
       properties:
         shift_id:
           type: string
           format: uuid
         event_name:
           type: string
+        event_logo_url:
+          type: [string, 'null']
+          format: uri
+        venue:
+          oneOf:
+            - $ref: '#/components/schemas/Venue'
+            - type: 'null'
+        shift_period:
+          type: [string, 'null']
+          enum: [morning, afternoon, null]
         shift_date:
           type: string
           format: date
+        arrival_at:
+          type: [string, 'null']
+          format: date-time
         deadline:
           type: [string, 'null']
           format: date-time
@@ -1936,9 +2036,32 @@ components:
           items:
             type: object
             additionalProperties: true
+        badges:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/ProfileBadge'
         updated_at:
           type: string
           format: date-time
+    ProfileBadge:
+      type: object
+      required: [icon, name, detail]
+      properties:
+        icon:
+          oneOf:
+            - type: string
+            - type: integer
+        name:
+          type: string
+        detail:
+          type: string
+        design:
+          type: [string, 'null']
+        url:
+          type: [string, 'null']
+          format: uri
     ProfileUpdateRequest:
       type: object
       required: [preferred_name, email, phone, address, compliance]
@@ -2310,7 +2433,9 @@ components:
           format: date
         status:
           type: string
-          enum: [draft, ready_to_invoice, invoiced, externally_invoiced]
+          enum: [draft, ready_to_invoice, invoiced, externally_invoiced, cancelled]
+        cancelled:
+          type: boolean
         total:
           type: [string, 'null']
           pattern: '^\d+\.\d{2}$'

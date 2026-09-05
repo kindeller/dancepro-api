@@ -75,10 +75,10 @@
                         $requiredRoles = $event->roleRequirements->sortBy('id')->values();
                         $assignments = $shift->assignments->keyBy('crew_role_id');
                         $isReady = $eventReadiness->get($event->uuid, false);
-                        $displayStatus = $isReady ? 'READY' : ($event->roster_status === 'published' || $event->roster_status === 'changed' ? 'Assigned' : ($event->availability_status->value === 'open' ? 'Availability open' : ($event->availability_status->value === 'closed' ? 'Rostering' : 'Draft')));
+                        $displayStatus = $event->cancelled_at ? 'Cancelled' : ($isReady ? 'READY' : ($event->roster_status === 'published' || $event->roster_status === 'changed' ? 'Assigned' : ($event->availability_status->value === 'open' ? 'Availability open' : ($event->availability_status->value === 'closed' ? 'Rostering' : 'Draft'))));
                         $statusHover = $event->availability_deadline ? 'Availability deadline: '.$event->availability_deadline->format('j M Y, g:i a') : 'No availability deadline set.';
                     @endphp
-                    <tr class="event-row" data-event="{{ $event->uuid }}">
+                    <tr class="event-row {{ $event->cancelled_at ? 'cancelled-event-row' : '' }}" data-event="{{ $event->uuid }}">
                         <td class="sticky-col col-date"><strong>{{ $shift->shift_date?->format('D j M') }}</strong><div class="muted">{{ $shift->shift_date?->format('Y') }}</div></td>
                         <td class="sticky-col col-time" title="Arrival {{ $shift->posted_arrival_at?->format('g:i a') ?: 'TBC' }} · Finish {{ $shift->estimated_finish_at?->format('g:i a') ?: 'TBC' }}">
                             <strong>{{ $event->event_type->value === 'competition' ? 'COMP-'.($shift->period->value === 'morning' ? 'M' : 'A') : 'CON' }}</strong>
@@ -87,14 +87,14 @@
                             <div class="muted">{{ $shift->starts_at?->format('g:i a') ?: 'TBC' }}–{{ $shift->estimated_finish_at?->format('g:i a') ?: 'TBC' }}</div>
                         </td>
                         <td class="sticky-col col-event event-select-cell" title="Click to select this event. {{ $event->admin_notes }}">
-                            <input form="bulk-events" class="event-selector" data-event="{{ $event->uuid }}" type="checkbox" name="event_ids[]" value="{{ $event->uuid }}" hidden><a href="{{ route('admin.scheduling-events.show', $event) }}"><strong>{{ $eventDisplayName }}</strong></a>
+                            @unless($event->cancelled_at)<input form="bulk-events" class="event-selector" data-event="{{ $event->uuid }}" type="checkbox" name="event_ids[]" value="{{ $event->uuid }}" hidden>@endunless<a href="{{ route('admin.scheduling-events.show', $event) }}"><strong>{{ $eventDisplayName }}</strong></a>
                             @if($eventSubtitle)<div class="muted">{{ $eventSubtitle }}</div>@endif
                         </td>
                         <td class="sticky-col col-venue" title="Access: {{ $event->venue?->access_notes ?: 'No notes' }} · Parking: {{ $event->venue?->parking_notes ?: 'No notes' }}">
                             {{ $event->venue?->name ?: 'Not set' }}
                             @if($booking)<div class="muted">{{ $booking->contact_name }} · {{ $booking->contact_phone }}</div>@endif
                         </td>
-                        <td class="sticky-col col-status" title="{{ $statusHover }}"><span class="badge {{ $isReady ? 'ready' : '' }}">{{ $displayStatus }}</span></td>
+                        <td class="sticky-col col-status" title="{{ $statusHover }}"><span class="badge {{ $event->cancelled_at ? 'cancelled' : ($isReady ? 'ready' : '') }}">{{ $displayStatus }}</span></td>
 
                         @foreach(range(0, 2) as $slotIndex)
                             @php($role = $requiredRoles->get($slotIndex)?->crewRole)
@@ -342,6 +342,10 @@
 
 @push('styles')
 <style>
+    .cancelled-event-row { filter:grayscale(1); opacity:.62; }
+    .cancelled-event-row .col-date, .cancelled-event-row .col-time, .cancelled-event-row .col-event, .cancelled-event-row .col-venue { text-decoration:line-through; }
+    .cancelled-event-row select, .cancelled-event-row input, .cancelled-event-row summary { pointer-events:none; }
+    .badge.cancelled { border-color:#b9b9b9; background:#ededed; color:#555; text-decoration:none; }
     .availability-key { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:0 0 8px; font-size:11px; }
     .roster-key { display:flex; gap:11px; align-items:center; flex-wrap:wrap; margin:0 0 8px; padding:6px 9px; border:1px solid #d7e4ea; background:#fff; font-size:11px; }
     .roster-key span { cursor:help; }

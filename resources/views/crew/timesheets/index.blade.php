@@ -28,6 +28,15 @@
 </div></section>
 @endif
 
+@if($cancelledAssignments->isNotEmpty())
+<section><div class="section-heading"><div><h2>Cancelled</h2><p class="muted">Previously recorded times are retained for your records but cannot be edited or invoiced.</p></div></div>
+@foreach($cancelledAssignments as $assignment)
+@php($entry = $assignment->timeEntry)
+<article class="card" style="opacity:.68"><div class="section-heading"><div><strong><s>{{ $assignment->shift->schedulingEvent->name }}</s></strong><div class="muted">{{ $assignment->shift->shift_date->format('j M Y') }} · {{ $assignment->role->name }}@if($entry?->actual_clock_in_at && $entry?->actual_finish_at) · Recorded {{ $entry->actual_clock_in_at->format('g:i a') }}–{{ $entry->actual_finish_at->format('g:i a') }}@endif</div></div><span class="status-pill">Cancelled</span></div></article>
+@endforeach
+</section>
+@endif
+
 <section><div class="section-heading"><div><h2>Complete</h2><p class="muted">Invoices awaiting payment and previously completed work.</p></div></div>
 @foreach($invoices as $invoice)<article class="card"><div class="section-heading"><div><strong>Invoice {{ $invoice->invoice_number }}</strong><div class="muted">{{ $invoice->schedulingEvent?->name ?: 'Concerts' }} · {{ $invoice->period_start->isSameDay($invoice->period_end) ? $invoice->period_start->format('j M Y') : $invoice->period_start->format('j M').'–'.$invoice->period_end->format('j M Y') }}</div></div><span class="status-pill {{ $invoice->status === 'paid' ? 'done' : 'attention' }}">{{ $invoice->status === 'pending_payment' ? 'Pending payment' : ucfirst(str_replace('_',' ',$invoice->status)) }}</span></div><div class="resource-actions invoice-card-actions"><strong>${{ number_format((float)$invoice->total,2) }}</strong><span></span><a class="button secondary" href="{{ route('crew.timesheets.invoices.show',$invoice) }}">View details</a><a class="button" target="_blank" href="{{ route('crew.timesheets.invoices.print',$invoice) }}">Print / Save PDF</a></div></article>@endforeach
 @foreach($completedExternal as $entry)<article class="card"><div class="section-heading"><div><strong>{{ $entry->assignment->shift->schedulingEvent->name }}</strong><div class="muted">{{ $entry->assignment->shift->shift_date->format('j M Y') }} · Own invoice emailed</div></div><span class="status-pill done">Complete</span></div></article>@endforeach

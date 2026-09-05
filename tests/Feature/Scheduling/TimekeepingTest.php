@@ -42,6 +42,21 @@ class TimekeepingTest extends TestCase
         $this->assertContains('Clocked in after posted arrival', $entry->reviewFlags());
     }
 
+    public function test_cancelled_events_cannot_create_time_entries_or_appear_as_upcoming_work(): void
+    {
+        Carbon::setTestNow('2026-09-10 08:00:00');
+        [$crewUser, $assignment] = $this->assignment('2026-09-10 08:00:00');
+        $assignment->shift->schedulingEvent->update(['cancelled_at' => now()]);
+
+        $this->actingAs($crewUser)->post(route('crew.assignments.time.clock-in', $assignment))
+            ->assertUnprocessable();
+        $this->assertDatabaseMissing('assignment_time_entries', ['scheduling_shift_assignment_id' => $assignment->id]);
+        $this->actingAs($crewUser)->get(route('crew.availability.index', ['view' => 'upcoming']))
+            ->assertOk()->assertDontSee($assignment->shift->schedulingEvent->name);
+        $this->actingAs($crewUser)->post(route('crew.assignments.acknowledge', $assignment))
+            ->assertSessionHasErrors('assignment');
+    }
+
     public function test_crew_can_finish_a_clocked_in_shift_now(): void
     {
         Carbon::setTestNow('2026-09-10 08:00:00');

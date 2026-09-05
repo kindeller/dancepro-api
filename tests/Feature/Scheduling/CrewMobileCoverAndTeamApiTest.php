@@ -25,6 +25,13 @@ class CrewMobileCoverAndTeamApiTest extends TestCase
         $replacement->roles()->attach($assignment->crew_role_id, ['status' => 'approved']);
         Sanctum::actingAs($ownerUser, [TokenAbility::CrewMobile->value]);
 
+        $this->getJson('/api/v1/assignments/'.$assignment->uuid.'/cover-candidates')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $replacement->uuid)
+            ->assertJsonPath('data.0.name', 'Replacement')
+            ->assertJsonPath('data.0.availability_status', null);
+
         $created = $this->withHeader('Idempotency-Key', (string) Str::uuid())
             ->postJson('/api/v1/assignments/'.$assignment->uuid.'/cover-requests', [
                 'recipients' => [$replacement->uuid],
@@ -67,6 +74,7 @@ class CrewMobileCoverAndTeamApiTest extends TestCase
             ->json('data.id');
 
         Sanctum::actingAs($unrelatedUser, [TokenAbility::CrewMobile->value]);
+        $this->getJson('/api/v1/assignments/'.$assignment->uuid.'/cover-candidates')->assertNotFound();
         $this->getJson('/api/v1/cover-requests')->assertOk()
             ->assertJsonPath('data', []);
         $this->withHeader('Idempotency-Key', (string) Str::uuid())
@@ -79,6 +87,12 @@ class CrewMobileCoverAndTeamApiTest extends TestCase
         [$leaderUser, $leader] = $this->crew('Leader');
         [, $crew] = $this->crew('Crew');
         $leaderAssignment = $this->assignment($leader, true, today());
+        $leaderAssignment->equipmentResponsibilities()->create([
+            'item_code' => 'video_1',
+            'is_bringing' => true,
+            'is_taking' => false,
+            'other_notes' => 'Charge batteries.',
+        ]);
         $crewRole = CrewRole::query()->create([
             'code' => 'competition-photographer',
             'name' => 'Photographer',
@@ -97,7 +111,11 @@ class CrewMobileCoverAndTeamApiTest extends TestCase
             ->assertJsonPath('data.time.actual_clock_in_at', null)
             ->assertJsonPath('data.time.locked', false)
             ->assertJsonPath('data.permissions.can_clock_in', true)
-            ->assertJsonPath('data.permissions.can_finish_team', true);
+            ->assertJsonPath('data.permissions.can_finish_team', true)
+            ->assertJsonPath('data.is_team_leader', true)
+            ->assertJsonPath('data.shift_code', 'COMP-A')
+            ->assertJsonPath('data.equipment_responsibilities.0.item_code', 'video_1')
+            ->assertJsonPath('data.equipment_responsibilities.0.notes', 'Charge batteries.');
 
         $this->withHeader('Idempotency-Key', (string) Str::uuid())
             ->postJson('/api/v1/assignments/'.$leaderAssignment->uuid.'/finish-team', [

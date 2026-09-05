@@ -10,6 +10,7 @@ use App\Features\Crew\Requests\ChangeOwnPasswordRequest;
 use App\Features\Crew\Requests\UpdateCrewMobileProfileRequest;
 use App\Features\Crew\Resources\CrewMobileProfileResource;
 use App\Features\Crew\Services\CrewOnboardingStatus;
+use App\Features\Crew\Services\CrewProfileBadges;
 use App\Http\Controllers\Controller;
 use App\Shared\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -17,21 +18,24 @@ use Illuminate\Http\Request;
 
 class CrewMobileProfileController extends Controller
 {
-    public function show(Request $request): JsonResponse
+    public function show(Request $request, CrewProfileBadges $badges): JsonResponse
     {
         $profile = $request->user()->crewProfile->load(['user', 'vehicles']);
+        $profile->setRelation('mobileBadges', $badges->for($profile));
 
         return ApiResponse::success('Crew profile returned.', new CrewMobileProfileResource($profile));
     }
 
-    public function update(UpdateCrewMobileProfileRequest $request, UpdateOwnCrewProfile $update, RefreshCrewOnboardingStatus $refresh, CrewOnboardingStatus $onboarding): JsonResponse
+    public function update(UpdateCrewMobileProfileRequest $request, UpdateOwnCrewProfile $update, RefreshCrewOnboardingStatus $refresh, CrewOnboardingStatus $onboarding, CrewProfileBadges $badges): JsonResponse
     {
         $profile = $update->execute($request->user()->crewProfile, $request->profileData());
         $refresh->execute($profile);
         $status = $onboarding->for($profile);
+        $profile->load(['user', 'vehicles']);
+        $profile->setRelation('mobileBadges', $badges->for($profile));
 
         return ApiResponse::success('Crew profile updated.', [
-            'profile' => new CrewMobileProfileResource($profile->load(['user', 'vehicles'])),
+            'profile' => new CrewMobileProfileResource($profile),
             'user' => new CrewMobileUserResource($request->user()->refresh()),
             'onboarding_complete' => $status['complete'],
             'onboarding_missing' => $status['missing'],

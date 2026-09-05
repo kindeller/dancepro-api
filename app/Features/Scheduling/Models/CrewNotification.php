@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['uuid', 'user_id', 'type', 'title', 'message', 'destination_type', 'destination_id', 'read_at'])]
+#[Fillable(['uuid', 'user_id', 'type', 'title', 'message', 'destination_type', 'destination_id', 'read_at', 'digest_notified_at'])]
 class CrewNotification extends Model
 {
     use HasPublicUuid;
@@ -34,6 +34,6 @@ class CrewNotification extends Model
 
     protected function casts(): array
     {
-        return ['read_at' => 'datetime'];
+        return ['read_at' => 'datetime', 'digest_notified_at' => 'datetime'];
     }
 }

@@ -28,19 +28,20 @@ class PostEventMessage
                 'attachment_size' => $attachment?->getSize(),
             ]);
 
-            if ($type === 'announcement') {
-                $userIds = $event->shifts()->with('assignments.crewProfile')->get()
-                    ->flatMap->assignments->pluck('crewProfile.user_id')->filter()->unique();
-                foreach ($userIds as $userId) {
-                    CrewNotification::query()->create([
-                        'user_id' => $userId,
-                        'type' => 'event_announcement',
-                        'title' => 'Important update: '.$event->name,
-                        'message' => $message->body ?: 'A new event attachment needs your acknowledgement.',
-                        'destination_type' => 'chat',
-                        'destination_id' => $event->uuid,
-                    ]);
-                }
+            $userIds = $event->shifts()->with('assignments.crewProfile')->get()
+                ->flatMap->assignments->pluck('crewProfile.user_id')->filter()
+                ->unique()->reject(fn (int $userId): bool => $userId === $author->id);
+            foreach ($userIds as $userId) {
+                CrewNotification::query()->create([
+                    'user_id' => $userId,
+                    'type' => $type === 'announcement' ? 'event_announcement' : 'event_message',
+                    'title' => $type === 'announcement' ? 'Important update: '.$event->name : 'New event message: '.$event->name,
+                    'message' => $message->body ?: ($type === 'announcement'
+                        ? 'A new event attachment needs your acknowledgement.'
+                        : 'A new attachment was shared in the event chat.'),
+                    'destination_type' => 'chat',
+                    'destination_id' => $event->uuid,
+                ]);
             }
 
             return $message;

@@ -41,5 +41,6 @@ class CrewEventCommunicationController extends Controller
     {
         $assignment->loadMissing('shift.schedulingEvent');
         abort_unless($assignment->crew_profile_id === $request->user()?->crewProfile?->id && $assignment->status === 'published', 403);
+        abort_if($assignment->shift->schedulingEvent->cancelled_at !== null, 422, 'This event has been cancelled. Event actions are disabled.');
     }
 }

@@ -43,13 +43,30 @@ class EventCommunicationTest extends TestCase
 
     public function test_assigned_crew_can_post_discussion_but_cannot_post_announcements(): void
     {
-        [$crewUser, $assignment] = $this->publishedAssignment();
+        [$crewUser, $assignment, $event] = $this->publishedAssignment();
+        $recipient = User::factory()->crew()->create();
+        $recipientProfile = CrewProfile::factory()->for($recipient)->create();
+        $event->shifts->first()->assignments()->create([
+            'crew_profile_id' => $recipientProfile->id,
+            'crew_role_id' => CrewRole::factory()->create()->id,
+            'status' => 'published',
+        ]);
 
         $this->actingAs($crewUser)->post(route('crew.assignments.messages.store', $assignment), [
             'message_type' => 'discussion',
             'body' => 'Which entrance should I use?',
         ])->assertRedirect();
         $this->assertDatabaseHas('event_messages', ['author_user_id' => $crewUser->id, 'message_type' => 'discussion']);
+        $this->assertDatabaseHas('crew_notifications', [
+            'user_id' => $recipient->id,
+            'type' => 'event_message',
+            'destination_type' => 'chat',
+            'destination_id' => $event->uuid,
+        ]);
+        $this->assertDatabaseMissing('crew_notifications', [
+            'user_id' => $crewUser->id,
+            'type' => 'event_message',
+        ]);
 
         $this->actingAs($crewUser)->post(route('crew.assignments.messages.store', $assignment), [
             'message_type' => 'announcement',

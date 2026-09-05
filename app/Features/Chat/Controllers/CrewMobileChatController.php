@@ -65,6 +65,9 @@ class CrewMobileChatController extends Controller
     public function store(StoreChatMessageRequest $request, string $chatId, CrewMobileChat $chat, PostEventMessage $postEvent, PostDirectChatMessage $postDirect): JsonResponse
     {
         [$kind, $conversation] = $chat->resolve($request->user(), $chatId);
+        if ($kind === 'event') {
+            abort_if($conversation->cancelled_at !== null, 422, 'This event has been cancelled. New messages are disabled.');
+        }
         $message = $kind === 'event'
             ? $postEvent->execute($conversation, $request->user(), 'discussion', $request->input('body'), $request->file('attachment'))
             : $postDirect->execute($conversation, $request->user(), $request->input('body'), $request->file('attachment'));

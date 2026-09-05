@@ -11,6 +11,9 @@ class PublishRoster
 {
     public function execute(SchedulingEvent $event): void
     {
+        if ($event->cancelled_at !== null) {
+            throw ValidationException::withMessages(['roster' => 'A cancelled event cannot be published.']);
+        }
         $event->load(['roleRequirements', 'shifts.assignments.crewProfile']);
         foreach ($event->shifts as $shift) {
             $missing = $event->roleRequirements->pluck('crew_role_id')->diff($shift->assignments->pluck('crew_role_id'));

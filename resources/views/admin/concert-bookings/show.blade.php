@@ -1,10 +1,57 @@
-@extends('layouts.admin', ['title' => $booking->studio_name, 'heading' => $booking->studio_name, 'subheading' => 'Concert booking review'])
+@extends('layouts.admin', ['title' => $booking->studio_name, 'heading' => $booking->studio_name, 'subheading' => 'Edit concert booking'])
 
 @section('content')
 @include('admin.event-management._tabs')
-<div class="grid two-col"><div class="card card-pad"><h2>Contact</h2><dl class="detail-list"><dt>Name</dt><dd>{{ $booking->contact_name }}</dd><dt>Email</dt><dd>{{ $booking->contact_email }}</dd><dt>Phone</dt><dd>{{ $booking->contact_phone }}</dd><dt>Status</dt><dd><span class="badge">{{ $booking->status->value }}</span></dd></dl></div><div class="card card-pad"><h2>Services</h2><p>Portrait photography: {{ $booking->wants_portrait_photography ? 'Yes' : 'No' }}</p><p>Concert photography: {{ $booking->wants_concert_photography ? 'Yes' : 'No' }}</p><p>Concert videography: {{ $booking->wants_concert_videography ? 'Yes' : 'No' }}</p><p>Approximate families: {{ $booking->approximate_family_count ?: 'Not supplied' }}</p></div></div>
+<div class="booking-page-controls">
+    <a class="button secondary" href="{{ route('admin.concert-bookings.index') }}">← Back to event bookings</a>
+    <div class="booking-page-actions">
+        <span class="badge booking-status {{ $booking->status->value }}">{{ ucfirst($booking->status->value) }}</span>
+        @if($booking->status->value === 'pending')
+            @php($hasUnresolvedVenues = $booking->items->contains(fn ($item) => $item->approval_status === 'pending' && !$item->venue_id))
+            <form method="POST" action="{{ route('admin.concert-bookings.approve', $booking) }}">
+                @csrf
+                @if($contactReview['studio'])<input type="hidden" name="studio_uuid" value="{{ $contactReview['studio']->uuid }}">@endif
+                <button type="submit" title="{{ $hasUnresolvedVenues ? 'Resolve every proposed venue before approving this booking.' : 'Approve booking and create draft scheduling events.' }}" @disabled($hasUnresolvedVenues)>Approve booking</button>
+            </form>
+        @endif
+    </div>
+</div>
+<form method="POST" action="{{ route('admin.concert-bookings.update', $booking) }}" class="booking-edit-form">
+    @csrf @method('PUT')
+    <div class="booking-form-heading"><div><h2>Edit booking</h2><p class="muted">Update the submitted contact, services and event details below.</p></div><button type="submit">Save changes</button></div>
+    <div class="card card-pad booking-section"><div class="booking-section-heading"><span class="booking-section-number">1</span><div><h2>Studio and primary contact</h2><p class="muted">The details supplied by the studio for this booking.</p></div></div>
+        <div class="grid two-col"><label>Studio/company name<input name="studio_name" value="{{ old('studio_name', $booking->studio_name) }}" required></label><label>Contact name<input name="contact_name" value="{{ old('contact_name', $booking->contact_name) }}" required></label><label>Email<input type="email" name="contact_email" value="{{ old('contact_email', $booking->contact_email) }}" required></label><label>Phone<input name="contact_phone" value="{{ old('contact_phone', $booking->contact_phone) }}" required></label></div>
+    </div>
+    <div class="card card-pad booking-section"><div class="booking-section-heading"><span class="booking-section-number">2</span><div><h2>Services and delivery</h2><p class="muted">Choose the services included and keep the delivery information current.</p></div></div>
+        <label>Portrait photography interest<select name="portrait_photography_interest"><option value="yes" @selected(old('portrait_photography_interest',$booking->portrait_photography_interest)==='yes')>Yes</option><option value="no" @selected(old('portrait_photography_interest',$booking->portrait_photography_interest)==='no')>No</option><option value="unsure" @selected(old('portrait_photography_interest',$booking->portrait_photography_interest)==='unsure')>Unsure</option></select></label>
+        <div class="service-choices">@foreach(['wants_portrait_photography'=>'Portrait photography','wants_concert_photography'=>'Concert photography','wants_concert_videography'=>'Concert videography'] as $field=>$label)<label class="choice"><input type="hidden" name="{{ $field }}" value="0"><input type="checkbox" name="{{ $field }}" value="1" @checked(old($field,$booking->$field))><span>{{ $label }}</span></label>@endforeach</div>
+        <div class="grid two-col"><label>Approximate families<input type="number" name="approximate_family_count" min="1" value="{{ old('approximate_family_count',$booking->approximate_family_count) }}"></label><label>Relationship between multiple concerts<input name="multiple_concert_relationship" value="{{ old('multiple_concert_relationship',$booking->multiple_concert_relationship) }}"></label><label>Postal address<textarea name="postal_address">{{ old('postal_address',$booking->postal_address) }}</textarea></label><label>Previous video feedback<textarea name="previous_video_feedback">{{ old('previous_video_feedback',$booking->previous_video_feedback) }}</textarea></label></div>
+        <label class="choice"><input type="checkbox" name="concert_inclusions[]" value="presentations_awards" @checked(in_array('presentations_awards',old('concert_inclusions',$booking->concert_inclusions ?? [])))><span>Presentations / awards included</span></label><label class="choice"><input type="checkbox" name="concert_inclusions[]" value="tap_dance" @checked(in_array('tap_dance',old('concert_inclusions',$booking->concert_inclusions ?? [])))><span>Tap dance included</span></label>
+    </div>
+    <div class="card card-pad booking-section"><div class="booking-section-heading"><span class="booking-section-number">3</span><div><h2>Events</h2><p class="muted">Each concert or dress rehearsal contained in this booking.</p></div></div>
+        @foreach($booking->items as $index=>$item)
+            <div class="booking-edit-event {{ $item->approval_status === 'cancelled' ? 'cancelled' : '' }}"><div class="event-card-heading"><div><span class="event-number">Event {{ $index + 1 }}</span><strong>{{ $item->title ?: str($item->item_type->value)->replace('_',' ')->title() }}</strong></div><div class="event-card-actions">@if($item->approval_status === 'cancelled')<span class="badge cancelled">Cancelled</span>@else @if($item->programme_path)<details class="programme-menu"><summary class="programme-icon attached" title="Programme attached" aria-label="Programme attached">▤</summary><div><a href="{{ route('admin.concert-booking-events.programme.show', $item) }}" target="_blank">Open Programme</a><button type="button" data-programme-picker="programme-{{ $item->uuid }}">Replace Programme</button></div></details>@else<button class="programme-icon" type="button" title="Attach Programme" aria-label="Attach Programme" data-programme-picker="programme-{{ $item->uuid }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 12.5 14.8 6.2a3 3 0 0 1 4.2 4.2l-8.1 8.1a5 5 0 0 1-7.1-7.1l8.5-8.5M7.1 14l8.2-8.2"/></svg></button>@endif @if($item->schedulingEvent)<a href="{{ route('admin.scheduling-events.show',$item->schedulingEvent) }}">View scheduling event</a>@else<span class="muted">Not yet scheduled</span><button class="button danger event-cancel-button" type="submit" form="cancel-event-{{ $item->uuid }}">Cancel event</button>@endif @endif</div></div><input type="hidden" name="items[{{ $index }}][uuid]" value="{{ $item->uuid }}"><div class="grid"><label>Event type<select name="items[{{ $index }}][event_type_definition_id]">@foreach($eventTypes as $type)<option value="{{ $type->id }}" @selected($item->event_type_definition_id===$type->id)>{{ $type->name }}</option>@endforeach</select></label><label>Event details<select name="items[{{ $index }}][item_type]"><option value="concert" @selected($item->item_type->value==='concert')>Concert</option><option value="dress_rehearsal" @selected($item->item_type->value==='dress_rehearsal')>DR Portrait</option></select></label><label>Title<input name="items[{{ $index }}][title]" value="{{ old("items.$index.title",$item->title) }}" placeholder="Optional"></label></div>
+            @php($venueSelection=$item->venue?->uuid ?: 'other')
+            <div class="grid"><label>Venue<select name="items[{{ $index }}][venue_uuid]" class="edit-venue-select"><option value="other" @selected($venueSelection==='other')>Other venue</option>@foreach($venues as $venue)<option value="{{ $venue->uuid }}" @selected($venueSelection===$venue->uuid)>{{ $venue->name }}</option>@endforeach</select></label><label>Venue name<input name="items[{{ $index }}][venue_name]" value="{{ old("items.$index.venue_name",$item->venue_name) }}"></label><label>Venue address<input name="items[{{ $index }}][venue_address]" value="{{ old("items.$index.venue_address",$item->venue_address) }}"></label></div>
+            <div class="grid"><label>Date<input type="date" name="items[{{ $index }}][event_date]" value="{{ old("items.$index.event_date",$item->event_date->toDateString()) }}" required></label><label>Start time<input type="time" name="items[{{ $index }}][starts_at]" value="{{ old("items.$index.starts_at",substr($item->starts_at,0,5)) }}" required></label><label>Finish time<input type="time" name="items[{{ $index }}][finishes_at]" value="{{ old("items.$index.finishes_at",substr($item->finishes_at,0,5)) }}" required></label></div>@if($item->approval_status !== 'cancelled' && $item->schedulingEvent)<div class="scheduled-event-cancellation"><span class="muted">Cancelling keeps this event in scheduling as a cancelled record and stops crew and timesheet activity.</span><button class="button danger event-cancel-button" type="submit" form="cancel-event-{{ $item->uuid }}">Cancel event</button></div>@endif</div>
+        @endforeach
+    </div>
+    <details class="card booking-secondary"><summary><span><strong>Booking confirmations and internal note</strong><small>Requirements accepted by the studio and staff-only notes</small></span></summary><div class="card-pad"><label>Internal review note<textarea name="internal_review_note">{{ old('internal_review_note',$booking->internal_review_note) }}</textarea></label><h3>Accepted requirements</h3><div class="confirmation-grid">@foreach(['accurate'=>'Information is accurate','portrait_space'=>'Portrait space','no_personal_backdrop_photos'=>'No personal backdrop photos','minimum_spend'=>'Minimum spend','photographer_seat'=>'Photographer position','no_audience_recording'=>'No audience recording','promote_gallery'=>'Gallery promotion','credit_images'=>'Image credits','video_access'=>'Early video access','video_space_audio'=>'Video space and audio','programme_invoice'=>'Programme and invoice'] as $value=>$label)<label class="choice"><input type="checkbox" name="accepted_requirements[]" value="{{ $value }}" @checked(in_array($value,old('accepted_requirements',$booking->accepted_requirements ?? [])))><span>{{ $label }}</span></label>@endforeach</div></div></details>
+    <div class="booking-save-bar"><span class="muted">Changes are not applied until saved.</span><button type="submit">Save booking changes</button></div>
+</form>
 
-<section class="card card-pad contact-check" style="margin-top:20px">
+@foreach($booking->items as $item)
+    <form class="programme-upload-form" id="programme-{{ $item->uuid }}" method="POST" enctype="multipart/form-data" action="{{ route('admin.concert-booking-events.programme.store', $item) }}">
+        @csrf
+        <input type="file" name="programme" accept="application/pdf,.pdf" required data-programme-input>
+    </form>
+    @if($item->approval_status !== 'cancelled')
+        <form id="cancel-event-{{ $item->uuid }}" method="POST" action="{{ route('admin.concert-booking-events.cancel', $item) }}" onsubmit="return confirm('Cancel only this event? The other events in this booking will remain active.')">@csrf</form>
+    @endif
+@endforeach
+
+<details class="card booking-secondary contact-check">
+    <summary><span><strong>Studio directory contact check</strong><small>Compare this booking against the saved studio record</small></span></summary><div class="card-pad">
     <div class="toolbar">
         <div><h2>Studio contact check</h2><p class="muted">Compare the submitted booking contact with the saved studio directory. The booking snapshot is always preserved.</p></div>
         @if($contactReview['studio'])<a class="button secondary" href="{{ route('admin.studios.edit', $contactReview['studio']) }}">View studio</a>@endif
@@ -80,53 +127,80 @@
             </div>
         </form>
     @endif
-</section>
+</div></details>
 
-<div class="card card-pad" style="margin-top:20px"><h2>Events supplied</h2><table><thead><tr><th>Type</th><th>Title</th><th>Date and time</th><th>Venue</th><th>Scheduling event</th></tr></thead><tbody>
-@foreach($booking->items as $item)
-<tr>
-    <td><strong>{{ $item->eventTypeDefinition?->name ?: 'Concert' }}</strong><div class="muted">{{ str($item->item_type->value)->replace('_', ' ')->title() }}</div></td>
-    <td>{{ $item->title ?: 'Dress rehearsal' }}</td>
-    <td>{{ $item->event_date->format('j M Y') }}<div class="muted">{{ $item->starts_at }}–{{ $item->finishes_at }}</div></td>
-    <td>
-        <strong>{{ $item->venue_name }}</strong><div class="muted">{{ $item->venue_address }}</div>
-        @if($item->venue)
-            <p><span class="badge">Resolved: {{ $item->venue->name }}</span></p>
-        @elseif($item->approval_status === 'pending')
-            <div class="error" style="margin-top:8px">This venue must be resolved before approval.</div>
-            <form method="POST" action="{{ route('admin.concert-booking-events.venue.update', $item) }}" class="grid" style="margin-top:8px">
-                @csrf @method('PUT')
-                <label>Match an existing venue<select name="venue_uuid"><option value="">Select venue</option>@foreach($venues as $venue)<option value="{{ $venue->uuid }}">{{ $venue->name }}</option>@endforeach</select></label>
-                <div class="toolbar">
-                    <button type="submit" name="resolution_action" value="match">Use selected venue</button>
-                    <button class="secondary" type="submit" name="resolution_action" value="create">Create “{{ $item->venue_name }}”</button>
-                </div>
-            </form>
-        @endif
-    </td>
-    <td>@if($item->schedulingEvent)<a href="{{ route('admin.scheduling-events.show', $item->schedulingEvent) }}">View draft event</a>@else Not created @endif</td>
-</tr>
-@endforeach
-</tbody></table></div>
+@if($booking->status->value !== 'cancelled')<details class="card booking-danger"><summary>Cancel entire booking</summary><form method="POST" action="{{ route('admin.concert-bookings.cancel',$booking) }}" class="card-pad" onsubmit="return confirm('Cancel this entire booking and every remaining event? This cannot be undone.')">@csrf<h2>Cancel every event in this booking</h2><p class="muted">Use this only when the studio has cancelled the complete booking. To remove just one concert, use “Cancel event” on that event above.</p><button class="danger" type="submit">Cancel entire booking</button></form></details>@endif
 
-@if($booking->status->value === 'pending')
-<form method="POST" action="{{ route('admin.concert-bookings.approve', $booking) }}" class="card card-pad" style="margin-top:20px">
-    @csrf
-    @if($contactReview['studio'])<input type="hidden" name="studio_uuid" value="{{ $contactReview['studio']->uuid }}">@endif
-    <h2>Approve booking</h2>
-    @if($booking->items->contains(fn ($item) => $item->approval_status === 'pending' && !$item->venue_id))
-        <div class="error">Resolve every proposed venue above before approving this booking.</div>
-    @else
-        <p class="muted">This creates one draft scheduling event per supplied concert or rehearsal. Crew will not see them yet.</p>
-    @endif
-    <label>Internal review note<textarea name="internal_review_note" style="min-height:100px">{{ old('internal_review_note') }}</textarea></label>
-    <button @disabled($booking->items->contains(fn ($item) => $item->approval_status === 'pending' && !$item->venue_id))>Approve and create draft events</button>
-</form>
-@endif
 @endsection
+
+@push('scripts')
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
+    document.querySelectorAll('[data-programme-picker]').forEach((button) => {
+        button.addEventListener('click', () => document.querySelector(`#${CSS.escape(button.dataset.programmePicker)} [data-programme-input]`)?.click());
+    });
+    document.querySelectorAll('[data-programme-input]').forEach((input) => {
+        input.addEventListener('change', () => { if (input.files.length) input.form.submit(); });
+    });
+</script>
+@endpush
 
 @push('styles')
 <style>
+    .booking-page-controls { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
+    .booking-page-actions { display:flex; align-items:center; gap:10px; }
+    .booking-status { padding:5px 10px; text-transform:capitalize; }
+    .booking-status.pending { border-color:#e8aaa4; background:#fff0ef; color:#a8241b; }
+    .booking-edit-form { display:grid; gap:18px; max-width:900px; }
+    .booking-edit-form input[type="checkbox"],
+    .booking-edit-form input[type="radio"],
+    .contact-check input[type="checkbox"],
+    .contact-check input[type="radio"] {
+        width:18px;
+        min-width:18px;
+        max-width:18px;
+        height:18px;
+        min-height:18px;
+        margin:2px 0 0;
+        padding:0;
+        flex:0 0 18px;
+        accent-color:var(--brand);
+    }
+    .booking-edit-form .choice, .contact-check .choice {
+        display:flex;
+        align-items:flex-start;
+        gap:10px;
+    }
+    .booking-section > label > select { max-width:420px; }
+    .booking-form-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:4px 2px; }
+    .booking-form-heading h2, .booking-form-heading p { margin:0; }
+    .booking-section { margin:0; }
+    .booking-section-heading { display:flex; align-items:flex-start; gap:12px; margin-bottom:20px; padding-bottom:14px; border-bottom:1px solid var(--line); }
+    .booking-section-heading h2, .booking-section-heading p { margin:0; }
+    .booking-section-number { display:grid; place-items:center; flex:0 0 30px; width:30px; height:30px; border-radius:50%; background:var(--soft); color:var(--brand-strong); font-weight:800; }
+    .service-choices { display:flex; flex-wrap:wrap; gap:10px 22px; margin:14px 0 18px; padding:12px 14px; border-radius:7px; background:var(--paper); }
+    .service-choices .choice { margin:0; }
+    .booking-edit-event { margin-top:16px; padding:18px; border:1px solid var(--line); border-radius:8px; background:var(--paper); }
+    .booking-edit-event.cancelled { border-color:#e8c7c4; background:#fff8f7; opacity:.78; }
+    .booking-edit-event.cancelled input, .booking-edit-event.cancelled select { pointer-events:none; }
+    .booking-edit-event:first-of-type { margin-top:0; }
+    .event-card-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
+    .event-card-heading > div:first-child { display:grid; }
+    .event-card-actions { display:flex; align-items:center; gap:10px; }
+    .event-cancel-button { min-height:34px; padding:6px 10px; }
+    .badge.cancelled { border-color:#e8aaa4; background:#fff0ef; color:#a8241b; }
+    .event-number { color:var(--brand-strong); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    .booking-secondary, .booking-danger { max-width:900px; margin-top:18px; overflow:visible; }
+    .booking-secondary > summary, .booking-danger > summary { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; list-style:none; cursor:pointer; }
+    .booking-secondary > summary::-webkit-details-marker, .booking-danger > summary::-webkit-details-marker { display:none; }
+    .booking-secondary > summary::after, .booking-danger > summary::after { content:'+'; color:var(--brand-strong); font-size:22px; }
+    .booking-secondary[open] > summary::after, .booking-danger[open] > summary::after { content:'−'; }
+    .booking-secondary > summary span { display:grid; }
+    .booking-secondary > summary small { color:var(--muted); font-weight:400; }
+    .booking-secondary[open] > .card-pad { border-top:1px solid var(--line); }
+    .confirmation-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 18px; }
+    .booking-save-bar { position:sticky; bottom:12px; z-index:10; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 16px; border:1px solid #b9dce9; border-radius:8px; background:rgba(255,255,255,.96); box-shadow:0 10px 30px rgba(16,24,32,.12); backdrop-filter:blur(8px); }
+    .booking-danger { border-color:#efc1bd; background:#fffafa; }
+    .booking-danger > summary { color:var(--danger); font-weight:800; }
     .contact-check h2, .contact-check p { margin-top:0; }
     .contact-match-form { margin:16px 0; }
     .contact-warning, .contact-match { margin:14px 0; padding:12px 14px; border-radius:6px; }
@@ -139,6 +213,8 @@
     .comparison-grid { display:grid; grid-template-columns:minmax(110px,.7fr) minmax(180px,1.2fr) minmax(180px,1.2fr) minmax(90px,.5fr); gap:16px; align-items:center; padding:10px 0; border-top:1px solid var(--line); }
     .comparison-heading { border-top:0; color:var(--muted); font-size:12px; text-transform:uppercase; }
     .compact-choice { margin:0; }
-    @media (max-width:760px) { .comparison-heading { display:none; } .comparison-grid { grid-template-columns:1fr; gap:5px; } }
+    .programme-icon{display:inline-grid;place-items:center;width:34px;height:34px;min-height:34px;padding:0;border:1px solid #b9c8d0;border-radius:7px;background:#fff;color:#52636c;font-size:18px;line-height:1;cursor:pointer}.programme-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.programme-icon:hover,.programme-icon.attached{border-color:#2478a8;color:#17658f;background:#edf7fc}.programme-menu{position:relative}.programme-menu summary{list-style:none}.programme-menu summary::-webkit-details-marker{display:none}.programme-menu>div{position:absolute;z-index:20;right:0;top:40px;min-width:165px;padding:6px;border:1px solid #c8d3d9;border-radius:8px;background:#fff;box-shadow:0 8px 24px rgba(16,32,42,.16)}.programme-menu a,.programme-menu button{display:block;width:100%;padding:8px 10px;border:0;border-radius:5px;background:transparent;color:#173847;text-align:left;text-decoration:none;font:inherit;cursor:pointer}.programme-menu a:hover,.programme-menu button:hover{background:#edf4f7}.programme-upload-form{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+    .booking-edit-form h2 { margin-top:0; }.booking-edit-form textarea{min-height:90px}
+    @media (max-width:760px) { .comparison-heading { display:none; } .comparison-grid, .confirmation-grid { grid-template-columns:1fr; gap:5px; } .booking-form-heading,.booking-save-bar,.event-card-heading{align-items:stretch;flex-direction:column}.booking-save-bar button{width:100%}.booking-edit-event{padding:14px}.booking-page-controls{align-items:flex-start} }
 </style>
 @endpush

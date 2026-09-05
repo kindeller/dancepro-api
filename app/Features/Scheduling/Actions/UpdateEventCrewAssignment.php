@@ -15,6 +15,9 @@ class UpdateEventCrewAssignment
     {
         $shift->loadMissing('schedulingEvent');
         $event = $shift->schedulingEvent;
+        if ($event->cancelled_at !== null) {
+            throw ValidationException::withMessages(['crew_profile_uuid' => 'Crew cannot be assigned to a cancelled event.']);
+        }
         if (! $event->roleRequirements()->where('crew_role_id', $role->id)->exists()) {
             throw ValidationException::withMessages(['crew_profile_uuid' => 'That role is not required for this event.']);
         }

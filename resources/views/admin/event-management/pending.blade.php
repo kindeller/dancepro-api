@@ -17,3 +17,9 @@
 @push('scripts')
 <script nonce="{{ request()->attributes->get('csp_nonce') }}">const selectAll=document.getElementById('select-all');const eventCheckboxes=[...document.querySelectorAll('.event-checkbox')];selectAll?.addEventListener('change',()=>eventCheckboxes.forEach(checkbox=>checkbox.checked=selectAll.checked));</script>
 @endpush
+
+@push('styles')
+<style nonce="{{ request()->attributes->get('csp_nonce') }}">
+    .badge.pending { border-color:#e8aaa4; background:#fff0ef; color:#a8241b; }
+</style>
+@endpush

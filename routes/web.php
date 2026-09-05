@@ -170,7 +170,12 @@ Route::middleware(['auth', 'admin.required', 'two-factor.required'])
         Route::put('venues/{venue}/map', [AdminOperationsController::class, 'updateVenueMap'])->name('venues.map.update');
         Route::get('concert-bookings', [AdminConcertBookingController::class, 'index'])->name('concert-bookings.index');
         Route::patch('concert-booking-events/bulk-status', [AdminConcertBookingController::class, 'bulkUpdate'])->name('concert-booking-events.bulk-status');
+        Route::post('concert-booking-events/{concertBookingItem}/programme', [AdminConcertBookingController::class, 'storeProgramme'])->name('concert-booking-events.programme.store');
+        Route::get('concert-booking-events/{concertBookingItem}/programme', [AdminConcertBookingController::class, 'programme'])->name('concert-booking-events.programme.show');
+        Route::post('concert-booking-events/{concertBookingItem}/cancel', [AdminConcertBookingController::class, 'cancelItem'])->name('concert-booking-events.cancel');
         Route::get('concert-bookings/{concertBooking}', [AdminConcertBookingController::class, 'show'])->name('concert-bookings.show');
+        Route::put('concert-bookings/{concertBooking}', [AdminConcertBookingController::class, 'update'])->name('concert-bookings.update');
+        Route::post('concert-bookings/{concertBooking}/cancel', [AdminConcertBookingController::class, 'cancel'])->name('concert-bookings.cancel');
         Route::post('concert-bookings/{concertBooking}/create-studio', [AdminConcertBookingController::class, 'createStudio'])->name('concert-bookings.create-studio');
         Route::post('concert-bookings/{concertBooking}/reconcile-contact', [AdminConcertBookingController::class, 'reconcileContact'])->name('concert-bookings.reconcile-contact');
         Route::post('concert-bookings/{concertBooking}/approve', [AdminConcertBookingController::class, 'approve'])->name('concert-bookings.approve');

@@ -15,7 +15,7 @@ class CrewMobileAssignmentController extends Controller
 {
     public function index(Request $request, CrewMobileAssignments $assignments): JsonResponse
     {
-        $scope = in_array($request->string('scope')->toString(), ['upcoming', 'past', 'all'], true)
+        $scope = in_array($request->string('scope')->toString(), ['upcoming', 'past', 'cancelled', 'all'], true)
             ? $request->string('scope')->toString() : 'upcoming';
         $limit = min(max($request->integer('limit', 25), 1), 100);
         $page = $assignments->paginate($request->user()->crewProfile, $scope, $limit);

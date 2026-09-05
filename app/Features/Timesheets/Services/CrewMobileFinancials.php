@@ -21,6 +21,9 @@ class CrewMobileFinancials
             ->join('scheduling_shifts', 'scheduling_shifts.id', '=', 'scheduling_shift_assignments.scheduling_shift_id')
             ->where('scheduling_shift_assignments.crew_profile_id', $profile->id)
             ->where('scheduling_shift_assignments.status', 'published')
+            ->where(fn (Builder $query) => $query
+                ->whereHas('shift.schedulingEvent', fn (Builder $event) => $event->whereNull('cancelled_at'))
+                ->orWhereHas('timeEntry'))
             ->whereDate('scheduling_shifts.shift_date', '<=', today())
             ->when($filters['from'] ?? null, fn (Builder $query, string $from) => $query->whereDate('scheduling_shifts.shift_date', '>=', $from))
             ->when($filters['to'] ?? null, fn (Builder $query, string $to) => $query->whereDate('scheduling_shifts.shift_date', '<=', $to))
@@ -117,12 +120,13 @@ class CrewMobileFinancials
     public function timesheetResource(SchedulingShiftAssignment $assignment): array
     {
         $entry = $assignment->timeEntry;
+        $cancelled = $assignment->shift->schedulingEvent->cancelled_at !== null;
         $preview = $this->calculator->execute($assignment);
-        $status = $entry?->invoiceLine ? 'invoiced' : match (true) {
+        $status = $cancelled ? 'cancelled' : ($entry?->invoiceLine ? 'invoiced' : match (true) {
             $entry?->approval_status === 'externally_invoiced' => 'externally_invoiced',
             $entry?->actual_clock_in_at !== null && $entry?->actual_finish_at !== null => 'ready_to_invoice',
             default => 'draft',
-        };
+        });
 
         return [
             'id' => $assignment->uuid,
@@ -130,6 +134,7 @@ class CrewMobileFinancials
             'event_name' => $assignment->shift->schedulingEvent->name,
             'event_date' => $assignment->shift->shift_date->toDateString(),
             'status' => $status,
+            'cancelled' => $cancelled,
             'actual_clock_in_at' => $entry?->actual_clock_in_at?->toIso8601String(),
             'actual_finish_at' => $entry?->actual_finish_at?->toIso8601String(),
             'locked' => $entry?->locked_at !== null,
@@ -139,6 +144,14 @@ class CrewMobileFinancials
 
     private function filterTimesheetStatus(Builder $query, string $status): void
     {
+        if ($status === 'cancelled') {
+            $query->whereHas('shift.schedulingEvent', fn (Builder $event) => $event->whereNotNull('cancelled_at'));
+
+            return;
+        }
+
+        $query->whereHas('shift.schedulingEvent', fn (Builder $event) => $event->whereNull('cancelled_at'));
+
         match ($status) {
             'invoiced' => $query->whereHas('timeEntry.invoiceLine'),
             'externally_invoiced' => $query->whereDoesntHave('timeEntry.invoiceLine')

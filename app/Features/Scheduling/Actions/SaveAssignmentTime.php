@@ -14,6 +14,7 @@ class SaveAssignmentTime
     public function execute(SchedulingShiftAssignment $assignment, User $changedBy, ?string $clockIn, ?string $finish, ?string $note, string $source): AssignmentTimeEntry
     {
         $assignment->loadMissing('shift.schedulingEvent');
+        abort_if($assignment->shift->schedulingEvent->cancelled_at !== null, 422, 'This event has been cancelled. Time entries are disabled.');
 
         return DB::transaction(function () use ($assignment, $changedBy, $clockIn, $finish, $note, $source): AssignmentTimeEntry {
             $entry = $assignment->timeEntry()->firstOrCreate();

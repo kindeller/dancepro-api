@@ -20,6 +20,9 @@ class CreateShiftCoverRequest
         if ($assignment->crew_profile_id !== $requester->id || $assignment->status !== 'published') {
             abort(403);
         }
+        if ($assignment->shift->schedulingEvent->cancelled_at !== null) {
+            throw ValidationException::withMessages(['recipients' => 'Cover cannot be requested for a cancelled event.']);
+        }
         if ($assignment->timeEntry?->actual_clock_in_at || $assignment->shift->shift_date->lt(today())) {
             throw ValidationException::withMessages(['recipients' => 'Cover can only be organised before the shift starts.']);
         }

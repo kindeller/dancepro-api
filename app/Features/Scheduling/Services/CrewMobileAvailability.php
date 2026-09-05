@@ -15,32 +15,41 @@ class CrewMobileAvailability
         return SchedulingEvent::query()
             ->where('availability_status', AvailabilityRoundStatus::Open)
             ->where('availability_deadline', '>=', now())
-            ->with(['shifts' => fn ($query) => $query->with([
+            ->with(['venue', 'studio', 'shifts' => fn ($query) => $query->with([
                 'availabilityResponses' => fn ($responses) => $responses->where('crew_profile_id', $profile->id),
                 'assignments' => fn ($assignments) => $assignments->where('crew_profile_id', $profile->id)->where('status', 'published'),
             ])])
             ->orderBy('event_date')->get()
             ->flatMap(fn (SchedulingEvent $event) => $event->shifts
                 ->filter(fn (SchedulingShift $shift): bool => $shift->assignments->isEmpty())
-                ->map(fn (SchedulingShift $shift): array => $this->resource($shift, $shift->availabilityResponses->first())))
+                ->map(fn (SchedulingShift $shift): array => $this->resource($shift, $shift->availabilityResponses->first(), $event)))
             ->values();
     }
 
     public function findFor(CrewProfile $profile, SchedulingShift $shift): array
     {
-        $shift->loadMissing('schedulingEvent');
+        $shift->loadMissing(['schedulingEvent.venue', 'schedulingEvent.studio']);
         $response = $shift->availabilityResponses()->where('crew_profile_id', $profile->id)->first();
 
         return $this->resource($shift, $response);
     }
 
-    private function resource(SchedulingShift $shift, mixed $response): array
+    private function resource(SchedulingShift $shift, mixed $response, ?SchedulingEvent $event = null): array
     {
+        $event ??= $shift->schedulingEvent;
+
         return [
             'shift_id' => $shift->uuid,
-            'event_name' => $shift->schedulingEvent->name,
+            'event_name' => $event->name,
+            'event_logo_url' => $event->crewLogoUrl(),
+            'venue' => $event->venue ? [
+                'id' => $event->venue->uuid,
+                'name' => $event->venue->name,
+            ] : null,
+            'shift_period' => $shift->period?->value,
             'shift_date' => $shift->shift_date->toDateString(),
-            'deadline' => $shift->schedulingEvent->availability_deadline?->toIso8601String(),
+            'arrival_at' => $shift->posted_arrival_at?->toIso8601String(),
+            'deadline' => $event->availability_deadline?->toIso8601String(),
             'status' => $response?->status?->value,
             'note' => $response?->note,
             'locked' => $response?->locked_at !== null,

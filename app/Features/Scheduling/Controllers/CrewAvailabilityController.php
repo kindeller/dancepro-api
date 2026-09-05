@@ -31,6 +31,7 @@ class CrewAvailabilityController extends Controller
         $crewProfile = $request->user()->crewProfile;
 
         $events = SchedulingEvent::query()
+            ->whereNull('cancelled_at')
             ->where('availability_status', AvailabilityRoundStatus::Open)
             ->where('availability_deadline', '>=', now())
             ->with(['venue', 'studio', 'shifts' => fn ($query) => $query->with([
@@ -50,6 +51,7 @@ class CrewAvailabilityController extends Controller
         $assignments = SchedulingShiftAssignment::query()
             ->where('crew_profile_id', $crewProfile->id)
             ->where('status', 'published')
+            ->whereHas('shift.schedulingEvent', fn ($query) => $query->whereNull('cancelled_at'))
             ->with([
                 'equipmentResponsibilities',
                 'coverRequests',
@@ -69,6 +71,18 @@ class CrewAvailabilityController extends Controller
                 return sprintf('%s %s', $shiftDate?->format('Y-m-d') ?? '9999-12-31', $assignment->shift->posted_arrival_at?->format('H:i:s') ?? '23:59:59');
             })
             ->values();
+        $cancelledAssignments = SchedulingShiftAssignment::query()
+            ->where('crew_profile_id', $crewProfile->id)
+            ->where('status', 'published')
+            ->whereHas('shift.schedulingEvent', fn ($query) => $query->whereNotNull('cancelled_at'))
+            ->with([
+                'equipmentResponsibilities', 'coverRequests', 'role', 'timeEntry',
+                'shift.schedulingEvent.venue', 'shift.schedulingEvent.studio',
+                'shift.schedulingEvent.concertBookingItem.booking',
+            ])
+            ->get()
+            ->sortByDesc(fn (SchedulingShiftAssignment $assignment): string => ($assignment->shift->shift_date ?? $assignment->shift->schedulingEvent->event_date)?->format('Y-m-d') ?? '0000-00-00'
+            )->values();
         $checklistProgress = $checklistProgressForAssignments->execute($assignments);
         $needsAcknowledgement = $assignments->where('acknowledgement_status', '!=', 'acknowledged')->count();
         $pendingAvailability = $events->sum(fn (SchedulingEvent $event): int => $event->shifts->filter(
@@ -81,7 +95,7 @@ class CrewAvailabilityController extends Controller
             ->with(['acceptedBy.user', 'recipients.crewProfile.user', 'assignment.role', 'assignment.shift.schedulingEvent.venue'])
             ->latest()->get();
         $pendingCoverCount = $receivedCoverRequests->filter(fn (ShiftCoverRequestRecipient $recipient): bool => $recipient->status === 'pending' && $recipient->coverRequest->status === 'open')->count();
-        $filter = in_array($requestedFilter, ['availability', 'acknowledge', 'upcoming', 'cover', 'completed', 'calendar'], true)
+        $filter = in_array($requestedFilter, ['availability', 'acknowledge', 'upcoming', 'cover', 'completed', 'cancelled', 'calendar'], true)
             ? $requestedFilter
             : ($pendingAvailability > 0
                 ? 'availability'
@@ -103,7 +117,7 @@ class CrewAvailabilityController extends Controller
                 ->with('items')
                 ->get();
         }
-        $visibleAssignments = $assignments->filter(function (SchedulingShiftAssignment $assignment) use ($filter): bool {
+        $visibleAssignments = $filter === 'cancelled' ? $cancelledAssignments : $assignments->filter(function (SchedulingShiftAssignment $assignment) use ($filter): bool {
             $shiftDate = $assignment->shift->shift_date ?? $assignment->shift->schedulingEvent->event_date;
             if ($filter === 'acknowledge') {
                 return $assignment->acknowledgement_status !== 'acknowledged';
@@ -115,7 +129,10 @@ class CrewAvailabilityController extends Controller
 
             return $shiftDate !== null && ($shiftDate->isToday() || $shiftDate->isFuture());
         })->values();
-        $displayEvents = $events->concat($assignments->map(fn (SchedulingShiftAssignment $assignment) => $assignment->shift->schedulingEvent))->unique('id');
+        $displayEvents = $events
+            ->concat($assignments->map(fn (SchedulingShiftAssignment $assignment) => $assignment->shift->schedulingEvent))
+            ->concat($cancelledAssignments->map(fn (SchedulingShiftAssignment $assignment) => $assignment->shift->schedulingEvent))
+            ->unique('id');
         $eventLogoUrls = $displayEvents->mapWithKeys(function (SchedulingEvent $event): array {
             $logoUrl = $event->logoUrl();
             if ($event->event_type === SchedulingEventType::Concert) {
@@ -131,7 +148,7 @@ class CrewAvailabilityController extends Controller
         $calendarEnd = ($assignmentDates->last()?->copy() ?? today())->startOfMonth()->max(today()->startOfMonth());
         $calendarMonths = collect(CarbonPeriod::create($calendarStart, '1 month', $calendarEnd))->map(fn ($month) => $month->copy());
 
-        return view('crew.availability.index', compact('events', 'crewProfile', 'assignments', 'visibleAssignments', 'nextAssignment', 'nextChecklistTemplates', 'notifications', 'filter', 'needsAcknowledgement', 'pendingAvailability', 'eventLogoUrls', 'receivedCoverRequests', 'sentCoverRequests', 'pendingCoverCount', 'assignmentsByDate', 'calendarMonths', 'checklistProgress'));
+        return view('crew.availability.index', compact('events', 'crewProfile', 'assignments', 'cancelledAssignments', 'visibleAssignments', 'nextAssignment', 'nextChecklistTemplates', 'notifications', 'filter', 'needsAcknowledgement', 'pendingAvailability', 'eventLogoUrls', 'receivedCoverRequests', 'sentCoverRequests', 'pendingCoverCount', 'assignmentsByDate', 'calendarMonths', 'checklistProgress'));
     }
 
     public function store(RecordAvailabilityResponseRequest $request, SchedulingShift $schedulingShift, RecordAvailabilityResponse $recordResponse): RedirectResponse

@@ -54,6 +54,9 @@ class CrewMobileProfileResource extends JsonResource
                 'colour' => $vehicle->colour,
                 'notes' => $vehicle->notes,
             ])->values(),
+            'badges' => $this->resource->relationLoaded('mobileBadges')
+                ? $this->resource->getRelation('mobileBadges')
+                : [],
             'updated_at' => $this->updated_at->toIso8601String(),
         ];
     }

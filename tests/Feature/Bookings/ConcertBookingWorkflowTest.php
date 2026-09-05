@@ -4,12 +4,17 @@ namespace Tests\Feature\Bookings;
 
 use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Bookings\Models\ConcertBookingItem;
+use App\Features\Crew\Models\CrewProfile;
+use App\Features\Crew\Models\CrewRole;
+use App\Features\Scheduling\Models\CrewNotification;
 use App\Features\Scheduling\Models\EventTypeDefinition;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Studios\Models\Studio;
 use App\Features\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ConcertBookingWorkflowTest extends TestCase
@@ -224,6 +229,11 @@ class ConcertBookingWorkflowTest extends TestCase
             'action' => 'approve',
         ])->assertRedirect();
 
+        $this->actingAs($staff)->get(route('admin.concert-bookings.index'))
+            ->assertOk()
+            ->assertSee('>Edit</a>', false)
+            ->assertSee('>Review</a>', false);
+
         $this->assertSame('approved', $items[0]->refresh()->approval_status);
         $this->assertSame('pending', $items[1]->refresh()->approval_status);
         $this->assertSame('pending', $booking->refresh()->status->value);
@@ -255,10 +265,209 @@ class ConcertBookingWorkflowTest extends TestCase
 
         $response = $this->actingAs($staff)->get(route('admin.concert-bookings.index'));
 
-        $response->assertOk()->assertSee('A Night of Dance')->assertSee('Dress rehearsal');
+        $response->assertOk()->assertSee('A Night of Dance')->assertSee('Dress rehearsal')->assertSee('Review')->assertDontSee('>Edit</a>', false);
         foreach ($items as $item) {
             $response->assertSee($item->uuid);
         }
+
+        $this->actingAs($staff)->get(route('admin.event-management.pending'))
+            ->assertOk()
+            ->assertSee('badge pending', false)
+            ->assertSee('Pending approval');
+
+        $this->actingAs($staff)->get(route('admin.concert-bookings.show', ConcertBooking::query()->firstOrFail()))
+            ->assertOk()
+            ->assertSee('Approve booking')
+            ->assertSee(route('admin.concert-bookings.approve', ConcertBooking::query()->firstOrFail()), false);
+    }
+
+    public function test_admin_can_attach_open_and_replace_an_event_programme(): void
+    {
+        Storage::fake('local');
+        config(['operations.filesystem_disk' => 'local']);
+        $this->post(route('concert-bookings.store'), $this->bookingData());
+        $staff = User::factory()->staff()->create();
+        $item = ConcertBookingItem::query()->firstOrFail();
+
+        $this->actingAs($staff)->get(route('admin.concert-bookings.index'))
+            ->assertOk()
+            ->assertSee('Attach Programme')
+            ->assertSee('name="programme"', false)
+            ->assertSee('enctype="multipart/form-data"', false);
+        $this->actingAs($staff)->get(route('admin.concert-bookings.show', $item->booking))
+            ->assertOk()
+            ->assertSee('Attach Programme')
+            ->assertSee('data-programme-picker="programme-'.$item->uuid.'"', false);
+
+        $this->actingAs($staff)->post(route('admin.concert-booking-events.programme.store', $item), [
+            'programme' => UploadedFile::fake()->create('first-programme.pdf', 40, 'application/pdf'),
+        ])->assertRedirect()->assertSessionHas('status', 'Event programme attached.');
+        $this->actingAs($staff)->post(route('admin.concert-bookings.approve', $item->booking))->assertRedirect();
+
+        $item->refresh();
+        $firstPath = $item->programme_path;
+        Storage::disk('local')->assertExists($firstPath);
+        $this->assertSame($firstPath, $item->schedulingEvent->programme_path);
+        $this->actingAs($staff)->get(route('admin.concert-booking-events.programme.show', $item))
+            ->assertOk()
+            ->assertHeader('content-disposition', 'inline; filename=first-programme.pdf');
+        $this->actingAs($staff)->get(route('admin.concert-bookings.index'))
+            ->assertOk()->assertSee('Open Programme')->assertSee('Replace Programme');
+        $this->actingAs($staff)->get(route('admin.concert-bookings.show', $item->booking))
+            ->assertOk()->assertSee('Open Programme')->assertSee('Replace Programme');
+
+        $this->actingAs($staff)->post(route('admin.concert-booking-events.programme.store', $item), [
+            'programme' => UploadedFile::fake()->create('replacement.pdf', 50, 'application/pdf'),
+        ])->assertRedirect();
+
+        Storage::disk('local')->assertMissing($firstPath);
+        Storage::disk('local')->assertExists($item->refresh()->programme_path);
+        $this->assertSame('replacement.pdf', $item->programme_name);
+        $this->assertSame($item->programme_path, $item->schedulingEvent->programme_path);
+    }
+
+    public function test_event_programmes_are_pdf_only_and_admin_private(): void
+    {
+        Storage::fake('local');
+        config(['operations.filesystem_disk' => 'local']);
+        $this->post(route('concert-bookings.store'), $this->bookingData());
+        $staff = User::factory()->staff()->create();
+        $item = ConcertBookingItem::query()->firstOrFail();
+
+        $this->actingAs($staff)->post(route('admin.concert-booking-events.programme.store', $item), [
+            'programme' => UploadedFile::fake()->image('not-a-programme.jpg'),
+        ])->assertSessionHasErrors('programme');
+
+        $crew = User::factory()->crew()->create(['onboarding_completed_at' => now()]);
+        $this->actingAs($crew)->post(route('admin.concert-booking-events.programme.store', $item), [
+            'programme' => UploadedFile::fake()->create('programme.pdf', 20, 'application/pdf'),
+        ])->assertForbidden();
+        $this->actingAs($crew)->get(route('admin.concert-booking-events.programme.show', $item))->assertForbidden();
+        $this->assertNull($item->refresh()->programme_path);
+    }
+
+    public function test_admin_can_edit_all_booking_and_event_details(): void
+    {
+        $this->post(route('concert-bookings.store'), $this->bookingData());
+        $staff = User::factory()->staff()->create();
+        $booking = ConcertBooking::query()->with('items')->firstOrFail();
+        $this->actingAs($staff)->post(route('admin.concert-bookings.approve', $booking))->assertRedirect();
+        $crewUser = User::factory()->crew()->create();
+        $crewProfile = CrewProfile::factory()->for($crewUser)->create();
+        $role = CrewRole::factory()->create();
+        $assignment = $booking->items()->oldest('id')->firstOrFail()->schedulingEvent->shifts()->firstOrFail()->assignments()->create([
+            'crew_profile_id' => $crewProfile->id,
+            'crew_role_id' => $role->id,
+            'status' => 'published',
+            'acknowledgement_status' => 'acknowledged',
+            'acknowledged_at' => now(),
+        ]);
+        $venue = Venue::query()->where('name', 'Example Theatre')->firstOrFail();
+        $items = $booking->items->values()->map(fn (ConcertBookingItem $item, int $index): array => [
+            'uuid' => $item->uuid,
+            'item_type' => $index === 0 ? 'dress_rehearsal' : 'concert',
+            'event_type_definition_id' => $item->event_type_definition_id,
+            'title' => $index === 0 ? 'Updated rehearsal' : 'Updated concert',
+            'venue_uuid' => $venue->uuid,
+            'event_date' => now()->addMonths(3 + $index)->toDateString(),
+            'starts_at' => '16:30',
+            'finishes_at' => '20:30',
+        ])->all();
+
+        $this->actingAs($staff)->put(route('admin.concert-bookings.update', $booking), [
+            'studio_name' => 'Updated Dance Academy', 'contact_name' => 'Updated Contact',
+            'contact_email' => 'updated@example.test', 'contact_phone' => '0411 222 333',
+            'portrait_photography_interest' => 'unsure', 'wants_portrait_photography' => '0',
+            'wants_concert_photography' => '1', 'wants_concert_videography' => '0',
+            'approximate_family_count' => 145, 'postal_address' => 'New postal address',
+            'previous_video_feedback' => 'Updated feedback', 'concert_inclusions' => ['tap_dance'],
+            'multiple_concert_relationship' => 'Same dancers', 'accepted_requirements' => ['accurate'],
+            'internal_review_note' => 'Details confirmed by phone.', 'items' => $items,
+        ])->assertRedirect()->assertSessionHas('status', 'Booking details updated.');
+
+        $booking->refresh();
+        $this->assertSame('Updated Dance Academy', $booking->studio_name);
+        $this->assertSame('updated@example.test', $booking->contact_email);
+        $this->assertFalse($booking->wants_concert_videography);
+        $this->assertSame(['tap_dance'], $booking->concert_inclusions);
+        $this->assertSame('Updated rehearsal', $booking->items()->oldest('id')->first()->title);
+        $this->assertSame('16:30:00', $booking->items()->oldest('id')->first()->starts_at);
+        $this->assertSame('reset_by_material_change', $assignment->refresh()->acknowledgement_status);
+        $this->assertNull($assignment->acknowledged_at);
+        $this->assertDatabaseHas('crew_notifications', [
+            'user_id' => $crewUser->id,
+            'type' => 'shift_changed',
+            'destination_id' => $assignment->uuid,
+        ]);
+    }
+
+    public function test_admin_can_safely_cancel_and_hide_a_pending_booking(): void
+    {
+        $this->post(route('concert-bookings.store'), $this->bookingData());
+        $staff = User::factory()->staff()->create();
+        $booking = ConcertBooking::query()->firstOrFail();
+
+        $this->actingAs($staff)->post(route('admin.concert-bookings.cancel', $booking))
+            ->assertRedirect(route('admin.concert-bookings.index'));
+        $this->assertSame('cancelled', $booking->refresh()->status->value);
+        $this->assertNotNull($booking->cancelled_at);
+        $this->assertTrue($booking->items->every(fn (ConcertBookingItem $item): bool => $item->approval_status === 'cancelled'));
+        $this->actingAs($staff)->get(route('admin.concert-bookings.index'))->assertOk()->assertDontSee($booking->studio_name);
+    }
+
+    public function test_admin_can_cancel_one_approved_event_without_removing_the_rest_of_the_booking(): void
+    {
+        $this->post(route('concert-bookings.store'), $this->bookingData());
+        $staff = User::factory()->staff()->create();
+        $booking = ConcertBooking::query()->firstOrFail();
+
+        $this->actingAs($staff)->post(route('admin.concert-bookings.approve', $booking))->assertRedirect();
+        $cancelledItem = $booking->items()->oldest('id')->firstOrFail();
+        $remainingItem = $booking->items()->latest('id')->firstOrFail();
+        $cancelledEvent = $cancelledItem->schedulingEvent;
+        $crewUser = User::factory()->crew()->create();
+        $crewProfile = CrewProfile::factory()->for($crewUser)->create();
+        $role = CrewRole::factory()->create();
+        $assignment = $cancelledEvent->shifts()->firstOrFail()->assignments()->create([
+            'crew_profile_id' => $crewProfile->id,
+            'crew_role_id' => $role->id,
+            'status' => 'published',
+        ]);
+        $obsoleteNotification = CrewNotification::query()->create([
+            'user_id' => $crewUser->id,
+            'type' => 'shift_allocation',
+            'title' => 'New shift',
+            'message' => 'Please acknowledge.',
+            'destination_type' => 'assignment',
+            'destination_id' => $assignment->uuid,
+        ]);
+
+        $this->actingAs($staff)->post(route('admin.concert-booking-events.cancel', $cancelledItem))
+            ->assertRedirect(route('admin.concert-bookings.show', $booking))
+            ->assertSessionHas('status', 'Booking event cancelled.');
+
+        $this->assertSame('cancelled', $cancelledItem->refresh()->approval_status);
+        $this->assertNotNull($cancelledItem->cancelled_at);
+        $this->assertNotNull($cancelledEvent->refresh()->cancelled_at);
+        $this->assertSame('closed', $cancelledEvent->availability_status->value);
+        $this->assertSame('approved', $remainingItem->refresh()->approval_status);
+        $this->assertSame('approved', $booking->refresh()->status->value);
+        $notification = CrewNotification::query()->where('user_id', $crewUser->id)->where('type', 'event_cancelled')->firstOrFail();
+        $this->assertSame('assignment', $notification->destination_type);
+        $this->assertSame($assignment->uuid, $notification->destination_id);
+        $this->assertNotNull($obsoleteNotification->refresh()->read_at);
+
+        $this->actingAs($crewUser)->get(route('crew.availability.index', ['view' => 'upcoming']))
+            ->assertOk()->assertSee('No shifts here.')->assertDontSee('cancelled-shift-card', false);
+        $this->actingAs($crewUser)->get(route('crew.availability.index', ['view' => 'cancelled']))
+            ->assertOk()->assertSee($cancelledEvent->name)->assertSee('Cancelled')->assertSee('text-decoration:line-through', false);
+        $this->actingAs($crewUser)->get(route('crew.assignments.show', $assignment))
+            ->assertOk()->assertSee('This shift has been cancelled')->assertDontSee('Organise cover')->assertDontSee('Post message');
+
+        $this->actingAs($staff)->get(route('admin.concert-bookings.show', $booking))
+            ->assertOk()->assertSee('Cancelled')->assertSee($remainingItem->title);
+        $this->actingAs($staff)->get(route('admin.scheduling-events.index'))
+            ->assertOk()->assertSee('cancelled-event-row')->assertSee('Cancelled');
     }
 
     public function test_event_creation_starts_with_the_event_type_decision(): void

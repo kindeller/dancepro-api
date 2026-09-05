@@ -8,6 +8,8 @@ use App\Features\Deployment\Services\DatabaseBackup;
 use App\Features\Deployment\Services\ProductionDependencyCheck;
 use App\Features\Deployment\Services\ProductionEnvironmentValidator;
 use App\Features\Downloads\Actions\PruneDownloadAccesses;
+use App\Features\Notifications\Actions\CreateDailyActionDigests;
+use App\Features\Notifications\Actions\CreateShiftArrivalReminders;
 use App\Features\Operations\Actions\SecureExistingInternalDocuments;
 use App\Features\Venues\Actions\ImportVenueCatalog;
 use Illuminate\Foundation\Inspiring;
@@ -82,6 +84,17 @@ Artisan::command('api:prune-idempotency', function (PruneApiIdempotencyRecords $
 
 Schedule::command('downloads:prune-accesses')->daily()->withoutOverlapping();
 Schedule::command('api:prune-idempotency')->hourly()->withoutOverlapping()->onOneServer();
+Schedule::call(fn () => app(CreateShiftArrivalReminders::class)->execute())
+    ->name('notifications:shift-arrival-reminders')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer();
+Schedule::call(fn () => app(CreateDailyActionDigests::class)->execute())
+    ->name('notifications:daily-action-digest')
+    ->dailyAt('10:00')
+    ->timezone((string) config('app.timezone'))
+    ->withoutOverlapping()
+    ->onOneServer();
 Schedule::command('database:backup --prune')
     ->dailyAt((string) config('backups.database.schedule_time'))
     ->timezone((string) config('app.timezone'))

@@ -12,6 +12,8 @@ class UpdateAssignmentChecklistItem
 {
     public function execute(SchedulingShiftAssignment $assignment, ChecklistTemplateItem $item, User $user, bool $completed): void
     {
+        $assignment->loadMissing('shift.schedulingEvent');
+        abort_if($assignment->shift->schedulingEvent->cancelled_at !== null, 422, 'This event has been cancelled. Checklist updates are disabled.');
         abort_unless($assignment->crew_profile_id === $user->crewProfile?->id && $assignment->status === 'published', 404);
         abort_unless($this->itemApplies($assignment, $item), 404);
 

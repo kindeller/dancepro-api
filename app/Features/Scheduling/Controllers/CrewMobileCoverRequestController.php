@@ -7,8 +7,11 @@ use App\Features\Scheduling\Actions\CreateShiftCoverRequest;
 use App\Features\Scheduling\Models\SchedulingShiftAssignment;
 use App\Features\Scheduling\Models\ShiftCoverRequest;
 use App\Features\Scheduling\Requests\StoreShiftCoverRequest;
+use App\Features\Scheduling\Resources\CrewCoverCandidateResource;
 use App\Features\Scheduling\Resources\CrewCoverRequestResource;
+use App\Features\Scheduling\Services\CrewMobileAssignments;
 use App\Features\Scheduling\Services\CrewMobileCoverRequests;
+use App\Features\Scheduling\Services\EligibleCoverCandidates;
 use App\Http\Controllers\Controller;
 use App\Shared\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +19,16 @@ use Illuminate\Http\Request;
 
 class CrewMobileCoverRequestController extends Controller
 {
+    public function candidates(Request $request, SchedulingShiftAssignment $assignment, CrewMobileAssignments $assignments, EligibleCoverCandidates $candidates): JsonResponse
+    {
+        $assignment = $assignments->findOwned($request->user()->crewProfile, $assignment);
+
+        return ApiResponse::success(
+            'Eligible cover candidates returned.',
+            CrewCoverCandidateResource::collection($candidates->execute($assignment)),
+        );
+    }
+
     public function index(Request $request, CrewMobileCoverRequests $coverRequests): JsonResponse
     {
         $limit = min(max($request->integer('limit', 25), 1), 100);

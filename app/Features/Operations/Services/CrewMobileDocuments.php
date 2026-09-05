@@ -3,6 +3,7 @@
 namespace App\Features\Operations\Services;
 
 use App\Features\Operations\Models\OperationalResource;
+use App\Features\Operations\Support\OperationalRoleCodes;
 use App\Features\Scheduling\Models\SchedulingShiftAssignment;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -30,12 +31,16 @@ class CrewMobileDocuments
         $event = $assignment->shift->schedulingEvent;
         $eventType = $event->event_type instanceof \BackedEnum ? $event->event_type->value : $event->event_type;
         $roleCode = $assignment->role?->code;
+        $roleCodes = OperationalRoleCodes::forAssignment($roleCode);
 
         return OperationalResource::query()
             ->where('is_active', true)
             ->whereNotNull('file_path')
-            ->where(fn ($query) => $query->whereNull('event_type')->orWhere('event_type', $eventType))
-            ->where(fn ($query) => $query->whereNull('role_code')->orWhere('role_code', $roleCode))
+            ->where(fn ($query) => $query
+                ->whereNull('event_type')
+                ->orWhere('event_type_definition_id', $event->event_type_definition_id)
+                ->orWhere(fn ($query) => $query->whereNull('event_type_definition_id')->where('event_type', $eventType)))
+            ->where(fn ($query) => $query->whereNull('role_code')->orWhereIn('role_code', $roleCodes))
             ->orderBy('sort_order')->orderBy('title')->get()
             ->filter(fn (OperationalResource $resource): bool => $this->files->disk()->exists($resource->file_path))
             ->map(fn (OperationalResource $resource): array => $this->metadata($resource))->values();

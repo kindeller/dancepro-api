@@ -29,9 +29,12 @@ class AssignmentTimeEntry extends Model
 
     public function reviewFlags(): array
     {
-        $this->loadMissing(['assignment.shift', 'audits']);
+        $this->loadMissing(['assignment.shift.schedulingEvent', 'audits']);
         $flags = [];
         $shift = $this->assignment->shift;
+        if ($shift->schedulingEvent->cancelled_at !== null) {
+            $flags[] = 'Event cancelled after time was recorded';
+        }
         if ($this->actual_clock_in_at && $shift->posted_arrival_at && $this->actual_clock_in_at->gt($shift->posted_arrival_at)) {
             $flags[] = 'Clocked in after posted arrival';
         }

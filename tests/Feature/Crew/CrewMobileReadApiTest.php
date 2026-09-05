@@ -7,6 +7,7 @@ use App\Features\CompetitionContacts\Models\CompetitionContact;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Operations\Models\OperationalResource;
+use App\Features\Scheduling\Models\EventTypeDefinition;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Studios\Models\Studio;
 use App\Features\Studios\Support\StudioStatus;
@@ -34,7 +35,10 @@ class CrewMobileReadApiTest extends TestCase
         $this->getJson('/api/v1/dashboard')
             ->assertOk()
             ->assertJsonPath('data.next_assignment.id', $own->uuid)
-            ->assertJsonPath('data.next_assignment.event_name', 'Own upcoming event');
+            ->assertJsonPath('data.next_assignment.event_name', 'Own upcoming event')
+            ->assertJsonStructure(['data' => [
+                'pending_acknowledgements', 'pending_cover_requests', 'pending_timesheets',
+            ]]);
 
         $this->getJson('/api/v1/assignments')
             ->assertOk()
@@ -58,6 +62,25 @@ class CrewMobileReadApiTest extends TestCase
         $this->getJson('/api/v1/assignments/'.$other->id)->assertNotFound();
     }
 
+    public function test_cancelled_assignments_are_read_only_and_available_in_cancelled_history(): void
+    {
+        [, $profile] = $this->authenticatedCrew();
+        $assignment = $this->assignmentFor($profile, 'Cancelled mobile event', today()->addDay()->toDateString());
+        $assignment->shift->schedulingEvent->update(['cancelled_at' => now()]);
+
+        $this->getJson('/api/v1/assignments')
+            ->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/assignments?scope=cancelled')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $assignment->uuid)
+            ->assertJsonPath('data.0.cancelled', true)
+            ->assertJsonPath('data.0.allowed_actions', []);
+        $this->getJson('/api/v1/assignments?scope=all')
+            ->assertOk()->assertJsonPath('data.0.id', $assignment->uuid);
+        $this->getJson('/api/v1/assignments/'.$assignment->uuid)
+            ->assertOk()->assertJsonPath('data.cancelled', true);
+    }
+
     public function test_assignment_detail_contains_private_venue_programme_and_applicable_documents(): void
     {
         Storage::fake('local');
@@ -65,6 +88,13 @@ class CrewMobileReadApiTest extends TestCase
         config(['operations.filesystem_disk' => 'local', 'uploads.public_disk' => 'public']);
         [, $profile] = $this->authenticatedCrew();
         $assignment = $this->assignmentFor($profile, 'Detailed Event', today()->addDay()->toDateString());
+        $assignment->update([
+            'crew_role_id' => CrewRole::query()->where('code', 'competition-photographer-p1')->firstOrFail()->id,
+        ]);
+        $eventType = EventTypeDefinition::query()->create([
+            'code' => 'dance-competition', 'name' => 'Dance Competition',
+            'system_category' => 'competition', 'is_active' => true,
+        ]);
         $venue = Venue::query()->create([
             'name' => 'Perth Theatre', 'address_line_1' => '1 Stage Road', 'suburb' => 'Perth',
             'state' => 'WA', 'postcode' => '6000', 'parking_notes' => 'Use bay 4.',
@@ -75,10 +105,15 @@ class CrewMobileReadApiTest extends TestCase
         Storage::disk('local')->put('events/programme.pdf', 'programme');
         Storage::disk('local')->put('resources/checklist.pdf', 'checklist');
         Storage::disk('public')->put('venues/reference.jpg', 'image');
-        $assignment->shift->schedulingEvent->update(['venue_id' => $venue->id, 'programme_path' => 'events/programme.pdf']);
+        $assignment->shift->schedulingEvent->update([
+            'venue_id' => $venue->id,
+            'programme_path' => 'events/programme.pdf',
+            'event_type_definition_id' => $eventType->id,
+        ]);
         OperationalResource::query()->create([
-            'title' => 'Photographer checklist', 'resource_type' => 'document', 'event_type' => 'competition',
-            'role_code' => $assignment->role->code, 'file_path' => 'resources/checklist.pdf', 'is_active' => true,
+            'title' => 'Photographer checklist', 'resource_type' => 'document',
+            'event_type_definition_id' => $eventType->id, 'role_code' => 'competition-photographer',
+            'file_path' => 'resources/checklist.pdf', 'is_active' => true,
         ]);
 
         $response = $this->getJson('/api/v1/assignments/'.$assignment->uuid)
@@ -98,6 +133,10 @@ class CrewMobileReadApiTest extends TestCase
             $temporaryUrls[] = $issued->json('data.url');
             $this->get($issued->json('data.url'))->assertOk()->assertHeader('cache-control', 'no-store, private');
         }
+        $assignment->shift->schedulingEvent->update(['cancelled_at' => now()]);
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->postJson('/api/v1/assignments/'.$assignment->uuid.'/files/programme/download')
+            ->assertOk();
         $this->get('/api/v1/assignment-files/'.$assignment->uuid.'/programme/content')->assertForbidden();
         $this->travel(11)->minutes();
         $this->get($temporaryUrls[0])->assertForbidden();
@@ -187,16 +226,36 @@ class CrewMobileReadApiTest extends TestCase
             'bank_bsb' => '123-456', 'bank_account_number' => '123456789',
             'internal_notes' => 'Administrator only', 'super_member_number' => 'SUPER-SECRET',
         ]);
+        $role = CrewRole::query()->create([
+            'code' => 'profile-badge-role', 'name' => 'Profile Badge Role',
+            'event_type' => 'competition', 'is_active' => true,
+        ]);
+        $profile->roles()->attach($role->id, ['status' => 'approved']);
 
         $this->getJson('/api/v1/profile')
             ->assertOk()
             ->assertJsonPath('data.id', $profile->uuid)
             ->assertJsonPath('data.payment_details.bsb_last_four', '3456')
             ->assertJsonPath('data.payment_details.account_number_last_four', '6789')
+            ->assertJsonPath('data.badges.training.0.name', 'Profile Badge Role')
             ->assertDontSee('123-456')
             ->assertDontSee('123456789')
             ->assertDontSee('Administrator only')
             ->assertDontSee('SUPER-SECRET');
+    }
+
+    public function test_current_user_capabilities_identify_admin_crew_without_granting_it_to_regular_crew(): void
+    {
+        [$crewUser] = $this->authenticatedCrew();
+        $this->getJson('/api/v1/auth/me')->assertOk()
+            ->assertJsonPath('data.capabilities', ['crew']);
+
+        $admin = User::factory()->crew()->create(['is_admin' => true]);
+        $this->completeCrew(user: $admin);
+        Sanctum::actingAs($admin, [TokenAbility::CrewMobile->value]);
+
+        $this->getJson('/api/v1/auth/me')->assertOk()
+            ->assertJsonPath('data.capabilities', ['crew', 'admin']);
     }
 
     public function test_incomplete_crew_can_read_profile_but_not_operational_data(): void

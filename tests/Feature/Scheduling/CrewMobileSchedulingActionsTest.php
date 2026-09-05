@@ -7,6 +7,7 @@ use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Operations\Models\ChecklistTemplate;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -25,11 +26,20 @@ class CrewMobileSchedulingActionsTest extends TestCase
             'event_date' => today()->addMonth(), 'availability_status' => 'open',
             'availability_deadline' => now()->addWeek(),
         ]);
-        $shift = $event->shifts()->create(['period' => 'morning', 'shift_date' => $event->event_date]);
+        $venue = Venue::query()->create(['name' => 'Availability Theatre']);
+        $event->update(['venue_id' => $venue->id]);
+        $shift = $event->shifts()->create([
+            'period' => 'morning',
+            'shift_date' => $event->event_date,
+            'posted_arrival_at' => $event->event_date->copy()->setTime(8, 0),
+        ]);
 
         $this->getJson('/api/v1/availability')->assertOk()
             ->assertJsonPath('data.0.shift_id', $shift->uuid)
-            ->assertJsonPath('data.0.status', null);
+            ->assertJsonPath('data.0.status', null)
+            ->assertJsonPath('data.0.venue.name', 'Availability Theatre')
+            ->assertJsonPath('data.0.shift_period', 'morning')
+            ->assertJsonPath('data.0.arrival_at', $shift->posted_arrival_at->toIso8601String());
 
         $this->putJson('/api/v1/availability/'.$shift->uuid, ['status' => 'available'])
             ->assertUnprocessable()->assertJsonPath('errors.idempotency_key.0', 'A valid Idempotency-Key UUID header is required.');

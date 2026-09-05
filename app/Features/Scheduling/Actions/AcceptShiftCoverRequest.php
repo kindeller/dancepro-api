@@ -25,6 +25,10 @@ class AcceptShiftCoverRequest
             }
 
             $assignment = SchedulingShiftAssignment::query()->lockForUpdate()->findOrFail($lockedRequest->scheduling_shift_assignment_id);
+            $assignment->loadMissing('shift.schedulingEvent');
+            if ($assignment->shift->schedulingEvent->cancelled_at !== null) {
+                throw ValidationException::withMessages(['cover' => 'This event has been cancelled.']);
+            }
             if (! $this->eligibleCandidates->contains($assignment, $replacement)) {
                 throw ValidationException::withMessages(['cover' => 'You are no longer eligible or are now scheduled elsewhere at this time.']);
             }

@@ -17,14 +17,27 @@ class CrewNavigationIndicators
 
     public function for(User $user): array
     {
+        $counts = $this->actionCounts($user);
+
+        return [
+            'shifts' => $counts['availability'] + $counts['acknowledgements'] + $counts['cover_requests'],
+            'timesheets' => $counts['timesheets'] + $counts['invoices'],
+            'chat' => $counts['chats'],
+        ];
+    }
+
+    /** @return array{availability: int, acknowledgements: int, cover_requests: int, timesheets: int, invoices: int, chats: int} */
+    public function actionCounts(User $user): array
+    {
         $profile = $user->crewProfile;
 
         if (! $user->is_active || $profile === null) {
-            return ['shifts' => 0, 'timesheets' => 0, 'chat' => 0];
+            return ['availability' => 0, 'acknowledgements' => 0, 'cover_requests' => 0, 'timesheets' => 0, 'invoices' => 0, 'chats' => 0];
         }
 
         $availabilityActions = SchedulingShift::query()
             ->whereHas('schedulingEvent', fn (Builder $query) => $query
+                ->whereNull('cancelled_at')
                 ->where('availability_status', AvailabilityRoundStatus::Open)
                 ->where('availability_deadline', '>=', now()))
             ->whereDoesntHave('availabilityResponses', fn (Builder $query) => $query->where('crew_profile_id', $profile->id))
@@ -36,6 +49,7 @@ class CrewNavigationIndicators
         $acknowledgementActions = SchedulingShiftAssignment::query()
             ->where('crew_profile_id', $profile->id)
             ->where('status', 'published')
+            ->whereHas('shift.schedulingEvent', fn (Builder $query) => $query->whereNull('cancelled_at'))
             ->where('acknowledgement_status', '!=', 'acknowledged')
             ->count();
 
@@ -48,6 +62,7 @@ class CrewNavigationIndicators
         $pendingTimesheets = SchedulingShiftAssignment::query()
             ->where('crew_profile_id', $profile->id)
             ->where('status', 'published')
+            ->whereHas('shift.schedulingEvent', fn (Builder $query) => $query->whereNull('cancelled_at'))
             ->whereHas('shift', fn (Builder $query) => $query->whereDate('shift_date', '<=', today()))
             ->where(function (Builder $query): void {
                 $query->whereDoesntHave('timeEntry')
@@ -65,9 +80,12 @@ class CrewNavigationIndicators
         $unreadChats = $this->chatInbox->conversations($user, 'unread')->sum('unread_count');
 
         return [
-            'shifts' => $availabilityActions + $acknowledgementActions + $coverActions,
-            'timesheets' => $pendingTimesheets + $pendingInvoices,
-            'chat' => $unreadChats,
+            'availability' => $availabilityActions,
+            'acknowledgements' => $acknowledgementActions,
+            'cover_requests' => $coverActions,
+            'timesheets' => $pendingTimesheets,
+            'invoices' => $pendingInvoices,
+            'chats' => $unreadChats,
         ];
     }
 }

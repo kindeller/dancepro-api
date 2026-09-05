@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['uuid', 'concert_booking_id', 'event_type_definition_id', 'item_type', 'title', 'venue_name', 'venue_address', 'venue_id', 'event_date', 'starts_at', 'finishes_at', 'approval_status', 'approved_by_user_id', 'approved_at', 'scheduling_event_id'])]
+#[Fillable(['uuid', 'concert_booking_id', 'event_type_definition_id', 'item_type', 'title', 'venue_name', 'venue_address', 'venue_id', 'event_date', 'starts_at', 'finishes_at', 'approval_status', 'approved_by_user_id', 'approved_at', 'scheduling_event_id', 'programme_path', 'programme_name', 'programme_mime', 'programme_size', 'cancelled_by_user_id', 'cancelled_at'])]
 class ConcertBookingItem extends Model
 {
     use HasPublicUuid;
@@ -44,6 +44,6 @@ class ConcertBookingItem extends Model
 
     protected function casts(): array
     {
-        return ['item_type' => ConcertBookingItemType::class, 'event_date' => 'date', 'approved_at' => 'datetime'];
+        return ['item_type' => ConcertBookingItemType::class, 'event_date' => 'date', 'approved_at' => 'datetime', 'cancelled_at' => 'datetime'];
     }
 }

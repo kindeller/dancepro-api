@@ -102,6 +102,7 @@ Route::prefix('v1')->middleware([
             ->middleware('api.idempotency')
             ->name('api.v1.assignments.files.download');
         Route::get('cover-requests', [CrewMobileCoverRequestController::class, 'index']);
+        Route::get('assignments/{assignment}/cover-candidates', [CrewMobileCoverRequestController::class, 'candidates']);
         Route::post('assignments/{assignment}/cover-requests', [CrewMobileCoverRequestController::class, 'store'])->middleware('api.idempotency');
         Route::post('cover-requests/{coverRequest}/accept', [CrewMobileCoverRequestController::class, 'accept'])->middleware('api.idempotency');
         Route::put('assignments/{assignment}/acknowledgement', [CrewMobileAssignmentActionController::class, 'acknowledge'])->middleware('api.idempotency');

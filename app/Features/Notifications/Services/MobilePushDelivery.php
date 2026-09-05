@@ -20,9 +20,13 @@ class MobilePushDelivery
             return;
         }
 
+        if (in_array($notification->type, ['shift_allocation', 'shift_changed', 'availability_request'], true)) {
+            return;
+        }
+
         MobilePushDevice::query()->where('user_id', $notification->user_id)->whereNull('disabled_at')
             ->each(function (MobilePushDevice $device) use ($gateway, $notification): void {
-                $usesNotificationContent = $notification->type === 'direct_message';
+                $usesNotificationContent = in_array($notification->type, ['shift_arrival_reminder', 'action_digest', 'direct_message', 'event_cancelled'], true);
                 $response = Http::withToken((string) config('mobile.push.gateway_token'))
                     ->timeout(10)->post($gateway, [
                         'platform' => $device->platform,

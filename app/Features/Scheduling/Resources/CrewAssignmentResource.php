@@ -11,6 +11,11 @@ class CrewAssignmentResource extends JsonResource
     public function toArray(Request $request): array
     {
         $event = $this->shift->schedulingEvent;
+        $eventType = $event->event_type->value;
+        $openCoverRequest = $this->relationLoaded('coverRequests')
+            ? $this->coverRequests->firstWhere('status', 'open')
+            : null;
+        $cancelled = $event->cancelled_at !== null;
         $timeEntry = $this->timeEntry;
         $locked = $timeEntry?->locked_at !== null;
         $hasClockIn = $timeEntry?->actual_clock_in_at !== null;
@@ -27,7 +32,7 @@ class CrewAssignmentResource extends JsonResource
             && ! $hasClockIn
             && ! $this->shift->shift_date->lt(today())
             && (! $this->relationLoaded('coverRequests') || $this->coverRequests->where('status', 'open')->isEmpty());
-        $allowedActions = collect([
+        $allowedActions = $cancelled ? collect() : collect([
             'acknowledge' => $this->acknowledgement_status !== 'acknowledged',
             'clock_in' => ! $locked && ! $hasClockIn,
             'clock_out' => ! $locked && ! $hasFinish && $clockOutIsAvailable,
@@ -39,14 +44,27 @@ class CrewAssignmentResource extends JsonResource
         return [
             'id' => $this->uuid,
             'event_name' => $event->name,
-            'event_type' => $event->event_type->value,
+            'event_type' => $eventType,
+            'event_logo_url' => $event->crewLogoUrl(),
+            'event_item_title' => $event->concertBookingItem?->title,
             'role' => $this->role->name,
+            'is_team_leader' => $this->is_team_leader,
+            'shift_period' => $this->shift->period?->value,
+            'shift_code' => $eventType === 'competition'
+                ? 'COMP-'.($this->shift->period?->value === 'morning' ? 'M' : 'A')
+                : 'CON',
             'shift_date' => $this->shift->shift_date->toDateString(),
             'arrival_at' => $this->shift->posted_arrival_at?->toIso8601String(),
             'starts_at' => $this->shift->starts_at?->toIso8601String(),
             'estimated_finish_at' => $this->shift->estimated_finish_at?->toIso8601String(),
             'status' => $this->status,
+            'cancelled' => $cancelled,
+            'cancelled_at' => $event->cancelled_at?->toIso8601String(),
             'acknowledged' => $this->acknowledgement_status === 'acknowledged',
+            'cover_request' => $openCoverRequest ? [
+                'id' => $openCoverRequest->uuid,
+                'status' => $openCoverRequest->status,
+            ] : null,
             'time' => [
                 'actual_clock_in_at' => $timeEntry?->actual_clock_in_at?->toIso8601String(),
                 'actual_finish_at' => $timeEntry?->actual_finish_at?->toIso8601String(),
@@ -54,10 +72,10 @@ class CrewAssignmentResource extends JsonResource
                 'locked' => $locked,
             ],
             'permissions' => [
-                'can_clock_in' => ! $locked && ! $hasClockIn,
-                'can_clock_out' => ! $locked && ! $hasFinish && $clockOutIsAvailable,
-                'can_edit_time' => ! $locked,
-                'can_finish_team' => ! $locked && $canFinishTeam,
+                'can_clock_in' => ! $cancelled && ! $locked && ! $hasClockIn,
+                'can_clock_out' => ! $cancelled && ! $locked && ! $hasFinish && $clockOutIsAvailable,
+                'can_edit_time' => ! $cancelled && ! $locked,
+                'can_finish_team' => ! $cancelled && ! $locked && $canFinishTeam,
             ],
             'allowed_actions' => $allowedActions,
             'version' => optional($this->published_at)->toIso8601String() ?? (string) $this->updated_at->getTimestamp(),
