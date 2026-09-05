@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['uuid', 'direct_chat_conversation_id', 'author_user_id', 'body'])]
+#[Fillable(['uuid', 'direct_chat_conversation_id', 'author_user_id', 'body', 'attachment_path', 'attachment_name', 'attachment_mime', 'attachment_size'])]
 class DirectChatMessage extends Model
 {
     use HasPublicUuid;
@@ -21,5 +21,12 @@ class DirectChatMessage extends Model
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'author_user_id');
+    }
+
+    public function attachmentUrl(): ?string
+    {
+        return $this->attachment_path
+            ? route('crew.chat.direct.attachment', [$this->conversation, $this])
+            : null;
     }
 }

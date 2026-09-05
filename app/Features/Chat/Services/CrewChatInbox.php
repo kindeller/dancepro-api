@@ -30,7 +30,7 @@ class CrewChatInbox
                     'kind' => 'event',
                     'model' => $event,
                     'title' => $event->name,
-                    'subtitle' => $lastMessage?->body ?: 'Event chat is ready',
+                    'subtitle' => $lastMessage?->body ?: ($lastMessage ? $this->attachmentPreview($lastMessage) : 'Event chat is ready'),
                     'activity_at' => $lastMessage?->created_at ?? $event->shifts->min('shift_date') ?? $event->event_date,
                     'unread_count' => $unreadCount,
                     'is_upcoming' => $isUpcoming,
@@ -55,7 +55,7 @@ class CrewChatInbox
                     'kind' => 'direct',
                     'model' => $conversation,
                     'title' => $other?->crewProfile?->preferred_name ?: $other?->name ?: 'Crew member',
-                    'subtitle' => $lastMessage?->body ?: 'Start the conversation',
+                    'subtitle' => $lastMessage?->body ?: ($lastMessage ? $this->attachmentPreview($lastMessage) : 'Start the conversation'),
                     'activity_at' => $lastMessage?->created_at ?? $conversation->created_at,
                     'unread_count' => $unreadCount,
                     'is_upcoming' => false,
@@ -107,6 +107,18 @@ class CrewChatInbox
         return CrewProfile::query()->where('user_id', '!=', $user->id)
             ->whereHas('user', fn (Builder $query) => $query->where('is_active', true))
             ->with('user')->orderBy('preferred_name')->get();
+    }
+
+    private function attachmentPreview(object $message): string
+    {
+        if (! filled($message->attachment_path)) {
+            return 'Start the conversation';
+        }
+
+        $kind = str_starts_with((string) $message->attachment_mime, 'image/') ? 'Photo' : 'File';
+        $name = $message->attachment_name ?: basename($message->attachment_path);
+
+        return $kind.': '.$name;
     }
 
     private function accessibleEventQuery(User $user): Builder

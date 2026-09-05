@@ -3,12 +3,15 @@
 namespace Tests\Feature\Operations;
 
 use App\Features\Chat\Models\DirectChatConversation;
+use App\Features\Chat\Models\DirectChatMessage;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Operations\Models\EventMessage;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class CrewChatTest extends TestCase
@@ -58,6 +61,40 @@ class CrewChatTest extends TestCase
         $outsider = User::factory()->crew()->create(['onboarding_completed_at' => now()]);
         CrewProfile::factory()->for($outsider)->create();
         $this->actingAs($outsider)->get(route('crew.chat.direct', $conversation))->assertForbidden();
+    }
+
+    public function test_crew_can_upload_and_view_a_private_direct_chat_photo_on_the_web(): void
+    {
+        Storage::fake('local');
+        config(['operations.filesystem_disk' => 'local']);
+        $sender = User::factory()->crew()->create(['onboarding_completed_at' => now()]);
+        CrewProfile::factory()->for($sender)->create(['preferred_name' => 'Alex']);
+        $recipient = User::factory()->crew()->create(['onboarding_completed_at' => now()]);
+        CrewProfile::factory()->for($recipient)->create(['preferred_name' => 'Jess']);
+        $conversation = DirectChatConversation::query()->create([
+            'participant_key' => DirectChatConversation::participantKey($sender->id, $recipient->id),
+        ]);
+        $conversation->participants()->attach([$sender->id, $recipient->id]);
+
+        $this->actingAs($sender)->post(route('crew.chat.direct.store', $conversation), [
+            'attachment' => UploadedFile::fake()->image('backstage.jpg'),
+        ])->assertRedirect(route('crew.chat.direct', $conversation));
+
+        $message = DirectChatMessage::query()->firstOrFail();
+        Storage::disk('local')->assertExists($message->attachment_path);
+        $this->actingAs($recipient)->get(route('crew.chat.index'))
+            ->assertOk()->assertSee('Photo: backstage.jpg');
+        $this->actingAs($recipient)->get(route('crew.chat.direct', $conversation))
+            ->assertOk()
+            ->assertSee('enctype="multipart/form-data"', false)
+            ->assertSee('name="attachment"', false)
+            ->assertSee($message->attachmentUrl(), false)
+            ->assertSee('backstage.jpg');
+        $this->actingAs($recipient)->get($message->attachmentUrl())->assertOk();
+
+        $outsider = User::factory()->crew()->create(['onboarding_completed_at' => now()]);
+        CrewProfile::factory()->for($outsider)->create();
+        $this->actingAs($outsider)->get($message->attachmentUrl())->assertForbidden();
     }
 
     private function assignedEvent($date, ?User $crew = null): array

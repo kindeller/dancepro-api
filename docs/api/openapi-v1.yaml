@@ -805,7 +805,7 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              description: At least one of body or attachment is required. Attachments are currently limited to event chats.
+              description: At least one of body or attachment is required. Attachments are supported in event and direct chats, up to 10 MB.
               properties:
                 body:
                   type: string
@@ -834,7 +834,7 @@ paths:
       tags: [Chat]
       operationId: downloadChatAttachment
       x-implementation-status: available
-      summary: Download an attachment from an event chat accessible to the current crew member
+      summary: Download an attachment from an event or direct chat accessible to the current crew member
       parameters:
         - $ref: '#/components/parameters/ChatId'
         - name: message
@@ -2204,16 +2204,19 @@ components:
           type: [string, 'null']
     ChatAttachment:
       type: object
-      required: [name, mime_type, download_url]
-      description: Present only for event-chat attachments. Initial mobile support is download-only.
+      required: [name, mime_type, size, download_url]
+      description: Present for event-chat and direct-chat attachments.
       properties:
         name:
           type: string
         mime_type:
           type: [string, 'null']
+        size:
+          type: [integer, 'null']
+          minimum: 0
+          description: File size in bytes.
         download_url:
           type: string
-          format: uri
           format: uri
     Notification:
       type: object

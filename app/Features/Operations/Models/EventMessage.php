@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['uuid', 'scheduling_event_id', 'author_user_id', 'message_type', 'body', 'attachment_path', 'attachment_name', 'attachment_mime'])]
+#[Fillable(['uuid', 'scheduling_event_id', 'author_user_id', 'message_type', 'body', 'attachment_path', 'attachment_name', 'attachment_mime', 'attachment_size'])]
 class EventMessage extends Model
 {
     use HasPublicUuid;

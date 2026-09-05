@@ -65,12 +65,9 @@ class CrewMobileChatController extends Controller
     public function store(StoreChatMessageRequest $request, string $chatId, CrewMobileChat $chat, PostEventMessage $postEvent, PostDirectChatMessage $postDirect): JsonResponse
     {
         [$kind, $conversation] = $chat->resolve($request->user(), $chatId);
-        if ($kind !== 'event' && $request->hasFile('attachment')) {
-            abort(422, 'Attachments are currently available in event chats only.');
-        }
         $message = $kind === 'event'
             ? $postEvent->execute($conversation, $request->user(), 'discussion', $request->input('body'), $request->file('attachment'))
-            : $postDirect->execute($conversation, $request->user(), $request->string('body')->toString());
+            : $postDirect->execute($conversation, $request->user(), $request->input('body'), $request->file('attachment'));
         $message->load('author.crewProfile');
 
         return ApiResponse::success('Message created.', $chat->messageResource($message, $chatId), 201);

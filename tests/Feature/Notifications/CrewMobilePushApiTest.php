@@ -82,6 +82,38 @@ class CrewMobilePushApiTest extends TestCase
         $this->assertNotNull($device->refresh()->disabled_at);
     }
 
+    public function test_direct_chat_photo_notification_uses_its_safe_attachment_preview(): void
+    {
+        $user = $this->authenticatedCrew();
+        MobilePushDevice::query()->create([
+            'user_id' => $user->id,
+            'installation_id' => (string) Str::uuid(),
+            'platform' => 'ios',
+            'push_token' => 'apns-token',
+            'push_token_hash' => hash('sha256', 'apns-token'),
+            'environment' => 'production',
+            'app_version' => '1.0.0',
+            'device_name' => 'Test iPhone',
+            'last_registered_at' => now(),
+        ]);
+        $notification = CrewNotification::query()->create([
+            'user_id' => $user->id,
+            'type' => 'direct_message',
+            'title' => 'New crew message',
+            'message' => 'Morgan sent a photo',
+            'destination_type' => 'chat',
+            'destination_id' => (string) Str::uuid(),
+        ]);
+        config(['mobile.push.gateway_url' => 'https://push.example.test/send', 'mobile.push.gateway_token' => 'gateway-secret']);
+        Http::fake(['push.example.test/*' => Http::response([], 202)]);
+
+        app(MobilePushDelivery::class)->deliver($notification->id);
+
+        Http::assertSent(fn ($request): bool => $request['title'] === 'New crew message'
+            && $request['body'] === 'Morgan sent a photo'
+            && $request['destination']['type'] === 'chat');
+    }
+
     public function test_app_config_is_public_and_contains_version_controls(): void
     {
         config(['mobile.app' => [

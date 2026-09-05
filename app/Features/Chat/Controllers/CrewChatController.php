@@ -5,16 +5,19 @@ namespace App\Features\Chat\Controllers;
 use App\Features\Chat\Actions\PostDirectChatMessage;
 use App\Features\Chat\Actions\StartDirectChat;
 use App\Features\Chat\Models\DirectChatConversation;
+use App\Features\Chat\Models\DirectChatMessage;
 use App\Features\Chat\Requests\StartDirectChatRequest;
 use App\Features\Chat\Requests\StoreChatMessageRequest;
 use App\Features\Chat\Services\CrewChatInbox;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Operations\Actions\PostEventMessage;
+use App\Features\Operations\Services\OperationsFileStorage;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CrewChatController extends Controller
 {
@@ -54,7 +57,7 @@ class CrewChatController extends Controller
     public function postEvent(StoreChatMessageRequest $request, SchedulingEvent $schedulingEvent, CrewChatInbox $inbox, PostEventMessage $post): RedirectResponse
     {
         $event = $inbox->accessibleEvent($request->user(), $schedulingEvent);
-        $post->execute($event, $request->user(), 'discussion', $request->string('body')->toString(), null);
+        $post->execute($event, $request->user(), 'discussion', $request->input('body'), $request->file('attachment'));
 
         return redirect()->route('crew.chat.event', $event);
     }
@@ -62,9 +65,23 @@ class CrewChatController extends Controller
     public function postDirect(StoreChatMessageRequest $request, DirectChatConversation $conversation, CrewChatInbox $inbox, PostDirectChatMessage $post): RedirectResponse
     {
         $conversation = $inbox->directConversation($request->user(), $conversation);
-        $post->execute($conversation, $request->user(), $request->string('body')->toString());
+        $post->execute($conversation, $request->user(), $request->input('body'), $request->file('attachment'));
 
         return redirect()->route('crew.chat.direct', $conversation);
+    }
+
+    public function directAttachment(Request $request, DirectChatConversation $conversation, DirectChatMessage $message, CrewChatInbox $inbox, OperationsFileStorage $files): StreamedResponse
+    {
+        $conversation = $inbox->directConversation($request->user(), $conversation);
+        abort_unless($message->direct_chat_conversation_id === $conversation->id && filled($message->attachment_path), 404);
+        abort_unless($files->disk()->exists($message->attachment_path), 404);
+
+        return $files->disk()->response(
+            $message->attachment_path,
+            $message->attachment_name ?: basename($message->attachment_path),
+            ['Cache-Control' => 'private, no-store'],
+            'attachment',
+        );
     }
 
     private function view(Request $request, CrewChatInbox $inbox, ?array $selectedChat = null): View

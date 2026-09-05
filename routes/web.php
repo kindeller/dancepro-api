@@ -202,6 +202,7 @@ Route::middleware(['auth', 'crew.required', 'two-factor.required', 'crew.onboard
     Route::post('chat/events/{schedulingEvent}', [CrewChatController::class, 'postEvent'])->name('chat.event.store');
     Route::get('chat/direct/{conversation}', [CrewChatController::class, 'direct'])->name('chat.direct');
     Route::post('chat/direct/{conversation}', [CrewChatController::class, 'postDirect'])->name('chat.direct.store');
+    Route::get('chat/direct/{conversation}/messages/{message}/attachment', [CrewChatController::class, 'directAttachment'])->name('chat.direct.attachment');
     Route::get('directory', CrewDirectoryController::class)->name('directory.index');
     Route::get('availability', [CrewAvailabilityController::class, 'index'])->name('availability.index');
     Route::put('availability/{schedulingShift}', [CrewAvailabilityController::class, 'store'])->name('availability.store');

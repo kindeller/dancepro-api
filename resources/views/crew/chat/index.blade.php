@@ -52,14 +52,22 @@
                 @forelse($messages as $message)
                     <div class="chat-bubble {{ $message->author_user_id === auth()->id() ? 'mine' : '' }} {{ ($message->message_type ?? null) === 'announcement' ? 'announcement' : '' }}">
                         <strong>{{ $message->author->name }}{{ ($message->message_type ?? null) === 'announcement' ? ' · IMPORTANT UPDATE' : '' }}</strong>
-                        <p>{{ $message->body }}</p><time>{{ $message->created_at->format('D j M, g:i a') }}</time>
+                        @if(filled($message->body))<p>{{ $message->body }}</p>@endif
+                        @if(filled($message->attachment_path))
+                            @php($attachmentUrl = $message->attachmentUrl())
+                            @if(Str::startsWith((string) $message->attachment_mime, 'image/'))
+                                <a href="{{ $attachmentUrl }}"><img src="{{ $attachmentUrl }}" alt="{{ $message->attachment_name ?: 'Chat attachment' }}" style="display:block;max-width:min(100%,420px);max-height:320px;border-radius:10px;margin:.65rem 0;object-fit:contain"></a>
+                            @endif
+                            <a href="{{ $attachmentUrl }}" download>{{ $message->attachment_name ?: 'Download attachment' }}</a>
+                        @endif
+                        <time>{{ $message->created_at->format('D j M, g:i a') }}</time>
                     </div>
                 @empty
                     <div class="empty-state"><strong>This chat is ready</strong><p class="muted">Send the first message below.</p></div>
                 @endforelse
             </div>
-            <form class="chat-compose" method="POST" action="{{ $isEvent ? route('crew.chat.event.store',$selected) : route('crew.chat.direct.store',$selected) }}">
-                @csrf<textarea name="body" required maxlength="5000" placeholder="Write a message…" aria-label="Message"></textarea><button type="submit">Send</button>
+            <form class="chat-compose" method="POST" enctype="multipart/form-data" action="{{ $isEvent ? route('crew.chat.event.store',$selected) : route('crew.chat.direct.store',$selected) }}">
+                @csrf<textarea name="body" maxlength="10000" placeholder="Write a message…" aria-label="Message"></textarea><label title="Attach a photo or file"><span class="sr-only">Attach a photo or file</span><input type="file" name="attachment" accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"></label><button type="submit">Send</button>
             </form>
         @else
             <div class="chat-welcome"><h2>Select a chat</h2><p>Choose a conversation or start a new direct chat.</p></div>

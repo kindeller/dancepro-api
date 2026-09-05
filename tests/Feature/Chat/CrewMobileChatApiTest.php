@@ -3,19 +3,24 @@
 namespace Tests\Feature\Chat;
 
 use App\Features\Auth\Support\TokenAbility;
+use App\Features\Chat\Actions\PostDirectChatMessage;
 use App\Features\Chat\Actions\StartDirectChat;
 use App\Features\Chat\Models\DirectChatMessage;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
+use App\Features\Notifications\Jobs\DeliverMobilePushNotification;
 use App\Features\Operations\Models\EventMessage;
+use App\Features\Operations\Services\OperationsFileStorage;
 use App\Features\Scheduling\Models\CrewNotification;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use RuntimeException;
 use Tests\TestCase;
 
 class CrewMobileChatApiTest extends TestCase
@@ -134,6 +139,111 @@ class CrewMobileChatApiTest extends TestCase
         $this->getJson('/api/v1/chats/'.$conversation->uuid.'/messages')->assertNotFound();
     }
 
+    public function test_direct_chat_accepts_attachment_only_photos_and_returns_downloadable_metadata(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        config(['operations.filesystem_disk' => 'local']);
+        [$sender, $senderProfile] = $this->authenticatedCrew();
+        $senderProfile->update(['preferred_name' => 'Morgan']);
+        $recipient = User::factory()->crew()->create();
+        CrewProfile::factory()->for($recipient)->create();
+        $conversation = app(StartDirectChat::class)->execute($sender, $recipient);
+
+        $response = $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->post('/api/v1/chats/'.$conversation->uuid.'/messages', [
+                'attachment' => UploadedFile::fake()->image('photo.jpg'),
+            ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.body', '')
+            ->assertJsonPath('data.attachment.name', 'photo.jpg')
+            ->assertJsonPath('data.attachment.mime_type', 'image/jpeg')
+            ->assertJsonPath('data.attachment.size', fn ($size): bool => is_int($size) && $size > 0);
+
+        $message = DirectChatMessage::query()->latest('id')->firstOrFail();
+        $this->assertNull($message->body);
+        $this->assertNotNull($message->attachment_size);
+        Storage::disk('local')->assertExists($message->attachment_path);
+        $this->get($response->json('data.attachment.download_url'))
+            ->assertOk()
+            ->assertHeader('content-disposition', 'attachment; filename=photo.jpg');
+        $this->assertDatabaseHas('crew_notifications', [
+            'user_id' => $recipient->id,
+            'type' => 'direct_message',
+            'message' => 'Morgan sent a photo',
+        ]);
+        Queue::assertPushed(DeliverMobilePushNotification::class);
+
+        [$outsider] = $this->authenticatedCrew();
+        $this->get($response->json('data.attachment.download_url'))->assertNotFound();
+    }
+
+    public function test_direct_chat_accepts_a_photo_with_a_message_body(): void
+    {
+        Storage::fake('local');
+        config(['operations.filesystem_disk' => 'local']);
+        [$sender] = $this->authenticatedCrew();
+        $recipient = User::factory()->crew()->create();
+        CrewProfile::factory()->for($recipient)->create();
+        $conversation = app(StartDirectChat::class)->execute($sender, $recipient);
+
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->post('/api/v1/chats/'.$conversation->uuid.'/messages', [
+                'body' => 'Here is the photo.',
+                'attachment' => UploadedFile::fake()->image('photo.jpg'),
+            ], ['Accept' => 'application/json'])
+            ->assertCreated()
+            ->assertJsonPath('data.body', 'Here is the photo.')
+            ->assertJsonPath('data.attachment.name', 'photo.jpg');
+    }
+
+    public function test_direct_chat_rejects_oversized_and_invalid_attachments(): void
+    {
+        [$sender] = $this->authenticatedCrew();
+        $recipient = User::factory()->crew()->create();
+        CrewProfile::factory()->for($recipient)->create();
+        $conversation = app(StartDirectChat::class)->execute($sender, $recipient);
+
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->post('/api/v1/chats/'.$conversation->uuid.'/messages', [
+                'attachment' => UploadedFile::fake()->create('large.pdf', 10241, 'application/pdf'),
+            ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('attachment');
+
+        $this->withHeader('Idempotency-Key', (string) Str::uuid())
+            ->post('/api/v1/chats/'.$conversation->uuid.'/messages', [
+                'attachment' => UploadedFile::fake()->createWithContent('malware.exe', 'not allowed'),
+            ], ['Accept' => 'application/json'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('attachment');
+
+        $this->assertDatabaseCount('direct_chat_messages', 0);
+    }
+
+    public function test_direct_chat_attachment_is_deleted_when_message_creation_fails(): void
+    {
+        Storage::fake('local');
+        config(['operations.filesystem_disk' => 'local']);
+        [$sender] = $this->authenticatedCrew();
+        $recipient = User::factory()->crew()->create();
+        CrewProfile::factory()->for($recipient)->create();
+        $conversation = app(StartDirectChat::class)->execute($sender, $recipient);
+        $action = \Mockery::mock(PostDirectChatMessage::class, [app(OperationsFileStorage::class)])
+            ->makePartial()->shouldAllowMockingProtectedMethods();
+        $action->shouldReceive('createMessage')->once()->andThrow(new RuntimeException('Database write failed.'));
+
+        try {
+            $action->execute($conversation, $sender, null, UploadedFile::fake()->image('photo.jpg'));
+            $this->fail('The simulated database failure was not thrown.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('Database write failed.', $exception->getMessage());
+        }
+
+        $this->assertSame([], Storage::disk('local')->allFiles('operations/chat/direct/'.$conversation->uuid));
+        $this->assertDatabaseCount('direct_chat_messages', 0);
+    }
+
     public function test_assigned_crew_can_discover_and_download_private_event_chat_attachments(): void
     {
         Storage::fake('local');
@@ -184,7 +294,8 @@ class CrewMobileChatApiTest extends TestCase
             ], ['Accept' => 'application/json'])
             ->assertCreated()
             ->assertJsonPath('data.attachment.name', 'brief.pdf')
-            ->assertJsonPath('data.attachment.mime_type', 'application/pdf');
+            ->assertJsonPath('data.attachment.mime_type', 'application/pdf')
+            ->assertJsonPath('data.attachment.size', fn ($size): bool => is_int($size) && $size > 0);
 
         $message = EventMessage::query()->latest('id')->firstOrFail();
         Storage::disk('local')->assertExists($message->attachment_path);

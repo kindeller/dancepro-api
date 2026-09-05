@@ -22,13 +22,14 @@ class MobilePushDelivery
 
         MobilePushDevice::query()->where('user_id', $notification->user_id)->whereNull('disabled_at')
             ->each(function (MobilePushDevice $device) use ($gateway, $notification): void {
+                $usesNotificationContent = $notification->type === 'direct_message';
                 $response = Http::withToken((string) config('mobile.push.gateway_token'))
                     ->timeout(10)->post($gateway, [
                         'platform' => $device->platform,
                         'environment' => $device->environment,
                         'push_token' => $device->push_token,
-                        'title' => 'DancePro update',
-                        'body' => 'Open DancePro to view this update.',
+                        'title' => $usesNotificationContent ? $notification->title : 'DancePro update',
+                        'body' => $usesNotificationContent ? $notification->message : 'Open DancePro to view this update.',
                         'destination' => $notification->destination(),
                     ]);
 

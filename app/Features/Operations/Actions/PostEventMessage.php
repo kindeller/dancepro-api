@@ -25,6 +25,7 @@ class PostEventMessage
                 'attachment_path' => $path,
                 'attachment_name' => $attachment ? $this->safeFilename($attachment->getClientOriginalName()) : null,
                 'attachment_mime' => $attachment?->getMimeType(),
+                'attachment_size' => $attachment?->getSize(),
             ]);
 
             if ($type === 'announcement') {

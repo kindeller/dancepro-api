@@ -3,6 +3,7 @@
 namespace App\Features\Chat\Services;
 
 use App\Features\Chat\Models\DirectChatConversation;
+use App\Features\Chat\Models\DirectChatMessage;
 use App\Features\Operations\Models\EventMessage;
 use App\Features\Operations\Models\EventMessageRead;
 use App\Features\Scheduling\Models\SchedulingEvent;
@@ -74,10 +75,9 @@ class CrewMobileChat
         $chat->participants()->updateExistingPivot($user->id, ['last_read_at' => $message->created_at]);
     }
 
-    public function attachment(User $user, string $chatUuid, string $messageUuid): EventMessage
+    public function attachment(User $user, string $chatUuid, string $messageUuid): EventMessage|DirectChatMessage
     {
         [$kind, $chat] = $this->resolve($user, $chatUuid);
-        abort_unless($kind === 'event', 404);
 
         return $chat->messages()
             ->where('uuid', $messageUuid)
@@ -98,9 +98,10 @@ class CrewMobileChat
                 'profile_photo_url' => null,
             ],
             'body' => (string) $message->body,
-            'attachment' => $message instanceof EventMessage && filled($message->attachment_path) ? [
+            'attachment' => filled($message->attachment_path) ? [
                 'name' => $message->attachment_name ?: basename($message->attachment_path),
                 'mime_type' => $message->attachment_mime,
+                'size' => $message->attachment_size,
                 'download_url' => route('api.v1.chats.attachments.show', [
                     'chatId' => $chatUuid,
                     'message' => $message->uuid,
