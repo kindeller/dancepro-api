@@ -55,18 +55,35 @@
         .status-pill.attention { background:#fff2cc; color:var(--amber); }
         .event-heading { display:flex; align-items:center; gap:12px; }
         .availability-row { display:grid; grid-template-columns:minmax(130px,.7fr) minmax(0,1.3fr); align-items:center; gap:12px; margin-top:12px; padding-top:12px; border-top:1px solid #e7edf0; }
+        .availability-shift-details { display:flex; min-width:0; flex-direction:column; gap:3px; }
         .availability-form { display:grid; grid-template-columns:minmax(130px,1fr) auto; align-items:center; gap:8px; }
+        .availability-card-actions { display:grid; gap:6px; }
+        .availability-clear-form { display:none; }
         input { width:100%; min-height:36px; padding:7px 9px; border:1px solid var(--line); border-radius:5px; }
         button,.button { display:inline-flex; align-items:center; justify-content:center; min-height:36px; padding:8px 12px; border:0; border-radius:5px; background:var(--brand); color:white; font-weight:800; text-decoration:none; cursor:pointer; }
         .button.secondary { border:1px solid #9bc7d8; background:#edf8fc; color:#087fae; }
         .available-button { background:#198754; }
         button.unavailable { background:#68767d; }
         .choice-buttons { display:flex; gap:5px; }
+        .choice-buttons button { width:112px; }
         .choice-buttons button:not(.selected) { opacity:.55; }
         .choice-buttons button.selected { outline:3px solid #10202a; outline-offset:2px; opacity:1; }
         .response-saved { margin-bottom:7px; font-size:11px; font-weight:800; text-align:right; }
         .response-saved.available { color:var(--green); }
         .response-saved.unavailable { color:#4f5d64; }
+        .availability-view-toggle { display:flex; justify-content:flex-end; gap:5px; margin:0 0 10px; }
+        .availability-view-toggle a { min-height:30px; padding:5px 9px; font-size:11px; }
+        .availability-grid-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:7px; background:white; }
+        .availability-grid { width:100%; min-width:760px; border-collapse:collapse; }
+        .availability-grid th,.availability-grid td { padding:10px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle; }
+        .availability-grid th { background:#f2f7f9; color:#52636c; font-size:10px; letter-spacing:.05em; text-transform:uppercase; }
+        .availability-grid tr:last-child td { border-bottom:0; }
+        .availability-cycle-form { display:flex; justify-content:center; }
+        .availability-cycle { width:42px; min-width:42px; height:36px; min-height:36px; padding:0; border:2px solid #b8c7cd; background:white; color:#60727a; font-size:18px; }
+        .availability-cycle[data-state="available"] { border-color:#198754; background:#198754; color:white; }
+        .availability-cycle[data-state="unavailable"] { border-color:#68767d; background:#68767d; color:white; }
+        .availability-cycle[disabled] { cursor:wait; opacity:.55; }
+        .availability-cycle-error { margin-top:4px; color:#9b2c2c; font-size:10px; text-align:center; }
         .filter-tabs { display:flex; gap:4px; margin:8px 0 10px; padding:3px; overflow:auto; border:1px solid var(--line); border-radius:7px; background:white; }
         .filter-tabs a { padding:7px 10px; border-radius:5px; color:#52636c; font-size:12px; font-weight:700; text-decoration:none; white-space:nowrap; }
         .filter-tabs a.active { background:var(--dark); color:white; }

@@ -2,6 +2,7 @@
 
 namespace App\Features\Scheduling\Controllers;
 
+use App\Features\Scheduling\Actions\ClearAvailabilityResponse;
 use App\Features\Scheduling\Actions\RecordAvailabilityResponse;
 use App\Features\Scheduling\Models\SchedulingShift;
 use App\Features\Scheduling\Requests\RecordAvailabilityResponseRequest;
@@ -24,5 +25,13 @@ class CrewMobileAvailabilityController extends Controller
         $record->execute($profile, $shift, $request->validated());
 
         return ApiResponse::success('Availability saved.', $availability->findFor($profile, $shift));
+    }
+
+    public function destroy(Request $request, SchedulingShift $shift, ClearAvailabilityResponse $clear, CrewMobileAvailability $availability): JsonResponse
+    {
+        $profile = $request->user()->crewProfile;
+        $clear->execute($profile, $shift);
+
+        return ApiResponse::success('Availability response cleared.', $availability->findFor($profile, $shift));
     }
 }

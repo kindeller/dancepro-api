@@ -109,6 +109,7 @@ Route::prefix('v1')->middleware([
         Route::put('assignments/{assignment}/checklist-items/{item}', [CrewMobileAssignmentActionController::class, 'checklist'])->middleware('api.idempotency');
         Route::get('availability', [CrewMobileAvailabilityController::class, 'index']);
         Route::put('availability/{shift}', [CrewMobileAvailabilityController::class, 'update'])->middleware('api.idempotency');
+        Route::delete('availability/{shift}', [CrewMobileAvailabilityController::class, 'destroy'])->middleware('api.idempotency');
         Route::get('directory', CrewMobileDirectoryController::class);
         Route::get('chats', [CrewMobileChatController::class, 'index']);
         Route::post('chats/direct', [CrewMobileChatController::class, 'start'])->middleware('api.idempotency');

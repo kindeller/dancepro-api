@@ -6,6 +6,7 @@ use App\Features\Operations\Models\ChecklistTemplate;
 use App\Features\Operations\Services\ChecklistProgressForAssignments;
 use App\Features\Operations\Support\OperationalRoleCodes;
 use App\Features\Scheduling\Actions\AcknowledgeShiftAssignment;
+use App\Features\Scheduling\Actions\ClearAvailabilityResponse;
 use App\Features\Scheduling\Actions\RecordAvailabilityResponse;
 use App\Features\Scheduling\Models\CrewNotification;
 use App\Features\Scheduling\Models\SchedulingEvent;
@@ -34,7 +35,7 @@ class CrewAvailabilityController extends Controller
             ->whereNull('cancelled_at')
             ->where('availability_status', AvailabilityRoundStatus::Open)
             ->where('availability_deadline', '>=', now())
-            ->with(['venue', 'studio', 'shifts' => fn ($query) => $query->with([
+            ->with(['venue', 'studio', 'competitionContact', 'shifts' => fn ($query) => $query->with([
                 'availabilityResponses' => fn ($query) => $query->where('crew_profile_id', $crewProfile->id),
                 'assignments' => fn ($query) => $query->where('crew_profile_id', $crewProfile->id)->where('status', 'published'),
             ])])
@@ -48,6 +49,7 @@ class CrewAvailabilityController extends Controller
         $events = $events->filter(fn (SchedulingEvent $event): bool => $event->shifts->isNotEmpty())->values();
 
         $requestedFilter = $request->string('view')->toString();
+        $availabilityLayout = $request->string('layout')->toString() === 'grid' ? 'grid' : 'detailed';
         $assignments = SchedulingShiftAssignment::query()
             ->where('crew_profile_id', $crewProfile->id)
             ->where('status', 'published')
@@ -148,14 +150,26 @@ class CrewAvailabilityController extends Controller
         $calendarEnd = ($assignmentDates->last()?->copy() ?? today())->startOfMonth()->max(today()->startOfMonth());
         $calendarMonths = collect(CarbonPeriod::create($calendarStart, '1 month', $calendarEnd))->map(fn ($month) => $month->copy());
 
-        return view('crew.availability.index', compact('events', 'crewProfile', 'assignments', 'cancelledAssignments', 'visibleAssignments', 'nextAssignment', 'nextChecklistTemplates', 'notifications', 'filter', 'needsAcknowledgement', 'pendingAvailability', 'eventLogoUrls', 'receivedCoverRequests', 'sentCoverRequests', 'pendingCoverCount', 'assignmentsByDate', 'calendarMonths', 'checklistProgress'));
+        return view('crew.availability.index', compact('events', 'crewProfile', 'assignments', 'cancelledAssignments', 'visibleAssignments', 'nextAssignment', 'nextChecklistTemplates', 'notifications', 'filter', 'availabilityLayout', 'needsAcknowledgement', 'pendingAvailability', 'eventLogoUrls', 'receivedCoverRequests', 'sentCoverRequests', 'pendingCoverCount', 'assignmentsByDate', 'calendarMonths', 'checklistProgress'));
     }
 
-    public function store(RecordAvailabilityResponseRequest $request, SchedulingShift $schedulingShift, RecordAvailabilityResponse $recordResponse): RedirectResponse
+    public function store(RecordAvailabilityResponseRequest $request, SchedulingShift $schedulingShift, RecordAvailabilityResponse $recordResponse): JsonResponse|RedirectResponse
     {
         $recordResponse->execute($request->user()->crewProfile, $schedulingShift, $request->validated());
 
-        return back()->with('status', 'Availability saved.');
+        return $request->expectsJson()
+            ? response()->json(['success' => true, 'status' => $request->validated('status')])
+            : back()->with('status', 'Availability saved.');
+    }
+
+    public function clear(Request $request, SchedulingShift $schedulingShift, ClearAvailabilityResponse $clearResponse): JsonResponse|RedirectResponse
+    {
+        abort_unless($request->user()?->canAccessCrew(), 403);
+        $clearResponse->execute($request->user()->crewProfile, $schedulingShift);
+
+        return $request->expectsJson()
+            ? response()->json(['success' => true, 'status' => null])
+            : back()->with('status', 'Availability response cleared.');
     }
 
     public function acknowledge(Request $request, SchedulingShiftAssignment $assignment, AcknowledgeShiftAssignment $acknowledge): RedirectResponse

@@ -211,6 +211,7 @@ Route::middleware(['auth', 'crew.required', 'two-factor.required', 'crew.onboard
     Route::get('directory', CrewDirectoryController::class)->name('directory.index');
     Route::get('availability', [CrewAvailabilityController::class, 'index'])->name('availability.index');
     Route::put('availability/{schedulingShift}', [CrewAvailabilityController::class, 'store'])->name('availability.store');
+    Route::delete('availability/{schedulingShift}', [CrewAvailabilityController::class, 'clear'])->name('availability.clear');
     Route::patch('notifications/{crewNotification}/read', [CrewAvailabilityController::class, 'markNotificationRead'])->name('notifications.read');
     Route::post('assignments/{assignment}/acknowledge', [CrewAvailabilityController::class, 'acknowledge'])->name('assignments.acknowledge');
     Route::get('profile', [CrewProfileController::class, 'edit'])->name('profile.edit');

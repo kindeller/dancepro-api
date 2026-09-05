@@ -646,7 +646,39 @@ paths:
                   maxLength: 2000
       responses:
         '200':
-          $ref: '#/components/responses/EmptySuccess'
+          description: Updated availability request returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AvailabilityRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+    delete:
+      tags: [Availability]
+      operationId: clearAvailability
+      x-implementation-status: available
+      parameters:
+        - $ref: '#/components/parameters/ShiftId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Cleared availability request returned with a null status.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AvailabilityRequest'
         '409':
           $ref: '#/components/responses/Conflict'
         '422':
@@ -1892,16 +1924,30 @@ components:
           enum: [available, unavailable, null]
     AvailabilityRequest:
       type: object
-      required: [shift_id, event_name, venue, shift_period, shift_date, arrival_at, status, locked, allowed_actions]
+      required: [shift_id, event_name, event_type, organisation, venue, shift_period, shift_date, arrival_at, starts_at, finish_at, status, locked, allowed_actions]
       properties:
         shift_id:
           type: string
           format: uuid
         event_name:
           type: string
+        event_type:
+          type: string
+          enum: [concert, competition]
         event_logo_url:
           type: [string, 'null']
           format: uri
+        organisation:
+          oneOf:
+            - type: object
+              required: [id, name]
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+            - type: 'null'
         venue:
           oneOf:
             - $ref: '#/components/schemas/Venue'
@@ -1913,6 +1959,12 @@ components:
           type: string
           format: date
         arrival_at:
+          type: [string, 'null']
+          format: date-time
+        starts_at:
+          type: [string, 'null']
+          format: date-time
+        finish_at:
           type: [string, 'null']
           format: date-time
         deadline:
@@ -1930,7 +1982,7 @@ components:
           uniqueItems: true
           items:
             type: string
-            enum: [update]
+            enum: [update, clear]
     Directory:
       type: object
       required: [crew, studios, competitions]

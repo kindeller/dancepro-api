@@ -183,6 +183,51 @@ document.querySelectorAll('[data-prestart-checklist-url]').forEach((box) => box.
 @if($filter === 'availability')
 <section>
     <div class="section-heading"><div><p class="eyebrow">Action needed</p><h2>Availability requests</h2></div><span class="count-pill">{{ $events->sum(fn($event) => $event->shifts->count()) }} shifts</span></div>
+    <nav class="availability-view-toggle" aria-label="Availability display">
+        <a class="{{ $availabilityLayout === 'detailed' ? 'active' : '' }}" href="{{ route('crew.availability.index', ['view' => 'availability']) }}" @if($availabilityLayout === 'detailed')aria-current="page"@endif>Detailed View</a>
+        <a class="{{ $availabilityLayout === 'grid' ? 'active' : '' }}" href="{{ route('crew.availability.index', ['view' => 'availability', 'layout' => 'grid']) }}" @if($availabilityLayout === 'grid')aria-current="page"@endif>Grid View</a>
+    </nav>
+    @if($availabilityLayout === 'grid' && $events->isNotEmpty())
+    <div class="availability-grid-wrap card">
+        <table class="availability-grid">
+            <thead><tr><th>Date</th><th>Arrival</th><th>Finish</th><th>Venue</th><th>Studio / competition</th><th>Availability</th></tr></thead>
+            <tbody>
+            @foreach($events as $event)
+                @foreach($event->shifts as $shift)
+                @php
+                    $response = $shift->availabilityResponses->first();
+                    $availabilityState = $response?->status->value ?? 'blank';
+                    $availabilityDate = $shift->shift_date ?? $event->event_date;
+                    $organisationName = $event->event_type->value === 'concert'
+                        ? ($event->studio?->name ?? $event->name)
+                        : ($event->competitionContact?->name ?? $event->name);
+                    $periodLabel = $shift->period
+                        ? ($event->event_type->value === 'competition'
+                            ? ($shift->period->value === 'morning' ? 'M' : 'A')
+                            : ucfirst($shift->period->value))
+                        : null;
+                @endphp
+                <tr>
+                    <td><strong>{{ $availabilityDate->format('D j M') }}</strong>@if($periodLabel)&nbsp;<span class="muted">{{ $periodLabel }}</span>@endif</td>
+                    <td>{{ $shift->posted_arrival_at?->format('g:i a') ?? 'TBC' }}</td>
+                    <td>{{ $shift->estimated_finish_at?->format('g:i a') ?? 'TBC' }}</td>
+                    <td>{{ $event->venue?->name ?? 'TBC' }}</td>
+                    <td>{{ $organisationName }}</td>
+                    <td>
+                        <form method="POST" action="{{ $availabilityState === 'unavailable' ? route('crew.availability.clear', $shift) : route('crew.availability.store', $shift) }}" class="availability-cycle-form" data-store-url="{{ route('crew.availability.store', $shift) }}" data-clear-url="{{ route('crew.availability.clear', $shift) }}">
+                            @csrf
+                            <input type="hidden" name="_method" value="{{ $availabilityState === 'unavailable' ? 'DELETE' : 'PUT' }}">
+                            <input type="hidden" name="status" value="{{ $availabilityState === 'blank' ? 'available' : 'unavailable' }}" @disabled($availabilityState === 'unavailable')>
+                            <button type="submit" class="availability-cycle" data-state="{{ $availabilityState }}" aria-label="{{ $availabilityState === 'blank' ? 'No availability selected. Select available' : ucfirst($availabilityState).'. Change availability' }}" title="{{ $availabilityState === 'blank' ? 'Not answered' : ucfirst($availabilityState) }}">{{ $availabilityState === 'available' ? '✓' : ($availabilityState === 'unavailable' ? '✕' : '—') }}</button>
+                        </form>
+                    </td>
+                </tr>
+                @endforeach
+            @endforeach
+            </tbody>
+        </table>
+    </div>
+    @elseif($availabilityLayout === 'detailed')
     @foreach($events as $event)
     @php
         $eventAvailabilityComplete = $event->shifts->every(
@@ -197,12 +242,22 @@ document.querySelectorAll('[data-prestart-checklist-url]').forEach((box) => box.
             $availabilityDate = $shift->shift_date ?? $event->event_date;
         @endphp
         <div class="availability-row">
-            <div><strong>{{ $availabilityDate->format('D j M') }}@if($shift->period) · {{ ucfirst($shift->period->value) }}@endif</strong><div class="muted">{{ $shift->posted_arrival_at ? 'Arrive '.$shift->posted_arrival_at->format('g:i a') : 'Times TBC' }}</div></div>
-            <form method="POST" action="{{ route('crew.availability.store', $shift) }}" class="availability-form">@csrf @method('PUT')<input name="note" value="{{ $response?->note }}" placeholder="Optional note"><div>@if($response)<div class="response-saved {{ $response->status->value }}">✓ Saved as {{ ucfirst($response->status->value) }}</div>@endif<div class="choice-buttons"><button class="available-button {{ $response?->status->value === 'available' ? 'selected' : '' }}" name="status" value="available">{{ $response?->status->value === 'available' ? '✓ ' : '' }}Available</button><button class="unavailable {{ $response?->status->value === 'unavailable' ? 'selected' : '' }}" name="status" value="unavailable">{{ $response?->status->value === 'unavailable' ? '✓ ' : '' }}Unavailable</button></div></div></form>
+            <div class="availability-shift-details">
+                <strong>{{ $availabilityDate->format('D j M') }}@if($shift->period) · {{ ucfirst($shift->period->value) }}@endif</strong>
+                <span class="muted">{{ ucfirst($event->event_type->value) }}</span>
+                <span class="muted">Arrival {{ $shift->posted_arrival_at?->format('g:i a') ?? 'TBC' }} · Start {{ $shift->starts_at?->format('g:i a') ?? 'TBC' }} · Finish {{ $shift->estimated_finish_at?->format('g:i a') ?? 'TBC' }}</span>
+            </div>
+            <div class="availability-card-actions">
+                <form method="POST" action="{{ route('crew.availability.store', $shift) }}" class="availability-form">@csrf @method('PUT')<input name="note" value="{{ $response?->note }}" placeholder="Optional note"><div>@if($response)<div class="response-saved {{ $response->status->value }}">✓ Saved as {{ ucfirst($response->status->value) }}</div>@endif<div class="choice-buttons"><button class="available-button {{ $response?->status->value === 'available' ? 'selected' : '' }}" @if($response?->status->value === 'available')form="clear-availability-{{ $shift->uuid }}" aria-label="Unselect Available"@else name="status" value="available"@endif>{{ $response?->status->value === 'available' ? '✓ ' : '' }}Available</button><button class="unavailable {{ $response?->status->value === 'unavailable' ? 'selected' : '' }}" @if($response?->status->value === 'unavailable')form="clear-availability-{{ $shift->uuid }}" aria-label="Unselect Unavailable"@else name="status" value="unavailable"@endif>{{ $response?->status->value === 'unavailable' ? '✕ ' : '' }}Unavailable</button></div></div></form>
+                @if($response)
+                <form id="clear-availability-{{ $shift->uuid }}" method="POST" action="{{ route('crew.availability.clear', $shift) }}" class="availability-clear-form">@csrf @method('DELETE')</form>
+                @endif
+            </div>
         </div>
         @endforeach
     </article>
     @endforeach
+    @endif
     @if($events->isEmpty())<div class="card empty-state"><strong>Availability is up to date.</strong><p class="muted">There are no open requests right now.</p></div>@endif
 </section>
 @endif
@@ -282,5 +337,10 @@ document.querySelectorAll('[data-prestart-checklist-url]').forEach((box) => box.
 @endsection
 
 @push('scripts')
-<script nonce="{{ request()->attributes->get('csp_nonce') }}">document.querySelectorAll('[data-calendar-date]').forEach(button=>button.addEventListener('click',()=>{const date=button.dataset.calendarDate;const panel=document.querySelector(`[data-calendar-panel="${date}"]`);const wasOpen=button.getAttribute('aria-expanded')==='true';document.querySelectorAll('[data-calendar-date]').forEach(item=>item.setAttribute('aria-expanded','false'));document.querySelectorAll('[data-calendar-panel]').forEach(item=>item.hidden=true);if(!wasOpen&&panel){button.setAttribute('aria-expanded','true');panel.hidden=false;requestAnimationFrame(()=>panel.scrollIntoView({behavior:'smooth',block:'nearest'}));}}));const unreadTimers=new WeakMap();const markNotificationRead=async item=>{unreadTimers.delete(item);unreadObserver.unobserve(item);try{const response=await fetch(item.dataset.notificationReadUrl,{method:'PATCH',headers:{'Accept':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'}});if(response.ok)item.querySelector('.unread-dot')?.remove();else unreadObserver.observe(item);}catch(error){unreadObserver.observe(item);}};const unreadObserver=new IntersectionObserver(entries=>entries.forEach(entry=>{const existingTimer=unreadTimers.get(entry.target);if(!entry.isIntersecting){if(existingTimer)clearTimeout(existingTimer);unreadTimers.delete(entry.target);return;}if(!existingTimer)unreadTimers.set(entry.target,setTimeout(()=>markNotificationRead(entry.target),3000));}),{threshold:.6});document.querySelectorAll('[data-notification-read-url]').forEach(item=>unreadObserver.observe(item));</script>
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
+const configureAvailabilityCycle=(form,state)=>{const button=form.querySelector('.availability-cycle');const method=form.querySelector('[name="_method"]');const status=form.querySelector('[name="status"]');button.dataset.state=state;button.textContent=state==='available'?'✓':state==='unavailable'?'✕':'—';button.title=state==='blank'?'Not answered':state.charAt(0).toUpperCase()+state.slice(1);button.setAttribute('aria-label',state==='blank'?'No availability selected. Select available':`${button.title}. Change availability`);if(state==='unavailable'){form.action=form.dataset.clearUrl;method.value='DELETE';status.disabled=true;}else{form.action=form.dataset.storeUrl;method.value='PUT';status.disabled=false;status.value=state==='blank'?'available':'unavailable';}};
+document.querySelectorAll('.availability-cycle-form').forEach(form=>form.addEventListener('submit',async event=>{event.preventDefault();const button=form.querySelector('.availability-cycle');const current=button.dataset.state;button.disabled=true;form.parentElement.querySelector('.availability-cycle-error')?.remove();try{const response=await fetch(form.action,{method:'POST',headers:{Accept:'application/json'},body:new FormData(form)});if(!response.ok)throw new Error('Availability could not be saved.');const next=current==='blank'?'available':current==='available'?'unavailable':'blank';configureAvailabilityCycle(form,next);}catch(error){const message=document.createElement('span');message.className='availability-cycle-error';message.textContent='Could not save';form.after(message);}finally{button.disabled=false;}}));
+document.querySelectorAll('[data-calendar-date]').forEach(button=>button.addEventListener('click',()=>{const date=button.dataset.calendarDate;const panel=document.querySelector(`[data-calendar-panel="${date}"]`);const wasOpen=button.getAttribute('aria-expanded')==='true';document.querySelectorAll('[data-calendar-date]').forEach(item=>item.setAttribute('aria-expanded','false'));document.querySelectorAll('[data-calendar-panel]').forEach(item=>item.hidden=true);if(!wasOpen&&panel){button.setAttribute('aria-expanded','true');panel.hidden=false;requestAnimationFrame(()=>panel.scrollIntoView({behavior:'smooth',block:'nearest'}));}}));
+const unreadTimers=new WeakMap();const markNotificationRead=async item=>{unreadTimers.delete(item);unreadObserver.unobserve(item);try{const response=await fetch(item.dataset.notificationReadUrl,{method:'PATCH',headers:{'Accept':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'}});if(response.ok)item.querySelector('.unread-dot')?.remove();else unreadObserver.observe(item);}catch(error){unreadObserver.observe(item);}};const unreadObserver=new IntersectionObserver(entries=>entries.forEach(entry=>{const existingTimer=unreadTimers.get(entry.target);if(!entry.isIntersecting){if(existingTimer)clearTimeout(existingTimer);unreadTimers.delete(entry.target);return;}if(!existingTimer)unreadTimers.set(entry.target,setTimeout(()=>markNotificationRead(entry.target),3000));}),{threshold:.6});document.querySelectorAll('[data-notification-read-url]').forEach(item=>unreadObserver.observe(item));
+</script>
 @endpush

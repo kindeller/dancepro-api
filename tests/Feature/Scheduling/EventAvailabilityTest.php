@@ -106,12 +106,86 @@ class EventAvailabilityTest extends TestCase
         $afternoon = $event->shifts()->create(['period' => 'afternoon']);
 
         $this->actingAs($user)->get(route('crew.availability.index'))->assertOk()->assertSee('Morning')->assertSee('Afternoon');
+        $this->actingAs($user)->get(route('crew.availability.index', ['view' => 'availability', 'layout' => 'grid']))
+            ->assertOk()
+            ->assertSee('&nbsp;<span class="muted">M</span>', false)
+            ->assertSee('&nbsp;<span class="muted">A</span>', false);
         $this->actingAs($user)->put(route('crew.availability.store', $morning), ['status' => 'available', 'note' => 'Can arrive early.'])->assertRedirect();
         $this->actingAs($user)->put(route('crew.availability.store', $afternoon), ['status' => 'unavailable', 'note' => 'Family commitment.'])->assertRedirect();
 
         $this->assertDatabaseHas('crew_availability_responses', ['crew_profile_id' => $crewProfile->id, 'scheduling_shift_id' => $morning->id, 'status' => 'available']);
         $this->assertDatabaseHas('crew_availability_responses', ['crew_profile_id' => $crewProfile->id, 'scheduling_shift_id' => $afternoon->id, 'status' => 'unavailable']);
         $this->actingAs($user)->get(route('crew.availability.index'))->assertOk()->assertSee('Assigned shifts')->assertDontSee('Availability requests');
+    }
+
+    public function test_crew_member_can_review_and_cycle_availability_in_grid_view(): void
+    {
+        $user = User::factory()->crew()->create();
+        $crewProfile = CrewProfile::factory()->for($user)->create();
+        $studio = Studio::factory()->create(['name' => 'Grid View Dance Studio']);
+        $venue = Venue::query()->create(['name' => 'Grid View Theatre']);
+        $event = SchedulingEvent::query()->create([
+            'studio_id' => $studio->id,
+            'venue_id' => $venue->id,
+            'name' => 'Grid View Concert',
+            'event_type' => 'concert',
+            'event_date' => '2030-08-12',
+            'availability_status' => 'open',
+            'availability_deadline' => now()->addWeek(),
+        ]);
+        $shift = $event->shifts()->create([
+            'shift_date' => '2030-08-12',
+            'posted_arrival_at' => '16:30',
+            'starts_at' => '18:00',
+            'estimated_finish_at' => '21:45',
+        ]);
+
+        $this->actingAs($user)->get(route('crew.availability.index', ['view' => 'availability']))
+            ->assertOk()
+            ->assertSee('Concert')
+            ->assertSee('Arrival 4:30 pm')
+            ->assertSee('Start 6:00 pm')
+            ->assertSee('Finish 9:45 pm');
+
+        $this->actingAs($user)->get(route('crew.availability.index', ['view' => 'availability', 'layout' => 'grid']))
+            ->assertOk()
+            ->assertSee('Grid View')
+            ->assertSee('Mon 12 Aug')
+            ->assertSee('4:30 pm')
+            ->assertSee('9:45 pm')
+            ->assertSee('Grid View Theatre')
+            ->assertSee('Grid View Dance Studio')
+            ->assertSee('data-state="blank"', false);
+
+        $this->actingAs($user)->putJson(route('crew.availability.store', $shift), ['status' => 'available'])
+            ->assertOk()
+            ->assertJsonPath('status', 'available');
+        $this->assertDatabaseHas('crew_availability_responses', [
+            'crew_profile_id' => $crewProfile->id,
+            'scheduling_shift_id' => $shift->id,
+            'status' => 'available',
+        ]);
+
+        $this->actingAs($user)->get(route('crew.availability.index', ['view' => 'availability', 'layout' => 'grid']))
+            ->assertOk()
+            ->assertSee('data-state="available"', false);
+
+        $this->actingAs($user)->get(route('crew.availability.index', ['view' => 'availability']))
+            ->assertOk()
+            ->assertDontSee('Clear selection')
+            ->assertSee('aria-label="Unselect Available"', false)
+            ->assertSee('form="clear-availability-'.$shift->uuid.'"', false);
+
+        $this->actingAs($user)->putJson(route('crew.availability.store', $shift), ['status' => 'unavailable'])
+            ->assertOk()
+            ->assertJsonPath('status', 'unavailable');
+        $this->actingAs($user)->deleteJson(route('crew.availability.clear', $shift))
+            ->assertOk()
+            ->assertJsonPath('status', null);
+        $this->assertDatabaseMissing('crew_availability_responses', [
+            'crew_profile_id' => $crewProfile->id,
+            'scheduling_shift_id' => $shift->id,
+        ]);
     }
 
     public function test_crew_account_cannot_open_administrator_events_or_private_profiles(): void
