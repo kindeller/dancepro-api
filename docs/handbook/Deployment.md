@@ -212,6 +212,13 @@ When CloudFront concert delivery is configured, also verify that Laravel can
 generate short-lived playback cookies and a short-lived attachment URL without
 logging or displaying private signing material.
 
+When the Flutter media API is deployed, use a synthetic asset to verify that an
+active staff media token can reserve an asset and obtain prefix-constrained
+upload requests, while customer and unrelated tokens receive `403`. Confirm
+that uploaded checksums are validated, incomplete multipart upload can resume,
+finalisation is idempotent and no bearer token or presigned query string appears
+in logs.
+
 ---
 
 # Smoke Tests
@@ -229,6 +236,12 @@ Following deployment, verify:
 - Desktop and mobile playback can seek when using the production media path.
 - The player handles an unavailable or expired media URL safely.
 - Concert originals use tracking links and download as attachments.
+- A synthetic fallback-only MP4 can be uploaded, assigned and played without an
+  HLS manifest.
+- A synthetic 720p/480p HLS package uploads its master manifest last and plays
+  through CloudFront.
+- The packaged macOS Flutter client stores its bearer token in Keychain and
+  contains no embedded AWS access key.
 - Disabled, unavailable or unapproved concerts remain inaccessible.
 
 ---

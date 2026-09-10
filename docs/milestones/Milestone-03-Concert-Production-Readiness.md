@@ -27,7 +27,9 @@ contain studio identity.
 
 AWS provisioning and production validation remain outstanding. Progressive
 video/download responses are still proxied by Laravel, and staff cannot yet
-manage concert media through the application.
+manage concert media through the web application or Flutter API. The target
+desktop ingest, presigned-upload, legacy-import and assignment contract is now
+documented but not implemented.
 
 ## In Scope
 
@@ -58,15 +60,33 @@ manage concert media through the application.
 ### Staff media management
 
 - List media collections belonging to a concert.
-- Browse storage-derived objects only beneath the configured collection prefix.
 - Create and edit collections.
-- Upload or import a video as a managed asset.
 - Replace media without losing its stable business identity.
 - Edit display names, playlist order, visibility and publication state.
 - Archive or delete managed assets safely.
-- Validate the collection prefix and object existence for every submitted
-  storage key.
 - Do not bulk-create managed asset records for every storage-derived photo.
+
+The web admin remains responsible for studio/concert management, publication,
+availability and customer access. The macOS Flutter application supplies the
+lower-level media ingest workflow:
+
+- Authenticate with an active staff/admin account and a limited Sanctum device
+  token stored in the macOS Keychain.
+- Limit initial use to trusted DancePro staff; add explicit studio/concert
+  account scope before client-studio or venue staff receive access.
+- Select staff-visible studios and concerts, including drafts.
+- Create or select a video collection under an existing concert.
+- Reserve a managed asset UUID before upload.
+- Convert locally to a compressed fallback MP4 and optional 720p/480p HLS.
+- Upload directly to private S3 through short-lived, Laravel-authorised
+  presigned requests without receiving an AWS credential.
+- Use resumable multipart upload for large MP4s and checksummed single-object
+  uploads for smaller HLS objects.
+- Finalise only after Laravel verifies object metadata and playlist references.
+- Import an existing MP4 only through a server-constrained legacy prefix and
+  opaque object reference.
+- Update display name, playlist order and visibility, without publishing a
+  concert or changing customer access.
 
 ### Programs and cover media
 
@@ -103,12 +123,18 @@ for this milestone:
 - Saved concerts, favourites and permanent customer libraries.
 - Ordering, purchasing and payment processing.
 - The wider Competition business domain.
-- Automatic transcoding and archive restoration.
+- Automatic server-side transcoding and archive restoration. Local conversion
+  in the Flutter ingest application is part of this milestone.
 
 ## Completion Criteria
 
 - Staff can configure and populate a concert without seed or direct database
   manipulation.
+- Flutter can upload or import and assign a concert MP4 without embedded AWS
+  credentials, direct database manipulation or unrestricted bucket access.
+- A fallback-only compressed MP4 remains playable when HLS conversion fails.
+- The production stream ladder is limited to 720p plus optional 480p; originals
+  remain protected downloads and are not advertised as streaming variants.
 - Published concert playback uses short-lived production media delivery and
   supports byte-range seeking.
 - Original downloads use database-backed tracking links and short-lived signed
@@ -130,3 +156,5 @@ for this milestone:
 - [Security](../handbook/Security.md)
 - [Testing](../handbook/Testing.md)
 - [Deployment](../handbook/Deployment.md)
+- [ADR-0003 - Desktop Media Ingest and Assignment](../decisions/ADR-0003-Desktop-Media-Ingest-and-Assignment.md)
+- [Flutter Desktop Media Ingest API](../specifications/Flutter-Desktop-Media-Ingest-API.md)

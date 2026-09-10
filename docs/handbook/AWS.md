@@ -18,10 +18,19 @@ configuration are supplied. Progressive playback and original downloads retain
 their existing Laravel filesystem responses pending the remaining production
 delivery work.
 
+The target media-ingest design uses a macOS Flutter converter/uploader. Flutter
+authenticates to Laravel and uploads directly to S3 using short-lived presigned
+requests for exact server-allocated object keys. The required Laravel media and
+upload endpoints are not yet implemented. The installed Laravel S3 adapter can
+generate a presigned `PutObject` request, and the installed AWS SDK can
+coordinate multipart uploads once application actions and policies are added.
+
 ## Scope
 
 - AWS credentials must remain server-side and must not be exposed to client
   applications.
+- Desktop applications must not embed access keys or depend on AWS CLI login for
+  their normal operation.
 - Private S3 buckets and CloudFront/S3 signing should remain behind Laravel
   actions or services.
 - Controllers must not contain S3 operations or CloudFront signing logic.
@@ -30,6 +39,8 @@ delivery work.
 - Public concert original downloads should use the same tracking-link workflow.
 - Concert playback should be authorised by Laravel and delivered using a
   short-lived URL that supports byte-range requests.
+- New concert uploads should send bytes directly from Flutter to private S3
+  using short-lived requests scoped to one server-allocated asset prefix.
 
 ## Competition Downloads
 
@@ -90,6 +101,11 @@ If the concert-specific access key, secret, or region are not set, the disk
 falls back to the shared `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and
 `AWS_DEFAULT_REGION` values.
 
+On EC2, prefer an instance profile with a least-privilege IAM role and leave
+long-lived access-key environment values unset where the deployed SDK credential
+chain supports that configuration. A server-side static key is still sensitive
+and should not be copied into Flutter or shared with client staff.
+
 ### Playback
 
 Laravel validates concert availability, asset ownership, visibility and the
@@ -128,6 +144,56 @@ Validate at least:
 - Streaming renditions are preferred where present; originals are not used for
   playback merely because they are available for download.
 
+### Desktop media ingest
+
+The web admin is the primary interface for studio/concert management,
+publication, availability and customer access. Flutter is limited to selecting
+an existing concert, converting media, uploading it, importing a permitted
+legacy MP4 and updating operational asset metadata.
+
+The target upload flow is:
+
+1. An active staff/admin account authenticates to Laravel with a limited Sanctum
+   token stored in the macOS Keychain.
+2. Laravel reserves the collection/asset UUID and derives
+   `{collection_uuid}/media/{asset_uuid}/`.
+3. Flutter reports the intended relative paths, sizes, content types and
+   checksums.
+4. Laravel returns short-lived presigned requests for only those exact objects.
+5. Flutter uploads bytes directly to S3. Large MP4s use multipart upload;
+   manifests, playlists, segments and thumbnails use single-object uploads.
+6. Laravel verifies the completed package and marks the asset available.
+7. Web staff review and publish it separately.
+
+The client must not choose a bucket, submit an unrestricted authoritative key,
+receive reusable AWS credentials or obtain deletion permission. Presigned URLs
+are temporary bearer capabilities and must be excluded from application,
+proxy, analytics and crash logs.
+
+The minimum new playback package contains a compressed 720p
+`stream/fallback.mp4`. HLS is optional and is limited to a 720p rendition plus
+an optional 480p rendition. Do not generate a high-resolution streaming
+rendition. Keep `original/video.mp4` for protected downloads and out of the HLS
+master manifest.
+
+For HLS, upload and verify every child object before issuing the upload request
+for `stream/master.m3u8`. Use object checksums, verify them during finalisation,
+and make finalisation idempotent. Configure lifecycle handling for abandoned
+incomplete multipart uploads.
+
+The existing resolver uses one `storage_disk` for all renditions of an asset.
+An old MP4 can play directly from `s3_concerts_legacy`, but an original in that
+bucket cannot currently be combined with HLS in `s3_concerts` as one asset.
+
+Enable encrypted access logging, CloudTrail S3 data events for relevant write
+paths, and CloudWatch metrics and alarms for upload and delivery failures. Keep
+Block Public Access enabled, ACLs disabled, encryption at rest enabled and all
+transport over TLS. Scope the Laravel IAM role to required actions and prefixes,
+with source-account and source-resource conditions where applicable.
+
+See the complete target contract in
+[Flutter Desktop Media Ingest API](../specifications/Flutter-Desktop-Media-Ingest-API.md).
+
 ### Original download target
 
 Concert originals should use a Laravel `/download/{token}` tracking URL backed
@@ -156,6 +222,8 @@ disk rather than assuming one domain serves every asset.
 
 - [Concert Streaming AWS Setup Handoff](Concert-Streaming-AWS-Setup-Handoff.md)
 - [ADR-0002 - Concert Media Storage and Playback](../decisions/ADR-0002-Concert-Media-Storage-and-Playback.md)
+- [ADR-0003 - Desktop Media Ingest and Assignment](../decisions/ADR-0003-Desktop-Media-Ingest-and-Assignment.md)
+- [Flutter Desktop Media Ingest API](../specifications/Flutter-Desktop-Media-Ingest-API.md)
 - [DancePro V1 S3 Structure](V1-S3-Structure.md)
 - [Competition Downloads Specification](../specifications/Competition-Downloads.md)
 - [Concert Epic](../epics/Concert.md)
@@ -163,6 +231,9 @@ disk rather than assuming one domain serves every asset.
 - [Download Links Specification](../specifications/Download-Links.md)
 - [Security](Security.md)
 - [Architecture](Architecture.md)
+- [Amazon S3 presigned uploads](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
+- [Amazon S3 multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html)
+- [Amazon S3 upload integrity](https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity-upload.html)
 
 ## Notes / Future Work
 

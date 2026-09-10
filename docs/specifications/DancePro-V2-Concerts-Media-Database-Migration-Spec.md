@@ -276,19 +276,26 @@ Managed concert videos use the following convention:
     └── {asset_uuid}/
         ├── original/video.mp4
         ├── stream/master.m3u8
-        ├── stream/high.m3u8
-        ├── stream/high-init.mp4
-        ├── stream/high-{segment}.m4s
-        ├── stream/standard.m3u8
-        ├── stream/standard-init.mp4
-        ├── stream/standard-{segment}.m4s
+        ├── stream/720p.m3u8
+        ├── stream/720p-init.mp4
+        ├── stream/720p-{segment}.m4s
+        ├── stream/480p.m3u8
+        ├── stream/480p-init.mp4
+        ├── stream/480p-{segment}.m4s
         ├── stream/fallback.mp4
         └── thumbnail/poster.png
 ```
 
-The stream is HLS video on demand using fragmented MP4 segments. `high` and
-`standard` are playback renditions, not historical file versions. Their files
-may remain flat inside `stream/` when their names prevent collisions.
+The stream is HLS video on demand using fragmented MP4 segments. The maximum
+streaming rendition is 720p, with an optional 480p rendition. These are playback
+renditions, not historical file versions. Their files may remain flat inside
+`stream/` when their names prevent collisions.
+
+Do not create a source-quality or 1080p streaming rendition in the initial
+production workflow. Keep the original for protected download and do not
+reference it from the HLS master manifest. A compressed
+`stream/fallback.mp4` is the minimum reliable output for a newly converted
+asset; the HLS package is optional.
 
 Concert programs may remain beneath the collection:
 
@@ -313,8 +320,9 @@ media packages are uploaded before a concert is released.
 
 Laravel authorises playback. HLS is delivered by CloudFront using short-lived
 signed cookies scoped to the selected asset prefix. Progressive fallback
-retains the existing application delivery path until production delivery is
-fully moved behind CloudFront.
+currently retains the existing application delivery path, but the production
+target is authorised CloudFront delivery with byte-range support rather than
+proxying video bytes through Laravel.
 
 ## 4.5 Storage-derived and managed media
 
@@ -329,6 +337,37 @@ archive tracking or stable external references.
 Original, HLS, fallback and thumbnail objects are renditions or locations of
 one media asset. They are not separate business assets merely because multiple
 S3 objects exist.
+
+The current playback resolver checks all canonical renditions on the asset's
+primary `storage_disk`; it does not resolve different renditions from
+`media_asset_locations`. Until that changes, a complete active package must be
+addressable on one disk. Location rows may record history but do not by
+themselves combine a legacy original with a new-bucket HLS package.
+
+## 4.6 Desktop ingest boundary
+
+The macOS Flutter application converts and uploads concert video, but Laravel
+remains responsible for authentication, authorisation, UUID allocation, object
+key derivation, upload signing, verification and database assignment.
+
+Flutter must not store a long-lived AWS credential or submit an unrestricted
+bucket/key. It authenticates with a limited staff/admin Sanctum token and
+uploads directly to S3 through short-lived requests for exact keys beneath a
+server-reserved asset prefix. Large MP4s use server-coordinated multipart
+upload; smaller HLS objects use presigned single-object uploads.
+
+New assets remain `processing` and invisible until Laravel verifies object
+metadata, checksums and playlist references. HLS child objects are uploaded
+before `master.m3u8`. Finalisation changes the asset to `available` but does not
+publish the collection or concert.
+
+Existing V1 MP4s may be imported through an opaque reference returned from a
+server-constrained legacy-prefix listing. The import endpoint verifies the
+object and creates the managed asset without exposing AWS credentials or
+accepting an arbitrary storage path.
+
+The complete target API is documented in
+[Flutter Desktop Media Ingest API](Flutter-Desktop-Media-Ingest-API.md).
 
 ---
 
@@ -1701,8 +1740,10 @@ Future migration flow:
 6. Create media collections for existing video and photo folders.
 7. Compare V1 video rows with actual S3 objects.
 8. Import selected videos as managed media assets.
-9. Leave V1 tables untouched.
-10. Generate a reconciliation report for missing or unmatched media.
+9. Expose legacy objects to Flutter only through collection-constrained opaque
+   references, not unrestricted bucket keys.
+10. Leave V1 tables untouched.
+11. Generate a reconciliation report for missing or unmatched media.
 
 No destructive migration from V1 is allowed during this phase.
 
@@ -1743,6 +1784,22 @@ Codex should include feature and unit tests covering at least:
 - Repeated basenames are allowed when full keys differ.
 - Asset UUID remains stable.
 - Asset can update its active storage location.
+
+## Desktop media ingest
+
+- Only active staff/admin accounts with the required token ability can reserve,
+  upload, import, finalise or update media.
+- Customer, inactive, expired and unrelated tokens are rejected.
+- Asset reservation, import and finalisation are idempotent.
+- Presigned requests are short-lived and restricted to exact server-derived
+  keys beneath one asset prefix.
+- Large MP4 multipart uploads can resume and validate their final checksum.
+- Invalid size, content type, checksum or HLS playlist references prevent
+  finalisation.
+- `master.m3u8` cannot be uploaded before its child package is verified.
+- Fallback-only MP4 assets can become available without HLS.
+- Legacy imports cannot escape the server-known collection prefix.
+- Finalisation does not publish a collection or concert.
 
 ## Customer access
 

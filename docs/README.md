@@ -69,6 +69,7 @@ Current specifications:
 - [Competition Downloads](specifications/Competition-Downloads.md)
 - [DancePro V2 Functional Specification](specifications/DancePro-V2-Functional-Specification.md)
 - [Concerts and Media Database Migration](specifications/DancePro-V2-Concerts-Media-Database-Migration-Spec.md)
+- [Flutter Desktop Media Ingest API](specifications/Flutter-Desktop-Media-Ingest-API.md)
 
 ## Milestones
 
@@ -96,6 +97,7 @@ Current records:
 - [DancePro V2 - Phase 0 Foundation Plan](decisions/DancePro-V2-Phase-0-Foundation-Plan.md)
 - [ADR-0001 - Generic Downloads Bounded Context](decisions/ADR-0001-Generic-Downloads-Bounded-Context.md)
 - [ADR-0002 - Concert Media Storage and Playback](decisions/ADR-0002-Concert-Media-Storage-and-Playback.md)
+- [ADR-0003 - Desktop Media Ingest and Assignment](decisions/ADR-0003-Desktop-Media-Ingest-and-Assignment.md)
 
 ## Documentation Principle
 

@@ -39,6 +39,9 @@ Existing context:
 - The application already contains HLS playback resolution and CloudFront
   signed-cookie generation. I am asking you to prepare the AWS side and provide
   the configuration values back to me.
+- The Flutter presigned-upload API contract is documented but its Laravel
+  endpoints are not yet implemented. Do not mistake the target flow for a
+  currently deployed upload service.
 
 Canonical V2 media structure:
 
@@ -47,12 +50,12 @@ Canonical V2 media structure:
 │   └── {asset_uuid}/
 │       ├── original/video.mp4
 │       ├── stream/master.m3u8
-│       ├── stream/high.m3u8
-│       ├── stream/high-init.mp4
-│       ├── stream/high-{segment}.m4s
-│       ├── stream/standard.m3u8
-│       ├── stream/standard-init.mp4
-│       ├── stream/standard-{segment}.m4s
+│       ├── stream/720p.m3u8
+│       ├── stream/720p-init.mp4
+│       ├── stream/720p-{segment}.m4s
+│       ├── stream/480p.m3u8
+│       ├── stream/480p-init.mp4
+│       ├── stream/480p-{segment}.m4s
 │       ├── stream/fallback.mp4
 │       └── thumbnail/poster.png
 └── documents/program.pdf
@@ -66,7 +69,11 @@ Playback order:
 HLS details:
 
 - Video-on-demand HLS using fragmented MP4 segments.
-- Two renditions: high and standard.
+- Maximum streaming resolution of 720p, with optional 480p adaptive playback.
+- Do not create a 1080p or source-quality streaming rendition. Retain the
+  original only for protected download.
+- A compressed 720p fallback MP4 is the minimum playback output. HLS is
+  optional when conversion fails.
 - CloudFront signed cookies must authorise all files beneath only the selected
   {collection_uuid}/media/{asset_uuid}/ prefix.
 - The S3 bucket must remain private.
@@ -74,6 +81,11 @@ HLS details:
 - The frontend will use native HLS where supported and hls.js elsewhere.
 - The player sends credentials when requesting manifests and segments.
 - Original downloads retain the existing protected application workflow.
+- The macOS Flutter converter/uploader authenticates to Laravel and receives
+  short-lived, object-specific presigned S3 upload requests. It must never hold
+  a long-lived AWS access key or CloudFront signing key.
+- Large MP4s require server-coordinated multipart upload. Small HLS objects use
+  presigned single-object uploads. The HLS master manifest is uploaded last.
 
 Please guide me through these phases:
 
@@ -105,11 +117,11 @@ Present the proposed resources before creating anything:
 12. Cache and response-header policies suitable for immutable HLS manifests,
     playlists, initialization files, segments, MP4 files, PNG files and PDFs.
 13. Logging, monitoring and cost implications.
-14. Least-privilege IAM boundaries for Laravel and the separate upload/FFmpeg
-    process.
+14. Least-privilege IAM boundaries for Laravel delivery and presigned upload
+    generation. The Flutter/FFmpeg process must not receive an IAM principal.
 
-Do not create separate high and standard directories. The FFmpeg output uses
-quality-prefixed filenames directly inside stream/.
+Do not create separate rendition directories. The FFmpeg output uses
+resolution-prefixed filenames directly inside stream/.
 
 Expected content types:
 
@@ -156,11 +168,16 @@ Use synthetic test media only and verify:
 3. Signed cookies load master.m3u8 and every referenced child object.
 4. A cookie scoped to one asset cannot read another asset prefix.
 5. Expired cookies fail.
-6. High and standard variants play.
+6. The 720p variant plays and the optional 480p variant is selected under
+   constrained bandwidth.
 7. Automatic quality switching works under throttled bandwidth.
 8. MP4 byte-range requests and seeking work.
 9. CORS and content types are correct.
 10. Logs do not contain signed cookie values or private signing material.
+11. Presigned upload requests cannot write outside one reserved asset prefix or
+    after expiry.
+12. Multipart MP4 upload resumes safely and validates its checksum.
+13. A fallback-only MP4 asset plays without an HLS manifest.
 
 At the end, return a redacted implementation summary and these non-secret
 Laravel configuration values:
@@ -210,3 +227,5 @@ unknown or awaiting a decision.
 
 The detailed application-side handoff remains in
 [Concert Streaming AWS Setup Handoff](Concert-Streaming-AWS-Setup-Handoff.md).
+The desktop contract is in
+[Flutter Desktop Media Ingest API](../specifications/Flutter-Desktop-Media-Ingest-API.md).

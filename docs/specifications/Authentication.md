@@ -38,6 +38,23 @@ Only active users can receive a token. The response includes a bearer token that
 Authorization: Bearer <token>
 ```
 
+The current login implementation issues the wildcard `*` token ability to any
+active user type. This is sufficient only for the initial baseline and must not
+be treated as the authorisation contract for privileged media operations.
+
+Before Flutter media endpoints are exposed:
+
+- login used by the desktop uploader must require an active `staff` or `admin`
+  account;
+- the server must issue only `concert-media:read`,
+  `concert-media:upload` and `concert-media:update` as appropriate;
+- a customer account must not receive these abilities;
+- the client must not submit or choose an arbitrary abilities list;
+- the token must use an explicit production expiry policy and be stored in the
+  macOS Keychain;
+- login must be rate limited;
+- bearer tokens and presigned URLs must be redacted from logs.
+
 ## Logout
 
 `POST /api/auth/logout` revokes the current Sanctum token only.
@@ -67,6 +84,7 @@ deleted_at
 - [API Guidelines](../handbook/API-Guidelines.md)
 - [Security](../handbook/Security.md)
 - [Foundation Epic](../epics/Foundation.md)
+- [Flutter Desktop Media Ingest API](Flutter-Desktop-Media-Ingest-API.md)
 
 ## Notes / Future Work
 
