@@ -134,6 +134,7 @@ class CrewMobileFinancials
             'assignment_id' => $assignment->uuid,
             'event_name' => $event->name,
             'event_logo_url' => $event->crewLogoUrl(),
+            'event_code' => $event->eventCode(),
             'event_type' => $event->event_type->value,
             'event_date' => $assignment->shift->shift_date->toDateString(),
             'status' => $status,

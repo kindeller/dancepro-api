@@ -7,9 +7,12 @@ use App\Features\CompetitionContacts\Models\CompetitionContact;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Operations\Models\ChecklistTemplate;
+use App\Features\Scheduling\Models\EventTypeDefinition;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Studios\Models\Studio;
 use App\Features\Venues\Models\Venue;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -18,6 +21,76 @@ use Tests\TestCase;
 class CrewMobileSchedulingActionsTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_mobile_event_code_is_consistent_across_dashboard_assignments_availability_and_timesheets(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-10 10:00:00'));
+        [, $profile] = $this->authenticatedCrew();
+        $assignment = $this->assignmentFor($profile);
+        $competition = CompetitionContact::query()->create([
+            'name' => 'Express Dance Challenge', 'code' => 'EDC',
+            'organiser_name' => 'Example', 'organiser_email' => 'example@example.test', 'organiser_phone' => '0000 000 000',
+        ]);
+        $event = $assignment->shift->schedulingEvent;
+        $event->update([
+            'competition_contact_id' => $competition->id, 'event_date' => today(),
+            'availability_status' => 'open', 'availability_deadline' => now()->addDay(),
+        ]);
+        $assignment->shift->update(['shift_date' => today()]);
+        $event->shifts()->create(['shift_date' => today()->addDay(), 'period' => 'afternoon']);
+        $paths = [
+            '/api/v1/dashboard' => 'data.next_assignment.event_code',
+            '/api/v1/assignments' => 'data.0.event_code',
+            '/api/v1/assignments/'.$assignment->uuid => 'data.event_code',
+            '/api/v1/availability' => 'data.0.event_code',
+            '/api/v1/timesheets' => 'data.0.event_code',
+        ];
+        foreach ($paths as $url => $path) {
+            $this->getJson($url)->assertOk()->assertJsonPath($path, 'EDC926');
+        }
+        $competition->update(['code' => null]);
+        foreach ($paths as $url => $path) {
+            $this->getJson($url)->assertOk()->assertJsonPath($path, null);
+        }
+        $competition->update(['code' => 'EDC']);
+        $studio = Studio::factory()->create(['code' => 'K2D']);
+        $event->update(['event_type' => 'concert', 'studio_id' => $studio->id]);
+        foreach ($paths as $url => $path) {
+            $this->getJson($url)->assertOk()->assertJsonPath($path, 'K2D2026');
+        }
+        $dr = EventTypeDefinition::query()->create(['code' => 'DR', 'name' => 'Portrait Shoot', 'system_category' => 'concert', 'is_active' => true]);
+        $event->update(['event_type_definition_id' => $dr->id, 'event_date' => '2026-12-10']);
+        foreach ($paths as $url => $path) {
+            $this->getJson($url)->assertOk()->assertJsonPath($path, 'K2D2026');
+        }
+        $event->update(['event_date' => '2027-01-01']);
+        foreach ($paths as $url => $path) {
+            $this->getJson($url)->assertOk()->assertJsonPath($path, 'K2D2027');
+        }
+        $studio->update(['code' => null]);
+        foreach ($paths as $url => $path) {
+            $this->getJson($url)->assertOk()->assertJsonPath($path, null);
+        }
+    }
+
+    public function test_dr_assignment_and_dashboard_use_configured_shift_code(): void
+    {
+        [, $profile] = $this->authenticatedCrew();
+        $assignment = $this->assignmentFor($profile);
+        $type = EventTypeDefinition::query()->create([
+            'code' => 'DR', 'name' => 'Portrait Shoot', 'system_category' => 'concert', 'is_active' => true,
+        ]);
+        $assignment->shift->schedulingEvent->update([
+            'event_type' => 'concert', 'event_type_definition_id' => $type->id,
+        ]);
+        $assignment->shift->update(['period' => null]);
+
+        $this->getJson('/api/v1/assignments')->assertOk()->assertJsonPath('data.0.shift_code', 'DR');
+        $this->getJson('/api/v1/assignments/'.$assignment->uuid)->assertOk()->assertJsonPath('data.shift_code', 'DR');
+        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.next_assignment.shift_code', 'DR');
+        $this->actingAs($profile->user, 'web')->get(route('crew.availability.index'))
+            ->assertOk()->assertSee('<div class="type-label">DR</div>', false);
+    }
 
     public function test_crew_lists_and_updates_open_shift_availability(): void
     {

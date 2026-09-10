@@ -62,7 +62,7 @@ class CrewAvailabilityController extends Controller
                 'checklistCompletions',
                 'shift.assignments.timeEntry',
                 'shift.assignments.crewProfile.user',
-                'shift.schedulingEvent.venue',
+                'shift.schedulingEvent.eventTypeDefinition', 'shift.schedulingEvent.venue',
                 'shift.schedulingEvent.studio',
                 'shift.schedulingEvent.concertBookingItem.booking',
             ])
@@ -79,7 +79,7 @@ class CrewAvailabilityController extends Controller
             ->whereHas('shift.schedulingEvent', fn ($query) => $query->whereNotNull('cancelled_at'))
             ->with([
                 'equipmentResponsibilities', 'coverRequests', 'role', 'timeEntry',
-                'shift.schedulingEvent.venue', 'shift.schedulingEvent.studio',
+                'shift.schedulingEvent.eventTypeDefinition', 'shift.schedulingEvent.venue', 'shift.schedulingEvent.studio',
                 'shift.schedulingEvent.concertBookingItem.booking',
             ])
             ->get()

@@ -45,6 +45,7 @@ class CrewMobileAvailability
             'event_name' => $event->name,
             'event_type' => $event->event_type->value,
             'event_logo_url' => $event->crewLogoUrl(),
+            'event_code' => $event->eventCode(),
             'organisation' => $organisation ? [
                 'id' => $organisation->uuid,
                 'name' => $organisation->name,

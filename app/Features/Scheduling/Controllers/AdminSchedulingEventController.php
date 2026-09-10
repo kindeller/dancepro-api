@@ -50,7 +50,7 @@ class AdminSchedulingEventController extends Controller
         $selectedType = $request->filled('type') ? EventTypeDefinition::query()->where('uuid', $request->string('type'))->first() : null;
 
         $shifts = SchedulingShift::query()
-            ->with(['schedulingEvent.venue', 'schedulingEvent.roleRequirements.crewRole', 'schedulingEvent.concertBookingItem.booking', 'assignments.crewProfile', 'assignments.equipmentResponsibilities', 'availabilityResponses'])
+            ->with(['schedulingEvent.eventTypeDefinition', 'schedulingEvent.competitionContact', 'schedulingEvent.studio', 'schedulingEvent.venue', 'schedulingEvent.roleRequirements.crewRole', 'schedulingEvent.concertBookingItem.booking', 'assignments.crewProfile', 'assignments.equipmentResponsibilities', 'availabilityResponses'])
             ->whereHas('schedulingEvent', function ($query) use ($request, $selectedType): void {
                 $query->when($request->filled('search'), fn ($query) => $query->where('name', 'like', '%'.$request->string('search').'%'))
                     ->when($selectedType, fn ($query) => $query->where('event_type_definition_id', $selectedType->id))
@@ -106,7 +106,7 @@ class AdminSchedulingEventController extends Controller
     {
         Gate::authorize('manageScheduling');
 
-        $schedulingEvent->load(['venue', 'roleRequirements.crewRole', 'messages.author', 'messages.reads', 'shifts.availabilityResponses.crewProfile.user', 'shifts.assignments.crewProfile', 'shifts.assignments.role', 'shifts.assignments.checklistCompletions', 'shifts.assignments.timeEntry.audits', 'shifts.assignments.allowances', 'shifts.assignments.shift.schedulingEvent']);
+        $schedulingEvent->load(['eventTypeDefinition', 'concertBookingItem.booking.items.schedulingEvent', 'studio', 'competitionContact', 'venue', 'roleRequirements.crewRole', 'messages.author', 'messages.reads', 'shifts.availabilityResponses.crewProfile.user', 'shifts.assignments.crewProfile', 'shifts.assignments.role', 'shifts.assignments.checklistCompletions', 'shifts.assignments.timeEntry.audits', 'shifts.assignments.allowances', 'shifts.assignments.shift.schedulingEvent']);
         $assignments = $schedulingEvent->shifts->flatMap->assignments;
 
         return view('admin.scheduling-events.show', [
@@ -122,7 +122,7 @@ class AdminSchedulingEventController extends Controller
     {
         Gate::authorize('manageScheduling');
         abort_unless($schedulingEvent->event_type === SchedulingEventType::Competition, 404);
-        $schedulingEvent->load(['shifts', 'roleRequirements.crewRole']);
+        $schedulingEvent->load(['competitionContact', 'shifts', 'roleRequirements.crewRole']);
 
         return view('admin.scheduling-events.edit', ['event' => $schedulingEvent] + $this->formData());
     }

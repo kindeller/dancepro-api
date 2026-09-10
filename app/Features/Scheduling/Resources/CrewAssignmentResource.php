@@ -46,13 +46,12 @@ class CrewAssignmentResource extends JsonResource
             'event_name' => $event->name,
             'event_type' => $eventType,
             'event_logo_url' => $event->crewLogoUrl(),
+            'event_code' => $event->eventCode(),
             'event_item_title' => $event->concertBookingItem?->title,
             'role' => $this->role->name,
             'is_team_leader' => $this->is_team_leader,
             'shift_period' => $this->shift->period?->value,
-            'shift_code' => $eventType === 'competition'
-                ? 'COMP-'.($this->shift->period?->value === 'morning' ? 'M' : 'A')
-                : 'CON',
+            'shift_code' => $this->shift->displayCode(),
             'shift_date' => $this->shift->shift_date->toDateString(),
             'arrival_at' => $this->shift->posted_arrival_at?->toIso8601String(),
             'starts_at' => $this->shift->starts_at?->toIso8601String(),

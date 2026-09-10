@@ -2,6 +2,7 @@
 
 namespace App\Features\Scheduling\Models;
 
+use App\Features\Scheduling\Support\SchedulingEventType;
 use App\Features\Scheduling\Support\ShiftPeriod;
 use App\Shared\Models\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -13,6 +14,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class SchedulingShift extends Model
 {
     use HasPublicUuid;
+
+    public function displayCode(): string
+    {
+        $event = $this->schedulingEvent;
+
+        if ($event->event_type === SchedulingEventType::Competition) {
+            return $this->period === ShiftPeriod::Morning ? 'COMP-M' : 'COMP-A';
+        }
+
+        return $event->eventTypeDefinition?->code ?: 'CON';
+    }
 
     public function schedulingEvent(): BelongsTo
     {

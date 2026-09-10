@@ -36,7 +36,10 @@
                         <tr>
                             <td><input class="event-checkbox" type="checkbox" name="event_ids[]" value="{{ $item->uuid }}" @checked(in_array($item->uuid, old('event_ids', [])))></td>
                             <td><strong>{{ $item->event_date->format('D j M') }}</strong><div class="muted">{{ \Carbon\Carbon::parse($item->starts_at)->format('g:i a') }}–{{ \Carbon\Carbon::parse($item->finishes_at)->format('g:i a') }}</div></td>
-                            <td><strong>{{ $item->title ?: 'Dress rehearsal' }}</strong><div class="muted">{{ $item->eventTypeDefinition?->name ?: str($item->item_type->value)->replace('_', ' ')->title() }} · {{ str($item->item_type->value)->replace('_', ' ')->title() }}</div></td>
+                            <td><div class="booking-event-heading">
+                                <x-event-artwork :url="$artworkUrls->get($item->uuid)" :name="$item->booking->studio_name" />
+                                <div><strong>{{ $item->title ?: 'Dress rehearsal' }}</strong><div class="muted">{{ $item->eventTypeDefinition?->name ?: str($item->item_type->value)->replace('_', ' ')->title() }} · {{ str($item->item_type->value)->replace('_', ' ')->title() }}</div></div>
+                            </div></td>
                             <td>{{ $item->booking->studio_name }}<div class="muted">{{ $item->booking->contact_name }}</div></td>
                             <td>{{ $item->venue_name }}<div class="muted">{{ $item->venue_address }}</div></td>
                             <td><span class="badge {{ $item->approval_status }}">{{ $item->approval_status === 'pending' ? 'Pending approval' : ucfirst($item->approval_status) }}</span></td>

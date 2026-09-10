@@ -4,6 +4,7 @@ namespace Tests\Feature\Bookings;
 
 use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Bookings\Models\ConcertBookingItem;
+use App\Features\CompetitionContacts\Models\CompetitionContact;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Scheduling\Models\CrewNotification;
@@ -20,6 +21,99 @@ use Tests\TestCase;
 class ConcertBookingWorkflowTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_expanded_event_displays_booking_details_and_edit_link(): void
+    {
+        $this->post(route('concert-bookings.store'), $this->bookingData())->assertRedirect();
+        $booking = ConcertBooking::query()->firstOrFail();
+        $this->actingAs(User::factory()->staff()->create())
+            ->post(route('admin.concert-bookings.approve', $booking))->assertRedirect();
+        $item = $booking->items()->oldest('id')->firstOrFail();
+        $item->update(['programme_path' => 'programmes/test.pdf', 'programme_name' => 'Studio run sheet.pdf']);
+        $item->venue->update(['access_notes' => 'Use stage door', 'parking_notes' => 'Crew bays at rear', 'operational_notes' => 'Power at stage left']);
+        $booking->update(['internal_review_note' => '<script>private note</script>', 'multiple_concert_relationship' => 'Different age groups', 'concert_inclusions' => ['presentations_awards', 'tap_dance']]);
+
+        $this->get(route('admin.scheduling-events.show', $item->schedulingEvent))->assertOk()
+            ->assertSee('Morgan Example')->assertSee('studio@example.test')->assertSee('0400 000 100')
+            ->assertSee('Portrait photography')->assertSee('Concert videography')->assertSee('120')
+            ->assertSee('Presentations / awards')->assertSee('Tap dance')
+            ->assertSee('1 Example Road, Perth WA 6000')->assertSee('Clear chapter navigation worked well.')
+            ->assertSee('Different age groups')->assertSee('No personal backdrop photos')
+            ->assertSee('17:00–20:00')->assertSee('Studio run sheet.pdf')
+            ->assertSee(route('admin.concert-booking-events.programme.show', $item), false)
+            ->assertSee('Use stage door')->assertSee('Crew bays at rear')->assertSee('Power at stage left')
+            ->assertSee('Other events in this booking (1)')->assertSee('A Night of Dance')
+            ->assertSee('&lt;script&gt;private note&lt;/script&gt;', false)->assertDontSee('<script>private note</script>', false)
+            ->assertSee(route('admin.concert-bookings.show', $booking).'#event-'.$item->uuid, false)
+            ->assertSee('Edit booking');
+        $this->get(route('admin.concert-bookings.show', $booking))->assertOk()
+            ->assertSee('id="event-'.$item->uuid.'"', false);
+    }
+
+    public function test_booking_and_pending_lists_show_matched_studio_artwork_or_a_placeholder(): void
+    {
+        Storage::fake('public');
+        config(['uploads.public_disk' => 'public']);
+        $this->post(route('concert-bookings.store'), $this->bookingData())->assertRedirect();
+        $studio = Studio::factory()->create([
+            'name' => 'fictional dance academy', 'logo_path' => 'studios/booking-artwork.png',
+        ]);
+        $this->actingAs(User::factory()->staff()->create());
+
+        foreach (['admin.concert-bookings.index', 'admin.event-management.pending'] as $route) {
+            $this->get(route($route))->assertOk()->assertSee('src="'.url($studio->logoUrl()).'"', false);
+        }
+
+        $studio->update(['logo_path' => null]);
+        foreach (['admin.concert-bookings.index', 'admin.event-management.pending'] as $route) {
+            $this->get(route($route))->assertOk()->assertSee('No artwork for Fictional Dance Academy')
+                ->assertDontSee('booking-artwork.png');
+        }
+
+        $studio->update(['name' => 'Another studio', 'logo_path' => 'studios/booking-artwork.png']);
+        $this->get(route('admin.event-management.pending'))->assertOk()
+            ->assertDontSee('booking-artwork.png')->assertSee('No artwork for Fictional Dance Academy');
+    }
+
+    public function test_approved_booking_artwork_uses_the_linked_event_instead_of_the_submitted_studio_name(): void
+    {
+        Storage::fake('public');
+        config(['uploads.public_disk' => 'public']);
+        $this->post(route('concert-bookings.store'), $this->bookingData())->assertRedirect();
+        Studio::factory()->create(['name' => 'Fictional Dance Academy', 'logo_path' => 'studios/old.png']);
+        $event = SchedulingEvent::query()->create([
+            'name' => 'Linked event', 'event_type' => 'concert', 'event_date' => today(), 'logo_path' => 'events/fallback.png',
+        ]);
+        ConcertBookingItem::query()->update(['scheduling_event_id' => $event->id, 'approval_status' => 'approved']);
+
+        $this->actingAs(User::factory()->staff()->create())->get(route('admin.concert-bookings.index'))
+            ->assertOk()->assertSee('src="'.url($event->logoUrl()).'"', false)->assertDontSee('studios/old.png');
+    }
+
+    public function test_expanded_admin_event_information_uses_organisation_artwork_and_fallbacks(): void
+    {
+        Storage::fake('public');
+        config(['uploads.public_disk' => 'public']);
+        $this->actingAs(User::factory()->staff()->create());
+        $studio = Studio::factory()->create(['logo_path' => 'studios/expanded.png']);
+        $competition = CompetitionContact::query()->create([
+            'name' => 'Artwork competition', 'logo_path' => 'competitions/expanded.png',
+            'organiser_name' => 'Organiser', 'organiser_email' => 'artwork@example.com', 'organiser_phone' => '0400 000 000',
+        ]);
+        foreach (['concert' => $studio, 'competition' => $competition] as $type => $organisation) {
+            $event = SchedulingEvent::query()->create([
+                'name' => 'Expanded '.$type, 'event_type' => $type, 'event_date' => today(),
+                'studio_id' => $studio->id, 'competition_contact_id' => $competition->id, 'logo_path' => 'events/fallback.png',
+            ]);
+            $this->get(route('admin.scheduling-events.show', $event))->assertOk()
+                ->assertSee('src="'.url($organisation->logoUrl()).'"', false)->assertDontSee('events/fallback.png');
+            $organisation->update(['logo_path' => null]);
+            $this->get(route('admin.scheduling-events.show', $event))->assertOk()
+                ->assertSee('src="'.url($event->logoUrl()).'"', false);
+            $event->update(['logo_path' => null]);
+            $this->get(route('admin.scheduling-events.show', $event))->assertOk()->assertSee('No artwork for Expanded '.$type);
+        }
+    }
 
     public function test_public_booking_collects_repeatable_concert_details(): void
     {
@@ -386,6 +480,10 @@ class ConcertBookingWorkflowTest extends TestCase
         ])->assertRedirect()->assertSessionHas('status', 'Booking details updated.');
 
         $booking->refresh();
+        $this->get(route('admin.scheduling-events.show', $assignment->shift->schedulingEvent))->assertOk()
+            ->assertSee('Updated Contact')->assertSee('updated@example.test')->assertSee('0411 222 333')
+            ->assertSee('Updated rehearsal')->assertSee('16:30–20:30')
+            ->assertSee('Updated feedback')->assertSee('Details confirmed by phone.');
         $this->assertSame('Updated Dance Academy', $booking->studio_name);
         $this->assertSame('updated@example.test', $booking->contact_email);
         $this->assertFalse($booking->wants_concert_videography);

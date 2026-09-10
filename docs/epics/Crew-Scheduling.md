@@ -367,7 +367,11 @@ timesheets all expose `event_logo_url` using the same selection: concert studio
 logo or competition contact logo, then the event logo, then `null` so the app
 keeps its placeholder. Timesheets also expose `event_type` (`concert` or
 `competition`). Artwork relationships are eager-loaded for collection reads.
-Desktop views continue to use their existing event/studio/contact logo helpers.
+Admin Event Bookings and Pending Events show contained logo thumbnails. Before
+approval, a booking uses a unique saved studio name match (ignoring case and
+surrounding whitespace); unmatched or ambiguous names keep a placeholder. Linked
+bookings and expanded Event Availability information use the same event artwork
+selection as mobile. Studio-name lookup is batched for each booking page.
 
 Artwork comes from `uploads.public_disk` and is returned as an absolute URL.
 The mobile image widget sends no bearer token: the public storage URL or CDN
@@ -426,7 +430,10 @@ row per morning or afternoon shift. Pending concert approvals, competition and
 concert details, venue, availability status, shift role assignments and every
 active crew member's response remain visible together. Availability and draft
 roster changes save inline; assignments do not overwrite the crew member's
-response.
+response. Shift labels use the configured event type code, such as `CON` or
+`DR`, across the matrix, crew shift cards and mobile assignments/dashboard.
+Competition sessions retain `COMP-M` and `COMP-A`; older concerts without a
+configured event type fall back to `CON`.
 
 Roster cells use a compact visual key: 👑 Team Leader, ✏️ private pencil,
 💌 published/sent and awaiting acknowledgement, ✅ acknowledged, and 🚩 an
@@ -555,3 +562,28 @@ fixed-rate concert lasting over seven hours retains its fixed base and is flagge
 for manual calculation rather than guessing an overtime rule. Payment previews
 do not approve, invoice or pay anything. Exact outlier thresholds beyond these
 agreed rules remain deferred until real examples are reviewed.
+
+The expanded administrator event page includes the linked booking contact,
+services, inclusions, family count, delivery details, feedback, programme,
+confirmations and internal notes, together with venue access and parking.
+Edit booking opens the matching event in the booking editor; saved changes
+use the existing booking-to-schedule synchronisation and material-change
+acknowledgement reset. The summary places artwork on the left and main
+event/contact details on the right, stacking them on smaller screens.
+
+Competition event codes are derived from the saved competition contact code
+and the first event date: `EDC926` means EDC, September, 2026; October is
+`EDC1026`. The field is read-only and automatically updates with the selected
+competition and earliest day in the create/edit form. The availability matrix
+and expanded event page use the same server-derived value, including existing
+events. Events without a saved competition code show no generated code. This
+is a display reference, not a unique identifier: two events for the same
+competition in the same month share a code; public UUIDs remain unchanged.
+
+Mobile API assignment summaries/details, dashboard `next_assignment`,
+availability records and timesheets expose the same nullable `event_code`.
+Clients can display it when present and omit it for missing codes.
+Studio events, including concerts and DR, use the saved studio code followed
+by the four-digit event year, for example `K2D2026`. All events for that studio
+in the same year share the code. The availability matrix and expanded details
+show the same value. Competition codes retain their month and two-digit year.

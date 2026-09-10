@@ -62,6 +62,18 @@ class SchedulingEvent extends Model
         return $this->hasMany(EventMessage::class);
     }
 
+    public function eventCode(): ?string
+    {
+        if (! $this->event_date) {
+            return null;
+        }
+
+        $competition = $this->event_type === SchedulingEventType::Competition;
+        $code = trim(($competition ? $this->competitionContact?->code : $this->studio?->code) ?? '');
+
+        return $code !== '' ? $code.$this->event_date->format($competition ? 'ny' : 'Y') : null;
+    }
+
     public function logoUrl(): ?string
     {
         return $this->logo_path ? Storage::disk(config('uploads.public_disk'))->url($this->logo_path) : null;

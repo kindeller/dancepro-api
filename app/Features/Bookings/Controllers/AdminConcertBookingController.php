@@ -21,6 +21,7 @@ use App\Features\Bookings\Requests\ResolveConcertBookingVenueRequest;
 use App\Features\Bookings\Requests\ReviewConcertBookingRequest;
 use App\Features\Bookings\Requests\StoreConcertBookingProgrammeRequest;
 use App\Features\Bookings\Requests\UpdateConcertBookingRequest;
+use App\Features\Bookings\Services\BookingArtwork;
 use App\Features\Bookings\Services\ReviewBookingStudioContact;
 use App\Features\Operations\Services\OperationsFileStorage;
 use App\Features\Scheduling\Models\EventTypeDefinition;
@@ -37,18 +38,21 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminConcertBookingController extends Controller
 {
-    public function index(): View
+    public function index(BookingArtwork $artwork): View
     {
         Gate::authorize('manageScheduling');
 
+        $items = ConcertBookingItem::query()
+            ->with(['booking', 'eventTypeDefinition', 'venue', 'schedulingEvent.studio', 'schedulingEvent.competitionContact'])
+            ->whereHas('booking', fn ($query) => $query->where('status', '!=', 'cancelled'))
+            ->where('approval_status', '!=', 'cancelled')
+            ->orderBy('event_date')
+            ->orderBy('starts_at')
+            ->paginate(50);
+
         return view('admin.concert-bookings.index', [
-            'items' => ConcertBookingItem::query()
-                ->with(['booking', 'eventTypeDefinition', 'schedulingEvent'])
-                ->whereHas('booking', fn ($query) => $query->where('status', '!=', 'cancelled'))
-                ->where('approval_status', '!=', 'cancelled')
-                ->orderBy('event_date')
-                ->orderBy('starts_at')
-                ->paginate(50),
+            'items' => $items,
+            'artworkUrls' => $artwork->forItems($items->getCollection()),
         ]);
     }
 
@@ -85,17 +89,20 @@ class AdminConcertBookingController extends Controller
             ->with('status', $request->validated('action') === 'add' ? 'Studio contact added.' : 'Studio contact details updated.');
     }
 
-    public function pending(): View
+    public function pending(BookingArtwork $artwork): View
     {
         Gate::authorize('manageScheduling');
 
+        $items = ConcertBookingItem::query()
+            ->with(['booking', 'eventTypeDefinition', 'venue', 'schedulingEvent.studio', 'schedulingEvent.competitionContact'])
+            ->where('approval_status', 'pending')
+            ->orderBy('event_date')
+            ->orderBy('starts_at')
+            ->paginate(50);
+
         return view('admin.event-management.pending', [
-            'items' => ConcertBookingItem::query()
-                ->with(['booking', 'eventTypeDefinition', 'venue'])
-                ->where('approval_status', 'pending')
-                ->orderBy('event_date')
-                ->orderBy('starts_at')
-                ->paginate(50),
+            'items' => $items,
+            'artworkUrls' => $artwork->forItems($items->getCollection()),
         ]);
     }
 

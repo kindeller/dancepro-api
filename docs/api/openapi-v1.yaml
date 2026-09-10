@@ -1733,7 +1733,7 @@ components:
               $ref: '#/components/schemas/CursorMeta'
     AssignmentSummary:
       type: object
-      required: [id, event_name, event_type, role, is_team_leader, shift_code, shift_date, status, cancelled, acknowledged, allowed_actions]
+      required: [id, event_name, event_type, event_code, role, is_team_leader, shift_code, shift_date, status, cancelled, acknowledged, allowed_actions]
       properties:
         id:
           type: string
@@ -1743,6 +1743,10 @@ components:
         event_type:
           type: string
           enum: [competition, concert]
+        event_code:
+          type: [string, 'null']
+          description: Concerts and DR use the saved studio code plus four-digit event year, for example K2D2026, shared by all studio events that year. Competitions use the saved competition code plus first event month (without a leading zero) and two-digit year, for example EDC926 or EDC1026. Null when the organisation code or date is missing. Automatically derived; not a unique identifier.
+          example: EDC926
         event_logo_url:
           type: [string, 'null']
           format: uri
@@ -1758,7 +1762,8 @@ components:
           enum: [morning, afternoon, null]
         shift_code:
           type: string
-          enum: [COMP-M, COMP-A, CON]
+          description: Configured event type code (for example CON or DR); competition sessions use COMP-M or COMP-A. Older concerts without a configured type use CON.
+          examples: [CON, DR, COMP-M, COMP-A]
         shift_date:
           type: string
           format: date
@@ -1925,7 +1930,7 @@ components:
           enum: [available, unavailable, null]
     AvailabilityRequest:
       type: object
-      required: [shift_id, event_name, event_type, organisation, venue, shift_period, shift_date, arrival_at, starts_at, finish_at, status, locked, allowed_actions]
+      required: [shift_id, event_name, event_type, event_code, organisation, venue, shift_period, shift_date, arrival_at, starts_at, finish_at, status, locked, allowed_actions]
       properties:
         shift_id:
           type: string
@@ -1935,6 +1940,10 @@ components:
         event_type:
           type: string
           enum: [concert, competition]
+        event_code:
+          type: [string, 'null']
+          description: Concerts and DR use the saved studio code plus four-digit event year, for example K2D2026, shared by all studio events that year. Competitions use the saved competition code plus first event month (without a leading zero) and two-digit year, for example EDC926 or EDC1026. Null when the organisation code or date is missing. Automatically derived; not a unique identifier.
+          example: EDC926
         event_logo_url:
           type: [string, 'null']
           format: uri
@@ -2472,7 +2481,7 @@ components:
               maximum: 999999999
     Timesheet:
       type: object
-      required: [id, assignment_id, event_name, event_logo_url, event_type, event_date, status]
+      required: [id, assignment_id, event_name, event_code, event_logo_url, event_type, event_date, status]
       properties:
         id:
           type: string
@@ -2482,6 +2491,10 @@ components:
           format: uuid
         event_name:
           type: string
+        event_code:
+          type: [string, 'null']
+          description: Concerts and DR use the saved studio code plus four-digit event year, for example K2D2026, shared by all studio events that year. Competitions use the saved competition code plus first event month (without a leading zero) and two-digit year, for example EDC926 or EDC1026. Null when the organisation code or date is missing. Automatically derived; not a unique identifier.
+          example: EDC926
         event_logo_url:
           type: [string, 'null']
           format: uri

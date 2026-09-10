@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Scheduling;
 
+use App\Features\CompetitionContacts\Models\CompetitionContact;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Scheduling\Models\CrewNotification;
+use App\Features\Scheduling\Models\EventTypeDefinition;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Scheduling\Support\ShiftPeriod;
 use App\Features\Studios\Models\Studio;
@@ -18,6 +20,61 @@ use Tests\TestCase;
 class EventAvailabilityTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_competition_event_code_uses_saved_code_and_first_day_month_and_year(): void
+    {
+        $competition = CompetitionContact::query()->create([
+            'name' => 'Express Dance Challenge', 'code' => 'EDC', 'is_active' => true,
+            'organiser_name' => 'Organiser', 'organiser_email' => 'organiser@example.test', 'organiser_phone' => '0000 000 000',
+        ]);
+        $this->actingAs(User::factory()->staff()->create())->post(route('admin.scheduling-events.store'), [
+            'name' => 'Express weekend', 'competition_contact_id' => $competition->id, 'event_type' => 'competition',
+            'organiser_name' => 'Organiser', 'organiser_email' => 'organiser@example.test', 'organiser_phone' => '0000 000 000',
+            'roles' => ['competition-videographer'], 'event_code' => 'CLIENT-OVERRIDE',
+            'days' => [['date' => '2026-10-01', 'morning' => '1'], ['date' => '2026-09-30', 'afternoon' => '1']],
+        ])->assertRedirect();
+        $event = SchedulingEvent::query()->firstOrFail();
+        $this->assertSame('EDC926', $event->eventCode());
+        $this->get(route('admin.scheduling-events.show', $event))->assertOk()->assertSee('EDC926');
+        $this->get(route('admin.scheduling-events.index'))->assertOk()->assertSee('EDC926');
+        $this->get(route('admin.scheduling-events.edit', $event))->assertOk()
+            ->assertSee('id="competition-event-code" value="EDC926" readonly', false)
+            ->assertSee('data-code="EDC"', false);
+
+        $event->update(['event_date' => '2026-10-01']);
+        $this->assertSame('EDC1026', $event->eventCode());
+        $event->update(['event_date' => '2027-01-01']);
+        $this->assertSame('EDC127', $event->eventCode());
+        $competition->update(['code' => 'PDC']);
+        $this->assertSame('PDC127', $event->fresh()->eventCode());
+        $competition->update(['code' => null]);
+        $this->assertNull($event->fresh()->eventCode());
+        $event->update(['competition_contact_id' => null]);
+        $this->assertNull($event->fresh()->eventCode());
+        $event->update(['event_type' => 'concert']);
+        $this->assertNull($event->fresh()->eventCode());
+    }
+
+    public function test_event_availability_displays_configured_shift_codes(): void
+    {
+        $type = EventTypeDefinition::query()->create([
+            'code' => 'DR', 'name' => 'Portrait Shoot', 'system_category' => 'concert', 'is_active' => true,
+        ]);
+        foreach ([['concert', $type->id, null], ['concert', null, null], ['competition', null, 'morning'], ['competition', null, 'afternoon']] as [$category, $typeId, $period]) {
+            $event = SchedulingEvent::query()->create([
+                'name' => 'Shift label example', 'event_type' => $category,
+                'event_type_definition_id' => $typeId, 'event_date' => today()->addWeek(),
+            ]);
+            $event->shifts()->create(['shift_date' => $event->event_date, 'period' => $period]);
+        }
+
+        $this->actingAs(User::factory()->staff()->create())
+            ->get(route('admin.scheduling-events.index'))->assertOk()
+            ->assertSee('<strong>DR</strong>', false)
+            ->assertSee('<strong>CON</strong>', false)
+            ->assertSee('<strong>COMP-M</strong>', false)
+            ->assertSee('<strong>COMP-A</strong>', false);
+    }
 
     public function test_concert_logo_uses_linked_studio_even_when_event_name_changes(): void
     {

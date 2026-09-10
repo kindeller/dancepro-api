@@ -81,13 +81,14 @@
                     <tr class="event-row {{ $event->cancelled_at ? 'cancelled-event-row' : '' }}" data-event="{{ $event->uuid }}">
                         <td class="sticky-col col-date"><strong>{{ $shift->shift_date?->format('D j M') }}</strong><div class="muted">{{ $shift->shift_date?->format('Y') }}</div></td>
                         <td class="sticky-col col-time" title="Arrival {{ $shift->posted_arrival_at?->format('g:i a') ?: 'TBC' }} · Finish {{ $shift->estimated_finish_at?->format('g:i a') ?: 'TBC' }}">
-                            <strong>{{ $event->event_type->value === 'competition' ? 'COMP-'.($shift->period->value === 'morning' ? 'M' : 'A') : 'CON' }}</strong>
+                            <strong>{{ $shift->displayCode() }}</strong>
                             @if($shift->requires_setup)<span class="mini-badge">Setup</span>@endif
                             @if($shift->requires_set_down)<span class="mini-badge">Set down</span>@endif
                             <div class="muted">{{ $shift->starts_at?->format('g:i a') ?: 'TBC' }}–{{ $shift->estimated_finish_at?->format('g:i a') ?: 'TBC' }}</div>
                         </td>
                         <td class="sticky-col col-event event-select-cell" title="Click to select this event. {{ $event->admin_notes }}">
                             @unless($event->cancelled_at)<input form="bulk-events" class="event-selector" data-event="{{ $event->uuid }}" type="checkbox" name="event_ids[]" value="{{ $event->uuid }}" hidden>@endunless<a href="{{ route('admin.scheduling-events.show', $event) }}"><strong>{{ $eventDisplayName }}</strong></a>
+                            @if($event->eventCode())<div class="muted">{{ $event->eventCode() }}</div>@endif
                             @if($eventSubtitle)<div class="muted">{{ $eventSubtitle }}</div>@endif
                         </td>
                         <td class="sticky-col col-venue" title="Access: {{ $event->venue?->access_notes ?: 'No notes' }} · Parking: {{ $event->venue?->parking_notes ?: 'No notes' }}">
