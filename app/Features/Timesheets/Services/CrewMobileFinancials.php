@@ -28,7 +28,7 @@ class CrewMobileFinancials
             ->when($filters['from'] ?? null, fn (Builder $query, string $from) => $query->whereDate('scheduling_shifts.shift_date', '>=', $from))
             ->when($filters['to'] ?? null, fn (Builder $query, string $to) => $query->whereDate('scheduling_shifts.shift_date', '<=', $to))
             ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $this->filterTimesheetStatus($query, $status))
-            ->with(['shift.schedulingEvent', 'role', 'allowances', 'timeEntry.invoiceLine'])
+            ->with(['shift.schedulingEvent.studio', 'shift.schedulingEvent.competitionContact', 'role', 'allowances', 'timeEntry.invoiceLine'])
             ->orderByDesc('cursor_shift_date')->orderByDesc('scheduling_shift_assignments.id')
             ->cursorPaginate($limit);
     }
@@ -120,7 +120,8 @@ class CrewMobileFinancials
     public function timesheetResource(SchedulingShiftAssignment $assignment): array
     {
         $entry = $assignment->timeEntry;
-        $cancelled = $assignment->shift->schedulingEvent->cancelled_at !== null;
+        $event = $assignment->shift->schedulingEvent;
+        $cancelled = $event->cancelled_at !== null;
         $preview = $this->calculator->execute($assignment);
         $status = $cancelled ? 'cancelled' : ($entry?->invoiceLine ? 'invoiced' : match (true) {
             $entry?->approval_status === 'externally_invoiced' => 'externally_invoiced',
@@ -131,7 +132,9 @@ class CrewMobileFinancials
         return [
             'id' => $assignment->uuid,
             'assignment_id' => $assignment->uuid,
-            'event_name' => $assignment->shift->schedulingEvent->name,
+            'event_name' => $event->name,
+            'event_logo_url' => $event->crewLogoUrl(),
+            'event_type' => $event->event_type->value,
             'event_date' => $assignment->shift->shift_date->toDateString(),
             'status' => $status,
             'cancelled' => $cancelled,

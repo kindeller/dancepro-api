@@ -362,6 +362,27 @@ the artwork is never cropped. Competition logos appear in administration and
 crew availability; studio logos appear in administration and public studio
 presentation.
 
+Mobile assignment lists/details, dashboard `next_assignment`, availability and
+timesheets all expose `event_logo_url` using the same selection: concert studio
+logo or competition contact logo, then the event logo, then `null` so the app
+keeps its placeholder. Timesheets also expose `event_type` (`concert` or
+`competition`). Artwork relationships are eager-loaded for collection reads.
+Desktop views continue to use their existing event/studio/contact logo helpers.
+
+Artwork comes from `uploads.public_disk` and is returned as an absolute URL.
+The mobile image widget sends no bearer token: the public storage URL or CDN
+must serve the image without cookies, browser login or API authentication.
+Production uses the public CDN configured by `AWS_PUBLIC_UPLOADS_URL`; local
+storage needs `public/storage` linked and an `APP_URL` reachable from the device.
+Private operational document download routes must not be used for artwork.
+
+Before releasing mobile artwork changes, run the artwork cases in
+`CrewMobileReadApiTest`, then verify a concert and competition fixture on the
+deployment target across all five endpoints. Fetch each returned image URL
+without an Authorization or Cookie header and without following redirects;
+expect HTTP 200 with an image content type. Verify a fixture with no logos
+returns `null`. Passing local API tests does not verify production CDN access.
+
 ## Scope
 
 - Crew profiles and role eligibility.

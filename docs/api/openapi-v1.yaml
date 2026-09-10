@@ -1746,6 +1746,7 @@ components:
         event_logo_url:
           type: [string, 'null']
           format: uri
+          description: Absolute public artwork URL requiring no bearer token or browser session. Concerts prefer the studio logo; competitions prefer the competition contact logo. Both fall back to the event logo, or null for the app placeholder.
         event_item_title:
           type: [string, 'null']
         role:
@@ -1937,6 +1938,7 @@ components:
         event_logo_url:
           type: [string, 'null']
           format: uri
+          description: Absolute public artwork URL requiring no bearer token or browser session. Concerts prefer the studio logo; competitions prefer the competition contact logo. Both fall back to the event logo, or null for the app placeholder.
         organisation:
           oneOf:
             - type: object
@@ -2470,7 +2472,7 @@ components:
               maximum: 999999999
     Timesheet:
       type: object
-      required: [id, assignment_id, event_name, event_date, status]
+      required: [id, assignment_id, event_name, event_logo_url, event_type, event_date, status]
       properties:
         id:
           type: string
@@ -2480,6 +2482,13 @@ components:
           format: uuid
         event_name:
           type: string
+        event_logo_url:
+          type: [string, 'null']
+          format: uri
+          description: Absolute public artwork URL requiring no bearer token or browser session. Concerts prefer the studio logo; competitions prefer the competition contact logo. Both fall back to the event logo, or null for the app placeholder.
+        event_type:
+          type: string
+          enum: [concert, competition]
         event_date:
           type: string
           format: date

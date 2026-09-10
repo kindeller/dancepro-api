@@ -20,7 +20,7 @@ class CrewMobileDashboard
             ->where('status', 'published')
             ->whereHas('shift.schedulingEvent', fn ($query) => $query->whereNull('cancelled_at'))
             ->whereHas('shift', fn ($query) => $query->whereDate('shift_date', '>=', today()))
-            ->with(['role', 'timeEntry', 'coverRequests', 'shift.schedulingEvent.venue', 'shift.schedulingEvent.studio', 'shift.schedulingEvent.concertBookingItem'])
+            ->with(['role', 'timeEntry', 'coverRequests', 'shift.schedulingEvent.venue', 'shift.schedulingEvent.studio', 'shift.schedulingEvent.competitionContact', 'shift.schedulingEvent.concertBookingItem'])
             ->get()
             ->sortBy(fn ($assignment): string => $assignment->shift->shift_date->format('Y-m-d').' '.($assignment->shift->posted_arrival_at?->format('H:i:s') ?? '23:59:59'))
             ->first();

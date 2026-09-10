@@ -69,9 +69,12 @@ class SchedulingEvent extends Model
 
     public function crewLogoUrl(): ?string
     {
-        return $this->event_type === SchedulingEventType::Concert
-            ? ($this->studio?->logoUrl() ?? $this->logoUrl())
-            : $this->logoUrl();
+        $logoUrl = match ($this->event_type) {
+            SchedulingEventType::Concert => $this->studio?->logoUrl(),
+            SchedulingEventType::Competition => $this->competitionContact?->logoUrl(),
+        } ?? $this->logoUrl();
+
+        return $logoUrl !== null ? url($logoUrl) : null;
     }
 
     public function programmeUrl(): ?string

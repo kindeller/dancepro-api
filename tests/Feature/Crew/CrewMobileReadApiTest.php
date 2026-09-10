@@ -14,10 +14,12 @@ use App\Features\Studios\Support\StudioStatus;
 use App\Features\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class CrewMobileReadApiTest extends TestCase
@@ -46,6 +48,104 @@ class CrewMobileReadApiTest extends TestCase
             ->assertJsonPath('data.0.id', $own->uuid)
             ->assertJsonMissing(['event_name' => 'Someone else event'])
             ->assertJsonStructure(['meta' => ['next_cursor', 'has_more']]);
+    }
+
+    #[DataProvider('artworkCases')]
+    public function test_mobile_cards_share_public_artwork_selection(
+        string $eventType,
+        ?string $organisationLogo,
+        ?string $eventLogo,
+        ?string $expectedLogo,
+        bool $hasOrganisation = true,
+        string $publicBase = '/storage',
+    ): void {
+        config(['uploads.public_disk' => 'public']);
+        Storage::fake('public', ['url' => $publicBase]);
+        [, $profile] = $this->authenticatedCrew();
+        $assignment = $this->assignmentFor($profile, 'Artwork fixture', today()->toDateString());
+        // Give the unrelated organisation artwork too, to catch cross-type selection.
+        $studio = Studio::factory()->create([
+            'logo_path' => $eventType === 'concert' ? $organisationLogo : 'studios/unrelated.png',
+        ]);
+        $competition = CompetitionContact::query()->create([
+            'name' => 'Artwork competition',
+            'organiser_name' => 'Fixture organiser', 'organiser_email' => 'artwork@example.com', 'organiser_phone' => '0400 000 000',
+            'logo_path' => $eventType === 'competition' ? $organisationLogo : 'competitions/unrelated.png',
+        ]);
+        $event = $assignment->shift->schedulingEvent;
+        $event->update([
+            'event_type' => $eventType,
+            'studio_id' => $hasOrganisation ? $studio->id : null,
+            'competition_contact_id' => $hasOrganisation ? $competition->id : null,
+            'logo_path' => $eventLogo,
+            'availability_status' => 'open',
+            'availability_deadline' => now()->addDay(),
+        ]);
+        $event->shifts()->create(['shift_date' => today()->toDateString()]);
+        $expectedUrl = $expectedLogo === null ? null : url($publicBase.'/'.$expectedLogo);
+
+        foreach ([
+            '/api/v1/assignments' => 'data.0',
+            '/api/v1/assignments/'.$assignment->uuid => 'data',
+            '/api/v1/dashboard' => 'data.next_assignment',
+            '/api/v1/availability' => 'data.0',
+            '/api/v1/timesheets' => 'data.0',
+        ] as $endpoint => $path) {
+            $this->getJson($endpoint)->assertOk()
+                ->assertJsonPath($path.'.event_logo_url', $expectedUrl)
+                ->assertJsonPath($path.'.event_type', $eventType);
+        }
+
+        // Desktop event artwork keeps using the event's own logo.
+        $this->assertSame($eventLogo === null ? null : $publicBase.'/'.$eventLogo, $event->logoUrl());
+    }
+
+    public static function artworkCases(): array
+    {
+        $cases = [];
+        foreach (['concert', 'competition'] as $type) {
+            $cases[$type.' organisation preferred'] = [$type, 'organisations/logo.png', 'events/logo.png', 'organisations/logo.png'];
+            $cases[$type.' event fallback'] = [$type, null, 'events/logo.png', 'events/logo.png'];
+            $cases[$type.' no artwork'] = [$type, null, null, null];
+            $cases[$type.' no organisation fallback'] = [$type, null, 'events/logo.png', 'events/logo.png', false];
+            $cases[$type.' no organisation or artwork'] = [$type, null, null, null, false];
+            $cases[$type.' public CDN'] = [$type, 'organisations/logo.png', null, 'organisations/logo.png', true, 'https://artwork.example.com'];
+        }
+
+        return $cases;
+    }
+
+    public function test_mobile_artwork_relationship_queries_are_batched(): void
+    {
+        [, $profile] = $this->authenticatedCrew();
+        foreach (['concert', 'competition', 'concert', 'competition'] as $index => $type) {
+            $assignment = $this->assignmentFor($profile, 'Artwork '.$index, today()->toDateString());
+            $studio = Studio::factory()->create(['logo_path' => 'studios/'.$index.'.png']);
+            $competition = CompetitionContact::query()->create([
+                'name' => 'Competition '.$index, 'logo_path' => 'competitions/'.$index.'.png',
+                'organiser_name' => 'Fixture organiser', 'organiser_email' => 'artwork@example.com', 'organiser_phone' => '0400 000 000',
+            ]);
+            $assignment->shift->schedulingEvent->update([
+                'event_type' => $type, 'studio_id' => $studio->id, 'competition_contact_id' => $competition->id,
+                'availability_status' => 'open', 'availability_deadline' => now()->addDay(),
+            ]);
+            $assignment->shift->schedulingEvent->shifts()->create(['shift_date' => today()->toDateString()]);
+        }
+
+        DB::enableQueryLog();
+        try {
+            foreach (['assignments', 'dashboard', 'availability', 'timesheets'] as $endpoint) {
+                DB::flushQueryLog();
+                $this->getJson('/api/v1/'.$endpoint)->assertOk();
+                $artworkQueries = collect(DB::getQueryLog())->filter(
+                    fn (array $query): bool => preg_match('/from [`"]?(studios|competition_contacts)[`"]? /i', $query['query']) === 1,
+                );
+                $this->assertCount(2, $artworkQueries, $endpoint.' must batch studio and competition contact loads.');
+            }
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
     }
 
     public function test_assignment_detail_uses_uuid_and_hides_other_crews_assignments(): void
