@@ -50,7 +50,8 @@ class TimesheetInvoiceWorkflowTest extends TestCase
         $this->assertSame('12345678', $invoice->issuer_snapshot['bank_account_number']);
         $this->assertStringNotContainsString('12345678', $invoice->getRawOriginal('issuer_snapshot'));
         $this->assertFalse($otherEntry->invoiceLine()->exists(), 'A separate competition must not be combined into this invoice.');
-        $this->actingAs($crewUser)->get(route('crew.timesheets.index'))->assertOk()->assertSee('status-pill attention', false)->assertSee('Pending payment');
+        $this->actingAs($crewUser)->get(route('crew.timesheets.index'))->assertOk()->assertDontSee('Invoice 37')->assertDontSee('Pending payment');
+        $this->actingAs($crewUser)->get(route('crew.timesheets.index', ['view' => 'invoices']))->assertOk()->assertSee('Invoice 37')->assertSee('Pending payment')->assertDontSee('class="timesheet-selector"', false);
         $this->actingAs($crewUser)->get(route('crew.timesheets.invoices.show', $invoice))->assertOk()->assertSee('Invoice 37')->assertSee('Pending payment')->assertDontSee('Pending_payment');
         $this->actingAs($crewUser)->get(route('crew.timesheets.invoices.print', $invoice))->assertOk()->assertSee('A4 portrait preview')->assertSee('Alex Contractor')->assertSee('ABN 77 221 718 867')->assertDontSee('dancepro-logo');
         $this->actingAs($admin)->get(route('admin.timesheets.index'))->assertOk()->assertSee('badge success', false);
@@ -62,7 +63,8 @@ class TimesheetInvoiceWorkflowTest extends TestCase
         $this->assertSame('pending_payment', $invoice->refresh()->status);
         $this->actingAs($admin)->patch(route('admin.timesheets.invoices.update', $invoice), ['action' => 'paid'])->assertRedirect();
         $this->assertSame('paid', $invoice->refresh()->status);
-        $this->actingAs($crewUser)->get(route('crew.timesheets.index'))->assertOk()->assertSee('status-pill done', false)->assertSee('Paid');
+        $this->actingAs($crewUser)->get(route('crew.timesheets.index'))->assertOk()->assertDontSee('Invoice 37')->assertDontSee('Paid');
+        $this->actingAs($crewUser)->get(route('crew.timesheets.index', ['view' => 'invoices']))->assertOk()->assertSee('Invoice 37')->assertSee('Paid');
         $this->actingAs($admin)->get(route('admin.timesheets.invoices.index'))->assertOk()->assertSee('badge success', false);
         $this->assertNotNull($invoice->invoice_number);
         $this->assertSame('37', $invoice->invoice_number);
@@ -181,7 +183,7 @@ class TimesheetInvoiceWorkflowTest extends TestCase
         $this->assertSame($date, $assignment->fresh()->timeEntry->actual_clock_in_at->toDateString());
 
         $this->actingAs($crewUser)->get(route('crew.timesheets.index'))
-            ->assertOk()->assertSee('Ready to invoice')->assertSee('$250.00');
+            ->assertOk()->assertSee('Times confirmed')->assertSee('$250.00');
 
         $this->actingAs($crewUser)->put(route('crew.assignments.time.update', $assignment), [
             'actual_clock_in_at' => '18:05', 'actual_finish_at' => '21:10',

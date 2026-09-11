@@ -21,6 +21,20 @@ class CrewMobileFinancialApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_invoice_style_is_shared_between_web_and_mobile_and_scoped_to_crew(): void
+    {
+        [$user, $profile] = $this->authenticatedCrew();
+        $other = $this->completeProfile();
+        $this->getJson('/api/v1/invoices/preferences')->assertOk()->assertJsonPath('data.invoice_style', 'classic');
+        $this->putJson('/api/v1/invoices/preferences', ['invoice_style' => 'modern'])->assertOk();
+        $this->assertSame('modern', $profile->fresh()->preferred_invoice_style);
+        $this->assertSame('classic', $other->fresh()->preferred_invoice_style);
+        $this->actingAs($user, 'web')->putJson('/crew/timesheets/invoice-style', ['invoice_style' => 'minimal'])->assertOk();
+        $this->getJson('/api/v1/invoices/preferences')->assertOk()->assertJsonPath('data.invoice_style', 'minimal');
+        $this->putJson('/api/v1/invoices/preferences', ['invoice_style' => 'unknown'])->assertUnprocessable();
+        $this->assertSame('minimal', $profile->fresh()->preferred_invoice_style);
+    }
+
     public function test_crew_can_clock_in_finish_and_correct_only_their_own_assignment(): void
     {
         [, $profile] = $this->authenticatedCrew();

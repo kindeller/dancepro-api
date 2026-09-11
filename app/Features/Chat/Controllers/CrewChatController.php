@@ -14,6 +14,7 @@ use App\Features\Operations\Actions\PostEventMessage;
 use App\Features\Operations\Services\OperationsFileStorage;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -30,7 +31,7 @@ class CrewChatController extends Controller
     {
         $event = $inbox->accessibleEvent($request->user(), $schedulingEvent);
         $inbox->markEventRead($request->user(), $event);
-        $event->load(['messages.author', 'shifts']);
+        $event->load(['messages.author', 'messages.reactions', 'shifts', 'studio', 'competitionContact']);
 
         return $this->view($request, $inbox, ['kind' => 'event', 'model' => $event]);
     }
@@ -39,7 +40,7 @@ class CrewChatController extends Controller
     {
         $conversation = $inbox->directConversation($request->user(), $conversation);
         $inbox->markDirectRead($request->user(), $conversation);
-        $conversation->load(['messages.author', 'participants.crewProfile']);
+        $conversation->load(['messages.author', 'messages.reactions', 'participants.crewProfile']);
 
         return $this->view($request, $inbox, ['kind' => 'direct', 'model' => $conversation]);
     }
@@ -91,8 +92,19 @@ class CrewChatController extends Controller
             ? $request->string('filter')->toString()
             : 'all';
 
+        $chats = $inbox->conversations($request->user(), $filter);
+        (new Collection($chats->where('kind', 'event')->pluck('model')->all()))
+            ->loadMissing(['studio', 'competitionContact']);
+        $chats = $chats->map(function (array $chat): array {
+            if ($chat['kind'] === 'event') {
+                $chat['title'] = $chat['model']->crewChatTitle();
+            }
+
+            return $chat;
+        });
+
         return view('crew.chat.index', [
-            'chats' => $inbox->conversations($request->user(), $filter),
+            'chats' => $chats,
             'crew' => $inbox->availableCrew($request->user()),
             'filter' => $filter,
             'selectedChat' => $selectedChat,

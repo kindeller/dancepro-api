@@ -63,14 +63,31 @@ class CrewNavigationIndicators
             ->where('crew_profile_id', $profile->id)
             ->where('status', 'published')
             ->whereHas('shift.schedulingEvent', fn (Builder $query) => $query->whereNull('cancelled_at'))
-            ->whereHas('shift', fn (Builder $query) => $query->whereDate('shift_date', '<=', today()))
             ->where(function (Builder $query): void {
                 $query->whereDoesntHave('timeEntry')
                     ->orWhereHas('timeEntry', fn (Builder $timeQuery) => $timeQuery
                         ->where('approval_status', '!=', 'externally_invoiced')
                         ->whereDoesntHave('invoiceLine'));
             })
-            ->count();
+            ->with(['timeEntry', 'shift.schedulingEvent.shifts'])
+            ->get();
+        $competitionGroups = $pendingTimesheets->groupBy('shift.scheduling_event_id');
+        $pendingTimesheets = $pendingTimesheets->filter(function ($assignment) use ($competitionGroups): bool {
+            $shift = $assignment->shift;
+            $entry = $assignment->timeEntry;
+            if ($entry?->locked_at !== null || ! $this->shiftHasFinished($shift)) {
+                return false;
+            }
+            if (! $entry?->actual_clock_in_at || ! $entry?->actual_finish_at) {
+                return true;
+            }
+            if ($shift->schedulingEvent->event_type->value !== 'competition') {
+                return true;
+            }
+
+            return $shift->schedulingEvent->shifts->every(fn ($eventShift) => $this->shiftHasFinished($eventShift))
+                && $competitionGroups[$shift->scheduling_event_id]->every(fn ($other) => $other->timeEntry?->actual_clock_in_at !== null && $other->timeEntry?->actual_finish_at !== null);
+        })->count();
 
         $pendingInvoices = CrewInvoice::query()
             ->where('crew_profile_id', $profile->id)
@@ -87,5 +104,10 @@ class CrewNavigationIndicators
             'invoices' => $pendingInvoices,
             'chats' => $unreadChats,
         ];
+    }
+
+    private function shiftHasFinished(SchedulingShift $shift): bool
+    {
+        return ($shift->estimated_finish_at ?? $shift->shift_date->copy()->endOfDay())->lte(now());
     }
 }

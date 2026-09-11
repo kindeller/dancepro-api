@@ -4,6 +4,8 @@ namespace Tests\Feature\Scheduling;
 
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
+use App\Features\Scheduling\Actions\RecordScheduledFinishes;
+use App\Features\Scheduling\Actions\SaveAssignmentTime;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
 use Carbon\Carbon;
@@ -18,6 +20,53 @@ class TimekeepingTest extends TestCase
     {
         Carbon::setTestNow();
         parent::tearDown();
+    }
+
+    public function test_missing_clock_out_uses_scheduled_finish_after_two_hours_and_can_be_corrected(): void
+    {
+        Carbon::setTestNow('2026-09-10 18:59:00');
+        [$user, $assignment] = $this->assignment('2026-09-10 08:00:00');
+        $entry = $assignment->timeEntry()->create(['actual_clock_in_at' => '2026-09-10 08:00:00']);
+        $record = app(RecordScheduledFinishes::class);
+        $this->assertSame(0, $record->execute());
+        $this->assertNull($entry->fresh()->actual_finish_at);
+        Carbon::setTestNow('2026-09-10 19:00:00');
+        $this->assertSame(1, $record->execute());
+        $entry->refresh();
+        $this->assertSame('17:00', $entry->actual_finish_at->format('H:i'));
+        $this->assertSame('19:00', $entry->finish_recorded_at->format('H:i'));
+        $this->assertSame('scheduled', $entry->finish_source);
+        $this->assertSame(0, $record->execute());
+        app(SaveAssignmentTime::class)->execute(
+            $assignment, $user, '08:00', '18:15', 'Worked late', 'crew',
+        );
+        $this->assertSame('18:15', $entry->fresh()->actual_finish_at->format('H:i'));
+        $this->assertSame('crew', $entry->fresh()->finish_source);
+        $this->assertSame(1, $entry->audits()->count());
+    }
+
+    public function test_scheduled_finish_preserves_recorded_locked_cancelled_and_unstarted_work(): void
+    {
+        Carbon::setTestNow('2026-09-10 20:00:00');
+        foreach (['recorded', 'locked', 'cancelled', 'unstarted', 'external', 'late_start', 'no_estimate', 'unpublished'] as $case) {
+            [, $assignment, $event] = $this->assignment('2026-09-10 08:00:00');
+            $entry = $assignment->timeEntry()->create([
+                'actual_clock_in_at' => $case === 'unstarted' ? null : ($case === 'late_start' ? '2026-09-10 18:00:00' : '2026-09-10 08:00:00'),
+                'actual_finish_at' => $case === 'recorded' ? '2026-09-10 18:30:00' : null,
+                'locked_at' => $case === 'locked' ? now() : null,
+                'approval_status' => $case === 'external' ? 'externally_invoiced' : 'draft',
+            ]);
+            if ($case === 'cancelled') {
+                $event->update(['cancelled_at' => now()]);
+            }
+            if ($case === 'no_estimate') {
+                $assignment->shift->update(['estimated_finish_at' => null]);
+            }
+            if ($case === 'unpublished') {
+                $assignment->update(['status' => 'draft']);
+            }
+        }
+        $this->assertSame(0, app(RecordScheduledFinishes::class)->execute());
     }
 
     public function test_early_clock_in_is_recorded_but_pay_starts_at_posted_arrival(): void
@@ -121,6 +170,7 @@ class TimekeepingTest extends TestCase
     {
         Carbon::setTestNow('2026-09-10 17:42:00');
         [$leaderUser, $leaderAssignment, $event] = $this->assignment('2026-09-10 08:00:00', true);
+        $leaderAssignment->shift->update(['estimated_finish_at' => '2026-09-10 18:00:00']);
         [, $crewAssignment] = $this->assignment('2026-09-10 08:00:00', false, $event);
         [, $alreadyFinished] = $this->assignment('2026-09-10 08:00:00', false, $event);
         $alreadyFinished->timeEntry()->create(['actual_finish_at' => '2026-09-10 16:30:00', 'finish_recorded_at' => now(), 'finish_source' => 'crew']);
@@ -139,7 +189,7 @@ class TimekeepingTest extends TestCase
 
         $this->actingAs($leaderUser)->get(route('crew.availability.index', ['view' => 'upcoming']))
             ->assertOk()
-            ->assertSee('Crew clocked out')
+            ->assertViewHas('nextAssignment', fn ($assignment) => $assignment === null)
             ->assertDontSee('Clock all crew out');
 
         $this->actingAs($leaderUser)->post(route('crew.assignments.time.finish-team', $leaderAssignment), [

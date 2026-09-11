@@ -2,6 +2,7 @@
 
 namespace App\Features\Operations\Models;
 
+use App\Features\Chat\Models\ChatMessageReaction;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
 use App\Shared\Models\HasPublicUuid;
@@ -18,6 +19,11 @@ class EventMessage extends Model
     public function schedulingEvent(): BelongsTo
     {
         return $this->belongsTo(SchedulingEvent::class);
+    }
+
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(ChatMessageReaction::class, 'event_message_id');
     }
 
     public function author(): BelongsTo

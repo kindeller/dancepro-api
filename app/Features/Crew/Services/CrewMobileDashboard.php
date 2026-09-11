@@ -22,6 +22,7 @@ class CrewMobileDashboard
             ->whereHas('shift', fn ($query) => $query->whereDate('shift_date', '>=', today()))
             ->with(['role', 'timeEntry', 'coverRequests', 'shift.schedulingEvent.eventTypeDefinition', 'shift.schedulingEvent.venue', 'shift.schedulingEvent.studio', 'shift.schedulingEvent.competitionContact', 'shift.schedulingEvent.concertBookingItem'])
             ->get()
+            ->reject(fn ($assignment) => $assignment->hasFinishedForUpcomingCard())
             ->sortBy(fn ($assignment): string => $assignment->shift->shift_date->format('Y-m-d').' '.($assignment->shift->posted_arrival_at?->format('H:i:s') ?? '23:59:59'))
             ->first();
 

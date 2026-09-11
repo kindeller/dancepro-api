@@ -9,6 +9,7 @@ use App\Features\Operations\Models\EventMessageRead;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 class CrewMobileChat
@@ -19,7 +20,10 @@ class CrewMobileChat
     {
         $items = $this->inbox->conversations($user, $filter);
         $offset = $this->decodeCursor($cursor);
-        $page = $items->slice($offset, $limit)->map(fn (array $chat): array => $this->summary($chat))->values();
+        $pageItems = $items->slice($offset, $limit);
+        (new Collection($pageItems->where('kind', 'event')->pluck('model')->all()))
+            ->loadMissing(['competitionContact', 'studio']);
+        $page = $pageItems->map(fn (array $chat): array => $this->summary($chat))->values();
         $nextOffset = $offset + $page->count();
         $hasMore = $items->count() > $nextOffset;
 
@@ -33,7 +37,7 @@ class CrewMobileChat
     public function messages(User $user, string $uuid, int $limit): array
     {
         [$kind, $chat] = $this->resolve($user, $uuid);
-        $page = $chat->messages()->with('author.crewProfile')
+        $page = $chat->messages()->with(['author.crewProfile', 'reactions'])
             ->when($kind === 'event', fn (Builder $query) => $query->with([
                 'reads' => fn ($readQuery) => $readQuery->where('user_id', $user->id),
             ]))
@@ -98,6 +102,7 @@ class CrewMobileChat
                 'profile_photo_url' => null,
             ],
             'body' => (string) $message->body,
+            'reactions' => MessageReactions::summary($message, auth()->id()),
             'attachment' => filled($message->attachment_path) ? [
                 'name' => $message->attachment_name ?: basename($message->attachment_path),
                 'mime_type' => $message->attachment_mime,
@@ -125,10 +130,17 @@ class CrewMobileChat
 
     private function summary(array $chat): array
     {
+        $title = $chat['title'];
+        if ($chat['kind'] === 'event') {
+            $title = $chat['model']->crewChatTitle();
+        }
+
         return [
             'id' => $chat['model']->uuid,
             'kind' => $chat['kind'],
-            'title' => $chat['title'],
+            'title' => $title,
+            'event_logo_url' => $chat['kind'] === 'event' ? $chat['model']->crewLogoUrl() : null,
+            'event_type' => $chat['kind'] === 'event' ? $chat['model']->event_type->value : null,
             'latest_message_preview' => $chat['subtitle'],
             'unread_count' => $chat['unread_count'],
             'activity_at' => $chat['activity_at']?->toIso8601String(),

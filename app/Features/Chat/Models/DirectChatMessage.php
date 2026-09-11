@@ -7,6 +7,7 @@ use App\Shared\Models\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['uuid', 'direct_chat_conversation_id', 'author_user_id', 'body', 'attachment_path', 'attachment_name', 'attachment_mime', 'attachment_size'])]
 class DirectChatMessage extends Model
@@ -16,6 +17,11 @@ class DirectChatMessage extends Model
     public function conversation(): BelongsTo
     {
         return $this->belongsTo(DirectChatConversation::class, 'direct_chat_conversation_id');
+    }
+
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(ChatMessageReaction::class, 'direct_chat_message_id');
     }
 
     public function author(): BelongsTo

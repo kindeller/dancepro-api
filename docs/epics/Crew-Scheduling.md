@@ -587,3 +587,29 @@ Studio events, including concerts and DR, use the saved studio code followed
 by the four-digit event year, for example `K2D2026`. All events for that studio
 in the same year share the code. The availability matrix and expanded details
 show the same value. Competition codes retain their month and two-digit year.
+
+## Crew web and mobile presentation parity
+
+Event chat titles use one shared rule: competition event codes (for example `EDC826`) and concert studio codes plus event day/month (for example `K2D 12/10`). Chat, shift, availability and pending timesheet artwork prefer the studio or competition contact logo with event-artwork fallback. The web Timesheets view contains uninvoiced work; paid, pending and externally invoiced work is under the Invoices tab. Acknowledgements include outstanding non-cancelled assignments across all dates.
+
+### Invoice print layout
+
+Invoice browser printing and mobile PDF downloads use a compact A4 portrait template with 12 mm margins and renderer-compatible columns. The layout regression test covers eight multi-line shifts on one page in all three invoice styles. Larger invoices may paginate rather than omit line items. Generated PDF cache paths include a layout version so existing invoices receive corrected layouts without changing their stored financial snapshots.
+
+Invoice styles have distinct typography and treatments: Classic uses DejaVu Serif headings with double rules, Minimal uses DejaVu Sans with monochrome fine dividers and a full-width total, and Modern uses a teal accent rail, alternating row shading and a dark total block. Browser print views embed the bundled font files; Dompdf embeds the corresponding built-in fonts. Mobile uses the same generated PDFs, and both style selectors describe the visual choices. Header and payment text remain compact to prioritize shift details.
+
+Crew invoice style is an account-level preference (default Classic), saved immediately when changed on web or mobile. Mobile loads it before requesting its invoice preview. Failed saves keep the previous choice; previously issued invoice styles remain unchanged. The authenticated GET/PUT `/api/v1/invoices/preferences` endpoints share `crew_profiles.preferred_invoice_style` with the web selector.
+
+### Chat reactions
+
+Web and mobile event/direct chats support thumbs up, heart, laugh and angry reactions. Each user has one reaction per message; selecting another replaces it and selecting the same removes it. Both clients share authenticated PUT `/api/v1/chats/{chat}/messages/{message}/reaction` semantics (web uses its CSRF-protected crew route). Message responses include reaction counts and the current user's selection. Chat membership and message ownership are checked before mutation. Reactions are separate from announcement acknowledgement.
+
+Timesheet attention badges count actionable work only: missing times after a shift ends, or confirmed uninvoiced work that can proceed. Confirmed competition shifts wait without an alert until all event shifts have ended and the crew member's pending times are complete. If a finish estimate is absent, the shift date's end is used. Mobile and web share these navigation counts; confirmed cards use the neutral “Times confirmed” label.
+
+The web and mobile next-shift cards skip completed assignments: actual clock-out takes precedence, otherwise a two-hour grace period after the estimated finish determines when the card moves on (end of the shift date when no estimate exists). The next available published, non-cancelled assignment is shown; completed work remains accessible through shifts and timesheets.
+
+Every minute, `shifts:record-scheduled-finishes` fills missing finish times for clocked-in, published assignments once the scheduled finish is two hours past. It records the scheduled time (not the grace cutoff), marks `finish_source=scheduled`, and preserves existing clock-outs, locked/invoiced entries and cancelled work. It does not invent a clock-in or a finish earlier than clock-in. Crew can correct an automatic finish through the existing editable time flow. Scheduler operation is required in deployed environments.
+
+Reaction choices are hidden until a long press on another person's message (keyboard users can focus the message and press Enter/Space). Only existing counts remain visible in the thread. Own messages show received counts but have no reaction picker; the API also rejects self-reactions.
+
+The long-press reaction picker uses a floating rounded bar above a preview of the held message, with the chat dimmed and blurred behind it. It contains only the existing four reactions; tapping outside dismisses it.

@@ -11,6 +11,7 @@ use App\Features\Downloads\Actions\PruneDownloadAccesses;
 use App\Features\Notifications\Actions\CreateDailyActionDigests;
 use App\Features\Notifications\Actions\CreateShiftArrivalReminders;
 use App\Features\Operations\Actions\SecureExistingInternalDocuments;
+use App\Features\Scheduling\Actions\RecordScheduledFinishes;
 use App\Features\Venues\Actions\ImportVenueCatalog;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -170,3 +171,11 @@ Artisan::command('operations:secure-documents {--apply} {--force}', function (Se
 
     return $summary['missing'] > 0 ? self::FAILURE : self::SUCCESS;
 })->purpose('Move tracked operational documents out of public storage');
+
+Artisan::command('shifts:record-scheduled-finishes', function (RecordScheduledFinishes $record): int {
+    $this->info('Recorded '.$record->execute().' scheduled finish time(s).');
+
+    return self::SUCCESS;
+})->purpose('Fill missing clock-outs with scheduled finish times after a two-hour grace period');
+
+Schedule::command('shifts:record-scheduled-finishes')->everyMinute()->withoutOverlapping()->onOneServer();

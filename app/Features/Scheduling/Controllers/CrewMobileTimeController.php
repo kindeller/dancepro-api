@@ -65,6 +65,7 @@ class CrewMobileTimeController extends Controller
         return ApiResponse::success($message, [
             'actual_clock_in_at' => $entry->actual_clock_in_at?->toIso8601String(),
             'actual_finish_at' => $entry->actual_finish_at?->toIso8601String(),
+            'finish_source' => $entry->finish_source,
             'optional_note' => $entry->optional_note,
             'locked' => $entry->locked_at !== null,
         ]);

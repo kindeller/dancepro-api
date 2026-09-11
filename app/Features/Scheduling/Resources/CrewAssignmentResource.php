@@ -67,6 +67,7 @@ class CrewAssignmentResource extends JsonResource
             'time' => [
                 'actual_clock_in_at' => $timeEntry?->actual_clock_in_at?->toIso8601String(),
                 'actual_finish_at' => $timeEntry?->actual_finish_at?->toIso8601String(),
+                'finish_source' => $timeEntry?->finish_source,
                 'optional_note' => $timeEntry?->optional_note,
                 'locked' => $locked,
             ],

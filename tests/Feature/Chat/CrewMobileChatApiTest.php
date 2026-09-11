@@ -6,6 +6,7 @@ use App\Features\Auth\Support\TokenAbility;
 use App\Features\Chat\Actions\PostDirectChatMessage;
 use App\Features\Chat\Actions\StartDirectChat;
 use App\Features\Chat\Models\DirectChatMessage;
+use App\Features\CompetitionContacts\Models\CompetitionContact;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Notifications\Jobs\DeliverMobilePushNotification;
@@ -13,6 +14,7 @@ use App\Features\Operations\Models\EventMessage;
 use App\Features\Operations\Services\OperationsFileStorage;
 use App\Features\Scheduling\Models\CrewNotification;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Studios\Models\Studio;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -26,6 +28,100 @@ use Tests\TestCase;
 class CrewMobileChatApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_reactions_are_shared_replaceable_removable_and_authorized(): void
+    {
+        [$crew, $profile] = $this->authenticatedCrew();
+        $crew->update(['onboarding_completed_at' => now()]);
+        [$other] = $this->authenticatedCrew();
+        Sanctum::actingAs($crew, [TokenAbility::CrewMobile->value]);
+        $direct = app(StartDirectChat::class)->execute($crew, $other);
+        $event = $this->assignedEvent($profile);
+        foreach ([$event, $direct] as $chat) {
+            $message = $chat->messages()->create(['author_user_id' => $other->id, 'body' => 'Reaction fixture', ...($chat === $event ? ['message_type' => 'discussion'] : [])]);
+            $url = '/api/v1/chats/'.$chat->uuid.'/messages/'.$message->uuid.'/reaction';
+            foreach (['thumbs_up', 'thumbs_up', 'heart', 'laugh', 'angry'] as $reaction) {
+                $this->putJson($url, ['reaction' => $reaction])->assertOk()
+                    ->assertJsonCount(1, 'data.reactions')->assertJsonPath('data.reactions.0.reaction', $reaction)
+                    ->assertJsonPath('data.reactions.0.count', 1)->assertJsonPath('data.reactions.0.selected', true);
+            }
+            $this->actingAs($crew, 'web')->putJson('/crew/chat/'.$chat->uuid.'/messages/'.$message->uuid.'/reaction', ['reaction' => 'heart'])->assertOk();
+            $this->getJson('/api/v1/chats/'.$chat->uuid.'/messages')->assertOk()->assertJsonPath('data.0.reactions.0.reaction', 'heart');
+            $own = $chat->messages()->create(['author_user_id' => $crew->id, 'body' => 'Own message', ...($chat === $event ? ['message_type' => 'discussion'] : [])]);
+            $this->putJson('/api/v1/chats/'.$chat->uuid.'/messages/'.$own->uuid.'/reaction', ['reaction' => 'heart'])->assertForbidden();
+            $this->actingAs($crew, 'web')->putJson('/crew/chat/'.$chat->uuid.'/messages/'.$own->uuid.'/reaction', ['reaction' => 'heart'])->assertForbidden();
+            $this->putJson($url, ['reaction' => 'invalid'])->assertUnprocessable();
+            $this->putJson($url, ['reaction' => null])->assertOk()->assertJsonCount(0, 'data.reactions');
+            $this->assertSame(0, $message->reactions()->count());
+            $wrongChat = $chat === $event ? $direct : $event;
+            $this->putJson('/api/v1/chats/'.$wrongChat->uuid.'/messages/'.$message->uuid.'/reaction', ['reaction' => 'heart'])->assertNotFound();
+        }
+        [$outsider] = $this->authenticatedCrew();
+        foreach ([$event, $direct] as $chat) {
+            $this->putJson('/api/v1/chats/'.$chat->uuid.'/messages/'.$chat->messages()->first()->uuid.'/reaction', ['reaction' => 'heart'])->assertNotFound();
+        }
+    }
+
+    public function test_mobile_event_chats_use_event_codes_and_fall_back_to_names(): void
+    {
+        [$crew, $profile] = $this->authenticatedCrew();
+        $event = $this->assignedEvent($profile);
+        $competition = CompetitionContact::query()->create([
+            'name' => 'Example Dance Competition', 'code' => 'EDC',
+            'organiser_name' => 'Fixture', 'organiser_email' => 'fixture@example.test',
+            'organiser_phone' => '0400 000 000',
+        ]);
+        $event->update(['competition_contact_id' => $competition->id, 'event_date' => '2026-08-01']);
+        $this->getJson('/api/v1/chats')->assertOk()->assertJsonPath('data.0.title', 'EDC826');
+        $event->update(['event_date' => '2027-11-01']);
+        $this->getJson('/api/v1/chats')->assertOk()->assertJsonPath('data.0.title', 'EDC1127');
+        $studio = Studio::factory()->create(['code' => 'ABC']);
+        $event->update(['event_type' => 'concert', 'studio_id' => $studio->id]);
+        $this->getJson('/api/v1/chats')->assertOk()->assertJsonPath('data.0.title', 'ABC 1/11');
+        $studio->update(['code' => null]);
+        $this->getJson('/api/v1/chats')->assertOk()->assertJsonPath('data.0.title', 'Mobile Event 1/11');
+        $event->update(['event_type' => 'competition']);
+        $competition->update(['code' => null]);
+        $this->getJson('/api/v1/chats')->assertOk()->assertJsonPath('data.0.title', 'Mobile Event');
+    }
+
+    public function test_concert_chats_for_the_same_studio_show_their_event_dates(): void
+    {
+        [, $profile] = $this->authenticatedCrew();
+        $studio = Studio::factory()->create(['code' => 'K2D']);
+        foreach (['2026-10-12', '2026-10-19'] as $date) {
+            $event = $this->assignedEvent($profile);
+            $event->update(['event_type' => 'concert', 'studio_id' => $studio->id, 'event_date' => $date]);
+        }
+        $response = $this->getJson('/api/v1/chats')->assertOk()->assertJsonCount(2, 'data');
+        $this->assertEqualsCanonicalizing(['K2D 12/10', 'K2D 19/10'], array_column($response->json('data'), 'title'));
+    }
+
+    public function test_event_chat_artwork_uses_the_studio_or_competition_logo_with_fallbacks(): void
+    {
+        config(['uploads.public_disk' => 'public']);
+        Storage::fake('public', ['url' => '/storage']);
+        [, $profile] = $this->authenticatedCrew();
+        $event = $this->assignedEvent($profile);
+        $studio = Studio::factory()->create(['logo_path' => 'studio.png']);
+        $competition = CompetitionContact::query()->create([
+            'name' => 'Fixture Competition', 'logo_path' => 'competition.png',
+            'organiser_name' => 'Fixture', 'organiser_email' => 'fixture@example.test',
+            'organiser_phone' => '0400 000 000',
+        ]);
+        $event->update(['studio_id' => $studio->id, 'competition_contact_id' => $competition->id, 'logo_path' => 'event.png']);
+        $this->getJson('/api/v1/chats')->assertOk()
+            ->assertJsonPath('data.0.event_logo_url', url('/storage/competition.png'))
+            ->assertJsonPath('data.0.event_type', 'competition');
+        $event->update(['event_type' => 'concert']);
+        $this->getJson('/api/v1/chats')->assertOk()
+            ->assertJsonPath('data.0.event_logo_url', url('/storage/studio.png'))
+            ->assertJsonPath('data.0.event_type', 'concert');
+        $studio->update(['logo_path' => null]);
+        $this->getJson('/api/v1/chats')->assertOk()->assertJsonPath('data.0.event_logo_url', url('/storage/event.png'));
+        $event->update(['logo_path' => null]);
+        $this->getJson('/api/v1/chats')->assertOk()->assertJsonPath('data.0.event_logo_url', null);
+    }
 
     public function test_crew_can_list_read_and_post_to_an_assigned_event_chat(): void
     {

@@ -31,6 +31,9 @@ class AssignmentTimeEntry extends Model
     {
         $this->loadMissing(['assignment.shift.schedulingEvent', 'audits']);
         $flags = [];
+        if ($this->finish_source === 'scheduled') {
+            $flags[] = 'Scheduled finish applied automatically; no clock-out recorded';
+        }
         $shift = $this->assignment->shift;
         if ($shift->schedulingEvent->cancelled_at !== null) {
             $flags[] = 'Event cancelled after time was recorded';

@@ -943,6 +943,53 @@ paths:
                         $ref: '#/components/schemas/ChatMessage'
         '404':
           $ref: '#/components/responses/NotFound'
+  /chats/{chat}/messages/{message}/reaction:
+    put:
+      tags: [Chat]
+      operationId: updateChatMessageReaction
+      x-implementation-status: available
+      summary: Set or remove the current user's reaction to a chat message
+      parameters:
+        - $ref: '#/components/parameters/ChatId'
+        - name: message
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reaction]
+              properties:
+                reaction:
+                  type: [string, 'null']
+                  enum: [thumbs_up, heart, laugh, angry, null]
+                  description: Null removes your reaction. Setting a value replaces it.
+      responses:
+        '200':
+          description: Updated counts and current user's selection.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          reactions:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/MessageReaction'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Invalid reaction.
   /chats/{chat}/read:
     put:
       tags: [Chat]
@@ -1080,6 +1127,46 @@ paths:
           description: Number of timesheets marked as externally invoiced.
         '422':
           $ref: '#/components/responses/ValidationError'
+  /invoices/preferences:
+    get:
+      tags: [Timesheets]
+      operationId: getInvoiceStylePreference
+      summary: Return the current crew member's saved invoice style
+      responses:
+        '200':
+          description: Account preference, shared with web. Defaults to classic.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    required: [invoice_style]
+                    properties:
+                      invoice_style:
+                        type: string
+                        enum: [classic, minimal, modern]
+    put:
+      tags: [Timesheets]
+      operationId: updateInvoiceStylePreference
+      summary: Save the default style for future invoices without altering existing invoices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invoice_style]
+              properties:
+                invoice_style:
+                  type: string
+                  enum: [classic, minimal, modern]
+      responses:
+        '200':
+          description: Saved style returned in data.invoice_style.
+        '422':
+          description: Invalid invoice style.
   /invoices:
     get:
       tags: [Timesheets]
@@ -1849,6 +1936,9 @@ components:
         actual_finish_at:
           type: [string, 'null']
           format: date-time
+        finish_source:
+          type: [string, 'null']
+          description: scheduled indicates the scheduled finish was applied automatically after the two-hour grace period; it is not a recorded clock-out.
         optional_note:
           type: [string, 'null']
         locked:
@@ -2311,6 +2401,14 @@ components:
           enum: [event, direct]
         title:
           type: string
+          description: Competition chats use the event code (for example EDC826), falling back to the event name when unavailable. Concert chats use the studio code (or event name when missing) followed by a space and the event date as unpadded day/month (for example K2D 12/10). Direct chat titles retain their names.
+        event_logo_url:
+          type: [string, 'null']
+          format: uri
+          description: Absolute public event artwork URL; studio or competition contact logo with event-logo fallback. Null for direct chats or missing artwork.
+        event_type:
+          type: [string, 'null']
+          enum: [concert, competition, null]
         latest_message_preview:
           type: [string, 'null']
         unread_count:
@@ -2359,6 +2457,10 @@ components:
         id:
           type: string
           format: uuid
+        reactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageReaction'
         author:
           $ref: '#/components/schemas/ChatAuthor'
         body:
@@ -2374,6 +2476,19 @@ components:
         created_at:
           type: string
           format: date-time
+    MessageReaction:
+      type: object
+      required: [reaction, count, selected]
+      properties:
+        reaction:
+          type: string
+          enum: [thumbs_up, heart, laugh, angry]
+        count:
+          type: integer
+          minimum: 1
+        selected:
+          type: boolean
+          description: Whether the current user has chosen this reaction.
     ChatAuthor:
       type: object
       required: [id, name]
@@ -2519,6 +2634,9 @@ components:
         actual_finish_at:
           type: [string, 'null']
           format: date-time
+        finish_source:
+          type: [string, 'null']
+          description: scheduled indicates the scheduled finish was applied automatically after the two-hour grace period; it is not a recorded clock-out.
         locked:
           type: boolean
     InvoiceSummary:

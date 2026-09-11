@@ -17,6 +17,18 @@ class SchedulingShiftAssignment extends Model
 {
     use HasPublicUuid;
 
+    public function hasFinishedForUpcomingCard(): bool
+    {
+        if ($this->timeEntry?->actual_finish_at !== null) {
+            return $this->timeEntry->actual_finish_at->lte(now());
+        }
+
+        $cutoff = $this->shift->estimated_finish_at?->copy()->addHours(2)
+            ?? $this->shift->shift_date->copy()->endOfDay();
+
+        return $cutoff->lte(now());
+    }
+
     public function shift(): BelongsTo
     {
         return $this->belongsTo(SchedulingShift::class, 'scheduling_shift_id');

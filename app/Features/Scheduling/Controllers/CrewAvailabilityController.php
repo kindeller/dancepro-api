@@ -16,7 +16,6 @@ use App\Features\Scheduling\Models\ShiftCoverRequest;
 use App\Features\Scheduling\Models\ShiftCoverRequestRecipient;
 use App\Features\Scheduling\Requests\RecordAvailabilityResponseRequest;
 use App\Features\Scheduling\Support\AvailabilityRoundStatus;
-use App\Features\Scheduling\Support\SchedulingEventType;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
@@ -63,7 +62,7 @@ class CrewAvailabilityController extends Controller
                 'shift.assignments.timeEntry',
                 'shift.assignments.crewProfile.user',
                 'shift.schedulingEvent.eventTypeDefinition', 'shift.schedulingEvent.venue',
-                'shift.schedulingEvent.studio',
+                'shift.schedulingEvent.studio', 'shift.schedulingEvent.competitionContact',
                 'shift.schedulingEvent.concertBookingItem.booking',
             ])
             ->get()
@@ -79,7 +78,7 @@ class CrewAvailabilityController extends Controller
             ->whereHas('shift.schedulingEvent', fn ($query) => $query->whereNotNull('cancelled_at'))
             ->with([
                 'equipmentResponsibilities', 'coverRequests', 'role', 'timeEntry',
-                'shift.schedulingEvent.eventTypeDefinition', 'shift.schedulingEvent.venue', 'shift.schedulingEvent.studio',
+                'shift.schedulingEvent.eventTypeDefinition', 'shift.schedulingEvent.venue', 'shift.schedulingEvent.studio', 'shift.schedulingEvent.competitionContact',
                 'shift.schedulingEvent.concertBookingItem.booking',
             ])
             ->get()
@@ -107,7 +106,7 @@ class CrewAvailabilityController extends Controller
         $nextAssignment = $assignments->first(function (SchedulingShiftAssignment $assignment): bool {
             $shiftDate = $assignment->shift->shift_date ?? $assignment->shift->schedulingEvent->event_date;
 
-            return $shiftDate !== null && ($shiftDate->isToday() || $shiftDate->isFuture());
+            return $shiftDate !== null && ($shiftDate->isToday() || $shiftDate->isFuture()) && ! $assignment->hasFinishedForUpcomingCard();
         });
         $nextChecklistTemplates = collect();
         if ($nextAssignment !== null) {
@@ -129,20 +128,13 @@ class CrewAvailabilityController extends Controller
                 return $shiftDate !== null && $shiftDate->isPast() && ! $shiftDate->isToday();
             }
 
-            return $shiftDate !== null && ($shiftDate->isToday() || $shiftDate->isFuture());
+            return $shiftDate !== null && ($shiftDate->isToday() || $shiftDate->isFuture()) && ! $assignment->hasFinishedForUpcomingCard();
         })->values();
         $displayEvents = $events
             ->concat($assignments->map(fn (SchedulingShiftAssignment $assignment) => $assignment->shift->schedulingEvent))
             ->concat($cancelledAssignments->map(fn (SchedulingShiftAssignment $assignment) => $assignment->shift->schedulingEvent))
             ->unique('id');
-        $eventLogoUrls = $displayEvents->mapWithKeys(function (SchedulingEvent $event): array {
-            $logoUrl = $event->logoUrl();
-            if ($event->event_type === SchedulingEventType::Concert) {
-                $logoUrl = $event->studio?->logoUrl() ?? $logoUrl;
-            }
-
-            return [$event->uuid => $logoUrl];
-        });
+        $eventLogoUrls = $displayEvents->mapWithKeys(fn (SchedulingEvent $event): array => [$event->uuid => $event->crewLogoUrl()]);
         $notifications = CrewNotification::query()->where('user_id', $request->user()->id)->latest()->limit(10)->get();
         $assignmentsByDate = $assignments->groupBy(fn (SchedulingShiftAssignment $assignment): string => $assignment->shift->shift_date->toDateString());
         $assignmentDates = $assignments->map(fn (SchedulingShiftAssignment $assignment) => $assignment->shift->shift_date);

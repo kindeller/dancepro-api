@@ -74,6 +74,17 @@ class SchedulingEvent extends Model
         return $code !== '' ? $code.$this->event_date->format($competition ? 'ny' : 'Y') : null;
     }
 
+    public function crewChatTitle(): string
+    {
+        if ($this->event_type === SchedulingEventType::Concert && $this->event_date !== null) {
+            $code = trim($this->studio?->code ?? '');
+
+            return ($code !== '' ? $code : $this->name).' '.$this->event_date->format('j/n');
+        }
+
+        return $this->eventCode() ?? $this->name;
+    }
+
     public function logoUrl(): ?string
     {
         return $this->logo_path ? Storage::disk(config('uploads.public_disk'))->url($this->logo_path) : null;

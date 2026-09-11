@@ -4,10 +4,12 @@ namespace Tests\Feature\Operations;
 
 use App\Features\Chat\Models\DirectChatConversation;
 use App\Features\Chat\Models\DirectChatMessage;
+use App\Features\CompetitionContacts\Models\CompetitionContact;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Operations\Models\EventMessage;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Studios\Models\Studio;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -17,6 +19,26 @@ use Tests\TestCase;
 class CrewChatTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_web_event_chat_titles_and_artwork_match_mobile(): void
+    {
+        config(['uploads.public_disk' => 'public']);
+        Storage::fake('public', ['url' => '/storage']);
+        [$crew, $event] = $this->assignedEvent(now()->addDay());
+        $competition = CompetitionContact::query()->create([
+            'name' => 'Example Competition', 'code' => 'EDC', 'logo_path' => 'competition.png',
+            'organiser_name' => 'Fixture', 'organiser_email' => 'fixture@example.test', 'organiser_phone' => '0400 000 000',
+        ]);
+        $event->update(['competition_contact_id' => $competition->id, 'event_date' => '2026-08-01']);
+        $this->actingAs($crew)->get(route('crew.chat.index'))->assertOk()->assertSee('EDC826')->assertSee(url('/storage/competition.png'));
+        $this->get(route('crew.chat.event', $event))->assertOk()->assertSee('<strong>EDC826</strong>', false);
+        $studio = Studio::factory()->create(['code' => 'K2D', 'logo_path' => 'studio.png']);
+        $event->update(['event_type' => 'concert', 'studio_id' => $studio->id, 'event_date' => '2026-10-12']);
+        [, $second] = $this->assignedEvent(now()->addDays(2), $crew);
+        $second->update(['event_type' => 'concert', 'studio_id' => $studio->id, 'event_date' => '2026-10-19']);
+        $this->get(route('crew.chat.index'))->assertOk()->assertSee('K2D 12/10')->assertSee('K2D 19/10')->assertSee(url('/storage/studio.png'));
+        $this->get(route('crew.chat.event', $event))->assertOk()->assertSee('<strong>K2D 12/10</strong>', false);
+    }
 
     public function test_upcoming_assigned_event_chat_appears_seven_days_before_event_without_messages(): void
     {

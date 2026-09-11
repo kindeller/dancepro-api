@@ -18,17 +18,18 @@ class CrewInvoicePdf
     {
         $invoice->loadMissing(['crewProfile.user', 'lines', 'schedulingEvent']);
         abort_unless($invoice->status !== 'draft' && $invoice->source === 'dancepro', 422);
-        $path = 'generated-invoices/'.$invoice->uuid.'.pdf';
+        $path = 'generated-invoices/styles-v4/'.$invoice->uuid.'.pdf';
         $disk = $this->disk();
 
         if (! $disk->exists($path)) {
             $options = new Options;
+            $options->set('defaultMediaType', 'print');
             $options->set('isRemoteEnabled', false);
             $options->set('isPhpEnabled', false);
             $options->set('isJavascriptEnabled', false);
             $dompdf = new Dompdf($options);
             $dompdf->setPaper('A4', 'portrait');
-            $dompdf->loadHtml(View::make('invoices.print', ['invoice' => $invoice])->render(), 'UTF-8');
+            $dompdf->loadHtml(View::make('invoices.print', ['invoice' => $invoice, 'pdf' => true])->render(), 'UTF-8');
             $dompdf->render();
             $disk->put($path, $dompdf->output());
         }

@@ -14,6 +14,7 @@ use App\Features\Studios\Support\StudioStatus;
 use App\Features\Venues\Models\Venue;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -25,6 +26,44 @@ use Tests\TestCase;
 class CrewMobileReadApiTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_next_assignment_moves_on_after_finish_time_or_clock_out(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-11 19:59:00'));
+        [, $profile] = $this->authenticatedCrew();
+        $today = $this->assignmentFor($profile, 'Today shift', '2026-09-11');
+        $today->shift->update(['estimated_finish_at' => '2026-09-11 18:00:00']);
+        $tomorrow = $this->assignmentFor($profile, 'Tomorrow shift', '2026-09-12');
+        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.next_assignment.id', $today->uuid);
+        $this->travelTo(Carbon::parse('2026-09-11 20:00:00'));
+        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.next_assignment.id', $tomorrow->uuid);
+        $this->travelTo(Carbon::parse('2026-09-11 17:00:00'));
+        $today->timeEntry()->create(['actual_clock_in_at' => '2026-09-11 13:00:00', 'actual_finish_at' => '2026-09-11 16:30:00']);
+        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.next_assignment.id', $tomorrow->uuid);
+        $tomorrow->update(['status' => 'draft']);
+        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.next_assignment', null);
+    }
+
+    public function test_timesheet_badge_waits_until_competition_work_is_actionable(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-11 20:00:00'));
+        [$user, $profile] = $this->authenticatedCrew();
+        $first = $this->assignmentFor($profile, 'Two day competition', '2026-09-11');
+        $first->shift->update(['estimated_finish_at' => '2026-09-11 18:00:00']);
+        $first->timeEntry()->create(['actual_clock_in_at' => '2026-09-11 13:00:00', 'actual_finish_at' => '2026-09-11 18:00:00']);
+        $nextShift = $first->shift->schedulingEvent->shifts()->create(['shift_date' => '2026-09-12', 'estimated_finish_at' => '2026-09-12 18:00:00']);
+        $second = $nextShift->assignments()->create(['crew_profile_id' => $profile->id, 'crew_role_id' => $first->crew_role_id, 'status' => 'published']);
+        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.pending_timesheets', 0);
+        $this->travelTo(Carbon::parse('2026-09-12 17:00:00'));
+        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.pending_timesheets', 0);
+        $this->travelTo(Carbon::parse('2026-09-12 19:00:00'));
+        // Only the missing times need attention; the first shift is still waiting.
+        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.pending_timesheets', 1);
+        $second->timeEntry()->create(['actual_clock_in_at' => '2026-09-12 13:00:00', 'actual_finish_at' => '2026-09-12 18:00:00']);
+        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.pending_timesheets', 2);
+        $first->shift->schedulingEvent->update(['cancelled_at' => now()]);
+        $this->getJson('/api/v1/dashboard')->assertOk()->assertJsonPath('data.pending_timesheets', 0);
+    }
 
     public function test_mobile_dashboard_and_assignment_list_only_return_the_current_crews_published_work(): void
     {

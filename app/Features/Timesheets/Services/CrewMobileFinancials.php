@@ -141,6 +141,7 @@ class CrewMobileFinancials
             'cancelled' => $cancelled,
             'actual_clock_in_at' => $entry?->actual_clock_in_at?->toIso8601String(),
             'actual_finish_at' => $entry?->actual_finish_at?->toIso8601String(),
+            'finish_source' => $entry?->finish_source,
             'locked' => $entry?->locked_at !== null,
             'total' => $preview['total'] !== null ? $this->money($preview['total']) : null,
         ];
