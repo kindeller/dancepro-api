@@ -14,6 +14,24 @@
 
 @if(!$isCancelled && !$assignment->timeEntry?->actual_clock_in_at && !$shift->shift_date->lt(today()))<section class="card profile-section"><p class="eyebrow">Can’t work this shift?</p><h2>Organise cover</h2>@if($assignment->coverRequests->where('status','open')->isNotEmpty())<p>A cover request is currently open.</p><a class="button secondary" href="{{ route('crew.availability.index',['view'=>'cover']) }}">View cover requests</a>@else<p class="muted">Ask one person, several people or all eligible crew. You can include an optional personal message.</p><a class="button secondary" href="{{ route('crew.cover.create',$assignment) }}">Organise cover</a>@endif</section>@endif
 
+<section class="card profile-section">
+    <div class="section-heading"><h2>Your team</h2><a class="button secondary" href="{{ route('crew.chat.event', $event) }}">Event chat</a></div>
+    @foreach($shift->assignments->where('status', 'published')->unique('crew_profile_id') as $teamAssignment)
+        @php($member = $teamAssignment->crewProfile)
+        <div class="section-heading">
+            <span>{{ $member->preferred_name ?: $member->user->name }}{{ $member->user_id === auth()->id() ? ' (You)' : '' }}</span>
+            @if($member->user_id !== auth()->id())
+                <form method="POST" action="{{ route('crew.chat.start') }}">@csrf
+                    <input type="hidden" name="recipient_profile_uuid" value="{{ $member->uuid }}">
+                    <button type="submit" class="secondary" aria-label="Chat with {{ $member->preferred_name ?: $member->user->name }}" title="Chat with {{ $member->preferred_name ?: $member->user->name }}">
+                        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H3l2-4A8.5 8.5 0 1 1 21 11.5Z"/></svg>
+                    </button>
+                </form>
+            @endif
+        </div>
+    @endforeach
+</section>
+
 @php($timeEntry=$assignment->timeEntry)
 
 

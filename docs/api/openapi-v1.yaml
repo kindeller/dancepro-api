@@ -1899,6 +1899,8 @@ components:
         - $ref: '#/components/schemas/AssignmentSummary'
         - type: object
           properties:
+            event_chat:
+              $ref: '#/components/schemas/ChatSummary'
             venue:
               $ref: '#/components/schemas/Venue'
             programme_url:

@@ -27,6 +27,16 @@ class CrewMobileReadApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_shift_details_link_to_the_event_chat(): void
+    {
+        [, $profile] = $this->authenticatedCrew();
+        $assignment = $this->assignmentFor($profile, 'Chat event', today()->toDateString());
+        $this->getJson('/api/v1/assignments/'.$assignment->uuid)->assertOk()
+            ->assertJsonPath('data.event_chat.id', $assignment->shift->schedulingEvent->uuid)
+            ->assertJsonPath('data.event_chat.kind', 'event')
+            ->assertJsonPath('data.event_chat.title', $assignment->shift->schedulingEvent->crewChatTitle());
+    }
+
     public function test_next_assignment_moves_on_after_finish_time_or_clock_out(): void
     {
         $this->travelTo(Carbon::parse('2026-09-11 19:59:00'));

@@ -13,6 +13,14 @@ class CrewAssignmentDetailResource extends CrewAssignmentResource
         $venue = $event->venue;
 
         return [...parent::toArray($request),
+            'event_chat' => [
+                'id' => $event->uuid,
+                'kind' => 'event',
+                'title' => $event->crewChatTitle(),
+                'event_logo_url' => $event->crewLogoUrl(),
+                'event_type' => $event->event_type->value,
+                'unread_count' => 0,
+            ],
             'venue' => $venue ? [
                 'id' => $venue->uuid,
                 'name' => $venue->name,

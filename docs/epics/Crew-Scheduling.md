@@ -613,3 +613,5 @@ Every minute, `shifts:record-scheduled-finishes` fills missing finish times for 
 Reaction choices are hidden until a long press on another person's message (keyboard users can focus the message and press Enter/Space). Only existing counts remain visible in the thread. Own messages show received counts but have no reaction picker; the API also rejects self-reactions.
 
 The long-press reaction picker uses a floating rounded bar above a preview of the held message, with the chat dimmed and blurred behind it. It contains only the existing four reactions; tapping outside dismisses it.
+
+Shift details include direct-chat icons for other published team members and an Event Chat shortcut. Mobile receives an `event_chat` summary in assignment details so it opens the correct event UUID and shared title. Web uses the existing authorized event and direct-chat routes.
