@@ -14,6 +14,13 @@ class ShiftCoverRequestTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->travelTo(now()->setDate(2026, 9, 9)->startOfDay());
+    }
+
     public function test_crew_can_send_a_personalised_request_to_multiple_eligible_people(): void
     {
         [$owner, $assignment, $role] = $this->assignment();
@@ -45,7 +52,9 @@ class ShiftCoverRequestTest extends TestCase
         [$first, $firstUser] = $this->qualifiedCrew($role, 'Avery');
         [$second, $secondUser] = $this->qualifiedCrew($role, 'Bailey');
         $assignment->equipmentResponsibilities()->create(['item_code' => 'video_1', 'is_bringing' => true, 'is_taking' => false]);
-        $this->actingAs($owner)->post(route('crew.cover.store', $assignment), ['recipients' => [$first->uuid, $second->uuid]]);
+        $this->actingAs($owner)->post(route('crew.cover.store', $assignment), ['recipients' => [$first->uuid, $second->uuid]])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('crew.availability.index', ['view' => 'cover']));
         $cover = $assignment->coverRequests()->firstOrFail();
 
         $this->actingAs($firstUser)->post(route('crew.cover.accept', $cover))->assertRedirect(route('crew.assignments.show', $assignment));
@@ -71,10 +80,29 @@ class ShiftCoverRequestTest extends TestCase
 
         $this->actingAs($owner)->post(route('crew.cover.store', $assignment), ['recipients' => [$unqualified->uuid]])->assertSessionHasErrors('recipients');
         $this->actingAs($owner)->post(route('crew.cover.store', $assignment), ['recipients' => [$conflicting->uuid]])->assertSessionHasErrors('recipients');
-        $this->actingAs($owner)->post(route('crew.cover.store', $assignment), ['recipients' => [$eligible->uuid]])->assertRedirect();
+        $this->actingAs($owner)->post(route('crew.cover.store', $assignment), ['recipients' => [$eligible->uuid]])
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('crew.availability.index', ['view' => 'cover']));
         $cover = $assignment->coverRequests()->firstOrFail();
-        $this->actingAs($eligibleUser)->post(route('crew.cover.accept', $cover))->assertRedirect();
+        $this->actingAs($eligibleUser)->post(route('crew.cover.accept', $cover))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('crew.assignments.show', $assignment));
         $this->assertNotSame($conflictingAssignment->crew_profile_id, $assignment->fresh()->crew_profile_id);
+    }
+
+    public function test_crew_cannot_request_cover_for_a_past_shift(): void
+    {
+        [$owner, $assignment, $role] = $this->assignment();
+        [$eligible] = $this->qualifiedCrew($role, 'Eligible');
+        $this->travelTo(now()->setDate(2026, 9, 11)->startOfDay());
+
+        $this->actingAs($owner)->get(route('crew.cover.create', $assignment))->assertNotFound();
+        $this->actingAs($owner)->post(route('crew.cover.store', $assignment), ['recipients' => [$eligible->uuid]])
+            ->assertSessionHasErrors(['recipients' => 'Cover can only be organised before the shift starts.']);
+
+        $this->assertDatabaseCount('shift_cover_requests', 0);
+        $this->assertDatabaseCount('shift_cover_request_recipients', 0);
+        $this->assertDatabaseMissing('crew_notifications', ['type' => 'cover_request']);
     }
 
     private function assignment(): array
