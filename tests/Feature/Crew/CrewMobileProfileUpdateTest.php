@@ -86,6 +86,32 @@ class CrewMobileProfileUpdateTest extends TestCase
         $this->assertStringNotContainsString('123456789', $response->getContent());
     }
 
+    public function test_payment_details_reveal_requires_current_password_and_never_returns_full_numbers(): void
+    {
+        [, $profile] = $this->authenticatedCrew();
+        $profile->update([
+            'bank_account_name' => 'David Mueller',
+            'bank_name' => 'Example Bank',
+            'bank_bsb' => '12-1234',
+            'bank_account_number' => '12345678',
+        ]);
+
+        $this->postJson('/api/v1/profile/payment-details/reveal', ['password' => 'wrong-password'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('password');
+
+        $response = $this->postJson('/api/v1/profile/payment-details/reveal', ['password' => 'secret-password'])
+            ->assertOk()
+            ->assertJsonPath('data.account_name', 'David Mueller')
+            ->assertJsonPath('data.bank_name', 'Example Bank')
+            ->assertJsonPath('data.bsb_last_four', '1234')
+            ->assertJsonPath('data.account_number_last_four', '5678')
+            ->assertJsonPath('data.complete', true);
+
+        $this->assertStringNotContainsString('12-1234', $response->getContent());
+        $this->assertStringNotContainsString('12345678', $response->getContent());
+    }
+
     public function test_profile_update_requires_idempotency_and_never_accepts_another_crews_vehicle(): void
     {
         [, $profile] = $this->authenticatedCrew();

@@ -39,6 +39,7 @@ class SensitiveAuthenticationRateLimitTest extends TestCase
             'two-factor.disable',
             'crew.profile.password',
             'crew.contracts.sign',
+            'api.v1.profile.payment-details.reveal',
         ] as $routeName) {
             $middleware = app('router')->getRoutes()->getByName($routeName)?->gatherMiddleware() ?? [];
 

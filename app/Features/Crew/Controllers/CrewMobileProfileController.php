@@ -5,8 +5,10 @@ namespace App\Features\Crew\Controllers;
 use App\Features\Auth\Actions\RotateUserPassword;
 use App\Features\Auth\Resources\CrewMobileUserResource;
 use App\Features\Crew\Actions\RefreshCrewOnboardingStatus;
+use App\Features\Crew\Actions\RevealCrewPaymentDetails;
 use App\Features\Crew\Actions\UpdateOwnCrewProfile;
 use App\Features\Crew\Requests\ChangeOwnPasswordRequest;
+use App\Features\Crew\Requests\RevealCrewPaymentDetailsRequest;
 use App\Features\Crew\Requests\UpdateCrewMobileProfileRequest;
 use App\Features\Crew\Resources\CrewMobileProfileResource;
 use App\Features\Crew\Services\CrewOnboardingStatus;
@@ -57,5 +59,13 @@ class CrewMobileProfileController extends Controller
                 ? 'all_api_sessions_revoked'
                 : 'current_mobile_session_preserved_other_api_sessions_revoked',
         ]);
+    }
+
+    public function revealPaymentDetails(RevealCrewPaymentDetailsRequest $request, RevealCrewPaymentDetails $reveal): JsonResponse
+    {
+        return ApiResponse::success(
+            'Payment details returned.',
+            $reveal->execute($request->user()->crewProfile),
+        );
     }
 }

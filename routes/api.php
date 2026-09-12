@@ -83,6 +83,9 @@ Route::prefix('v1')->middleware([
         ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
     Route::put('profile/password', [CrewMobileProfileController::class, 'changePassword'])
         ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
+    Route::post('profile/payment-details/reveal', [CrewMobileProfileController::class, 'revealPaymentDetails'])
+        ->middleware('throttle:sensitive-auth')
+        ->name('api.v1.profile.payment-details.reveal');
     Route::get('address-search', CrewMobileAddressController::class)->middleware('throttle:address-search');
     Route::get('address-search/{placeId}', [CrewMobileAddressController::class, 'resolve'])
         ->middleware('throttle:address-search');
