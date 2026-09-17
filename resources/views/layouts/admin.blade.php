@@ -64,6 +64,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            color: inherit;
             margin-bottom: 34px;
             font-size: 13px;
             font-weight: 800;
@@ -489,10 +490,10 @@
 <body>
     <div class="shell">
         <aside class="sidebar">
-            <div class="brand">
+            <a class="brand" href="https://www.dancepro.com.au/">
                 <img class="brand-mark" src="{{ asset('storage/1024.png') }}" alt="">
                 <span>DancePro Admin</span>
-            </div>
+            </a>
 
             <nav class="nav" aria-label="Admin navigation">
                 <a href="{{ route('admin.dashboard') }}" @if(request()->routeIs('admin.dashboard')) aria-current="page" @endif>Dashboard</a>

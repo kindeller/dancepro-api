@@ -60,7 +60,7 @@
 <body style="--concert-brand: {{ $concert->brand_color ?? $studio->brand_color ?? '#0aa0db' }}">
 <header class="site-header">
     <div class="header-inner">
-        <a class="logo" href="{{ route('studios.index') }}"><img src="{{ asset('storage/1024.png') }}" alt=""><span>DancePro</span></a>
+        <a class="logo" href="https://www.dancepro.com.au/"><img src="{{ asset('storage/1024.png') }}" alt=""><span>DancePro</span></a>
         <nav aria-label="Main navigation"><a href="{{ route('studios.index') }}">Studios & concerts</a><a href="{{ route('admin.dashboard') }}">Staff</a></nav>
     </div>
 </header>
