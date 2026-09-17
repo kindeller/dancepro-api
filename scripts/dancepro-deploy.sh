@@ -335,10 +335,10 @@ printf 'Created local rollback tag: %s -> %s\n' "$ROLLBACK_TAG" "$CURRENT_COMMIT
 
 log "Enable maintenance mode"
 if [[ -f resources/views/errors/503.blade.php ]]; then
-    run php artisan down --render="errors.503"
+    php artisan down --render="errors.503"
 else
     printf 'Custom 503 view not present; using Laravel default maintenance response.\n'
-    run php artisan down
+    php artisan down
 fi
 DEPLOY_STARTED=true
 
