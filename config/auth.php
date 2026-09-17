@@ -4,6 +4,8 @@ use App\Models\User;
 
 return [
 
+    'staff_token_ttl_minutes' => (int) env('STAFF_API_TOKEN_TTL_MINUTES', 43200),
+
     /*
     |--------------------------------------------------------------------------
     | Authentication Defaults

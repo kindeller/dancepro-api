@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Features\Auth\Support\ApiTokenAbility;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +14,8 @@ class LoginTest extends TestCase
 
     public function test_active_user_can_login_and_receive_a_sanctum_token(): void
     {
+        $this->freezeTime();
+        config(['auth.staff_token_ttl_minutes' => 43200]);
         $user = User::factory()->create([
             'email' => 'staff@example.com',
             'password' => Hash::make('secret-password'),
@@ -39,6 +42,9 @@ class LoginTest extends TestCase
 
         $this->assertDatabaseCount('personal_access_tokens', 1);
         $this->assertNotNull($user->fresh()->last_login_at);
+        $this->assertSame(ApiTokenAbility::staffAbilities(), $user->tokens()->firstOrFail()->abilities);
+        $this->assertNotNull($user->tokens()->firstOrFail()->expires_at);
+        $this->assertSame(now()->addDays(30)->timestamp, $user->tokens()->firstOrFail()->expires_at->timestamp);
     }
 
     public function test_login_rejects_invalid_credentials(): void
@@ -77,6 +83,23 @@ class LoginTest extends TestCase
             ->assertForbidden()
             ->assertJsonPath('success', false)
             ->assertJsonPath('message', 'This account is inactive.');
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
+    }
+
+    public function test_customer_cannot_receive_a_staff_api_token(): void
+    {
+        User::factory()->customer()->create([
+            'email' => 'customer@example.com',
+            'password' => Hash::make('secret-password'),
+        ]);
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'customer@example.com',
+            'password' => 'secret-password',
+        ])
+            ->assertForbidden()
+            ->assertJsonPath('message', 'This account cannot use staff API access.');
 
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }

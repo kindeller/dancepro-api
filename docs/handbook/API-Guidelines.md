@@ -52,6 +52,12 @@ must check both an active staff/admin account and the relevant
 Possession of a valid wildcard or unrelated token must not substitute for a
 media policy decision.
 
+For compatibility, existing wildcard tokens may satisfy only
+`competition-objects:read` and `download-links:manage`; account policies still
+apply. New login tokens receive explicit abilities and an individual expiry
+configured by `STAFF_API_TOKEN_TTL_MINUTES` (30 days by default). The optional
+`SANCTUM_EXPIRATION` global limit is not newly imposed on old tokens.
+
 Create, import, upload-completion and finalisation requests must support an
 `Idempotency-Key` so a desktop client can retry after an uncertain network
 result without duplicating business records or completing an operation twice.

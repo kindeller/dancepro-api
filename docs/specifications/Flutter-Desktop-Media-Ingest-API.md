@@ -11,15 +11,15 @@ does not mean this Laravel codebase is V1.
 
 ## Implementation status
 
-This document contains two deliberately separate sections:
+The Laravel endpoints in this document are implemented in this repository. They
+are the handoff contract for Flutter development, but they are not production
+ready until the new migrations have run, the S3/IAM prerequisites have been
+applied, automated tests pass in Sail and a synthetic upload succeeds in the
+target environment.
 
-- **Implemented baseline** describes API behaviour present in this repository.
-- **Required media API** describes the target contract that Laravel must
-  implement before Flutter can use the secure upload and assignment workflow.
-
-Do not build the Flutter upload integration on the assumption that the required
-media endpoints already exist. Endpoint names and payloads in that section are
-the agreed implementation target, not currently deployed routes.
+The API intentionally does not include studio/concert creation, publication,
+asset deletion or arbitrary S3 browsing. Per-studio account scope and the
+CloudFront progressive-download improvements remain separate future work.
 
 ## Responsibility boundary
 
@@ -35,9 +35,7 @@ Flutter should not create or publish studios or concerts in the initial media
 workflow. It may create a video collection beneath an existing concert when one
 does not exist. Broader management remains in the web application.
 
-## Implemented baseline
-
-### Authentication
+## Authentication
 
 The following endpoints exist:
 
@@ -67,6 +65,14 @@ token:
   "data": {
     "token": "returned-once-token",
     "token_type": "Bearer",
+    "abilities": [
+      "concert-media:read",
+      "concert-media:upload",
+      "concert-media:update",
+      "competition-objects:read",
+      "download-links:manage"
+    ],
+    "expires_at": "2026-10-10T12:00:00Z",
     "user": {
       "name": "Staff Name",
       "email": "staff@example.com",
@@ -89,22 +95,26 @@ assets, ordinary preferences, crash reports or logs. On `401`, discard it and
 return to login. On logout, call `/api/auth/logout` before deleting the local
 Keychain item.
 
-Current authentication limitations that Laravel must address before enabling
-media upload:
+Login accepts only active `staff` and `admin` accounts, is rate limited, issues
+server-selected abilities rather than `*`, and creates an expiring token. The
+default expiry is 43,200 minutes (30 days) and is configurable with
+`STAFF_API_TOKEN_TTL_MINUTES`. `/api/auth/me` returns the current abilities and expiry so
+Flutter can reject a session that lacks the required contract before beginning
+a job.
 
-- login currently issues the wildcard `*` ability;
-- the login controller does not currently reject an active customer account,
-  despite its staff/admin intent;
-- API login is not currently protected by an explicit route rate limit;
-- token expiry depends on deployment configuration and may be unset;
-- no device-token listing or remote revocation screen exists.
+Existing wildcard tokens remain valid only for the competition-object and
+download-link abilities, subject to active staff/admin policies and their
+existing expiry/revocation. They do not grant media access. `SANCTUM_EXPIRATION`
+remains an optional global age limit (default `null`), so deployment does not
+retroactively expire old competition tokens. Keep any deliberately configured
+global limit; new login tokens always have an individual expiry.
 
 The current repository also has no staff account creation API, self-registration
 flow or per-studio staff assignment. Accounts must be provisioned through an
 authorised server-side process. Use named accounts, not a credential embedded in
 the application or shared by an entire venue.
 
-### Existing discovery endpoints
+### Public endpoints are not uploader discovery
 
 The current API has public read-only endpoints:
 
@@ -118,46 +128,13 @@ These return only active studios and publicly available concerts. They are not
 suitable for a staff uploader because an unpublished or disabled concert would
 be invisible.
 
-Studio and concert creation/editing currently exists only in the authenticated
-server-rendered web admin. There are no staff studio or concert management API
-routes.
+Studio and concert creation/editing remains in the authenticated server-rendered
+web admin. Flutter uses the staff discovery endpoints below to select existing
+records, including drafts.
 
-### Existing AWS-related API behaviour
+## Implemented authorisation contract
 
-The API currently exposes a server-side, read-only Competition object browser:
-
-```text
-GET /api/competitions/objects
-```
-
-It does not upload concert media. The only current upload-signing capability is
-inside the installed Laravel S3 adapter; no controller or route exposes it.
-Download signing and CloudFront playback signing are outbound delivery
-capabilities and cannot be reused as upload endpoints without new server-side
-actions and policies.
-
-A review of the routes, application code and visible Git history in this
-repository found no earlier concert upload, presigned-upload or multipart-upload
-API implementation. Any working direct AWS upload code belongs to the old or
-Flutter application and is outside this Laravel repository; it must not be
-assumed to survive in the V2 API.
-
-There is no currently implemented endpoint for:
-
-- listing private/draft concerts for staff;
-- listing or creating concert media collections;
-- reserving a media asset UUID;
-- creating a presigned upload request;
-- coordinating a multipart upload;
-- finalising or verifying an upload;
-- importing an existing legacy MP4;
-- editing media asset metadata;
-- assigning an uploaded asset to a concert.
-
-## Required authentication contract
-
-Before the routes below are exposed, Laravel must enforce both account type and
-token ability:
+Laravel enforces both account type and an explicit token ability:
 
 | Ability | Purpose |
 | --- | --- |
@@ -180,7 +157,7 @@ Every required route uses `auth:sanctum`, a staff/media authorisation policy and
 an appropriate rate limit. A valid token without the required ability receives
 `403`, not a presigned URL.
 
-## Required media API
+## Media API
 
 All identifiers in routes and responses are public UUIDs. Internal numeric
 database IDs, bucket credentials and CloudFront signing material are never
@@ -431,13 +408,35 @@ POST /api/staff/media-assets/{asset_uuid}/finalize
 }
 ```
 
-Before returning success, Laravel performs low-impact metadata and playlist
-validation. It confirms declared object existence, size, content type and
-checksum where available. It verifies that HLS references are relative, remain
-inside the asset prefix and point to uploaded objects.
+Before returning success, Laravel checks required objects are nonempty and
+validates the HLS package. Batch completion verifies declared size and checksum
+where available; multipart completion requires the recorded size and full-object
+CRC64NVME checksum. A retry reconciles a matching existing object before asking
+S3 to complete again, including after a lost S3 response or failed database write.
+Unverified or mismatched objects cannot be marked complete.
 
-The HLS master manifest is signed for upload only after all child HLS objects
-have passed verification. It is therefore the last HLS object uploaded.
+HLS validation requires an `#EXTM3U` master with `BANDWIDTH` and `RESOLUTION`
+on every variant and a child playlist for each requested 720p/480p rendition.
+Children require positive `EXTINF` durations, a valid `EXT-X-TARGETDURATION`,
+nonempty referenced segments and `EXT-X-ENDLIST`. Fragmented MP4 requires an
+existing MP4 `EXT-X-MAP`. Use self-contained variants with muxed audio; external
+renditions, encryption, byte-range segments and live playlists are unsupported.
+All references must remain relative and inside the asset's `stream/` prefix.
+This validates packaging, not the actual encoded resolution or video decodability.
+
+The server lists the stream prefix in pages of 1,000 objects and reads only the
+playlists, avoiding a HEAD request per segment. Defaults limit the inventory to
+10,000 objects (`MEDIA_MAX_HLS_OBJECTS`), variants to four
+(`MEDIA_MAX_HLS_VARIANTS`), and each playlist to 2 MiB
+(`MEDIA_MAX_MANIFEST_BYTES`). Over-limit packages return `422` and remain processing.
+
+Upload the HLS master last. Signing it requires a completed child-playlist and
+segment batch; finalisation validates every referenced child object.
+
+New reservations require a managed video collection on `MEDIA_UPLOAD_DISK`.
+Signing, completion and abort operations also reject legacy or other disks,
+including an upload-disk alias configured against the legacy bucket. Legacy
+imports remain available as a separate read-only storage workflow.
 
 Successful finalisation sets:
 

@@ -114,6 +114,14 @@ lower-level media ingest workflow:
 - Update the Concert, AWS, testing and deployment documentation as behavior is
   implemented.
 
+## Ingest implementation status
+
+The ingest implementation now includes legacy competition-token compatibility,
+multipart completion reconciliation, bounded HLS package validation, upload-disk
+isolation and exact legacy listing boundaries. These changes do not complete the
+remaining delivery, publishing and production smoke-test criteria below. See
+[ADR-0004](../decisions/ADR-0004-Media-Ingest-Compatibility-and-Verification.md).
+
 ## Deferred
 
 The following existing documented areas remain future work and are not required

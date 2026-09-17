@@ -5,6 +5,7 @@ namespace App\Features\Media\Models;
 use App\Features\Media\Support\MediaAssetStatus;
 use App\Features\Media\Support\MediaType;
 use App\Features\Orders\Models\OrderItem;
+use App\Models\User;
 use App\Shared\Models\HasPublicUuid;
 use Database\Factories\MediaAssetFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['uuid', 'media_collection_id', 'media_type', 'storage_disk', 'storage_key', 'original_filename', 'display_name', 'status', 'is_visible', 'sort_order', 'size_bytes', 'duration_seconds', 'mime_type', 'extension', 'thumbnail_storage_disk', 'thumbnail_storage_key', 'verified_at', 'missing_at', 'archived_at', 'metadata'])]
+#[Fillable(['uuid', 'media_collection_id', 'media_type', 'storage_disk', 'storage_key', 'original_filename', 'display_name', 'status', 'is_visible', 'sort_order', 'size_bytes', 'duration_seconds', 'mime_type', 'extension', 'thumbnail_storage_disk', 'thumbnail_storage_key', 'created_by_user_id', 'idempotency_key', 'verified_at', 'missing_at', 'archived_at', 'metadata'])]
 class MediaAsset extends Model
 {
     /** @use HasFactory<MediaAssetFactory> */
@@ -33,6 +34,21 @@ class MediaAsset extends Model
     public function orderItems(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function uploads(): HasMany
+    {
+        return $this->hasMany(MediaUpload::class);
+    }
+
+    public function ingestEvents(): HasMany
+    {
+        return $this->hasMany(MediaIngestEvent::class);
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
     protected function casts(): array

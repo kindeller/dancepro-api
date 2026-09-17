@@ -5,11 +5,12 @@ namespace Tests\Feature\Competition;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
-use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AuthenticatesApiTokens;
 use Tests\TestCase;
 
 class CompetitionObjectsTest extends TestCase
 {
+    use AuthenticatesApiTokens;
     use RefreshDatabase;
 
     public function test_authenticated_user_can_list_competition_objects(): void
@@ -25,7 +26,7 @@ class CompetitionObjectsTest extends TestCase
         Storage::disk('s3_competitions')->put('competition-b/audio.mp3', 'audio');
         Storage::disk('s3_competitions')->put('root-file.pdf', 'pdf');
 
-        Sanctum::actingAs(User::factory()->create());
+        $this->actingAsApiUser(User::factory()->create(), ['competition-objects:read']);
 
         $response = $this->getJson('/api/competitions/objects');
 
@@ -65,7 +66,7 @@ class CompetitionObjectsTest extends TestCase
         Storage::disk('s3_competitions')->put('competition-a/video-2.mp4', 'video');
         Storage::disk('s3_competitions')->put('competition-a/routines/video-1.mp4', 'video');
 
-        Sanctum::actingAs(User::factory()->create());
+        $this->actingAsApiUser(User::factory()->create(), ['competition-objects:read']);
 
         $response = $this->getJson('/api/competitions/objects?prefix=competition-a');
 
@@ -87,7 +88,7 @@ class CompetitionObjectsTest extends TestCase
 
     public function test_unsafe_prefixes_are_rejected(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        $this->actingAsApiUser(User::factory()->create(), ['competition-objects:read']);
 
         $this->getJson('/api/competitions/objects?prefix=../private')
             ->assertUnprocessable()

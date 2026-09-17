@@ -47,6 +47,16 @@ Current Concert production-readiness coverage should include:
   prefix.
 - Reservation, import and finalisation remain idempotent across retries.
 - Large multipart MP4 uploads can resume and fail safely on invalid checksums.
+- Multipart completion reconciles an existing object after a lost S3 response
+  or rolled-back database write, checking both size and CRC64NVME before success.
+- Old staff wildcard tokens retain competition/download access but cannot use
+  media endpoints; explicit expiry, revocation and account restrictions remain.
+- Reservations and all upload operations reject legacy disks and aliases of the
+  legacy bucket before contacting storage.
+- Legacy listing passes a slash-terminated prefix and excludes neighbouring keys.
+- HLS finalisation rejects empty/invalid masters, missing requested renditions,
+  invalid VOD playlists, absent initialization maps and empty segments. A large
+  fixture verifies paginated listing without per-segment HEAD requests.
 - HLS package validation rejects missing child objects, absolute references and
   path traversal, and uploads the master manifest last.
 - A compressed fallback-only MP4 finalises and plays without HLS.

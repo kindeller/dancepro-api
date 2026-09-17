@@ -67,6 +67,11 @@ Work through these areas before beginning another major product capability:
 
 ## Notes / Future Work
 
+- Desktop ingest now preserves existing competition-token access while requiring
+  explicit media abilities, reconciles multipart completion, validates bounded
+  HLS VOD packages, restricts upload destinations and isolates legacy prefixes.
+  See [ADR-0004](../decisions/ADR-0004-Media-Ingest-Compatibility-and-Verification.md).
+
 - Customer accounts, ordering and payments remain future work and are not
   required to complete the current Concert production-readiness milestone.
 - Automatic server-side transcoding, archive restoration and deeper streaming
