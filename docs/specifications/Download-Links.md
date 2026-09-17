@@ -6,6 +6,18 @@ Download links provide database-backed public tracking URLs for private storage
 objects. They avoid exposing long-lived S3 or CloudFront URLs and keep all
 signing decisions server-side.
 
+## Current Integration Status
+
+The tracking, expiry, revocation, access logging and S3/CloudFront signing
+behavior described here is implemented for generic storage keys and is used by
+the Competition object-selection workflow.
+
+Download links can reference a concert, media collection and media asset, but
+the public Concert page does not yet consume this workflow. Concert originals
+currently use a direct Laravel filesystem response. Milestone 03 replaces that
+path with the tracking and redirect behavior in this specification for both
+individual and bulk concert downloads.
+
 ## Database Tables
 
 `download_links` stores one public link record per private object key. It

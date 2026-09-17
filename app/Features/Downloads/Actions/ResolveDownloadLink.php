@@ -26,7 +26,7 @@ class ResolveDownloadLink
 
         if (! $downloadLink) {
             return $this->unavailable(
-                'Invalid download',
+                'Incorrect download link',
                 'This link does not exist. Check that the complete link was copied correctly.',
                 404,
             );

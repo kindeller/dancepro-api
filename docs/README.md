@@ -26,9 +26,14 @@ deployment, security, testing, brand style, and git workflow.
 Start with:
 
 - [Development Environment](handbook/Development-Environment.md)
+- [Remote Development](handbook/Remote-Development.md)
+- [Remote Development Cheat Sheet](handbook/Remote-Development-Cheat-Sheet.md)
 - [Git Workflow](handbook/Git-Workflow.md)
 - [Architecture](handbook/Architecture.md)
 - [API Guidelines](handbook/API-Guidelines.md)
+- [DancePro V1 S3 Structure](handbook/V1-S3-Structure.md)
+- [Concert Streaming AWS Setup Handoff](handbook/Concert-Streaming-AWS-Setup-Handoff.md)
+- [Concert Streaming AWS ChatGPT Prompt](handbook/Concert-Streaming-AWS-ChatGPT-Prompt.md)
 - [Brand Style](handbook/Brand-Style.md)
 - [Security](handbook/Security.md)
 
@@ -62,6 +67,9 @@ Current specifications:
 - [Authentication](specifications/Authentication.md)
 - [Download Links](specifications/Download-Links.md)
 - [Competition Downloads](specifications/Competition-Downloads.md)
+- [DancePro V2 Functional Specification](specifications/DancePro-V2-Functional-Specification.md)
+- [Concerts and Media Database Migration](specifications/DancePro-V2-Concerts-Media-Database-Migration-Spec.md)
+- [Flutter Desktop Media Ingest API](specifications/Flutter-Desktop-Media-Ingest-API.md)
 
 ## Milestones
 
@@ -75,6 +83,7 @@ Current milestones:
 
 - [Milestone 01 - Foundation](milestones/Milestone-01-Foundation.md)
 - [Milestone 02 - Competition](milestones/Milestone-02-Competition.md)
+- [Milestone 03 - Concert Production Readiness](milestones/Milestone-03-Concert-Production-Readiness.md)
 
 ## Decisions
 
@@ -87,6 +96,8 @@ Current records:
 
 - [DancePro V2 - Phase 0 Foundation Plan](decisions/DancePro-V2-Phase-0-Foundation-Plan.md)
 - [ADR-0001 - Generic Downloads Bounded Context](decisions/ADR-0001-Generic-Downloads-Bounded-Context.md)
+- [ADR-0002 - Concert Media Storage and Playback](decisions/ADR-0002-Concert-Media-Storage-and-Playback.md)
+- [ADR-0003 - Desktop Media Ingest and Assignment](decisions/ADR-0003-Desktop-Media-Ingest-and-Assignment.md)
 
 ## Documentation Principle
 

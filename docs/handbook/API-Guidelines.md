@@ -42,10 +42,34 @@ Use Laravel Form Requests for request validation once input is more than trivial
 
 ## Authentication
 
-Protected API routes should use `auth:sanctum`. Token abilities may be added later where a route needs more specific permission checks.
+Protected API routes should use `auth:sanctum`. Routes that perform privileged
+or client-specific operations must also enforce explicit token abilities and
+domain policies.
+
+Privileged media routes are the first required use of explicit abilities. They
+must check both an active staff/admin account and the relevant
+`concert-media:read`, `concert-media:upload` or `concert-media:update` ability.
+Possession of a valid wildcard or unrelated token must not substitute for a
+media policy decision.
+
+For compatibility, existing wildcard tokens may satisfy only
+`competition-objects:read` and `download-links:manage`; account policies still
+apply. New login tokens receive explicit abilities and an individual expiry
+configured by `STAFF_API_TOKEN_TTL_MINUTES` (30 days by default). The optional
+`SANCTUM_EXPIRATION` global limit is not newly imposed on old tokens.
+
+Create, import, upload-completion and finalisation requests must support an
+`Idempotency-Key` so a desktop client can retry after an uncertain network
+result without duplicating business records or completing an operation twice.
+
+The API allocates UUIDs and authoritative object keys. A client may submit only
+validated relative paths within its reserved media asset. Presigned upload URLs
+and their query strings are sensitive bearer capabilities and must not be
+logged.
 
 ## Related Documentation
 
 - [Authentication Handbook](Authentication.md)
 - [Authentication Specification](../specifications/Authentication.md)
 - [Security](Security.md)
+- [Flutter Desktop Media Ingest API](../specifications/Flutter-Desktop-Media-Ingest-API.md)

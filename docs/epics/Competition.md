@@ -7,13 +7,19 @@ capabilities.
 
 ## Current Status
 
-Competition work has not yet been fully specified. The first known technical
-focus is consuming the generic Downloads feature for database-backed download
-tracking.
+The initial technical Competition slice is implemented. Authenticated API and
+admin users can browse the `s3_competitions` object hierarchy, select files and
+create database-backed tracking links through the generic Downloads feature.
+Expiry, revocation, access logging and server-side S3 or CloudFront signing are
+implemented by Downloads.
+
+The wider Competition business domain has not yet been fully specified. The
+current object browser and download workflow must not be mistaken for complete
+Competition CRUD or product workflows.
 
 ## Scope
 
-- Competition domain structure under `app/Features/Competition`.
+- Competition object-browser structure under `app/Features/Competition`.
 - Use the generic Downloads bounded context for secure download tracking.
 - Server-side generation of signed download redirects through Downloads.
 - Future competition workflows as they are planned.

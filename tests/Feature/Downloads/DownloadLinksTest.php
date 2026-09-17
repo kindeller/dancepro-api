@@ -8,18 +8,19 @@ use App\Features\Downloads\Support\DownloadLinkStatus;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Laravel\Sanctum\Sanctum;
 use Mockery\MockInterface;
 use RuntimeException;
+use Tests\Concerns\AuthenticatesApiTokens;
 use Tests\TestCase;
 
 class DownloadLinksTest extends TestCase
 {
+    use AuthenticatesApiTokens;
     use RefreshDatabase;
 
     public function test_authenticated_user_can_create_download_links(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        $this->actingAsApiUser(User::factory()->create(), ['download-links:manage']);
 
         $response = $this->postJson('/api/download-links', [
             'keys' => ['folder/file.mp4'],
@@ -63,7 +64,7 @@ class DownloadLinksTest extends TestCase
 
     public function test_duplicate_keys_are_deduplicated_after_normalisation(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        $this->actingAsApiUser(User::factory()->create(), ['download-links:manage']);
 
         $response = $this->postJson('/api/download-links', [
             'keys' => ['folder//file.mp4', 'folder/file.mp4'],
@@ -80,7 +81,7 @@ class DownloadLinksTest extends TestCase
 
     public function test_unsafe_keys_are_rejected(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        $this->actingAsApiUser(User::factory()->create(), ['download-links:manage']);
 
         $response = $this->postJson('/api/download-links', [
             'keys' => ['../private/file.mp4'],
@@ -97,7 +98,7 @@ class DownloadLinksTest extends TestCase
 
     public function test_created_link_stores_token_hash_but_not_raw_token(): void
     {
-        Sanctum::actingAs(User::factory()->create());
+        $this->actingAsApiUser(User::factory()->create(), ['download-links:manage']);
 
         $response = $this->postJson('/api/download-links', [
             'keys' => ['folder/file.mp4'],
@@ -239,7 +240,7 @@ class DownloadLinksTest extends TestCase
     public function test_revoke_endpoint_updates_link_status(): void
     {
         $user = User::factory()->create();
-        Sanctum::actingAs($user);
+        $this->actingAsApiUser($user, ['download-links:manage']);
 
         $downloadLink = DownloadLink::factory()->create([
             'generated_by_user_id' => $user->id,

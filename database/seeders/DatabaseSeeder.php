@@ -2,14 +2,13 @@
 
 namespace Database\Seeders;
 
+use App\Features\Concerts\Models\Concert;
+use App\Features\Studios\Models\Studio;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
      */
@@ -20,6 +19,21 @@ class DatabaseSeeder extends Seeder
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
+        ]);
+
+        $studio = Studio::factory()->create([
+            'name' => 'DancePro Demo Studio',
+            'slug' => 'dancepro-demo-studio',
+            'description' => 'A local demonstration studio for exploring the customer concert experience.',
+            'brand_color' => '#0AA0DB',
+        ]);
+
+        Concert::factory()->published()->for($studio)->create([
+            'name' => 'A Night in Motion',
+            'slug' => 'a-night-in-motion',
+            'description' => 'A demonstration concert ready for local media to be attached.',
+            'event_date' => now()->toDateString(),
+            'access_password_hash' => 'dancepro',
         ]);
     }
 }

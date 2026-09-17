@@ -33,6 +33,7 @@ return [
     |--------------------------------------------------------------------------
     */
 
+    // Keep the existing global policy; new staff tokens have their own expiry.
     'expiration' => env('SANCTUM_EXPIRATION'),
 
     /*

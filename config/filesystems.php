@@ -86,6 +86,19 @@ return [
             'report' => false,
         ],
 
+        's3_concerts_legacy' => [
+            'driver' => 's3',
+            'key' => env('AWS_CONCERT_LEGACY_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
+            'secret' => env('AWS_CONCERT_LEGACY_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
+            'region' => env('AWS_CONCERT_LEGACY_DEFAULT_REGION', env('AWS_DEFAULT_REGION')),
+            'bucket' => env('AWS_CONCERT_LEGACY_BUCKET'),
+            'url' => env('AWS_CONCERT_LEGACY_URL'),
+            'endpoint' => env('AWS_CONCERT_LEGACY_ENDPOINT', env('AWS_ENDPOINT')),
+            'use_path_style_endpoint' => env('AWS_CONCERT_LEGACY_USE_PATH_STYLE_ENDPOINT', env('AWS_USE_PATH_STYLE_ENDPOINT', false)),
+            'throw' => false,
+            'report' => false,
+        ],
+
     ],
 
     /*

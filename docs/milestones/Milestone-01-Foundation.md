@@ -6,7 +6,12 @@ Track delivery of the initial DancePro V2 platform foundation.
 
 ## Current Status
 
-In progress.
+Substantially complete.
+
+The initial Laravel 13 structure, API conventions, Sanctum authentication, user
+foundation, documentation structure and baseline feature tests are in place.
+Remaining hardening is tracked with the product milestone it supports rather
+than by extending the foundation indefinitely.
 
 ## Scope
 
@@ -29,6 +34,6 @@ In progress.
 
 ## Notes / Future Work
 
-Update this milestone as foundation delivery progresses. Once completed, keep it
-as a historical delivery record rather than rewriting it into current-state
-documentation.
+Keep this milestone as a historical delivery record. Security, authorization,
+testing and deployment guidance must continue to improve with active product
+work, including the Concert production-readiness milestone.

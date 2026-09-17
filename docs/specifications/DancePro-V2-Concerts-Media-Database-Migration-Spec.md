@@ -12,6 +12,39 @@ This document defines the proposed database structure and migration approach for
 - Concert access tracking
 - Optional saved concert access
 - Future carts, orders and individual photo purchases
+
+## Current Implementation Status
+
+The additive database foundation described by this specification has been
+implemented for studios, concerts, media collections, media assets, media asset
+locations, customer profiles, concert access grants, concert accesses, orders,
+order items and download-link relationships. Models, enums, factories, local
+demonstration data and domain tests are present.
+
+The following application behavior is also implemented:
+
+- Public studio and concert discovery.
+- Concert approval, publication, availability and password controls.
+- Password and student-name session access with attempt logging.
+- Ordered managed-video playback and automatic next-item playback.
+- HLS playback-source resolution, CloudFront signed-cookie generation and
+  progressive MP4 fallback.
+- Basic staff studio and concert administration.
+- Read-only competition object browsing and generic tracked downloads.
+
+The next implementation work is not another schema expansion. It is the
+production-readiness layer around the existing Concert domain:
+
+- Staff collection and managed-asset administration.
+- Storage-derived concert object listing within collection boundaries.
+- Program and cover-image management.
+- Production CloudFront, S3, CORS and signing-key configuration and validation.
+- Concert originals delivered through the generic Downloads bounded context.
+- Operational authorization, testing and deployment documentation.
+
+Orders and customer account workflows remain scaffolded or future work. Their
+existing design remains in this specification, but they are not part of the
+current Concert production-readiness milestone.
 - Durable media location tracking
 
 The immediate priority is to establish a stable database design that can be implemented and tested locally before the customer-facing behaviour is finalised.
@@ -179,65 +212,48 @@ download_links
 
 # 4. Storage Strategy
 
+The canonical legacy bucket layout and UUID-to-prefix relationship are recorded
+in the [DancePro V1 S3 Structure](../handbook/V1-S3-Structure.md) handbook
+reference. Use that document when interpreting V1 source keys during migration.
+
 ## 4.1 Laravel disks
 
 Retain separate Laravel storage disks:
 
 ```text
 s3_concerts
+s3_concerts_legacy
 s3_competitions
 ```
 
-These may point to separate S3 buckets.
-
-Separate buckets are acceptable and recommended because concerts and competitions are major business domains with potentially different:
-
-- IAM permissions
-- Retention rules
-- Lifecycle rules
-- Migration paths
-- Operational access
-- Cost reporting
-- Archival policies
-
-Do not split buckets by file type unless a later operational requirement justifies it.
-
-Preferred boundary:
+Concerts and competitions remain separate business and operational domains.
+The intended bucket boundary is:
 
 ```text
-concert bucket
-  ├── photos
-  └── videos
-
-competition bucket
-  ├── photos
-  └── videos
+s3_concerts         → dance-pro-concerts
+s3_concerts_legacy  → dance-pro-videos
+s3_competitions     → competition storage
 ```
+
+This supports independent IAM, retention, lifecycle, migration, access and cost
+policies without forcing an immediate V1 media migration.
 
 ## 4.2 Prefix stability
 
-Storage prefixes should contain immutable identifiers.
+Storage prefixes must contain immutable identifiers. Studio names, concert
+names, slugs and other mutable business data must not appear in authoritative
+concert storage prefixes.
 
-Do not derive storage prefixes only from mutable names or dates.
-
-Recommended examples:
-
-```text
-studios/{studio-uuid}/concerts/{concert-uuid}/
-competitions/{competition-uuid}/
-```
-
-Within the entity prefix:
+Recommended roots:
 
 ```text
-photos/
-videos/
-thumbnails/
-downloads/
-manifests/
+{collection_uuid}/media/{asset_uuid}/
+competitions/{competition_uuid}/
 ```
 
-A readable slug may be included, but the immutable UUID should remain part of the path.
+The collection UUID identifies the logical media grouping. The asset UUID
+identifies one managed video independently of its display name, owning studio
+or concert name.
 
 ## 4.3 Storage identity
 
@@ -247,9 +263,111 @@ A physical S3 object is identified by:
 storage_disk + full storage_key
 ```
 
-Never use the filename alone as an identifier.
+Never use the filename alone as an identifier. Repeated fixed filenames such
+as `video.mp4` are safe because their full UUID-based keys differ.
 
-Repeated filenames such as `IMG_0001.jpg` are expected and safe because their full keys differ.
+## 4.4 Concert video storage convention
+
+Managed concert videos use the following convention:
+
+```text
+{collection_uuid}/
+└── media/
+    └── {asset_uuid}/
+        ├── original/video.mp4
+        ├── stream/master.m3u8
+        ├── stream/720p.m3u8
+        ├── stream/720p-init.mp4
+        ├── stream/720p-{segment}.m4s
+        ├── stream/480p.m3u8
+        ├── stream/480p-init.mp4
+        ├── stream/480p-{segment}.m4s
+        ├── stream/fallback.mp4
+        └── thumbnail/poster.png
+```
+
+The stream is HLS video on demand using fragmented MP4 segments. The maximum
+streaming rendition is 720p, with an optional 480p rendition. These are playback
+renditions, not historical file versions. Their files may remain flat inside
+`stream/` when their names prevent collisions.
+
+Do not create a source-quality or 1080p streaming rendition in the initial
+production workflow. Keep the original for protected download and do not
+reference it from the HLS master manifest. A compressed
+`stream/fallback.mp4` is the minimum reliable output for a newly converted
+asset; the HLS package is optional.
+
+Concert programs may remain beneath the collection:
+
+```text
+{collection_uuid}/documents/program.pdf
+```
+
+Playback resolution order is:
+
+```text
+stream/master.m3u8
+    ↓ unavailable or playback failure
+stream/fallback.mp4
+    ↓ unavailable
+original/video.mp4
+```
+
+For migrated or transitional assets, `media_assets.storage_key` remains the
+authoritative recorded original location and may be used as the final fallback.
+The application does not require a database readiness flag because complete
+media packages are uploaded before a concert is released.
+
+Laravel authorises playback. HLS is delivered by CloudFront using short-lived
+signed cookies scoped to the selected asset prefix. Progressive fallback
+currently retains the existing application delivery path, but the production
+target is authorised CloudFront delivery with byte-range support rather than
+proxying video bytes through Laravel.
+
+## 4.5 Storage-derived and managed media
+
+The database does not require individual rows for photos simply because they
+exist in S3. Concert videos require managed assets so their original,
+renditions, thumbnail and fallback share one durable asset UUID.
+
+`media_assets` should also be created whenever a file requires durable business
+identity, such as for orders, favourites, custom metadata, manual visibility,
+archive tracking or stable external references.
+
+Original, HLS, fallback and thumbnail objects are renditions or locations of
+one media asset. They are not separate business assets merely because multiple
+S3 objects exist.
+
+The current playback resolver checks all canonical renditions on the asset's
+primary `storage_disk`; it does not resolve different renditions from
+`media_asset_locations`. Until that changes, a complete active package must be
+addressable on one disk. Location rows may record history but do not by
+themselves combine a legacy original with a new-bucket HLS package.
+
+## 4.6 Desktop ingest boundary
+
+The macOS Flutter application converts and uploads concert video, but Laravel
+remains responsible for authentication, authorisation, UUID allocation, object
+key derivation, upload signing, verification and database assignment.
+
+Flutter must not store a long-lived AWS credential or submit an unrestricted
+bucket/key. It authenticates with a limited staff/admin Sanctum token and
+uploads directly to S3 through short-lived requests for exact keys beneath a
+server-reserved asset prefix. Large MP4s use server-coordinated multipart
+upload; smaller HLS objects use presigned single-object uploads.
+
+New assets remain `processing` and invisible until Laravel verifies object
+metadata, checksums and playlist references. HLS child objects are uploaded
+before `master.m3u8`. Finalisation changes the asset to `available` but does not
+publish the collection or concert.
+
+Existing V1 MP4s may be imported through an opaque reference returned from a
+server-constrained legacy-prefix listing. The import endpoint verifies the
+object and creates the managed asset without exposing AWS credentials or
+accepting an arbitrary storage path.
+
+The complete target API is documented in
+[Flutter Desktop Media Ingest API](Flutter-Desktop-Media-Ingest-API.md).
 
 ---
 
@@ -326,6 +444,10 @@ Do not use a database enum.
 - `legacy_id` supports V1 migration and reconciliation.
 - Do not make `slug` globally authoritative.
 - UUID should be used for public routes.
+- Optional `GET /s/{slug}` and `GET /c/{slug}` convenience routes may resolve
+  exactly one studio or concert and temporarily redirect to its canonical UUID
+  route. Missing and ambiguous slugs must return `404`; downstream access and
+  media security checks remain on the canonical routes.
 - Contact fields are business contact information, not authentication identity.
 
 ---
@@ -422,19 +544,29 @@ Validation should use:
 Hash::check($submittedPassword, $concert->access_password_hash)
 ```
 
-Do not store a recoverable plain-text concert password.
+Staff now need to view and share the concert access code. Keep the hash for
+verification and store a separate copy using Laravel's encrypted cast in the
+nullable `access_password_encrypted` column. Only the authorised admin concert
+form displays the decrypted value. Existing hash-only codes cannot be
+recovered; staff must set a new code to make one visible. Do not store the code
+as plaintext or expose it in public or general API responses. See
+[ADR-0005](../decisions/ADR-0005-Retrievable-Concert-Access-Codes.md).
 
 ## 7.5 Storage prefix
 
-`storage_prefix` identifies the root S3 location for the concert.
+`storage_prefix` is retained as an immutable concert-level compatibility and
+administrative boundary. It must not contain the studio name, studio UUID,
+concert name or slug.
 
 Example:
 
 ```text
-studios/{studio-uuid}/concerts/{concert-uuid}/
+{concert_uuid}/
 ```
 
-Media collections may point to folders beneath this prefix.
+Managed V2 media collections use their own collection UUID roots as described
+in the storage convention. Reassigning a concert to another studio must not
+change either prefix.
 
 ---
 
@@ -580,8 +712,9 @@ Meaning:
 Initial recommendation:
 
 ```text
-Videos: managed or hybrid
-Photos: storage or hybrid
+Concert media: storage by default
+Competition media: storage by default
+Managed or hybrid mode: only when individual files require database-managed identity
 ```
 
 ## 8.7 Visibility values
@@ -1613,8 +1746,10 @@ Future migration flow:
 6. Create media collections for existing video and photo folders.
 7. Compare V1 video rows with actual S3 objects.
 8. Import selected videos as managed media assets.
-9. Leave V1 tables untouched.
-10. Generate a reconciliation report for missing or unmatched media.
+9. Expose legacy objects to Flutter only through collection-constrained opaque
+   references, not unrestricted bucket keys.
+10. Leave V1 tables untouched.
+11. Generate a reconciliation report for missing or unmatched media.
 
 No destructive migration from V1 is allowed during this phase.
 
@@ -1655,6 +1790,22 @@ Codex should include feature and unit tests covering at least:
 - Repeated basenames are allowed when full keys differ.
 - Asset UUID remains stable.
 - Asset can update its active storage location.
+
+## Desktop media ingest
+
+- Only active staff/admin accounts with the required token ability can reserve,
+  upload, import, finalise or update media.
+- Customer, inactive, expired and unrelated tokens are rejected.
+- Asset reservation, import and finalisation are idempotent.
+- Presigned requests are short-lived and restricted to exact server-derived
+  keys beneath one asset prefix.
+- Large MP4 multipart uploads can resume and validate their final checksum.
+- Invalid size, content type, checksum or HLS playlist references prevent
+  finalisation.
+- `master.m3u8` cannot be uploaded before its child package is verified.
+- Fallback-only MP4 assets can become available without HLS.
+- Legacy imports cannot escape the server-known collection prefix.
+- Finalisation does not publish a collection or concert.
 
 ## Customer access
 
@@ -1776,9 +1927,9 @@ The agreed design is:
 5. Both buckets may contain photos and videos.
 6. Every meaningful gallery or folder has a `media_collections` record.
 7. Not every S3 photo requires a database row.
-8. Videos will usually be represented by `media_assets`.
-9. Photos may remain storage-derived until individually managed.
-10. Purchased or otherwise important photos are promoted into `media_assets`.
+8. Videos and photos are storage-derived by default.
+9. Individual files are promoted into `media_assets` only when they require durable business identity.
+10. Purchased or otherwise important media is promoted into `media_assets`.
 11. A media asset UUID is the durable logical identity.
 12. A media asset stores its current physical location.
 13. An order item stores both the media asset relationship and a historical location snapshot.
