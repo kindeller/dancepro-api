@@ -4,6 +4,7 @@ namespace App\Features\Concerts\Services;
 
 use App\Features\Concerts\Support\ConcertPlaybackSource;
 use Aws\CloudFront\CookieSigner;
+use Aws\CloudFront\UrlSigner;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Cookie;
 
@@ -23,6 +24,21 @@ class ConcertCloudFrontSigner
             'https://%s/%s',
             trim((string) config('concerts.playback.cloudfront.domain'), '/'),
             implode('/', array_map('rawurlencode', explode('/', ltrim($key, '/')))),
+        );
+    }
+
+    public function signedVideoUrl(ConcertPlaybackSource $source): string
+    {
+        if (! $this->isConfigured() || $source->disk !== 's3_concerts') {
+            throw new RuntimeException('Signed CloudFront concert playback is not available for this storage disk.');
+        }
+
+        return (new UrlSigner(
+            (string) config('concerts.playback.cloudfront.key_pair_id'),
+            (string) $this->privateKey(),
+        ))->getSignedUrl(
+            $this->urlFor($source->key),
+            now()->addMinutes((int) config('concerts.playback.signed_url_ttl_minutes', 15))->getTimestamp(),
         );
     }
 

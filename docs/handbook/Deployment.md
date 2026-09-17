@@ -349,6 +349,11 @@ accessible with their production credentials.
 When CloudFront concert delivery is configured, also verify that Laravel can
 generate short-lived playback cookies and a short-lived attachment URL without
 logging or displaying private signing material.
+Before publishing concert video, verify the CloudFront behavior requires signed
+requests and that the S3 origin cannot be read directly. Test an unsigned MP4
+CloudFront URL and its direct S3 URL; both must be denied. Test a signed MP4 URL
+and byte-range seeking from an authorised concert session. Assets on the legacy
+disk are not routed through the new concert distribution.
 
 When the Flutter media API is deployed, use a synthetic asset to verify that an
 active staff media token can reserve an asset and obtain prefix-constrained

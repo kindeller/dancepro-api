@@ -14,9 +14,10 @@ or CloudFront URLs.
 Concert playback now resolves HLS, a progressive streaming fallback and the
 recorded original in that order. The application can issue CloudFront signed
 cookies for HLS after the distribution, trusted key group and signing
-configuration are supplied. Progressive playback and original downloads retain
-their existing Laravel filesystem responses pending the remaining production
-delivery work.
+configuration are supplied. Progressive playback now uses an exact-object,
+short-lived CloudFront signed URL for assets on `s3_concerts`. Playback from the
+legacy disk or without signing configuration fails closed. Original downloads
+still use Laravel filesystem responses.
 
 The target media-ingest design uses a macOS Flutter converter/uploader. Flutter
 authenticates to Laravel and uploads directly to S3 using short-lived presigned
@@ -112,7 +113,14 @@ Laravel validates concert availability, asset ownership, visibility and the
 customer's concert access. It returns an HLS manifest URL with short-lived
 CloudFront signed cookies when HLS delivery is configured. The browser uses
 native HLS or `hls.js` and falls back to the progressive MP4 route after a fatal
-HLS error.
+HLS error. The MP4 route redirects to an exact-object CloudFront signed URL;
+progressive-only playback receives the signed URL directly. The CloudFront
+behavior must require trusted key-group signatures, and its S3 origin must be
+private and accessible only through an origin access control. Otherwise an
+unsigned CloudFront URL or direct S3 URL may still expose the object despite
+the application's signed URLs. Check this on the deployed distribution and
+bucket before publishing video. Signed URL requests add CloudFront request and
+transfer costs; they avoid proxying MP4 bytes through the EC2 application.
 
 Configure playback using:
 

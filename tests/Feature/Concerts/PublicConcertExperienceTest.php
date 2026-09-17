@@ -97,14 +97,14 @@ class PublicConcertExperienceTest extends TestCase
 
     public function test_playback_prefers_hls_and_returns_cloudfront_cookies_and_progressive_fallback(): void
     {
-        Storage::fake('local');
+        Storage::fake('s3_concerts');
         $this->configureConcertCloudFront();
 
         [$concert, $collection, $asset] = $this->createVideoAsset();
         $prefix = "{$collection->uuid}/media/{$asset->uuid}";
-        Storage::disk('local')->put("{$prefix}/stream/master.m3u8", '#EXTM3U');
-        Storage::disk('local')->put("{$prefix}/stream/fallback.mp4", 'stream-video');
-        Storage::disk('local')->put($asset->storage_key, 'original-video');
+        Storage::disk('s3_concerts')->put("{$prefix}/stream/master.m3u8", '#EXTM3U');
+        Storage::disk('s3_concerts')->put("{$prefix}/stream/fallback.mp4", 'stream-video');
+        Storage::disk('s3_concerts')->put($asset->storage_key, 'original-video');
 
         $response = $this->getJson(route('concerts.media.playback', [$concert, $asset]))
             ->assertOk()
@@ -127,52 +127,62 @@ class PublicConcertExperienceTest extends TestCase
 
         $fallbackUrl = $response->json('data.fallback_url');
         $this->assertIsString($fallbackUrl);
-        $this->get($fallbackUrl)
-            ->assertOk()
-            ->assertStreamedContent('stream-video');
+        $fallbackResponse = $this->get($fallbackUrl)->assertRedirect();
+        $this->assertStringStartsWith(
+            "https://media.dancepro.test/{$prefix}/stream/fallback.mp4?",
+            $fallbackResponse->headers->get('Location'),
+        );
+        $this->assertStringContainsString('Signature=', $fallbackResponse->headers->get('Location'));
     }
 
-    public function test_playback_uses_fallback_mp4_when_cloudfront_is_not_configured(): void
+    public function test_playback_fails_closed_when_cloudfront_is_not_configured(): void
     {
-        Storage::fake('local');
+        Storage::fake('s3_concerts');
         config()->set('concerts.playback.cloudfront.domain', null);
 
         [$concert, $collection, $asset] = $this->createVideoAsset();
         $prefix = "{$collection->uuid}/media/{$asset->uuid}";
-        Storage::disk('local')->put("{$prefix}/stream/master.m3u8", '#EXTM3U');
-        Storage::disk('local')->put("{$prefix}/stream/fallback.mp4", 'stream-video');
-        Storage::disk('local')->put($asset->storage_key, 'original-video');
+        Storage::disk('s3_concerts')->put("{$prefix}/stream/master.m3u8", '#EXTM3U');
+        Storage::disk('s3_concerts')->put("{$prefix}/stream/fallback.mp4", 'stream-video');
+        Storage::disk('s3_concerts')->put($asset->storage_key, 'original-video');
 
         $response = $this->getJson(route('concerts.media.playback', [$concert, $asset]))
-            ->assertOk()
-            ->assertJsonPath('data.format', 'progressive')
-            ->assertJsonPath('data.fallback_url', null);
+            ->assertStatus(503);
 
-        $this->get($response->json('data.url'))
-            ->assertOk()
-            ->assertStreamedContent('stream-video');
+        $this->get(route('concerts.media.stream', [$concert, $asset]))->assertStatus(503);
     }
 
     public function test_playback_falls_back_to_the_recorded_original_storage_key(): void
     {
-        Storage::fake('local');
-        config()->set('concerts.playback.cloudfront.domain', null);
+        Storage::fake('s3_concerts');
+        $this->configureConcertCloudFront();
 
         [$concert, , $asset] = $this->createVideoAsset();
-        Storage::disk('local')->put($asset->storage_key, 'original-video');
+        Storage::disk('s3_concerts')->put($asset->storage_key, 'original-video');
 
         $response = $this->getJson(route('concerts.media.playback', [$concert, $asset]))
             ->assertOk()
             ->assertJsonPath('data.format', 'progressive');
 
-        $this->get($response->json('data.url'))
-            ->assertOk()
-            ->assertStreamedContent('original-video');
+        $this->assertStringStartsWith('https://media.dancepro.test/legacy/', $response->json('data.url'));
+        $this->assertStringContainsString('Signature=', $response->json('data.url'));
+    }
+
+    public function test_playback_does_not_assume_legacy_disk_uses_the_new_cloudfront_origin(): void
+    {
+        Storage::fake('s3_concerts_legacy');
+        $this->configureConcertCloudFront();
+
+        [$concert, , $asset] = $this->createVideoAsset();
+        $asset->update(['storage_disk' => 's3_concerts_legacy']);
+        Storage::disk('s3_concerts_legacy')->put($asset->storage_key, 'legacy-video');
+
+        $this->getJson(route('concerts.media.playback', [$concert, $asset]))->assertStatus(503);
     }
 
     public function test_playback_returns_not_found_when_no_expected_source_exists(): void
     {
-        Storage::fake('local');
+        Storage::fake('s3_concerts');
         config()->set('concerts.playback.cloudfront.domain', null);
 
         [$concert, , $asset] = $this->createVideoAsset();
@@ -190,10 +200,10 @@ class PublicConcertExperienceTest extends TestCase
         $collection = MediaCollection::factory()->for($concert)->create([
             'status' => MediaCollectionStatus::Published,
             'media_type' => MediaType::Video,
-            'storage_disk' => 'local',
+            'storage_disk' => 's3_concerts',
         ]);
         $asset = MediaAsset::factory()->for($collection, 'collection')->create([
-            'storage_disk' => 'local',
+            'storage_disk' => 's3_concerts',
             'storage_key' => "legacy/{$collection->uuid}/performance.mp4",
             'original_filename' => 'performance.mp4',
             'media_type' => MediaType::Video,

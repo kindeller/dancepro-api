@@ -74,11 +74,12 @@ class PublicConcertController extends Controller
         abort_unless($asset->media_type === MediaType::Video, 404);
 
         $source = $resolvePlayback->execute($asset, $cloudFront->isConfigured());
+        abort_unless($cloudFront->isConfigured() && $source->disk === 's3_concerts', 503);
 
         if (! $source->isHls()) {
             return ApiResponse::success('Concert playback source returned.', [
                 'format' => $source->format->value,
-                'url' => $this->temporaryPlaybackUrl($concert, $asset),
+                'url' => $cloudFront->signedVideoUrl($source),
                 'fallback_url' => null,
             ]);
         }
@@ -103,7 +104,7 @@ class PublicConcertController extends Controller
         ConcertAccessSession $access,
         ResolveConcertPlaybackSource $resolvePlayback,
         ConcertCloudFrontSigner $cloudFront,
-    ): RedirectResponse|StreamedResponse {
+    ): RedirectResponse {
         $this->authorizeAsset($request, $concert, $asset, $access);
         abort_unless($asset->media_type === MediaType::Video, 404);
 
@@ -111,6 +112,7 @@ class PublicConcertController extends Controller
             $asset,
             $cloudFront->isConfigured() && ! $request->boolean('fallback'),
         );
+        abort_unless($cloudFront->isConfigured() && $source->disk === 's3_concerts', 503);
 
         if ($source->isHls()) {
             $response = redirect()->away($cloudFront->urlFor($source->key));
@@ -122,11 +124,7 @@ class PublicConcertController extends Controller
             return $response;
         }
 
-        return Storage::disk($source->disk)->response(
-            $source->key,
-            $asset->display_name ?? $asset->original_filename,
-            ['Content-Type' => 'video/mp4'],
-        );
+        return redirect()->away($cloudFront->signedVideoUrl($source));
     }
 
     public function download(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access): StreamedResponse
