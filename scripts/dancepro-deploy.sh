@@ -334,7 +334,12 @@ git tag "$ROLLBACK_TAG" "$CURRENT_COMMIT"
 printf 'Created local rollback tag: %s -> %s\n' "$ROLLBACK_TAG" "$CURRENT_COMMIT"
 
 log "Enable maintenance mode"
-php artisan down --render="errors.503"
+if [[ -f resources/views/errors/503.blade.php ]]; then
+    run php artisan down --render="errors.503"
+else
+    printf 'Custom 503 view not present; using Laravel default maintenance response.\n'
+    run php artisan down
+fi
 DEPLOY_STARTED=true
 
 log "Update production branch"
