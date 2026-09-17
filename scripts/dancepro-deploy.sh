@@ -216,7 +216,12 @@ if [[ -n "$(git status --porcelain)" ]]; then
     fail "The working tree is not clean. Resolve the changes before deploying."
 fi
 
-APP_ENV_VALUE="$(php artisan env --no-ansi 2>/dev/null | sed -n 's/^Current application environment: //p' | tr -d '[:space:]')"
+# Laravel 13 reports the environment as:
+# "INFO  The application environment is [production]."
+APP_ENV_VALUE="$(
+    php artisan env --no-ansi 2>/dev/null |
+    sed -n 's/.*application environment is \[\([^]]*\)\].*/\1/p'
+)"
 
 if [[ "$APP_ENV_VALUE" != "production" ]]; then
     php artisan about --only=environment || true
