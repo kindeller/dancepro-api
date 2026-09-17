@@ -24,8 +24,6 @@
         @if($concert?->requiresPassword() && ! $concert->access_password_encrypted)<p class="muted">This concert has an older hashed code that cannot be displayed. Enter a new code and save to make it visible here.</p>@endif
         @if($concert?->requiresPassword())<input type="hidden" name="clear_access_password" value="0"><label style="display:flex;grid-template-columns:auto 1fr;align-items:center"><input type="checkbox" name="clear_access_password" value="1" style="width:auto;min-height:auto"> Remove current concert password</label>@endif
         <label>Brand colour<input name="brand_color" value="{{ old('brand_color', $concert?->brand_color) }}" placeholder="#0AA0DB" pattern="#[0-9A-Fa-f]{6}"></label>
-        <label>Cover image URL<input type="url" name="cover_image_url" value="{{ old('cover_image_url', $concert?->cover_image_url) }}" placeholder="https://…"></label>
-        <label>Program URL<input type="url" name="program_url" value="{{ old('program_url', $concert?->program_url) }}" placeholder="https://…"></label>
         <label>External gallery URL<input type="url" name="external_gallery_url" value="{{ old('external_gallery_url', $concert?->external_gallery_url) }}" placeholder="https://…"></label>
         <label>Internal notes<textarea name="notes" style="min-height:100px">{{ old('notes', $concert?->notes) }}</textarea></label>
     </div>

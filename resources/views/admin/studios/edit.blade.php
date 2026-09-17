@@ -3,6 +3,17 @@
 <form class="card card-pad" method="POST" action="{{ route('admin.studios.update', $studio) }}">@csrf @method('PUT')
     @include('admin.studios._form', ['submitLabel' => 'Save studio'])
 </form>
+<section class="card card-pad" style="margin-top:24px">
+    <h2>Studio logo / cover image</h2>
+    @if($studio->cover_image_url)<p><img src="{{ $studio->cover_image_url }}" alt="Current studio cover" style="max-width:320px;width:100%;border-radius:8px"></p>@endif
+    <form method="POST" action="{{ route('admin.branding.studios.cover.store', $studio) }}" enctype="multipart/form-data">@csrf
+        <label>Image (JPG, PNG or WebP; up to 10 MB)<input type="file" name="file" accept="image/jpeg,image/png,image/webp" required></label>
+        @if($studio->cover_image_storage_key)<label style="display:flex;align-items:flex-start;gap:8px"><input type="checkbox" name="replace_confirm" value="1" required style="width:auto;min-height:auto"><span><strong>Confirm replacement</strong><br>Replace the current object in {{ config('filesystems.disks.'.config('media.upload_disk').'.bucket') }} at <code>{{ $studio->cover_image_storage_key }}</code>. Earlier versions may remain if S3 Versioning is enabled.</span></label>@endif
+        @error('replace_confirm')<p role="alert">{{ $message }}</p>@enderror
+        @error('file')<p role="alert">{{ $message }}</p>@enderror
+        <div class="actions"><button type="submit">{{ $studio->cover_image_url ? 'Replace cover' : 'Upload cover' }}</button>@if($studio->cover_image_url)<a class="button secondary" href="{{ route('admin.branding.studios.cover.confirm-delete', $studio) }}">Clear cover</a>@endif</div>
+    </form>
+</section>
 
 <section style="margin-top:24px">
     <div class="toolbar">

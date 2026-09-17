@@ -2,6 +2,8 @@
 
 use App\Features\Admin\Controllers\AdminDashboardController;
 use App\Features\Admin\Controllers\AdminDownloadLinkController;
+use App\Features\Admin\Controllers\AdminBrandingMediaController;
+use App\Features\Media\Controllers\PublicBrandingMediaController;
 use App\Features\Admin\Controllers\AdminConcertController;
 use App\Features\Admin\Controllers\AdminStudioController;
 use App\Features\Auth\Controllers\WebAuthController;
@@ -21,7 +23,10 @@ Route::get('/', [PublicStudioController::class, 'index'])->name('studios.index')
 Route::get('s/{slug}', [PublicSlugRedirectController::class, 'studio'])->name('studios.resolve-slug');
 Route::get('c/{slug}', [PublicSlugRedirectController::class, 'concert'])->name('concerts.resolve-slug');
 Route::get('studios/{studio}', [PublicStudioController::class, 'show'])->name('studios.show');
+Route::get('studios/{studio}/cover', [PublicBrandingMediaController::class, 'studioCover'])->name('studios.cover');
 Route::get('concerts/{concert}', [PublicConcertController::class, 'show'])->name('concerts.show');
+Route::get('concerts/{concert}/cover', [PublicBrandingMediaController::class, 'concertCover'])->name('concerts.cover');
+Route::get('concerts/{concert}/program', [PublicBrandingMediaController::class, 'program'])->name('concerts.program');
 Route::post('concerts/{concert}/unlock', [PublicConcertController::class, 'unlock'])->middleware('throttle:10,1')->name('concerts.unlock');
 Route::get('concerts/{concert}/media/{asset}/playback', [PublicConcertController::class, 'playback'])->name('concerts.media.playback');
 Route::get('concerts/{concert}/media/{asset}', [PublicConcertController::class, 'media'])->name('concerts.media.stream');
@@ -43,6 +48,15 @@ Route::middleware('auth')
         Route::get('/', AdminDashboardController::class)->name('dashboard');
         Route::resource('studios', AdminStudioController::class)->except(['show', 'destroy']);
         Route::resource('concerts', AdminConcertController::class)->except(['show', 'destroy']);
+        Route::post('branding/studios/{studio}/cover', [AdminBrandingMediaController::class, 'uploadStudioCover'])->name('branding.studios.cover.store');
+        Route::get('branding/studios/{studio}/cover/delete', [AdminBrandingMediaController::class, 'confirmStudioClear'])->name('branding.studios.cover.confirm-delete');
+        Route::delete('branding/studios/{studio}/cover', [AdminBrandingMediaController::class, 'clearStudioCover'])->name('branding.studios.cover.destroy');
+        Route::post('branding/concerts/{concert}/cover', [AdminBrandingMediaController::class, 'uploadConcertCover'])->name('branding.concerts.cover.store');
+        Route::get('branding/concerts/{concert}/cover/delete', [AdminBrandingMediaController::class, 'confirmConcertCoverClear'])->name('branding.concerts.cover.confirm-delete');
+        Route::delete('branding/concerts/{concert}/cover', [AdminBrandingMediaController::class, 'clearConcertCover'])->name('branding.concerts.cover.destroy');
+        Route::post('branding/concerts/{concert}/program', [AdminBrandingMediaController::class, 'uploadProgram'])->name('branding.concerts.program.store');
+        Route::get('branding/concerts/{concert}/program/delete', [AdminBrandingMediaController::class, 'confirmProgramClear'])->name('branding.concerts.program.confirm-delete');
+        Route::delete('branding/concerts/{concert}/program', [AdminBrandingMediaController::class, 'clearProgram'])->name('branding.concerts.program.destroy');
         Route::get('concerts/{concert}/media', AdminConcertMediaController::class)->name('concerts.media.index');
         Route::get('concert-media/assets/{asset}/delete', [AdminConcertMediaDeletionController::class, 'confirmAsset'])->name('concerts.media.assets.confirm-delete');
         Route::delete('concert-media/assets/{asset}', [AdminConcertMediaDeletionController::class, 'destroyAsset'])->name('concerts.media.assets.destroy');

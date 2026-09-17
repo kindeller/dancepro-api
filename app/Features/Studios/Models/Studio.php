@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['uuid', 'name', 'slug', 'status', 'description', 'cover_image_url', 'brand_color', 'contact_name', 'contact_email', 'contact_phone', 'legacy_id', 'notes'])]
+#[Fillable(['uuid', 'name', 'slug', 'status', 'description', 'cover_image_url', 'cover_image_storage_key', 'cover_image_revision', 'cover_image_mime_type', 'brand_color', 'contact_name', 'contact_email', 'contact_phone', 'legacy_id', 'notes'])]
 class Studio extends Model
 {
     /** @use HasFactory<StudioFactory> */

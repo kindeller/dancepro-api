@@ -391,6 +391,9 @@ Following deployment, verify:
 - The packaged macOS Flutter client stores its bearer token in Keychain and
   contains no embedded AWS access key.
 - Disabled, unavailable or unapproved concerts remain inaccessible.
+- A studio cover, concert cover and PDF program can be uploaded, viewed,
+  replaced and cleared against the configured concert bucket. Check the
+  production PHP and web-server upload limits before testing a 10 MB file.
 
 ---
 

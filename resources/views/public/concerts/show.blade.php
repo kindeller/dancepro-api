@@ -1,7 +1,7 @@
 @extends('layouts.public')
 
 @section('content')
-<section class="hero"><div class="container"><div class="eyebrow">{{ $concert->studio->name }}</div><h1>{{ $concert->name }}</h1><p class="lead">{{ $concert->description }}</p><div class="meta" style="color:#d9e8ee">{{ $concert->event_date?->format('j F Y') }} @if($concert->venue_name) · {{ $concert->venue_name }} @endif</div></div></section>
+<section class="hero"><div class="container" style="display:flex;gap:30px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:240px"><div class="eyebrow">{{ $concert->studio->name }}</div><h1>{{ $concert->name }}</h1><p class="lead">{{ $concert->description }}</p><div class="meta" style="color:#d9e8ee">{{ $concert->event_date?->format('j F Y') }} @if($concert->venue_name) · {{ $concert->venue_name }} @endif</div></div>@if($concert->cover_image_url)<img src="{{ $concert->cover_image_url }}" alt="{{ $concert->name }} cover" style="width:min(100%,330px);max-height:360px;object-fit:contain;border-radius:10px">@endif</div></section>
 <section class="section"><div class="container">
 @php($assets = $concert->mediaCollections->flatMap->assets->filter(fn ($asset) => $asset->media_type === \App\Features\Media\Support\MediaType::Video)->values())
 @if($assets->isEmpty())
@@ -24,12 +24,12 @@
         @endforeach
         </aside>
     </div>
-    <div class="utility-grid">
-        <article class="card utility"><h3>Download manager</h3><p class="muted" id="download-status">Ready to download {{ $assets->count() }} originals. Your browser may ask permission for multiple files.</p><div class="actions"><button class="button secondary" id="download-all" type="button">Start</button><button class="button secondary" id="download-pause" type="button" disabled>Pause</button><button class="button secondary" id="download-reset" type="button">Reset</button></div></article>
-        <article class="card utility"><h3>Concert program</h3>@if($concert->program_url)<p class="muted">View the program supplied for this concert.</p><a class="button secondary" href="{{ $concert->program_url }}" target="_blank" rel="noopener">Open program</a>@else<p class="muted">No program is available for this concert.</p>@endif</article>
-        <article class="card utility"><h3>Photo gallery</h3>@if($concert->external_gallery_url)<p class="muted">Continue to the studio's external gallery.</p><a class="button secondary" href="{{ $concert->external_gallery_url }}" target="_blank" rel="noopener">Open gallery</a>@else<p class="muted">No external gallery is available.</p>@endif</article>
-    </div>
 @endif
+<div class="utility-grid">
+    @if($assets->isNotEmpty())<article class="card utility"><h3>Download manager</h3><p class="muted" id="download-status">Ready to download {{ $assets->count() }} originals. Your browser may ask permission for multiple files.</p><div class="actions"><button class="button secondary" id="download-all" type="button">Start</button><button class="button secondary" id="download-pause" type="button" disabled>Pause</button><button class="button secondary" id="download-reset" type="button">Reset</button></div></article>@endif
+    <article class="card utility"><h3>Concert program</h3>@if($concert->program_url)<p class="muted">View the program supplied for this concert.</p><a class="button secondary" href="{{ $concert->program_url }}" target="_blank" rel="noopener">Open program</a>@else<p class="muted">No program is available for this concert.</p>@endif</article>
+    <article class="card utility"><h3>Photo gallery</h3>@if($concert->external_gallery_url)<p class="muted">Continue to the studio's external gallery.</p><a class="button secondary" href="{{ $concert->external_gallery_url }}" target="_blank" rel="noopener">Open gallery</a>@else<p class="muted">No external gallery is available.</p>@endif</article>
+</div>
 </div></section>
 @endsection
 

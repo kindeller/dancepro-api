@@ -25,6 +25,28 @@ concert's **Upload media** page can send an original MP4 and a fallback MP4
 directly from the browser to S3. It does not convert videos or create HLS.
 The macOS Flutter converter/uploader can use the same API when ready.
 
+### Studio and concert images and programs
+
+The admin edit pages upload studio covers, concert covers and PDF programs to
+the configured `media.upload_disk` (normally `s3_concerts`). During local
+testing that disk may point to the test bucket; production must point to the
+production concert bucket. The fixed keys are `studios/{studio_uuid}/cover`,
+`concerts/{concert_uuid}/cover` and
+`concerts/{concert_uuid}/documents/program.pdf`. The program is concert-level
+because the current catalogue has one `program_url` per concert; the older
+collection-level program path in the database migration specification is not
+used by this web form.
+
+Files remain private in S3. Laravel serves their public-facing routes from the
+managed keys; program access follows the concert access check. JPG, PNG and
+WebP covers and PDFs are limited to 10 MB, subject also to PHP and web-server
+upload limits. Replacing a managed file overwrites its fixed key after staff
+confirms the exact bucket and key. Clearing opens a separate confirmation page
+and deletes that exact current key before clearing the database reference.
+Existing external URLs remain usable and can be cleared without an S3 delete.
+S3 Versioning, if enabled, may retain older versions. The concert bucket role
+needs scoped `PutObject`, `GetObject` and `DeleteObject` access for these keys.
+
 ## Scope
 
 - AWS credentials must remain server-side and must not be exposed to client
