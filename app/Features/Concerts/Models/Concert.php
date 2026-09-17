@@ -18,11 +18,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Hash;
 
-#[Fillable(['uuid', 'studio_id', 'name', 'slug', 'status', 'event_date', 'event_end_date', 'venue_name', 'description', 'cover_image_url', 'brand_color', 'is_enabled', 'requires_approval', 'approved_at', 'approved_by_user_id', 'available_from', 'available_until', 'program_url', 'external_gallery_url', 'storage_disk', 'storage_prefix', 'access_password_hash', 'published_at', 'archived_at', 'created_by_user_id', 'updated_by_user_id', 'legacy_id', 'notes'])]
+#[Fillable(['uuid', 'studio_id', 'name', 'slug', 'status', 'event_date', 'event_end_date', 'venue_name', 'description', 'cover_image_url', 'brand_color', 'is_enabled', 'requires_approval', 'approved_at', 'approved_by_user_id', 'available_from', 'available_until', 'program_url', 'external_gallery_url', 'storage_disk', 'storage_prefix', 'access_password_hash', 'access_password_encrypted', 'published_at', 'archived_at', 'created_by_user_id', 'updated_by_user_id', 'legacy_id', 'notes'])]
 class Concert extends Model
 {
     /** @use HasFactory<ConcertFactory> */
     use HasFactory, HasPublicUuid, SoftDeletes;
+
+    protected $hidden = ['access_password_hash', 'access_password_encrypted'];
 
     public function studio(): BelongsTo
     {
@@ -92,6 +94,7 @@ class Concert extends Model
     {
         return [
             'status' => ConcertStatus::class,
+            'access_password_encrypted' => 'encrypted',
             'event_date' => 'date', 'event_end_date' => 'date',
             'published_at' => 'datetime', 'archived_at' => 'datetime',
             'is_enabled' => 'boolean', 'requires_approval' => 'boolean', 'approved_at' => 'datetime',

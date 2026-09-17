@@ -61,7 +61,7 @@
 <header class="site-header">
     <div class="header-inner">
         <a class="logo" href="{{ route('studios.index') }}"><img src="{{ asset('storage/1024.png') }}" alt=""><span>DancePro</span></a>
-        <nav aria-label="Main navigation"><a href="{{ route('studios.index') }}">Studios & concerts</a><a href="{{ route('login') }}">Staff</a></nav>
+        <nav aria-label="Main navigation"><a href="{{ route('studios.index') }}">Studios & concerts</a><a href="{{ route('admin.dashboard') }}">Staff</a></nav>
     </div>
 </header>
 <main>@yield('content')</main>

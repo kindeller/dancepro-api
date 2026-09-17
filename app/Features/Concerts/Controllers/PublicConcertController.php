@@ -8,6 +8,7 @@ use App\Features\Concerts\Models\Concert;
 use App\Features\Concerts\Requests\UnlockConcertRequest;
 use App\Features\Concerts\Services\ConcertAccessSession;
 use App\Features\Concerts\Services\ConcertCloudFrontSigner;
+use App\Features\Concerts\Services\ConcertDownloadFilename;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Support\MediaAssetStatus;
 use App\Features\Media\Support\MediaCollectionStatus;
@@ -73,7 +74,7 @@ class PublicConcertController extends Controller
         $this->authorizeAsset($request, $concert, $asset, $access);
         abort_unless($asset->media_type === MediaType::Video, 404);
 
-        $source = $resolvePlayback->execute($asset, $cloudFront->isConfigured());
+        $source = $resolvePlayback->execute($asset, $cloudFront->canSignCookies());
         abort_unless($cloudFront->isConfigured() && $source->disk === 's3_concerts', 503);
 
         if (! $source->isHls()) {
@@ -110,7 +111,7 @@ class PublicConcertController extends Controller
 
         $source = $resolvePlayback->execute(
             $asset,
-            $cloudFront->isConfigured() && ! $request->boolean('fallback'),
+            $cloudFront->canSignCookies() && ! $request->boolean('fallback'),
         );
         abort_unless($cloudFront->isConfigured() && $source->disk === 's3_concerts', 503);
 
@@ -127,20 +128,20 @@ class PublicConcertController extends Controller
         return redirect()->away($cloudFront->signedVideoUrl($source));
     }
 
-    public function download(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access): StreamedResponse
+    public function download(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access, ConcertDownloadFilename $filenames): StreamedResponse
     {
         $this->authorizeAsset($request, $concert, $asset, $access);
 
         return Storage::disk($asset->storage_disk)->download(
             $asset->storage_key,
-            $asset->original_filename ?? basename($asset->storage_key),
+            $filenames->for($concert, $asset),
         );
     }
 
     private function authorizeAsset(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access): void
     {
         abort_unless($concert->isPubliclyAvailable(), 404);
-        abort_unless($asset->collection()->where('concert_id', $concert->id)->exists(), 404);
+        abort_unless($asset->collection()->where('concert_id', $concert->id)->where('status', MediaCollectionStatus::Published)->exists(), 404);
         abort_unless($asset->status === MediaAssetStatus::Available && $asset->is_visible, 404);
         abort_unless($access->allows($request, $concert), 403);
     }

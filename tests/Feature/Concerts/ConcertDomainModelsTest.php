@@ -31,7 +31,7 @@ class ConcertDomainModelsTest extends TestCase
         $this->assertDatabaseHas('studios', ['id' => $studio->id, 'deleted_at' => null]);
     }
 
-    public function test_concert_password_is_hashed_and_can_be_checked(): void
+    public function test_older_hashed_concert_password_can_be_checked_but_not_retrieved(): void
     {
         $concert = Concert::factory()->create(['access_password_hash' => 'secret']);
 
@@ -39,6 +39,7 @@ class ConcertDomainModelsTest extends TestCase
         $this->assertTrue(Hash::check('secret', $concert->access_password_hash));
         $this->assertTrue($concert->passwordMatches('secret'));
         $this->assertFalse($concert->passwordMatches('wrong'));
+        $this->assertNull($concert->access_password_encrypted);
     }
 
     public function test_media_collection_requires_exactly_one_owner(): void

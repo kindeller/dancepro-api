@@ -63,6 +63,9 @@ class AdminConcertController extends Controller
     {
         Gate::authorize('manageConcerts');
 
+        $concert->load(['mediaCollections' => fn ($query) => $query->orderBy('sort_order')->orderBy('id'),
+            'mediaCollections.assets' => fn ($query) => $query->orderBy('sort_order')->orderBy('id')]);
+
         return view('admin.concerts.edit', compact('concert') + $this->formData());
     }
 

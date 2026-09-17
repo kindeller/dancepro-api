@@ -4,7 +4,12 @@ Phase 0 establishes the security defaults for later DancePro features.
 
 - Secrets must stay in `.env` and must not be committed.
 - API authentication uses Laravel Sanctum bearer tokens.
-- Passwords are hashed through Laravel's password hashing cast/factory helpers.
+- Account passwords are hashed through Laravel's password hashing cast/factory helpers.
+- Concert shared access codes are hashed for verification and also encrypted at
+  rest so authorised staff can view and share them. Never expose the decrypted
+  code on public pages or in general API responses. Existing hash-only codes
+  must be reset before they can be displayed. See
+  [ADR-0005](../decisions/ADR-0005-Retrievable-Concert-Access-Codes.md).
 - Inactive users cannot log in.
 - Protected API routes must use `auth:sanctum`.
 - Non-trivial input must use Form Requests.

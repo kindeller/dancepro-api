@@ -25,16 +25,20 @@ class S3MediaStorage
     /**
      * @return array{upload_id: string}
      */
-    public function startMultipart(string $disk, string $key, string $contentType): array
+    public function startMultipart(string $disk, string $key, string $contentType, ?string $sourceFilename = null): array
     {
         [$adapter, $bucket, $resolvedKey] = $this->s3Context($disk, $key);
-        $result = $adapter->getClient()->createMultipartUpload([
+        $arguments = [
             'Bucket' => $bucket,
             'Key' => $resolvedKey,
             'ContentType' => $contentType,
             'ChecksumAlgorithm' => 'CRC64NVME',
             'ChecksumType' => 'FULL_OBJECT',
-        ]);
+        ];
+        if ($sourceFilename !== null) {
+            $arguments['Metadata'] = ['source-filename' => rawurlencode($sourceFilename)];
+        }
+        $result = $adapter->getClient()->createMultipartUpload($arguments);
 
         return ['upload_id' => (string) $result['UploadId']];
     }

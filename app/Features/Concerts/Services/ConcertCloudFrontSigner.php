@@ -14,8 +14,13 @@ class ConcertCloudFrontSigner
     {
         return filled(config('concerts.playback.cloudfront.domain'))
             && filled(config('concerts.playback.cloudfront.key_pair_id'))
-            && filled(config('concerts.playback.cloudfront.cookie_domain'))
             && filled($this->privateKey());
+    }
+
+    public function canSignCookies(): bool
+    {
+        return $this->isConfigured()
+            && filled(config('concerts.playback.cloudfront.cookie_domain'));
     }
 
     public function urlFor(string $key): string
@@ -47,7 +52,7 @@ class ConcertCloudFrontSigner
      */
     public function cookiesFor(ConcertPlaybackSource $source): array
     {
-        if (! $this->isConfigured()) {
+        if (! $this->canSignCookies()) {
             throw new RuntimeException('Concert CloudFront signing is not configured.');
         }
 

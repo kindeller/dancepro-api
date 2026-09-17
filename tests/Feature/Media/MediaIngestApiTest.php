@@ -152,7 +152,10 @@ class MediaIngestApiTest extends TestCase
         $checksum = base64_encode(str_repeat('c', 8));
 
         $this->mock(S3MediaStorage::class, function (MockInterface $mock) use ($checksum): void {
-            $mock->shouldReceive('startMultipart')->once()->andReturn(['upload_id' => 'private-provider-id']);
+            $mock->shouldReceive('startMultipart')->once()->withArgs(fn ($disk, $key, $contentType, $sourceFilename) =>
+                $disk === 's3_concerts' && $contentType === 'video/mp4' && $sourceFilename === 'evening-show.mp4'
+                    && str_ends_with($key, '/stream/fallback.mp4'))
+                ->andReturn(['upload_id' => 'private-provider-id']);
             $mock->shouldReceive('presignPart')->once()->andReturn([
                 'url' => 'https://upload.example.test/part-1',
                 'headers' => ['x-amz-checksum-crc64nvme' => $checksum],
@@ -173,6 +176,7 @@ class MediaIngestApiTest extends TestCase
                 'size_bytes' => 5242880,
                 'checksum_algorithm' => 'CRC64NVME',
                 'checksum' => $checksum,
+                'source_filename' => 'evening-show.mp4',
             ])
             ->assertCreated()
             ->assertJsonMissing(['provider_upload_id'])

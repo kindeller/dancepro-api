@@ -43,8 +43,10 @@ class SaveConcert
 
         if ($clearPassword) {
             $attributes['access_password_hash'] = null;
-        } elseif (filled($password)) {
+            $attributes['access_password_encrypted'] = null;
+        } elseif (filled($password) && $password !== $concert->access_password_encrypted) {
             $attributes['access_password_hash'] = $password;
+            $attributes['access_password_encrypted'] = $password;
         }
 
         $concert->fill($attributes)->save();

@@ -137,7 +137,7 @@ class ManageMediaUploads
         ])->first();
 
         if (! $upload) {
-            $provider = $this->storage->startMultipart($asset->storage_disk, $key, $data['content_type']);
+            $provider = $this->storage->startMultipart($asset->storage_disk, $key, $data['content_type'], $data['source_filename'] ?? null);
             $upload = MediaUpload::query()->create([
                 'media_asset_id' => $asset->id,
                 'user_id' => $user->id,
@@ -152,6 +152,7 @@ class ManageMediaUploads
                 'size_bytes' => $data['size_bytes'],
                 'checksum_algorithm' => $data['checksum_algorithm'],
                 'checksum' => $data['checksum'],
+                'metadata' => ['source_filename' => $data['source_filename'] ?? null],
                 'expires_at' => now()->addHours((int) config('media.upload_record_ttl_hours')),
             ]);
         }
@@ -274,7 +275,7 @@ class ManageMediaUploads
             if ($locked->status !== MediaUploadStatus::Pending) {
                 throw ValidationException::withMessages(['upload' => 'This multipart upload is no longer pending.']);
             }
-            $locked->update(['status' => MediaUploadStatus::Completed, 'completed_at' => now(), 'metadata' => ['parts' => $ordered->count()]]);
+            $locked->update(['status' => MediaUploadStatus::Completed, 'completed_at' => now(), 'metadata' => array_merge($locked->metadata ?? [], ['parts' => $ordered->count()])]);
             $this->recordEvent->handle($user, $asset, 'media_upload.multipart_completed', ['upload_uuid' => $locked->uuid]);
         });
 

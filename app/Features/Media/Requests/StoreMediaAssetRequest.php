@@ -24,6 +24,7 @@ class StoreMediaAssetRequest extends FormRequest
             'source.duration_seconds' => ['nullable', 'integer', 'min:0'],
             'source.width' => ['nullable', 'integer', 'min:1'],
             'source.height' => ['nullable', 'integer', 'min:1'],
+            'source.fallback_filename' => ['nullable', 'string', 'max:255'],
         ];
     }
 

@@ -74,6 +74,24 @@ class ManageMediaCatalogue
      */
     public function updateCollection(MediaCollection $collection, array $data): MediaCollection
     {
+        if (($data['status'] ?? null) === MediaCollectionStatus::Published->value) {
+            $this->destination->ensureCollectionAllowed($collection);
+        }
+
+        if (($data['status'] ?? null) === MediaCollectionStatus::Published->value
+            && ! $collection->assets()->where('status', MediaAssetStatus::Available->value)
+                ->where('is_visible', true)->whereNotNull('verified_at')->exists()) {
+            throw ValidationException::withMessages(['status' => 'Publish a verified, visible video before publishing the collection.']);
+        }
+
+        if (($data['status'] ?? null) === MediaCollectionStatus::Published->value) {
+            $data['visibility'] = MediaCollectionVisibility::Public;
+            $data['published_at'] = $collection->published_at ?? now();
+        } elseif (($data['status'] ?? null) === MediaCollectionStatus::Draft->value) {
+            $data['visibility'] = MediaCollectionVisibility::Private;
+            $data['published_at'] = null;
+        }
+
         $collection->update($data);
 
         return $collection->refresh();

@@ -3,4 +3,5 @@
 <form class="card card-pad" method="POST" action="{{ route('admin.concerts.update', $concert) }}">@csrf @method('PUT')
     @include('admin.concerts._form', ['submitLabel' => 'Save concert'])
 </form>
+@include('admin.concerts._media_management')
 @endsection

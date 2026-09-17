@@ -19,12 +19,11 @@ short-lived CloudFront signed URL for assets on `s3_concerts`. Playback from the
 legacy disk or without signing configuration fails closed. Original downloads
 still use Laravel filesystem responses.
 
-The target media-ingest design uses a macOS Flutter converter/uploader. Flutter
-authenticates to Laravel and uploads directly to S3 using short-lived presigned
-requests for exact server-allocated object keys. The required Laravel media and
-upload endpoints are not yet implemented. The installed Laravel S3 adapter can
-generate a presigned `PutObject` request, and the installed AWS SDK can
-coordinate multipart uploads once application actions and policies are added.
+The media-ingest API reserves exact object keys, issues short-lived presigned
+requests and verifies multipart uploads. A staff-only web uploader under each
+concert's **Upload media** page can send an original MP4 and a fallback MP4
+directly from the browser to S3. It does not convert videos or create HLS.
+The macOS Flutter converter/uploader can use the same API when ready.
 
 ## Scope
 
@@ -40,8 +39,57 @@ coordinate multipart uploads once application actions and policies are added.
 - Public concert original downloads should use the same tracking-link workflow.
 - Concert playback should be authorised by Laravel and delivered using a
   short-lived URL that supports byte-range requests.
-- New concert uploads should send bytes directly from Flutter to private S3
+- New concert uploads should send bytes directly from the browser or Flutter to private S3
   using short-lived requests scoped to one server-allocated asset prefix.
+
+### Staff web uploader
+
+From the admin concert edit page, select **Upload media**. The first upload
+automatically creates a collection named after the concert; staff can add a
+separate collection for another show. Choose or drop both MP4 files and upload.
+The original filename supplies the initial video title, which staff can edit.
+The uploaded filenames are retained in the catalogue and S3 object metadata;
+the object keys remain the fixed `original/video.mp4` and
+`stream/fallback.mp4` paths required by the ingest and playback contract.
+For a batch, drop all MP4s into **Upload several videos**: `Ballet.mp4` pairs
+with `Ballet-stream.mp4`. Review each match and edit its title before upload;
+unmatched or duplicate files must be resolved first. The batch uses the same
+direct-to-S3 multipart flow and creates one asset per pair. Concert downloads
+use the recorded original filename, or the video title if that filename is a
+generic storage name. Duplicate download names within a concert get a short
+asset identifier so that downloading all videos does not overwrite them.
+Finalisation verifies the required `original/video.mp4` and
+`stream/fallback.mp4` objects. A verified
+asset remains hidden until staff explicitly makes it visible; a collection
+cannot be published without a verified visible asset. Keep the concert itself
+in draft until playback has been checked on the production distribution.
+
+The public playlist groups videos by published collection name while retaining
+the collection and asset sort order. Each MP4 slot shows its own upload
+progress, and the page shows combined byte progress for the current upload or
+entire batch.
+
+The concert edit page lists collections and their videos for renaming,
+visibility and publishing. Managed collections also offer deletion. Before a
+delete, staff must review the exact S3 object keys and count on a separate
+confirmation page and type `DELETE`; the server checks that the list has not
+changed before removing current objects and soft-deleting the database rows.
+Legacy storage is excluded from this deletion flow. S3 Versioning and
+retention, when enabled, may keep older versions. The managed concert bucket
+credentials need scoped object listing and deletion permissions for this flow;
+the legacy bucket must remain read-only.
+
+The browser uses the existing multipart API with CRC-64/NVME checksums. It
+uploads parts directly to S3 and sends only metadata to Laravel. The S3 bucket
+must permit CORS `PUT` from the exact admin site origin, allow the signed
+request headers (including `x-amz-checksum-crc64nvme`), and expose `ETag` to
+browser JavaScript. Restrict CORS origins to the actual admin origin. The
+browser keeps incomplete upload identifiers locally for retry with the same
+files, resending parts when needed; close or clear failed multipart uploads through the existing API or a
+bucket lifecycle rule after review. S3 multipart requests, incomplete parts,
+storage and transfer incur charges. The browser must support BigInt and Web
+Crypto, and checksum calculation can take time for large files. File extension
+and checksum validation do not prove the fallback codec is browser-playable.
 
 ## Competition Downloads
 
@@ -115,7 +163,10 @@ CloudFront signed cookies when HLS delivery is configured. The browser uses
 native HLS or `hls.js` and falls back to the progressive MP4 route after a fatal
 HLS error. The MP4 route redirects to an exact-object CloudFront signed URL;
 progressive-only playback receives the signed URL directly. The CloudFront
-behavior must require trusted key-group signatures, and its S3 origin must be
+cookie domain is required for HLS but is not required for signed MP4 URLs. A
+local app on `localhost` can therefore test fallback MP4 playback through a
+signed CloudFront URL without issuing cookies for an unrelated media domain.
+The CloudFront behavior must require trusted key-group signatures, and its S3 origin must be
 private and accessible only through an origin access control. Otherwise an
 unsigned CloudFront URL or direct S3 URL may still expose the object despite
 the application's signed URLs. Check this on the deployed distribution and

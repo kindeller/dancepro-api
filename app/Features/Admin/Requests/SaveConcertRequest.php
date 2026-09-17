@@ -39,7 +39,7 @@ class SaveConcertRequest extends FormRequest
             'available_until' => ['nullable', 'date'],
             'program_url' => ['nullable', 'url:http,https', 'max:2048'],
             'external_gallery_url' => ['nullable', 'url:http,https', 'max:2048'],
-            'access_password' => ['nullable', 'string', 'min:6', 'max:255'],
+            'access_password' => ['nullable', 'string', 'max:255'],
             'clear_access_password' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ];

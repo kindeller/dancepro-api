@@ -20,7 +20,8 @@
         </div>
         <label>Available from<input type="datetime-local" name="available_from" value="{{ old('available_from', $concert?->available_from?->format('Y-m-d\TH:i')) }}"></label>
         <label>Available until<input type="datetime-local" name="available_until" value="{{ old('available_until', $concert?->available_until?->format('Y-m-d\TH:i')) }}"></label>
-        <label>Concert password<input type="password" name="access_password" minlength="6" autocomplete="new-password" placeholder="{{ $concert?->requiresPassword() ? 'Leave blank to keep current password' : 'Leave blank for open access' }}"></label>
+        <label>Concert access code<input type="text" name="access_password" value="{{ old('access_password', $concert?->access_password_encrypted) }}" maxlength="255" autocomplete="off" placeholder="{{ $concert?->requiresPassword() ? 'Set a new code to make it visible' : 'Leave blank for open access' }}"></label>
+        @if($concert?->requiresPassword() && ! $concert->access_password_encrypted)<p class="muted">This concert has an older hashed code that cannot be displayed. Enter a new code and save to make it visible here.</p>@endif
         @if($concert?->requiresPassword())<input type="hidden" name="clear_access_password" value="0"><label style="display:flex;grid-template-columns:auto 1fr;align-items:center"><input type="checkbox" name="clear_access_password" value="1" style="width:auto;min-height:auto"> Remove current concert password</label>@endif
         <label>Brand colour<input name="brand_color" value="{{ old('brand_color', $concert?->brand_color) }}" placeholder="#0AA0DB" pattern="#[0-9A-Fa-f]{6}"></label>
         <label>Cover image URL<input type="url" name="cover_image_url" value="{{ old('cover_image_url', $concert?->cover_image_url) }}" placeholder="https://…"></label>
@@ -32,4 +33,4 @@
 @if($concert)
 <div class="notice" style="margin-top:16px"><strong>Media storage is managed separately.</strong><br><span class="muted">Disk: {{ $concert->storage_disk }} · Prefix: {{ $concert->storage_prefix }} · Collections: {{ $concert->mediaCollections()->count() }}</span></div>
 @endif
-<div style="margin-top:16px"><button type="submit">{{ $submitLabel }}</button> <a class="button secondary" href="{{ route('admin.concerts.index') }}">Cancel</a>@if($concert?->isPubliclyAvailable()) <a class="button secondary" href="{{ route('concerts.show', $concert) }}" target="_blank" rel="noopener">View public page</a>@endif</div>
+<div style="margin-top:16px"><button type="submit">{{ $submitLabel }}</button> <a class="button secondary" href="{{ route('admin.concerts.index') }}">Cancel</a>@if($concert)<a class="button secondary" href="{{ route('admin.concerts.media.index', $concert) }}">Upload media</a>@endif @if($concert?->isPubliclyAvailable()) <a class="button secondary" href="{{ route('concerts.show', $concert) }}" target="_blank" rel="noopener">View public page</a>@endif</div>

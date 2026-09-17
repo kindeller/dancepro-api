@@ -13,8 +13,14 @@
     <div class="player-grid">
         <section class="card player"><video id="concert-player" controls preload="metadata" crossorigin="use-credentials" @unless($playerScriptAvailable) src="{{ route('concerts.media.stream', [$concert, $first]) }}" @endunless></video><div class="player-info"><h3 id="player-title">{{ $first->display_name ?? $first->original_filename }}</h3><div class="meta" id="player-status" style="color:#a9bec8">{{ $playerScriptAvailable ? 'Preparing playback…' : 'MP4 playback' }}</div><div class="actions"><label style="margin:0;color:#d9e8ee">Quality <select id="player-quality" disabled><option value="-1">Auto</option></select></label><a id="player-download" class="button" href="{{ $downloadUrls[$first->uuid] }}">Download original</a></div></div></section>
         <aside class="card playlist" aria-label="Concert playlist">
-        @foreach($assets as $asset)
-            <button class="playlist-item @if($loop->first) active @endif" type="button" data-playback="{{ route('concerts.media.playback', [$concert, $asset]) }}" data-download="{{ $downloadUrls[$asset->uuid] }}" data-title="{{ $asset->display_name ?? $asset->original_filename }}"><span class="playlist-thumb">▶</span><span><strong>{{ $asset->display_name ?? $asset->original_filename }}</strong><br><span class="meta">{{ $asset->duration_seconds ? gmdate('i:s', $asset->duration_seconds) : ucfirst($asset->media_type->value) }}</span></span></button>
+        @foreach($concert->mediaCollections as $collection)
+            @php($collectionVideos = $collection->assets->filter(fn ($asset) => $asset->media_type === \App\Features\Media\Support\MediaType::Video))
+            @if($collectionVideos->isNotEmpty())
+                <div class="meta" style="padding:14px 16px 6px;font-weight:700">{{ $collection->name }}</div>
+                @foreach($collectionVideos as $asset)
+                    <button class="playlist-item @if($asset->is($first)) active @endif" type="button" data-playback="{{ route('concerts.media.playback', [$concert, $asset]) }}" data-download="{{ $downloadUrls[$asset->uuid] }}" data-title="{{ $asset->display_name ?? $asset->original_filename }}"><span class="playlist-thumb">▶</span><span><strong>{{ $asset->display_name ?? $asset->original_filename }}</strong><br><span class="meta">{{ $asset->duration_seconds ? gmdate('i:s', $asset->duration_seconds) : ucfirst($asset->media_type->value) }}</span></span></button>
+                @endforeach
+            @endif
         @endforeach
         </aside>
     </div>

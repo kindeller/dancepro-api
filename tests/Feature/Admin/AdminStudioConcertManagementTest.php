@@ -69,6 +69,10 @@ class AdminStudioConcertManagementTest extends TestCase
         $concert = Concert::query()->where('name', 'Fictional Winter Showcase')->firstOrFail();
         $this->assertFalse($concert->isPubliclyAvailable());
         $this->assertTrue($concert->passwordMatches('concert-password'));
+        $this->assertSame('concert-password', $concert->access_password_encrypted);
+        $this->assertNotSame('concert-password', $concert->getRawOriginal('access_password_encrypted'));
+        $this->actingAs($staff)->get(route('admin.concerts.edit', $concert))
+            ->assertOk()->assertSee('value="concert-password"', false);
         $this->assertSame($concert->uuid.'/', $concert->storage_prefix);
 
         $this->actingAs($staff)->put('/admin/concerts/'.$concert->uuid, [
@@ -88,6 +92,7 @@ class AdminStudioConcertManagementTest extends TestCase
         $this->assertTrue($concert->isPubliclyAvailable());
         $this->assertTrue($concert->approvedBy->is($staff));
         $this->assertTrue($concert->passwordMatches('concert-password'));
+        $this->assertSame('concert-password', $concert->access_password_encrypted);
     }
 
     public function test_customer_cannot_manage_studios_or_concerts(): void
@@ -96,6 +101,33 @@ class AdminStudioConcertManagementTest extends TestCase
 
         $this->actingAs($customer)->get('/admin/studios')->assertForbidden();
         $this->actingAs($customer)->get('/admin/concerts')->assertForbidden();
+    }
+
+    public function test_staff_can_replace_an_old_hashed_code_and_clear_a_visible_code(): void
+    {
+        $staff = User::factory()->staff()->create();
+        $concert = Concert::factory()->create(['access_password_hash' => 'old-secret']);
+
+        $this->actingAs($staff)->get(route('admin.concerts.edit', $concert))
+            ->assertOk()->assertSee('older hashed code that cannot be displayed');
+
+        $payload = [
+            'studio_id' => $concert->studio_id,
+            'name' => $concert->name,
+            'status' => 'draft',
+            'is_enabled' => '1',
+            'access_password' => 'new-shared-code',
+        ];
+        $this->actingAs($staff)->put(route('admin.concerts.update', $concert), $payload)->assertRedirect();
+        $this->assertTrue($concert->refresh()->passwordMatches('new-shared-code'));
+        $this->assertSame('new-shared-code', $concert->access_password_encrypted);
+        $this->assertArrayNotHasKey('access_password_encrypted', $concert->toArray());
+
+        $this->actingAs($staff)->put(route('admin.concerts.update', $concert), array_merge($payload, [
+            'clear_access_password' => '1',
+        ]))->assertRedirect();
+        $this->assertFalse($concert->refresh()->requiresPassword());
+        $this->assertNull($concert->access_password_encrypted);
     }
 
     public function test_admin_navigation_contains_studio_and_concert_links(): void

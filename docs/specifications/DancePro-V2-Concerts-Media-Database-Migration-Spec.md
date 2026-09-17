@@ -544,7 +544,13 @@ Validation should use:
 Hash::check($submittedPassword, $concert->access_password_hash)
 ```
 
-Do not store a recoverable plain-text concert password.
+Staff now need to view and share the concert access code. Keep the hash for
+verification and store a separate copy using Laravel's encrypted cast in the
+nullable `access_password_encrypted` column. Only the authorised admin concert
+form displays the decrypted value. Existing hash-only codes cannot be
+recovered; staff must set a new code to make one visible. Do not store the code
+as plaintext or expose it in public or general API responses. See
+[ADR-0005](../decisions/ADR-0005-Retrievable-Concert-Access-Codes.md).
 
 ## 7.5 Storage prefix
 

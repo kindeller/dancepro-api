@@ -361,6 +361,11 @@ upload requests, while customer and unrelated tokens receive `403`. Confirm
 that uploaded checksums are validated, incomplete multipart upload can resume,
 finalisation is idempotent and no bearer token or presigned query string appears
 in logs.
+For the staff web uploader, verify that a session-authenticated staff member
+can reserve a test asset, upload both MP4 versions directly to S3, finalise it,
+make it visible and publish its collection. Confirm a customer cannot access
+the admin page or media actions. S3 CORS must permit the admin origin's `PUT`
+requests and expose `ETag`; the browser should not send video bytes to PHP.
 
 ---
 
