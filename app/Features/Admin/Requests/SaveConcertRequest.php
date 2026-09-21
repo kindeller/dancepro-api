@@ -2,6 +2,8 @@
 
 namespace App\Features\Admin\Requests;
 
+use App\Features\Bookings\Models\ConcertBookingItem;
+use App\Features\Bookings\Support\ConcertBookingItemType;
 use App\Features\Concerts\Models\Concert;
 use App\Features\Concerts\Support\ConcertStatus;
 use Illuminate\Foundation\Http\FormRequest;
@@ -23,6 +25,10 @@ class SaveConcertRequest extends FormRequest
 
         return [
             'studio_id' => ['required', 'integer', Rule::exists('studios', 'id')->whereNull('deleted_at')],
+            'concert_booking_item_id' => ['nullable', 'integer', Rule::exists('concert_booking_items', 'id')
+                ->where('item_type', ConcertBookingItemType::Concert->value)
+                ->whereNull('cancelled_at'),
+                Rule::unique('concerts', 'concert_booking_item_id')->ignore($concert)],
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', Rule::unique('concerts', 'slug')->ignore($concert)],
             'status' => ['required', Rule::enum(ConcertStatus::class)],
@@ -39,7 +45,7 @@ class SaveConcertRequest extends FormRequest
             'available_until' => ['nullable', 'date'],
             'program_url' => ['nullable', 'url:http,https', 'max:2048'],
             'external_gallery_url' => ['nullable', 'url:http,https', 'max:2048'],
-            'access_password' => ['nullable', 'string', 'min:6', 'max:255'],
+            'access_password' => ['nullable', 'string', 'max:255'],
             'clear_access_password' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ];
@@ -59,6 +65,13 @@ class SaveConcertRequest extends FormRequest
                     && $this->filled(['available_from', 'available_until'])
                     && Carbon::parse($this->input('available_until'))->lessThanOrEqualTo(Carbon::parse($this->input('available_from')))) {
                     $validator->errors()->add('available_until', 'The availability end must be after the availability start.');
+                }
+
+                if (! $validator->errors()->has('concert_booking_item_id') && $this->filled('concert_booking_item_id')) {
+                    $item = ConcertBookingItem::query()->with('schedulingEvent')->find($this->integer('concert_booking_item_id'));
+                    if ($item?->schedulingEvent?->studio_id && $item->schedulingEvent->studio_id !== $this->integer('studio_id')) {
+                        $validator->errors()->add('concert_booking_item_id', 'The booking event belongs to a different studio.');
+                    }
                 }
             },
         ];

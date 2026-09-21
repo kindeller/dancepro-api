@@ -8,6 +8,7 @@ use App\Features\Auth\Middleware\RequireTwoFactorAuthentication;
 use App\Features\Crew\Middleware\RequireCompletedCrewOnboarding;
 use App\Features\Crew\Middleware\RequireCrewAccess;
 use App\Shared\Middleware\AddSecurityHeaders;
+use App\Shared\Middleware\RequireExplicitTokenAbility;
 use App\Shared\Responses\ApiResponse;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -43,6 +44,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'two-factor.required' => RequireTwoFactorAuthentication::class,
             'crew.required' => RequireCrewAccess::class,
             'crew.onboarded' => RequireCompletedCrewOnboarding::class,
+            'token.ability' => RequireExplicitTokenAbility::class,
         ]);
         $middleware->encryptCookies(except: [
             'CloudFront-Policy',
@@ -52,7 +54,7 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
-            fn (Request $request) => $request->is('api/*'),
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
 
         $exceptions->render(function (ValidationException $exception, Request $request) {

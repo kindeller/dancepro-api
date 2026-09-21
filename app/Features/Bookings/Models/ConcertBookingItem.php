@@ -3,6 +3,7 @@
 namespace App\Features\Bookings\Models;
 
 use App\Features\Bookings\Support\ConcertBookingItemType;
+use App\Features\Concerts\Models\Concert;
 use App\Features\Scheduling\Models\EventTypeDefinition;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Venues\Models\Venue;
@@ -11,6 +12,7 @@ use App\Shared\Models\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['uuid', 'concert_booking_id', 'event_type_definition_id', 'item_type', 'title', 'venue_name', 'venue_address', 'venue_id', 'event_date', 'starts_at', 'finishes_at', 'approval_status', 'approved_by_user_id', 'approved_at', 'scheduling_event_id', 'programme_path', 'programme_name', 'programme_mime', 'programme_size', 'cancelled_by_user_id', 'cancelled_at'])]
 class ConcertBookingItem extends Model
@@ -20,6 +22,11 @@ class ConcertBookingItem extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(ConcertBooking::class, 'concert_booking_id');
+    }
+
+    public function concert(): HasOne
+    {
+        return $this->hasOne(Concert::class, 'concert_booking_item_id');
     }
 
     public function schedulingEvent(): BelongsTo

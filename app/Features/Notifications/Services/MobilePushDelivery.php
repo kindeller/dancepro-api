@@ -10,6 +10,10 @@ class MobilePushDelivery
 {
     public function deliver(int $notificationId): void
     {
+        if (app()->environment('local')) {
+            return;
+        }
+
         $gateway = config('mobile.push.gateway_url');
         if (! filled($gateway)) {
             return;

@@ -6,11 +6,12 @@ use App\Features\Auth\Support\TokenAbility;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
-use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\AuthenticatesApiTokens;
 use Tests\TestCase;
 
 class CompetitionObjectsTest extends TestCase
 {
+    use AuthenticatesApiTokens;
     use RefreshDatabase;
 
     public function test_authenticated_user_can_list_competition_objects(): void
@@ -26,7 +27,7 @@ class CompetitionObjectsTest extends TestCase
         Storage::disk('s3_competitions')->put('competition-b/audio.mp3', 'audio');
         Storage::disk('s3_competitions')->put('root-file.pdf', 'pdf');
 
-        Sanctum::actingAs(User::factory()->create(), [TokenAbility::CompetitionObjectsRead->value]);
+        $this->actingAsApiUser(User::factory()->create(), [TokenAbility::CompetitionObjectsRead->value]);
 
         $response = $this->getJson('/api/competitions/objects');
 
@@ -66,7 +67,7 @@ class CompetitionObjectsTest extends TestCase
         Storage::disk('s3_competitions')->put('competition-a/video-2.mp4', 'video');
         Storage::disk('s3_competitions')->put('competition-a/routines/video-1.mp4', 'video');
 
-        Sanctum::actingAs(User::factory()->create(), [TokenAbility::CompetitionObjectsRead->value]);
+        $this->actingAsApiUser(User::factory()->create(), [TokenAbility::CompetitionObjectsRead->value]);
 
         $response = $this->getJson('/api/competitions/objects?prefix=competition-a');
 
@@ -89,7 +90,7 @@ class CompetitionObjectsTest extends TestCase
     public function test_customer_and_crew_users_cannot_list_competition_objects(): void
     {
         foreach ([User::factory()->customer()->create(), User::factory()->crew()->create()] as $user) {
-            Sanctum::actingAs($user, [TokenAbility::CompetitionObjectsRead->value]);
+            $this->actingAsApiUser($user, [TokenAbility::CompetitionObjectsRead->value]);
 
             $this->getJson('/api/competitions/objects')
                 ->assertForbidden()
@@ -100,7 +101,7 @@ class CompetitionObjectsTest extends TestCase
 
     public function test_inactive_staff_user_cannot_list_competition_objects(): void
     {
-        Sanctum::actingAs(User::factory()->staff()->inactive()->create(), [TokenAbility::CompetitionObjectsRead->value]);
+        $this->actingAsApiUser(User::factory()->staff()->inactive()->create(), [TokenAbility::CompetitionObjectsRead->value]);
 
         $this->getJson('/api/competitions/objects')
             ->assertForbidden();
@@ -109,7 +110,7 @@ class CompetitionObjectsTest extends TestCase
     public function test_active_admin_user_can_list_competition_objects(): void
     {
         Storage::fake('s3_competitions');
-        Sanctum::actingAs(User::factory()->admin()->create(), [TokenAbility::CompetitionObjectsRead->value]);
+        $this->actingAsApiUser(User::factory()->admin()->create(), [TokenAbility::CompetitionObjectsRead->value]);
 
         $this->getJson('/api/competitions/objects')
             ->assertOk()
@@ -118,14 +119,14 @@ class CompetitionObjectsTest extends TestCase
 
     public function test_admin_token_without_the_competition_ability_cannot_list_objects(): void
     {
-        Sanctum::actingAs(User::factory()->admin()->create(), [TokenAbility::AccountRead->value]);
+        $this->actingAsApiUser(User::factory()->admin()->create(), [TokenAbility::AccountRead->value]);
 
         $this->getJson('/api/competitions/objects')->assertForbidden();
     }
 
     public function test_unsafe_prefixes_are_rejected(): void
     {
-        Sanctum::actingAs(User::factory()->create(), [TokenAbility::CompetitionObjectsRead->value]);
+        $this->actingAsApiUser(User::factory()->create(), [TokenAbility::CompetitionObjectsRead->value]);
 
         $this->getJson('/api/competitions/objects?prefix=../private')
             ->assertUnprocessable()

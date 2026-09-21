@@ -29,6 +29,45 @@ sail pint
 Avoid bare `php artisan`, `composer`, or `vendor/bin/pint` commands unless
 explicitly working inside the Sail container.
 
+## Local media and production isolation
+
+With `APP_ENV=local`, all AWS-named filesystem disks are backed by separate
+private folders under `storage/app/local-aws/`. The database continues to use
+the logical disk names (for example `s3_concerts`), so media uploaded locally
+cannot be sent to S3 even if AWS credentials are present in `.env`. Do not copy
+production database records into local development: their object keys will
+refer to files that are absent from the isolated local folders.
+
+Managed concert video uploads use short-lived, signed local PUT URLs. They
+retain the same SHA-256 and CRC64NVME verification and multipart completion
+contract as production. Local playback and downloads are served by Laravel;
+video responses support byte-range requests. Covers and programs are also
+served by Laravel. CloudFront signing is disabled in local mode, even if its
+settings were copied into `.env`. `APP_ENV=testing` retains the existing fake
+storage/test configuration; production continues to require private S3 and
+CloudFront.
+
+External cover, program and gallery URLs retained in local database records
+are suppressed in local pages and the public catalogue API, without changing
+the saved records. This prevents imported links from silently loading live
+media in a browser. Use the fictional local seeder rather than copying a
+production database for testing.
+
+Local startup refuses remote database, mail and queue configuration, or a
+cached AWS disk driver. Keep the database on SQLite or the local Sail database,
+mail on `log`, `array` or local Mailpit, and queues on a local driver. Push
+notifications are not sent to a configured gateway in local mode, and Redis
+is restricted to local hosts. When switching between environments, clear
+cached configuration before starting the local application
+(`sail artisan config:clear`). The local upload routes
+exist in other environments for stable route registration but reject requests
+unless the app is actually running in local mode with a valid signed URL.
+
+The `APP_URL` host in `.env` must be local/private and reachable by the browser
+or desktop media client because the local signed PUT URLs point back to Laravel.
+Local media files are not shared with production and should not be treated as
+backups.
+
 ## Local Demonstration Data
 
 After running migrations, seed the opt-in fictional development dataset with:
@@ -42,13 +81,11 @@ The seeder refuses to run unless `APP_ENV=local`. It is not called by
 placeholder media files. It updates its deterministic demonstration records
 when run again instead of continually adding duplicates.
 
-The placeholder videos are intended to validate the concert page, playlist and
-automatic next-item behavior only. They are served through Laravel's local
-filesystem response and are not representative of production video delivery.
-Depending on the browser, seeking may produce incomplete-response or content
-length errors. This local limitation does not change the production design:
-authorised playback will redirect to short-lived S3 or CloudFront delivery with
-byte-range support.
+The older fictional placeholder videos use the separate private `local` disk
+and are intended to validate the concert page, playlist and automatic
+next-item behavior only. They now use the same local byte-range file response
+as new managed media. Production authorised playback uses short-lived
+CloudFront delivery with byte-range support.
 
 Automatic next-item playback has been manually tested successfully on desktop
 and mobile across multiple browsers. Retest it when the production media

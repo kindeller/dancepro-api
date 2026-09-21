@@ -7,6 +7,7 @@ use App\Features\Media\Support\MediaCatalogueMode;
 use App\Features\Media\Support\MediaCollectionStatus;
 use App\Features\Media\Support\MediaCollectionVisibility;
 use App\Features\Media\Support\MediaType;
+use App\Models\User;
 use App\Shared\Models\HasPublicUuid;
 use Database\Factories\MediaCollectionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['uuid', 'concert_id', 'competition_id', 'name', 'media_type', 'catalogue_mode', 'status', 'visibility', 'storage_disk', 'storage_prefix', 'manifest_key', 'sort_order', 'published_at', 'archived_at', 'metadata'])]
+#[Fillable(['uuid', 'concert_id', 'competition_id', 'name', 'media_type', 'catalogue_mode', 'status', 'visibility', 'storage_disk', 'storage_prefix', 'manifest_key', 'created_by_user_id', 'idempotency_key', 'sort_order', 'published_at', 'archived_at', 'metadata'])]
 class MediaCollection extends Model
 {
     /** @use HasFactory<MediaCollectionFactory> */
@@ -30,6 +31,11 @@ class MediaCollection extends Model
     public function assets(): HasMany
     {
         return $this->hasMany(MediaAsset::class);
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
     protected function casts(): array

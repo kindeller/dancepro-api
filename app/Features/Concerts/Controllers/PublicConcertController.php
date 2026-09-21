@@ -8,6 +8,7 @@ use App\Features\Concerts\Models\Concert;
 use App\Features\Concerts\Requests\UnlockConcertRequest;
 use App\Features\Concerts\Services\ConcertAccessSession;
 use App\Features\Concerts\Services\ConcertCloudFrontSigner;
+use App\Features\Concerts\Services\ConcertDownloadFilename;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Support\MediaAssetStatus;
 use App\Features\Media\Support\MediaCollectionStatus;
@@ -20,7 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PublicConcertController extends Controller
 {
@@ -73,12 +74,23 @@ class PublicConcertController extends Controller
         $this->authorizeAsset($request, $concert, $asset, $access);
         abort_unless($asset->media_type === MediaType::Video, 404);
 
-        $source = $resolvePlayback->execute($asset, $cloudFront->isConfigured());
+        $local = app()->environment('local');
+        $source = $resolvePlayback->execute($asset, ! $local && $cloudFront->canSignCookies());
+        if ($local) {
+            abort_unless(in_array($source->disk, ['s3_concerts', 'local'], true), 503);
+
+            return ApiResponse::success('Concert playback source returned.', [
+                'format' => $source->format->value,
+                'url' => $this->temporaryPlaybackUrl($concert, $asset),
+                'fallback_url' => null,
+            ]);
+        }
+        abort_unless($cloudFront->isConfigured() && $source->disk === 's3_concerts', 503);
 
         if (! $source->isHls()) {
             return ApiResponse::success('Concert playback source returned.', [
                 'format' => $source->format->value,
-                'url' => $this->temporaryPlaybackUrl($concert, $asset),
+                'url' => $cloudFront->signedVideoUrl($source),
                 'fallback_url' => null,
             ]);
         }
@@ -103,14 +115,24 @@ class PublicConcertController extends Controller
         ConcertAccessSession $access,
         ResolveConcertPlaybackSource $resolvePlayback,
         ConcertCloudFrontSigner $cloudFront,
-    ): RedirectResponse|StreamedResponse {
+    ): RedirectResponse|BinaryFileResponse {
         $this->authorizeAsset($request, $concert, $asset, $access);
         abort_unless($asset->media_type === MediaType::Video, 404);
 
+        $local = app()->environment('local');
         $source = $resolvePlayback->execute(
             $asset,
-            $cloudFront->isConfigured() && ! $request->boolean('fallback'),
+            ! $local && $cloudFront->canSignCookies() && ! $request->boolean('fallback'),
         );
+        if ($local) {
+            abort_unless(in_array($source->disk, ['s3_concerts', 'local'], true), 503);
+
+            return response()->file(Storage::disk($source->disk)->path($source->key), [
+                'Cache-Control' => 'private, no-store',
+                'Content-Type' => 'video/mp4',
+            ]);
+        }
+        abort_unless($cloudFront->isConfigured() && $source->disk === 's3_concerts', 503);
 
         if ($source->isHls()) {
             $response = redirect()->away($cloudFront->urlFor($source->key));
@@ -122,27 +144,27 @@ class PublicConcertController extends Controller
             return $response;
         }
 
-        return Storage::disk($source->disk)->response(
-            $source->key,
-            $asset->display_name ?? $asset->original_filename,
-            ['Content-Type' => 'video/mp4'],
-        );
+        return redirect()->away($cloudFront->signedVideoUrl($source));
     }
 
-    public function download(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access): StreamedResponse
+    public function download(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access, ConcertDownloadFilename $filenames, ConcertCloudFrontSigner $cloudFront): RedirectResponse|BinaryFileResponse
     {
         $this->authorizeAsset($request, $concert, $asset, $access);
+        if (app()->environment('local')) {
+            abort_unless(in_array($asset->storage_disk, ['s3_concerts', 'local'], true), 503);
+            abort_unless(Storage::disk($asset->storage_disk)->exists($asset->storage_key), 404);
 
-        return Storage::disk($asset->storage_disk)->download(
-            $asset->storage_key,
-            $asset->original_filename ?? basename($asset->storage_key),
-        );
+            return response()->download(Storage::disk($asset->storage_disk)->path($asset->storage_key), $filenames->for($concert, $asset), ['Cache-Control' => 'private, no-store']);
+        }
+        abort_unless($cloudFront->isConfigured() && $asset->storage_disk === 's3_concerts', 503);
+
+        return redirect()->away($cloudFront->signedFileUrl($asset->storage_key, $filenames->for($concert, $asset)));
     }
 
     private function authorizeAsset(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access): void
     {
         abort_unless($concert->isPubliclyAvailable(), 404);
-        abort_unless($asset->collection()->where('concert_id', $concert->id)->exists(), 404);
+        abort_unless($asset->collection()->where('concert_id', $concert->id)->where('status', MediaCollectionStatus::Published)->exists(), 404);
         abort_unless($asset->status === MediaAssetStatus::Available && $asset->is_visible, 404);
         abort_unless($access->allows($request, $concert), 403);
     }

@@ -2,14 +2,18 @@
 
 namespace App\Features\Concerts\Actions;
 
+use App\Features\Admin\Actions\ManageBrandingMedia;
 use App\Features\Concerts\Models\Concert;
 use App\Features\Concerts\Support\ConcertStatus;
 use App\Models\User;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SaveConcert
 {
+    public function __construct(private readonly ManageBrandingMedia $brandingMedia) {}
+
     public function execute(array $attributes, User $staff, ?Concert $concert = null): Concert
     {
         $concert ??= new Concert;
@@ -43,11 +47,19 @@ class SaveConcert
 
         if ($clearPassword) {
             $attributes['access_password_hash'] = null;
-        } elseif (filled($password)) {
+            $attributes['access_password_encrypted'] = null;
+        } elseif (filled($password) && $password !== $concert->access_password_encrypted) {
             $attributes['access_password_hash'] = $password;
+            $attributes['access_password_encrypted'] = $password;
         }
 
-        $concert->fill($attributes)->save();
+        DB::transaction(function () use ($concert, $attributes): void {
+            $concert->fill($attributes)->save();
+
+            if ($concert->concert_booking_item_id && $concert->bookingItem) {
+                $this->brandingMedia->syncBookingProgram($concert, $concert->bookingItem);
+            }
+        });
 
         return $concert;
     }

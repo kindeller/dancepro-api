@@ -27,7 +27,8 @@ class DownloadUrlSigner
 
     private function hasCloudFrontConfiguration(): bool
     {
-        return filled(config('downloads.cloudfront.domain'))
+        return ! app()->environment('local')
+            && filled(config('downloads.cloudfront.domain'))
             && filled(config('downloads.cloudfront.key_pair_id'))
             && filled($this->privateKey());
     }

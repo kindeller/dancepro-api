@@ -17,6 +17,9 @@ class ApiTokenAbilities
         if ($user->canAccessAdmin()) {
             $abilities[] = TokenAbility::CompetitionObjectsRead->value;
             $abilities[] = TokenAbility::DownloadLinksManage->value;
+            $abilities[] = TokenAbility::ConcertMediaRead->value;
+            $abilities[] = TokenAbility::ConcertMediaUpload->value;
+            $abilities[] = TokenAbility::ConcertMediaUpdate->value;
         }
 
         return $abilities;

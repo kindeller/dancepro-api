@@ -223,7 +223,12 @@ if [[ -n "$(git status --porcelain)" ]]; then
     fail "The working tree is not clean. Resolve the changes before deploying."
 fi
 
-APP_ENV_VALUE="$(php artisan env --no-ansi 2>/dev/null | sed -n 's/^Current application environment: //p' | tr -d '[:space:]')"
+# Laravel 13 reports the environment as:
+# "INFO  The application environment is [production]."
+APP_ENV_VALUE="$(
+    php artisan env --no-ansi 2>/dev/null |
+    sed -n 's/.*application environment is \[\([^]]*\)\].*/\1/p'
+)"
 
 if [[ "$APP_ENV_VALUE" != "production" ]]; then
     php artisan about --only=environment || true
@@ -336,7 +341,12 @@ git tag "$ROLLBACK_TAG" "$CURRENT_COMMIT"
 printf 'Created local rollback tag: %s -> %s\n' "$ROLLBACK_TAG" "$CURRENT_COMMIT"
 
 log "Enable maintenance mode"
-php artisan down --render="errors.503"
+if [[ -f resources/views/errors/503.blade.php ]]; then
+    php artisan down --render="errors.503"
+else
+    printf 'Custom 503 view not present; using Laravel default maintenance response.\n'
+    php artisan down
+fi
 DEPLOY_STARTED=true
 
 log "Update production branch"

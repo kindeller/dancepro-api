@@ -13,6 +13,12 @@ use App\Features\Crew\Controllers\CrewMobileDashboardController;
 use App\Features\Crew\Controllers\CrewMobileDirectoryController;
 use App\Features\Crew\Controllers\CrewMobileProfileController;
 use App\Features\Downloads\Controllers\DownloadLinkController;
+use App\Features\Media\Controllers\LegacyMediaController;
+use App\Features\Media\Controllers\LocalMediaUploadController;
+use App\Features\Media\Controllers\MediaAssetController;
+use App\Features\Media\Controllers\MediaCollectionController;
+use App\Features\Media\Controllers\MediaUploadController;
+use App\Features\Media\Controllers\StaffMediaDiscoveryController;
 use App\Features\Notifications\Controllers\CrewMobileAppConfigController;
 use App\Features\Notifications\Controllers\CrewMobilePushDeviceController;
 use App\Features\Operations\Controllers\CrewMobileDocumentController;
@@ -29,6 +35,12 @@ use App\Features\Timesheets\Controllers\InvoiceStylePreferenceController;
 use App\Features\Training\Controllers\CrewMobileTrainingController;
 use App\Features\Venues\Controllers\CrewMobileAddressController;
 use Illuminate\Support\Facades\Route;
+
+// Signed uploads are deliberately inert outside APP_ENV=local (see request authorization).
+Route::put('local-media/objects', [LocalMediaUploadController::class, 'object'])
+    ->middleware(['signed', 'throttle:media-uploads'])->name('local-media.object.put');
+Route::put('local-media/parts/{uploadId}/{partNumber}', [LocalMediaUploadController::class, 'part'])
+    ->middleware(['signed', 'throttle:media-uploads'])->name('local-media.part.put');
 
 Route::middleware('throttle:public-catalogue')->group(function (): void {
     Route::get('studios', [PublicConcertApiController::class, 'studios']);
@@ -159,13 +171,45 @@ Route::prefix('v1')->middleware([
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('competitions/objects', [CompetitionObjectController::class, 'index'])
-        ->middleware('abilities:'.TokenAbility::CompetitionObjectsRead->value);
+        ->middleware('token.ability:'.TokenAbility::CompetitionObjectsRead->value);
 
-    Route::middleware('abilities:'.TokenAbility::DownloadLinksManage->value)->group(function (): void {
+    Route::middleware('token.ability:'.TokenAbility::DownloadLinksManage->value)->group(function (): void {
         Route::get('download-links', [DownloadLinkController::class, 'index']);
         Route::post('download-links', [DownloadLinkController::class, 'store']);
         Route::get('download-links/{downloadLink}', [DownloadLinkController::class, 'show']);
         Route::patch('download-links/{downloadLink}/revoke', [DownloadLinkController::class, 'revoke']);
         Route::get('download-links/{downloadLink}/accesses', [DownloadLinkController::class, 'accesses']);
+    });
+
+    Route::prefix('staff')->group(function (): void {
+        Route::middleware('token.ability:'.TokenAbility::ConcertMediaRead->value)->group(function (): void {
+            Route::get('studios', [StaffMediaDiscoveryController::class, 'studios']);
+            Route::get('concerts', [StaffMediaDiscoveryController::class, 'concerts']);
+            Route::get('concerts/{concert}', [StaffMediaDiscoveryController::class, 'concert']);
+            Route::get('concerts/{concert}/legacy-media', [LegacyMediaController::class, 'index']);
+            Route::get('concerts/{concert}/media-collections', [MediaCollectionController::class, 'index']);
+            Route::get('media-collections/{collection}', [MediaCollectionController::class, 'show']);
+            Route::get('media-collections/{collection}/media-assets', [MediaAssetController::class, 'index']);
+            Route::get('media-assets/{asset}', [MediaAssetController::class, 'show']);
+            Route::get('media-assets/{asset}/uploads/{upload}', [MediaUploadController::class, 'show']);
+        });
+
+        Route::middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:media-uploads'])->group(function (): void {
+            Route::post('concerts/{concert}/media-collections', [MediaCollectionController::class, 'store']);
+            Route::post('media-collections/{collection}/media-assets', [MediaAssetController::class, 'store']);
+            Route::post('media-assets/{asset}/upload-urls', [MediaUploadController::class, 'uploadUrls']);
+            Route::post('media-assets/{asset}/upload-batches/{upload}/complete', [MediaUploadController::class, 'completeUploadBatch']);
+            Route::post('media-assets/{asset}/multipart-uploads', [MediaUploadController::class, 'startMultipart']);
+            Route::post('media-assets/{asset}/multipart-uploads/{upload}/parts', [MediaUploadController::class, 'multipartParts']);
+            Route::post('media-assets/{asset}/multipart-uploads/{upload}/complete', [MediaUploadController::class, 'completeMultipart']);
+            Route::post('media-assets/{asset}/multipart-uploads/{upload}/abort', [MediaUploadController::class, 'abortMultipart']);
+            Route::post('media-assets/{asset}/finalize', [MediaUploadController::class, 'finalize']);
+            Route::post('media-collections/{collection}/imports', [LegacyMediaController::class, 'store']);
+        });
+
+        Route::middleware('token.ability:'.TokenAbility::ConcertMediaUpdate->value)->group(function (): void {
+            Route::patch('media-collections/{collection}', [MediaCollectionController::class, 'update']);
+            Route::patch('media-assets/{asset}', [MediaAssetController::class, 'update']);
+        });
     });
 });

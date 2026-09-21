@@ -64,7 +64,7 @@ Tokens use explicit least-privilege abilities:
 
 - All active users receive `account:read` for `GET /api/auth/me`.
 - Active admins additionally receive `competition-objects:read` and
-  `download-links:manage`.
+  `download-links:manage` and the `concert-media:*` media-ingest abilities.
 - Sensitive API routes check the relevant token ability as well as the user's
   current database permissions. No newly issued token receives the wildcard
   `*` ability.
@@ -134,6 +134,11 @@ submissions are limited to five per minute for an email-address/IP combination
 and 20 per hour for an IP address. These limits supplement the password
 broker's token protections and apply equally to known and unknown email
 addresses.
+The desktop uploader uses the same two-factor-protected admin login and receives
+only server-selected abilities. Its media routes require both a media token
+ability and current admin authorisation; customers and ordinary crew cannot
+receive or use media-management access. The client stores its bearer token in
+the platform secure credential store and never logs tokens or presigned URLs.
 
 ## Logout
 
@@ -164,6 +169,7 @@ deleted_at
 - [API Guidelines](../handbook/API-Guidelines.md)
 - [Security](../handbook/Security.md)
 - [Foundation Epic](../epics/Foundation.md)
+- [Flutter Desktop Media Ingest API](Flutter-Desktop-Media-Ingest-API.md)
 
 ## Notes / Future Work
 

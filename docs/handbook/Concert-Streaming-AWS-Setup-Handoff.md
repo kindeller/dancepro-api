@@ -26,11 +26,19 @@ the proposed resources, permissions and costs before applying them.
 - Laravel performs playback authorisation and generates the signed cookies.
 - CloudFront delivers manifests, segments and MP4 fallback content.
 - S3 remains private and must not be exposed as the public delivery endpoint.
+- The macOS Flutter application converts media and uploads bytes directly to S3
+  only through short-lived, Laravel-authorised presigned requests.
+- No long-lived AWS credential or CloudFront signing key is stored in Flutter.
+- Studio and concert management remains in the web admin. Flutter selects an
+  existing concert and manages the lower-level media ingest workflow.
 
 ## Canonical V2 Object Layout
 
 The initial streaming format is video-on-demand HLS using fragmented MP4
-segments. Two renditions are expected: `high` and `standard`.
+segments. The maximum streaming rendition is 720p. A 480p rendition may be
+included for adaptive bandwidth reduction. High-resolution and source-quality
+streaming renditions are intentionally excluded; the original remains available
+only through the protected download workflow.
 
 Variant files may remain directly inside `stream/`; separate rendition folders
 are not required. FFmpeg output names must prevent collisions between the two
@@ -44,14 +52,14 @@ renditions.
 │       │   └── video.mp4
 │       ├── stream/
 │       │   ├── master.m3u8
-│       │   ├── high.m3u8
-│       │   ├── high-init.mp4
-│       │   ├── high-000001.m4s
-│       │   ├── high-000002.m4s
-│       │   ├── standard.m3u8
-│       │   ├── standard-init.mp4
-│       │   ├── standard-000001.m4s
-│       │   ├── standard-000002.m4s
+│       │   ├── 720p.m3u8
+│       │   ├── 720p-init.mp4
+│       │   ├── 720p-000001.m4s
+│       │   ├── 720p-000002.m4s
+│       │   ├── 480p.m3u8
+│       │   ├── 480p-init.mp4
+│       │   ├── 480p-000001.m4s
+│       │   ├── 480p-000002.m4s
 │       │   └── fallback.mp4
 │       └── thumbnail/
 │           └── poster.png
@@ -81,6 +89,56 @@ source from the expected object keys.
 
 The original MP4 fallback remains allowed. It is existing supported behaviour
 and does not require a feature flag.
+
+`stream/fallback.mp4` is the minimum required playback output for a newly
+converted asset. HLS is optional. If the converter cannot produce a valid HLS
+package, it must omit `master.m3u8` and finalise the asset as fallback-only.
+
+The initial encoding targets are a compressed H.264/AAC 720p fallback and HLS
+rendition near a 2 Mbps maximum, plus an optional 480p rendition near a 1 Mbps
+maximum. These are starting points based on current AWS MediaConvert QVBR
+guidance. Representative high-motion dance footage must be reviewed before the
+profile is accepted.
+
+## Desktop Ingest Workflow
+
+The target Flutter integration is documented in
+[Flutter Desktop Media Ingest API](../specifications/Flutter-Desktop-Media-Ingest-API.md).
+The corresponding Laravel endpoints are not yet implemented.
+
+The intended flow is:
+
+1. Flutter authenticates to Laravel using an active staff/admin account and a
+   limited Sanctum device token stored in the macOS Keychain.
+2. Flutter selects an existing staff-visible studio and concert.
+3. Laravel creates or selects a collection, reserves the asset UUID and derives
+   its immutable object prefix.
+4. Flutter converts the source locally and submits a file inventory containing
+   relative paths, sizes, content types and checksums.
+5. Laravel returns short-lived, object-specific presigned upload requests.
+   Small HLS objects use `PutObject`; large MP4s use server-coordinated
+   multipart upload.
+6. Flutter transfers bytes directly to S3 and reports completion to Laravel.
+7. HLS child objects are uploaded and verified before `master.m3u8` is signed
+   and uploaded last.
+8. Laravel verifies object metadata and playlist references, then changes the
+   asset from `processing` to `available`.
+9. Web staff review and publish the collection/concert. Upload finalisation does
+   not publish customer content automatically.
+
+Flutter must not receive a reusable AWS access key, choose a bucket, submit an
+authoritative full object key or obtain delete permission. AWS CLI access is for
+authorised operators and diagnostics only, not normal application operation.
+
+An existing legacy MP4 may be attached without conversion. Laravel must list
+only the server-known legacy collection prefix, return an opaque object
+reference, verify the selected object, and create the media asset on the legacy
+disk. The client must not receive unrestricted legacy-bucket browsing.
+
+The current playback resolver reads original, HLS and fallback objects from one
+`storage_disk`. Until it becomes location-aware, keep every active package on
+one disk. Do not assume an original in `s3_concerts_legacy` can be combined with
+HLS in `s3_concerts` merely through location metadata.
 
 ## Required AWS Components
 
@@ -186,16 +244,23 @@ variant playlists, initialization files and media segments.
 
 ## IAM Boundary
 
-Define separate least-privilege access for application delivery and media
-upload/processing.
+Define least-privilege access for application delivery and upload signing.
 
 The Laravel runtime should receive only the S3 and signing access required by
 its implemented workflows. It must not receive bucket-administration or broad
 account permissions.
 
-The upload/FFmpeg process may require permission to write within an explicitly
-selected collection or asset prefix. It should not receive deletion permission
-unless a separately designed and approved cleanup workflow requires it.
+When Laravel runs on EC2, prefer a least-privilege instance profile over
+long-lived access keys in deployment environment variables. The application
+still generates presigned requests from that role; the role credential is never
+returned to Flutter.
+
+The Flutter/FFmpeg process does not receive an IAM principal. Laravel uses its
+server-side role to create presigned requests restricted to the exact selected
+asset prefix and required operation. The runtime should receive only the S3
+actions needed to create those requests and coordinate multipart uploads. Do
+not grant deletion permission unless a separately designed and approved cleanup
+workflow requires it.
 
 CloudFront signing uses the private key locally; it does not require broad
 CloudFront administration permissions at application runtime.
@@ -235,7 +300,8 @@ infrastructure is considered ready:
   child object.
 - Expired cookies are rejected.
 - The cookie policy cannot access another asset UUID prefix.
-- Both high and standard renditions play.
+- The 720p rendition plays and the optional 480p rendition is selected under
+  constrained bandwidth.
 - Automatic quality switching works under throttled bandwidth.
 - Manual quality selection works where supported by the frontend player.
 - Seeking works and MP4 range requests return partial content.
@@ -245,6 +311,16 @@ infrastructure is considered ready:
 - Cache behaviour does not leak authorisation or cache private cookies as
   content variants.
 - Logs do not contain cookies, private keys or signed policy values.
+- Flutter contains no embedded AWS credential and stores its Sanctum token in
+  the macOS Keychain.
+- Customer and inactive accounts cannot obtain upload requests.
+- Presigned requests cannot write outside the reserved asset prefix or after
+  expiry.
+- Interrupted multipart MP4 upload can resume, complete and pass checksum
+  validation.
+- Upload finalisation is idempotent and does not publish the concert.
+- A fallback-only asset finalises and plays without `master.m3u8`.
+- An imported legacy MP4 is constrained to its server-known collection prefix.
 
 ## Information to Return to the Application Team
 
@@ -269,4 +345,8 @@ Return only non-secret deployment information:
 - [Choosing signed URLs or signed cookies](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-choosing-signed-urls-cookies.html)
 - [Using CloudFront signed cookies](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-signed-cookies.html)
 - [Restricting S3 origin access with Origin Access Control](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html)
+- [Amazon S3 presigned uploads](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
+- [Amazon S3 multipart upload](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html)
+- [Amazon S3 upload integrity](https://docs.aws.amazon.com/AmazonS3/latest/userguide/checking-object-integrity-upload.html)
+- [MediaConvert QVBR guidance](https://docs.aws.amazon.com/mediaconvert/latest/ug/qvbr-guidelines.html)
 - [FFmpeg HLS muxer](https://ffmpeg.org/ffmpeg-formats.html#hls-2)

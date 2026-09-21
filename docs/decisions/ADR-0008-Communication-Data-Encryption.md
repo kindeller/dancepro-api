@@ -1,4 +1,4 @@
-# ADR-0004: Communication Data Encryption
+# ADR-0008: Communication Data Encryption
 
 ## Status
 

@@ -26,7 +26,7 @@ class PublicConcertApiController extends Controller
                 'uuid' => $studio->uuid,
                 'name' => $studio->name,
                 'description' => $studio->description,
-                'cover_image_url' => $studio->cover_image_url,
+                'cover_image_url' => $studio->coverImageForDisplay(),
                 'brand_color' => $studio->brand_color,
             ]);
         $truncated = $studios->count() > $limit;
@@ -56,7 +56,7 @@ class PublicConcertApiController extends Controller
                 'uuid' => $studio->uuid,
                 'name' => $studio->name,
                 'description' => $studio->description,
-                'cover_image_url' => $studio->cover_image_url,
+                'cover_image_url' => $studio->coverImageForDisplay(),
                 'brand_color' => $studio->brand_color,
             ],
             'concerts' => $concerts->take($limit)->values(),
@@ -84,11 +84,11 @@ class PublicConcertApiController extends Controller
             'event_date' => $concert->event_date?->toDateString(),
             'event_end_date' => $concert->event_end_date?->toDateString(),
             'venue_name' => $concert->venue_name,
-            'cover_image_url' => $concert->cover_image_url,
+            'cover_image_url' => $concert->coverImageForDisplay(),
             'brand_color' => $concert->brand_color,
             'requires_password' => $concert->requiresPassword(),
-            'program_available' => $concert->program_url !== null,
-            'gallery_available' => $concert->external_gallery_url !== null,
+            'program_available' => $concert->programForDisplay() !== null,
+            'gallery_available' => $concert->galleryForDisplay() !== null,
         ];
     }
 

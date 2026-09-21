@@ -29,6 +29,8 @@ operations:
   CloudFront delivery.
 - Use database-backed Downloads tracking for concert originals.
 - Add staff media collection, asset, program and cover management.
+- Add the macOS Flutter media-ingest API for secure conversion upload, legacy
+  import, verification and assignment without embedded AWS credentials.
 - Complete playback error states, thumbnails, authorization, production
   configuration and verification.
 
@@ -124,6 +126,11 @@ Requirements
 - Next-item playback.
 - Playlist with thumbnails and display names.
 - Streaming media is used where available.
+- A compressed MP4 remains playable when adaptive conversion is absent or
+  fails.
+- Streaming output is limited to a cost-conscious 720p maximum with an optional
+  480p adaptive rendition; the high-resolution original is not offered as a
+  streaming quality.
 - Original media remains available for protected downloads.
 
 ---
@@ -181,6 +188,9 @@ Staff can manage:
 - Availability
 - Approval workflow
 
+The server-rendered web application is the primary management interface for
+studios, concerts, publication, availability and customer access.
+
 ---
 
 ## Staff Media Management
@@ -196,7 +206,18 @@ Requirements
 - Upload programs.
 - Manage cover images.
 
-The implementation may initially use local or seeded media before object storage integration.
+The macOS Flutter application performs local conversion and lower-level media
+ingest for an existing concert. It can upload or import media, monitor transfer
+and verification, and update asset presentation metadata. It does not publish
+concerts or replace the web administration boundary.
+
+Flutter uploads directly to private object storage through short-lived requests
+issued by Laravel. It never contains a reusable AWS credential. Laravel assigns
+the managed asset UUID and storage prefix, verifies the completed package and
+updates database state.
+
+The implementation may initially use local or seeded media before object
+storage integration.
 
 ---
 
@@ -223,8 +244,11 @@ The API provides secure access to:
 - Media discovery
 - Protected download links
 - Administrative functions
+- Staff media ingest, upload verification and assignment
 
 The API should expose business entities rather than storage implementation.
+Upload endpoints may expose short-lived object-specific requests and relative
+package paths, but never bucket credentials or unrestricted storage access.
 
 ---
 
@@ -267,7 +291,7 @@ storage and CDN alignment. This work is tracked by
 - Media purchasing
 - Download analytics
 - Streaming optimisation
-- Automatic transcoding
+- Automatic server-side transcoding
 - Archive storage
 - Customer favourites
 

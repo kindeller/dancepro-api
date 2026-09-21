@@ -16,6 +16,7 @@ class LoginTest extends TestCase
 
     public function test_active_user_can_login_and_receive_a_sanctum_token(): void
     {
+        $this->freezeTime();
         $user = User::factory()->create([
             'email' => 'staff@example.com',
             'password' => Hash::make('secret-password'),
@@ -48,10 +49,14 @@ class LoginTest extends TestCase
                 TokenAbility::AccountRead->value,
                 TokenAbility::CompetitionObjectsRead->value,
                 TokenAbility::DownloadLinksManage->value,
+                TokenAbility::ConcertMediaRead->value,
+                TokenAbility::ConcertMediaUpload->value,
+                TokenAbility::ConcertMediaUpdate->value,
             ]),
         ]);
         $this->assertNotNull($user->tokens()->firstOrFail()->expires_at);
         $this->assertNotNull($user->fresh()->last_login_at);
+        $this->assertSame(now()->addMinutes((int) config('sanctum.expiration'))->timestamp, $user->tokens()->firstOrFail()->expires_at->timestamp);
     }
 
     public function test_expired_api_token_cannot_authenticate(): void
@@ -68,7 +73,7 @@ class LoginTest extends TestCase
             ->assertUnauthorized();
     }
 
-    public function test_non_admin_token_receives_only_the_account_read_ability(): void
+    public function test_non_admin_cannot_receive_a_staff_api_token(): void
     {
         $user = User::factory()->crew()->create([
             'email' => 'crew@example.com',
@@ -78,12 +83,9 @@ class LoginTest extends TestCase
         $this->postJson('/api/auth/login', [
             'email' => $user->email,
             'password' => 'secret-password',
-        ])->assertOk();
+        ])->assertForbidden();
 
-        $this->assertDatabaseHas('personal_access_tokens', [
-            'tokenable_id' => $user->id,
-            'abilities' => json_encode([TokenAbility::AccountRead->value]),
-        ]);
+        $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
     public function test_login_rejects_invalid_credentials(): void
@@ -244,5 +246,22 @@ class LoginTest extends TestCase
         $user->refresh();
 
         return $withRecoveryCodes ? [$user, $recoveryCodes] : $user;
+    }
+
+    public function test_customer_cannot_receive_a_staff_api_token(): void
+    {
+        User::factory()->customer()->create([
+            'email' => 'customer@example.com',
+            'password' => Hash::make('secret-password'),
+        ]);
+
+        $this->postJson('/api/auth/login', [
+            'email' => 'customer@example.com',
+            'password' => 'secret-password',
+        ])
+            ->assertForbidden()
+            ->assertJsonPath('message', 'This account cannot use staff API access.');
+
+        $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 }

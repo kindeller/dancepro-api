@@ -7,7 +7,11 @@ use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Downloads\Policies\DownloadLinkPolicy;
 use App\Features\Exceptions\Services\AdminExceptionOverview;
 use App\Features\Media\Models\MediaAsset;
+use App\Features\Media\Models\MediaCollection;
+use App\Features\Media\Policies\MediaAssetPolicy;
+use App\Features\Media\Policies\MediaCollectionPolicy;
 use App\Models\User;
+use App\Shared\Support\LocalDevelopmentSafety;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -32,6 +36,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if ($this->app->environment('local')) {
+            $this->app->make(LocalDevelopmentSafety::class)->assertSafe();
+        }
+
         RateLimiter::for('login', function (Request $request): array {
             $emailAndIp = hash('sha256', mb_strtolower($request->string('email')->toString()).'|'.$request->ip());
 
@@ -118,12 +126,18 @@ class AppServiceProvider extends ServiceProvider
         $this->registerConcertMediaRateLimiters();
 
         Gate::policy(DownloadLink::class, DownloadLinkPolicy::class);
+        Gate::policy(MediaCollection::class, MediaCollectionPolicy::class);
+        Gate::policy(MediaAsset::class, MediaAssetPolicy::class);
 
         Gate::define('viewCompetitionObjects', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('manageStudios', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('manageConcerts', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('manageCrew', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('manageScheduling', fn (User $user): bool => $user->canAccessAdmin());
+        Gate::define('viewStaffMedia', fn (User $user): bool => $user->canAccessAdmin());
+
+        RateLimiter::for('media-uploads', fn (Request $request): Limit => Limit::perMinute(120)
+            ->by((string) ($request->user()?->id ?? $request->ip())));
 
         View::composer('layouts.crew', function (ViewContract $view): void {
             $user = auth()->user();

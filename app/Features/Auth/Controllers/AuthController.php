@@ -37,6 +37,10 @@ class AuthController extends Controller
             return ApiResponse::error('This account is inactive.', status: 403);
         }
 
+        if (! $user->canAccessAdmin()) {
+            return ApiResponse::error('This account cannot use staff API access.', status: 403);
+        }
+
         $twoFactorResult = $twoFactor->check(
             $user,
             $request->string('two_factor_code')->toString() ?: null,
@@ -74,6 +78,7 @@ class AuthController extends Controller
         return ApiResponse::success('Logged in.', [
             'token' => $token->plainTextToken,
             'token_type' => 'Bearer',
+            'abilities' => $token->accessToken->abilities,
             'expires_at' => $expiresAt->toIso8601String(),
             'user' => new AuthUserResource($user),
         ]);
@@ -93,6 +98,10 @@ class AuthController extends Controller
 
         return ApiResponse::success('Authenticated user returned.', [
             'user' => new AuthUserResource($user),
+            'abilities' => $user->currentAccessToken()?->abilities ?? [],
+            'expires_at' => $user->currentAccessToken()?->expires_at,
+            'abilities' => $user->currentAccessToken()?->abilities ?? [],
+            'expires_at' => $user->currentAccessToken()?->expires_at,
         ]);
     }
 

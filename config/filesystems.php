@@ -1,5 +1,9 @@
 <?php
 
+// A local app must never reach an AWS bucket, even if credentials were copied
+// into its environment. Keep the logical disk names used by database records.
+$localAwsDisks = env('APP_ENV') === 'local';
+
 return [
 
     /*
@@ -51,12 +55,14 @@ return [
         ],
 
         's3' => [
-            'driver' => 's3',
+            'driver' => $localAwsDisks ? 'local' : 's3',
+            'root' => storage_path('app/local-aws/default'),
+            'serve' => $localAwsDisks,
             'key' => env('AWS_ACCESS_KEY_ID'),
             'secret' => env('AWS_SECRET_ACCESS_KEY'),
             'region' => env('AWS_DEFAULT_REGION'),
             'bucket' => env('AWS_BUCKET'),
-            'url' => env('AWS_URL'),
+            'url' => $localAwsDisks ? rtrim(env('APP_URL', 'http://localhost'), '/').'/local-aws/default' : env('AWS_URL'),
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
             'throw' => true,
@@ -65,12 +71,14 @@ return [
         ],
 
         's3_public_uploads' => [
-            'driver' => 's3',
+            'driver' => $localAwsDisks ? 'local' : 's3',
+            'root' => storage_path('app/local-aws/public-uploads'),
+            'serve' => $localAwsDisks,
             'key' => env('AWS_PUBLIC_UPLOADS_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
             'secret' => env('AWS_PUBLIC_UPLOADS_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
             'region' => env('AWS_PUBLIC_UPLOADS_DEFAULT_REGION', env('AWS_DEFAULT_REGION')),
             'bucket' => env('AWS_PUBLIC_UPLOADS_BUCKET'),
-            'url' => env('AWS_PUBLIC_UPLOADS_URL'),
+            'url' => $localAwsDisks ? rtrim(env('APP_URL', 'http://localhost'), '/').'/local-aws/public-uploads' : env('AWS_PUBLIC_UPLOADS_URL'),
             'endpoint' => env('AWS_PUBLIC_UPLOADS_ENDPOINT', env('AWS_ENDPOINT')),
             'use_path_style_endpoint' => env('AWS_PUBLIC_UPLOADS_USE_PATH_STYLE_ENDPOINT', env('AWS_USE_PATH_STYLE_ENDPOINT', false)),
             'throw' => true,
@@ -80,12 +88,14 @@ return [
         ],
 
         's3_competitions' => [
-            'driver' => 's3',
+            'driver' => $localAwsDisks ? 'local' : 's3',
+            'root' => storage_path('app/local-aws/competitions'),
+            'serve' => $localAwsDisks,
             'key' => env('AWS_COMPETITIONS_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
             'secret' => env('AWS_COMPETITIONS_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
             'region' => env('AWS_COMPETITIONS_DEFAULT_REGION', env('AWS_DEFAULT_REGION')),
             'bucket' => env('AWS_COMPETITIONS_BUCKET', env('AWS_BUCKET')),
-            'url' => env('AWS_COMPETITIONS_URL'),
+            'url' => $localAwsDisks ? rtrim(env('APP_URL', 'http://localhost'), '/').'/local-aws/competitions' : env('AWS_COMPETITIONS_URL'),
             'endpoint' => env('AWS_COMPETITIONS_ENDPOINT', env('AWS_ENDPOINT')),
             'use_path_style_endpoint' => env('AWS_COMPETITIONS_USE_PATH_STYLE_ENDPOINT', env('AWS_USE_PATH_STYLE_ENDPOINT', false)),
             'throw' => true,
@@ -93,12 +103,14 @@ return [
         ],
 
         's3_concerts' => [
-            'driver' => 's3',
+            'driver' => $localAwsDisks ? 'local' : 's3',
+            'root' => storage_path('app/local-aws/concerts'),
+            'serve' => $localAwsDisks,
             'key' => env('AWS_CONCERT_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
             'secret' => env('AWS_CONCERT_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
             'region' => env('AWS_CONCERT_DEFAULT_REGION', env('AWS_DEFAULT_REGION')),
             'bucket' => env('AWS_CONCERT_BUCKET', env('AWS_BUCKET')),
-            'url' => env('AWS_CONCERT_URL', env('AWS_URL')),
+            'url' => $localAwsDisks ? rtrim(env('APP_URL', 'http://localhost'), '/').'/local-aws/concerts' : env('AWS_CONCERT_URL', env('AWS_URL')),
             'endpoint' => env('AWS_CONCERT_ENDPOINT', env('AWS_ENDPOINT')),
             'use_path_style_endpoint' => env('AWS_CONCERT_USE_PATH_STYLE_ENDPOINT', env('AWS_USE_PATH_STYLE_ENDPOINT', false)),
             'throw' => true,
@@ -106,12 +118,14 @@ return [
         ],
 
         's3_concerts_legacy' => [
-            'driver' => 's3',
+            'driver' => $localAwsDisks ? 'local' : 's3',
+            'root' => storage_path('app/local-aws/concerts-legacy'),
+            'serve' => $localAwsDisks,
             'key' => env('AWS_CONCERT_LEGACY_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
             'secret' => env('AWS_CONCERT_LEGACY_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
             'region' => env('AWS_CONCERT_LEGACY_DEFAULT_REGION', env('AWS_DEFAULT_REGION')),
             'bucket' => env('AWS_CONCERT_LEGACY_BUCKET'),
-            'url' => env('AWS_CONCERT_LEGACY_URL'),
+            'url' => $localAwsDisks ? rtrim(env('APP_URL', 'http://localhost'), '/').'/local-aws/concerts-legacy' : env('AWS_CONCERT_LEGACY_URL'),
             'endpoint' => env('AWS_CONCERT_LEGACY_ENDPOINT', env('AWS_ENDPOINT')),
             'use_path_style_endpoint' => env('AWS_CONCERT_LEGACY_USE_PATH_STYLE_ENDPOINT', env('AWS_USE_PATH_STYLE_ENDPOINT', false)),
             'throw' => true,

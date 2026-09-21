@@ -2,12 +2,14 @@
 
 namespace App\Features\Concerts\Models;
 
+use App\Features\Bookings\Models\ConcertBookingItem;
 use App\Features\Concerts\Support\ConcertStatus;
 use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Media\Models\MediaCollection;
 use App\Features\Studios\Models\Studio;
 use App\Models\User;
 use App\Shared\Models\HasPublicUuid;
+use App\Shared\Support\LocalMediaUrl;
 use Database\Factories\ConcertFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -18,15 +20,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Hash;
 
-#[Fillable(['uuid', 'studio_id', 'name', 'slug', 'status', 'event_date', 'event_end_date', 'venue_name', 'description', 'cover_image_url', 'brand_color', 'is_enabled', 'requires_approval', 'approved_at', 'approved_by_user_id', 'available_from', 'available_until', 'program_url', 'external_gallery_url', 'storage_disk', 'storage_prefix', 'access_password_hash', 'published_at', 'archived_at', 'created_by_user_id', 'updated_by_user_id', 'legacy_id', 'notes'])]
+#[Fillable(['uuid', 'studio_id', 'concert_booking_item_id', 'booking_programme_path_synced', 'name', 'slug', 'status', 'event_date', 'event_end_date', 'venue_name', 'description', 'cover_image_url', 'cover_image_storage_key', 'cover_image_revision', 'cover_image_mime_type', 'brand_color', 'is_enabled', 'requires_approval', 'approved_at', 'approved_by_user_id', 'available_from', 'available_until', 'program_url', 'program_storage_key', 'program_revision', 'program_mime_type', 'external_gallery_url', 'storage_disk', 'storage_prefix', 'access_password_hash', 'access_password_encrypted', 'published_at', 'archived_at', 'created_by_user_id', 'updated_by_user_id', 'legacy_id', 'notes'])]
 class Concert extends Model
 {
     /** @use HasFactory<ConcertFactory> */
     use HasFactory, HasPublicUuid, SoftDeletes;
 
+    protected $hidden = ['access_password_hash', 'access_password_encrypted'];
+
     public function studio(): BelongsTo
     {
         return $this->belongsTo(Studio::class);
+    }
+
+    public function bookingItem(): BelongsTo
+    {
+        return $this->belongsTo(ConcertBookingItem::class, 'concert_booking_item_id');
     }
 
     public function mediaCollections(): HasMany
@@ -68,6 +77,7 @@ class Concert extends Model
     {
         return $this->is_enabled
             && $this->status === ConcertStatus::Published
+            && ($this->concert_booking_item_id === null || $this->bookingItem?->cancelled_at === null)
             && (! $this->requires_approval || $this->approved_at !== null)
             && ($this->available_from === null || $this->available_from->isPast())
             && ($this->available_until === null || $this->available_until->isFuture());
@@ -76,6 +86,21 @@ class Concert extends Model
     public function requiresPassword(): bool
     {
         return $this->access_password_hash !== null;
+    }
+
+    public function coverImageForDisplay(): ?string
+    {
+        return app(LocalMediaUrl::class)->display($this->cover_image_url);
+    }
+
+    public function programForDisplay(): ?string
+    {
+        return app(LocalMediaUrl::class)->display($this->program_url);
+    }
+
+    public function galleryForDisplay(): ?string
+    {
+        return app(LocalMediaUrl::class)->display($this->external_gallery_url);
     }
 
     public function passwordMatches(string $password): bool
@@ -92,6 +117,7 @@ class Concert extends Model
     {
         return [
             'status' => ConcertStatus::class,
+            'access_password_encrypted' => 'encrypted',
             'event_date' => 'date', 'event_end_date' => 'date',
             'published_at' => 'datetime', 'archived_at' => 'datetime',
             'is_enabled' => 'boolean', 'requires_approval' => 'boolean', 'approved_at' => 'datetime',

@@ -6,5 +6,6 @@
 <form class="card card-pad" method="POST" action="{{ route('admin.concerts.store') }}">@csrf
     @include('admin.concerts._form', ['submitLabel' => 'Create concert'])
 </form>
+<p class="muted">After creating the concert, open its edit page to upload a cover image and PDF program.</p>
 @endif
 @endsection

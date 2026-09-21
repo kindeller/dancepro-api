@@ -8,4 +8,7 @@ enum TokenAbility: string
     case CrewMobile = 'crew-mobile';
     case CompetitionObjectsRead = 'competition-objects:read';
     case DownloadLinksManage = 'download-links:manage';
+    case ConcertMediaRead = 'concert-media:read';
+    case ConcertMediaUpload = 'concert-media:upload';
+    case ConcertMediaUpdate = 'concert-media:update';
 }

@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Accepted. The initial rendition ladder and desktop ingest boundary are amended
+by [ADR-0003](ADR-0003-Desktop-Media-Ingest-and-Assignment.md).
 
 ## Context
 
@@ -39,17 +40,23 @@ Each managed video may contain:
 ```text
 original/video.mp4
 stream/master.m3u8
-stream/high.m3u8
-stream/high-{segment}.m4s
-stream/standard.m3u8
-stream/standard-{segment}.m4s
+stream/720p.m3u8
+stream/720p-{segment}.m4s
+stream/480p.m3u8
+stream/480p-{segment}.m4s
 stream/fallback.mp4
 thumbnail/poster.png
 ```
 
 The initial adaptive format is HLS video on demand using fragmented MP4
-segments with high and standard renditions. Rendition files may remain flat
-inside `stream/` when their names prevent collisions.
+segments. The maximum streaming rendition is 720p, with an optional 480p
+rendition for adaptive bandwidth reduction. A source-quality or 1080p streaming
+rendition is intentionally excluded. Rendition files may remain flat inside
+`stream/` when their names prevent collisions.
+
+The original is retained for protected download and must not be referenced by
+the HLS master manifest. A compressed `stream/fallback.mp4` is the minimum
+reliable playback output; HLS is optional.
 
 Playback resolves sources in this order:
 
@@ -76,10 +83,16 @@ production delivery is fully migrated.
   must be configured before production HLS playback is available.
 - Progressive fallback prevents AWS setup or HLS failures from removing the
   existing playback capability.
+- Omitting high-resolution streaming reduces stored derivatives and delivered
+  bytes while retaining the source original for protected download.
+- The Flutter desktop converter and uploader uses Laravel-authorised presigned
+  S3 requests. It does not hold a long-lived AWS credential.
 
 ## Related Documentation
 
 - [DancePro V1 S3 Structure](../handbook/V1-S3-Structure.md)
 - [Concert Streaming AWS Setup Handoff](../handbook/Concert-Streaming-AWS-Setup-Handoff.md)
+- [ADR-0003 - Desktop Media Ingest and Assignment](ADR-0003-Desktop-Media-Ingest-and-Assignment.md)
+- [Flutter Desktop Media Ingest API](../specifications/Flutter-Desktop-Media-Ingest-API.md)
 - [AWS](../handbook/AWS.md)
 - [Concerts and Media Database Migration](../specifications/DancePro-V2-Concerts-Media-Database-Migration-Spec.md)

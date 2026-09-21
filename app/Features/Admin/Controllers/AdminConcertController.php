@@ -3,6 +3,8 @@
 namespace App\Features\Admin\Controllers;
 
 use App\Features\Admin\Requests\SaveConcertRequest;
+use App\Features\Bookings\Models\ConcertBookingItem;
+use App\Features\Bookings\Support\ConcertBookingItemType;
 use App\Features\Concerts\Actions\SaveConcert;
 use App\Features\Concerts\Models\Concert;
 use App\Features\Concerts\Support\ConcertStatus;
@@ -63,7 +65,10 @@ class AdminConcertController extends Controller
     {
         Gate::authorize('manageConcerts');
 
-        return view('admin.concerts.edit', compact('concert') + $this->formData());
+        $concert->load(['mediaCollections' => fn ($query) => $query->orderBy('sort_order')->orderBy('id'),
+            'mediaCollections.assets' => fn ($query) => $query->orderBy('sort_order')->orderBy('id')]);
+
+        return view('admin.concerts.edit', compact('concert') + $this->formData($concert));
     }
 
     public function update(SaveConcertRequest $request, Concert $concert, SaveConcert $saveConcert): RedirectResponse
@@ -75,11 +80,28 @@ class AdminConcertController extends Controller
         return back()->with('status', 'Concert updated.');
     }
 
-    private function formData(): array
+    private function formData(?Concert $concert = null): array
     {
+        $bookingItems = ConcertBookingItem::query()
+            ->with('booking')
+            ->where('item_type', ConcertBookingItemType::Concert->value)
+            ->whereNull('cancelled_at')
+            ->whereDoesntHave('concert')
+            ->orderByDesc('event_date')
+            ->limit(200)
+            ->get();
+
+        if ($concert?->concert_booking_item_id && ! $bookingItems->contains('id', $concert->concert_booking_item_id)) {
+            $selected = ConcertBookingItem::query()->with('booking')->find($concert->concert_booking_item_id);
+            if ($selected) {
+                $bookingItems->prepend($selected);
+            }
+        }
+
         return [
             'studios' => Studio::query()->orderBy('name')->get(),
             'statuses' => ConcertStatus::cases(),
+            'bookingItems' => $bookingItems,
         ];
     }
 }

@@ -57,4 +57,8 @@ database-backed meaning.
 
 Concert media collections, assets, programs and cover uploads are not yet
 managed through the dashboard. They are part of the Concert production-readiness
-milestone.
+milestone. The web dashboard will own business-facing review, publication,
+availability and customer access. The macOS Flutter application will own local
+conversion and lower-level direct upload/import through the limited media API.
+
+See [Flutter Desktop Media Ingest API](Flutter-Desktop-Media-Ingest-API.md).

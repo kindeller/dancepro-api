@@ -36,7 +36,8 @@ Start with:
 - [Concert Streaming AWS Setup Handoff](handbook/Concert-Streaming-AWS-Setup-Handoff.md)
 - [Concert Streaming AWS ChatGPT Prompt](handbook/Concert-Streaming-AWS-ChatGPT-Prompt.md)
 - [Crew Mobile API v1 contract](api/openapi-v1.yaml)
-- [ADR-0003: Crew Mobile API Contract](decisions/ADR-0003-Crew-Mobile-API-Contract.md)
+- [ADR-0007: Crew Mobile API Contract](decisions/ADR-0007-Crew-Mobile-API-Contract.md)
+- [ADR-0010: Local Media Isolation](decisions/ADR-0010-Local-Media-Isolation.md)
 - [Brand Style](handbook/Brand-Style.md)
 - [Security](handbook/Security.md)
 - [Production Launch Checklist](handbook/Production-Launch-Checklist.md)
@@ -75,6 +76,7 @@ Current specifications:
 - [Competition Downloads](specifications/Competition-Downloads.md)
 - [DancePro V2 Functional Specification](specifications/DancePro-V2-Functional-Specification.md)
 - [Concerts and Media Database Migration](specifications/DancePro-V2-Concerts-Media-Database-Migration-Spec.md)
+- [Flutter Desktop Media Ingest API](specifications/Flutter-Desktop-Media-Ingest-API.md)
 
 ## Milestones
 
@@ -103,7 +105,13 @@ Current records:
 - [Crew Scheduling - Phase 0 Integration Plan](decisions/DancePro-Crew-Scheduling-Phase-0-Integration-Plan.md)
 - [ADR-0001 - Generic Downloads Bounded Context](decisions/ADR-0001-Generic-Downloads-Bounded-Context.md)
 - [ADR-0002 - Concert Media Storage and Playback](decisions/ADR-0002-Concert-Media-Storage-and-Playback.md)
-- [ADR-0003 - Crew Mobile API Contract](decisions/ADR-0003-Crew-Mobile-API-Contract.md)
+- [ADR-0003 - Desktop Media Ingest and Assignment](decisions/ADR-0003-Desktop-Media-Ingest-and-Assignment.md)
+- [ADR-0004 - Media Ingest Compatibility and Verification](decisions/ADR-0004-Media-Ingest-Compatibility-and-Verification.md)
+- [ADR-0005 - Retrievable Concert Access Codes](decisions/ADR-0005-Retrievable-Concert-Access-Codes.md)
+- [ADR-0006 - Concert Branding Storage](decisions/ADR-0006-Concert-Branding-Storage.md)
+- [ADR-0007 - Crew Mobile API Contract](decisions/ADR-0007-Crew-Mobile-API-Contract.md)
+- [ADR-0008 - Communication Data Encryption](decisions/ADR-0008-Communication-Data-Encryption.md)
+- [ADR-0009 - Booking Concert Link and Programme Copy](decisions/ADR-0009-Booking-Concert-Link-and-Programme-Copy.md)
 
 ## Documentation Principle
 
