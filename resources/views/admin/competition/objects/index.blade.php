@@ -1,7 +1,7 @@
 @extends('layouts.admin', [
-    'title' => 'Competition Objects',
-    'heading' => 'Competition Objects',
-    'subheading' => 'Browse the competition storage structure exposed to the app.',
+    'title' => 'Competition Media',
+    'heading' => 'Competition Media',
+    'subheading' => 'Browse the existing competition storage used by the live app.',
 ])
 
 @section('content')
@@ -64,6 +64,12 @@
             Create links <span id="competition-selection-count"></span>
         </a>
 
+        @if($videoEvent)
+            <form method="post" action="{{ route('admin.competition.objects.videos.sync', $videoEvent) }}" style="margin:0">@csrf
+                <button type="submit" class="secondary">Link existing videos to gallery</button>
+            </form>
+        @endif
+
         <div class="competition-file-filter" role="search">
             <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"></circle>
@@ -88,6 +94,11 @@
             </button>
         </div>
     </div>
+
+    @if(session('status'))<div class="notice" role="status">{{ session('status') }}</div>@endif
+    @if($videoEvent)
+        <div class="notice"><strong>{{ $videoEvent->name }}</strong><br><span class="muted">This folder matches {{ $videoEvent->eventCode() }}. Linking creates gallery references to the files in place. It does not move, rename, replace or delete a video.</span></div>
+    @endif
 
     @if ($objects['breadcrumbs'] !== [])
         <div class="notice">

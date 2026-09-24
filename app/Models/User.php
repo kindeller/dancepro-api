@@ -2,14 +2,15 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Features\Concerts\Models\ConcertAccess;
 use App\Features\Concerts\Models\ConcertAccessGrant;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Customers\Models\CustomerProfile;
 use App\Features\Customers\Support\UserType;
 use App\Features\Orders\Models\Order;
+use App\Features\Payments\Models\CustomerCreditTransaction;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,19 +23,24 @@ use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable(['name', 'email', 'password', 'is_active', 'is_admin', 'type', 'last_login_at', 'last_seen_at', 'invitation_sent_at', 'onboarding_completed_at'])]
 #[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     public function homeRouteName(): string
     {
-        return $this->canAccessAdmin() ? 'admin.dashboard' : 'crew.availability.index';
+        return $this->canAccessAdmin() ? 'admin.dashboard' : ($this->type === UserType::Customer->value ? 'customer.media.index' : 'crew.availability.index');
     }
 
     public function canAccessAdmin(): bool
     {
         return $this->is_active && $this->is_admin;
+    }
+
+    public function canAccessCustomer(): bool
+    {
+        return $this->is_active && ($this->type === UserType::Customer->value || $this->canAccessAdmin());
     }
 
     public function canAccessCrew(): bool
@@ -67,6 +73,11 @@ class User extends Authenticatable
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function creditTransactions(): HasMany
+    {
+        return $this->hasMany(CustomerCreditTransaction::class);
     }
 
     /**

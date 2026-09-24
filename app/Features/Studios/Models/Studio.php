@@ -20,6 +20,8 @@ class Studio extends Model
     /** @use HasFactory<StudioFactory> */
     use HasFactory, HasPublicUuid, SoftDeletes;
 
+    protected $hidden = ['gallery_code_hash'];
+
     public function concerts(): HasMany
     {
         return $this->hasMany(Concert::class);
@@ -28,6 +30,11 @@ class Studio extends Model
     public function contacts(): HasMany
     {
         return $this->hasMany(StudioContact::class)->orderBy('position')->orderBy('id');
+    }
+
+    public function accountAccesses(): HasMany
+    {
+        return $this->hasMany(StudioAccountAccess::class)->orderBy('email');
     }
 
     /** @return list<string> */
@@ -52,7 +59,7 @@ class Studio extends Model
 
     protected function casts(): array
     {
-        return ['status' => StudioStatus::class];
+        return ['status' => StudioStatus::class, 'gallery_code_version' => 'integer'];
     }
 
     protected static function newFactory(): StudioFactory

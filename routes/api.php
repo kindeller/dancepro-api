@@ -8,10 +8,13 @@ use App\Features\Chat\Controllers\CrewMobileChatController;
 use App\Features\Chat\Controllers\MessageReactionController;
 use App\Features\Competition\Controllers\CompetitionObjectController;
 use App\Features\Concerts\Controllers\PublicConcertApiController;
+use App\Features\Concerts\Controllers\PublicConcertController;
 use App\Features\Crew\Controllers\CrewMobileContractController;
 use App\Features\Crew\Controllers\CrewMobileDashboardController;
 use App\Features\Crew\Controllers\CrewMobileDirectoryController;
 use App\Features\Crew\Controllers\CrewMobileProfileController;
+use App\Features\Customers\Controllers\CustomerMobileAuthController;
+use App\Features\Customers\Controllers\CustomerMobileMediaController;
 use App\Features\Downloads\Controllers\DownloadLinkController;
 use App\Features\Media\Controllers\LegacyMediaController;
 use App\Features\Media\Controllers\LocalMediaUploadController;
@@ -23,6 +26,18 @@ use App\Features\Notifications\Controllers\CrewMobileAppConfigController;
 use App\Features\Notifications\Controllers\CrewMobilePushDeviceController;
 use App\Features\Operations\Controllers\CrewMobileDocumentController;
 use App\Features\Operations\Controllers\CrewMobileHandbookController;
+use App\Features\Programmes\Controllers\CompetitionFoldersController;
+use App\Features\Programmes\Controllers\CompetitionVideoUploadController;
+use App\Features\Programmes\Controllers\PhotoCompletionController;
+use App\Features\Programmes\Controllers\PhotoContentController;
+use App\Features\Programmes\Controllers\PhotoContributionsController;
+use App\Features\Programmes\Controllers\PhotoFilesController;
+use App\Features\Programmes\Controllers\PhotoUploadProgressController;
+use App\Features\Programmes\Controllers\ProgrammeController;
+use App\Features\Programmes\Controllers\ProgrammePhotographersController;
+use App\Features\Programmes\Controllers\ProgrammeSyncController;
+use App\Features\Programmes\Controllers\ProgrammeUploadRolesController;
+use App\Features\Programmes\Controllers\SharedConcertProgrammeController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentActionController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentFileController;
@@ -30,6 +45,8 @@ use App\Features\Scheduling\Controllers\CrewMobileAvailabilityController;
 use App\Features\Scheduling\Controllers\CrewMobileCoverRequestController;
 use App\Features\Scheduling\Controllers\CrewMobileNotificationController;
 use App\Features\Scheduling\Controllers\CrewMobileTimeController;
+use App\Features\Studios\Controllers\StudioEventFileController;
+use App\Features\Studios\Controllers\StudioEventSeatsController;
 use App\Features\Timesheets\Controllers\CrewMobileFinancialController;
 use App\Features\Timesheets\Controllers\InvoiceStylePreferenceController;
 use App\Features\Training\Controllers\CrewMobileTrainingController;
@@ -76,6 +93,35 @@ Route::prefix('v1/auth')->group(function (): void {
             ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
         Route::delete('two-factor', [CrewMobileSecurityController::class, 'disableTwoFactor'])
             ->middleware(['api.idempotency', 'throttle:sensitive-auth']);
+    });
+});
+
+Route::prefix('v1/customer')->name('api.v1.customer.')->group(function (): void {
+    Route::post('register', [CustomerMobileAuthController::class, 'register'])->middleware('throttle:5,1')->name('register');
+    Route::post('auth/login', [CustomerMobileAuthController::class, 'login'])->middleware('throttle:login')->name('auth.login');
+    Route::post('auth/forgot-password', [CustomerMobileAuthController::class, 'forgotPassword'])->middleware('throttle:password-reset-link')->name('auth.forgot-password');
+    Route::middleware(['auth:sanctum', 'token.ability:'.TokenAbility::CustomerMobile->value])->group(function (): void {
+        Route::get('auth/me', [CustomerMobileAuthController::class, 'me'])->name('auth.me');
+        Route::post('auth/logout', [CustomerMobileAuthController::class, 'logout'])->name('auth.logout');
+        Route::post('auth/resend-verification', [CustomerMobileAuthController::class, 'resend'])->middleware('throttle:3,1')->name('auth.resend');
+        Route::post('policy', [CustomerMobileAuthController::class, 'policy'])->name('policy');
+
+        Route::middleware('api.customer.onboarded')->group(function (): void {
+            Route::get('media', [CustomerMobileMediaController::class, 'home'])->name('media');
+            Route::post('profile', [CustomerMobileMediaController::class, 'profile'])->name('profile');
+            Route::post('competitions', [CustomerMobileMediaController::class, 'competition'])->middleware('throttle:10,1')->name('competitions.store');
+            Route::get('competitions/{schedulingEvent}', [CustomerMobileMediaController::class, 'gallery'])->name('competitions.show');
+            Route::get('competitions/{schedulingEvent}/photos/{photo}', [CustomerMobileMediaController::class, 'image'])->whereUuid('photo')->name('competitions.image');
+            Route::get('recommendations/{schedulingEvent}/{item}/{photo}/thumbnail', [CustomerMobileMediaController::class, 'recommendation'])->whereUuid(['item', 'photo'])->name('recommendations.thumbnail');
+            Route::post('concert-codes', [CustomerMobileMediaController::class, 'concertCode'])->middleware('throttle:10,1')->name('concert-codes.store');
+            Route::get('concerts/{concert}', [CustomerMobileMediaController::class, 'concert'])->name('concerts.show');
+            Route::post('studios/{studio}/events/{schedulingEvent}/seats', [StudioEventSeatsController::class, 'store'])
+                ->middleware('throttle:10,1')->name('studio-events.seats.store');
+            Route::post('studios/{studio}/events/{schedulingEvent}/files', [StudioEventFileController::class, 'store'])
+                ->middleware('throttle:10,1')->name('studio-events.files.store');
+            Route::get('concerts/{concert}/media/{asset}/playback', [PublicConcertController::class, 'playback'])->name('concerts.playback');
+            Route::get('concerts/{concert}/media/{asset}/download', [PublicConcertController::class, 'download'])->name('concerts.download');
+        });
     });
 });
 
@@ -182,6 +228,36 @@ Route::middleware('auth:sanctum')->group(function (): void {
     });
 
     Route::prefix('staff')->group(function (): void {
+        Route::get('events/{schedulingEvent}/programme/photo-progress', PhotoUploadProgressController::class)
+            ->middleware(['token.ability:'.TokenAbility::ProgrammeRead->value, 'throttle:60,1']);
+        Route::get('events/{schedulingEvent}/programme/upload-roles', ProgrammeUploadRolesController::class)
+            ->middleware(['token.ability:'.TokenAbility::ProgrammeRead->value, 'throttle:60,1']);
+        Route::get('events/{schedulingEvent}/programme/photographers', ProgrammePhotographersController::class)
+            ->middleware(['token.ability:'.TokenAbility::ProgrammeRead->value, 'throttle:60,1']);
+        Route::put('events/{schedulingEvent}/programme/photo-files/{photoFile}/content', PhotoContentController::class)
+            ->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:120,1']);
+        Route::post('events/{schedulingEvent}/programme/photo-files', PhotoFilesController::class)
+            ->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:60,1']);
+        Route::post('events/{schedulingEvent}/programme/photo-completion', PhotoCompletionController::class)
+            ->middleware(['token.ability:concert-media:upload', 'throttle:30,1']);
+        Route::post('events/{schedulingEvent}/programme/photo-contributions', PhotoContributionsController::class)
+            ->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:30,1']);
+        Route::get('events/{schedulingEvent}/programme/competition-folders', [CompetitionFoldersController::class, 'show'])->middleware(['token.ability:programmes:read', 'throttle:60,1']);
+        Route::post('events/{schedulingEvent}/programme/competition-folders', [CompetitionFoldersController::class, 'store'])->middleware(['token.ability:concert-media:upload', 'throttle:30,1']);
+        Route::post('events/{schedulingEvent}/competition-videos/batches', [CompetitionVideoUploadController::class, 'begin'])->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:30,1']);
+        Route::post('events/{schedulingEvent}/competition-videos/batches/{batch}/files', [CompetitionVideoUploadController::class, 'reserve'])->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:60,1']);
+        Route::post('events/{schedulingEvent}/competition-videos/batches/{batch}/files/{file}/verify', [CompetitionVideoUploadController::class, 'verify'])->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:60,1']);
+        Route::post('events/{schedulingEvent}/competition-videos/batches/{batch}/complete', [CompetitionVideoUploadController::class, 'complete'])->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:30,1']);
+        Route::get('events/{schedulingEvent}/programme/shared', SharedConcertProgrammeController::class)
+            ->middleware(['token.ability:'.TokenAbility::ProgrammeRead->value, 'throttle:60,1']);
+        Route::post('events/{schedulingEvent}/programme/sync', ProgrammeSyncController::class)
+            ->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:30,1']);
+        Route::get('programme-events', [ProgrammeController::class, 'events'])
+            ->middleware(['token.ability:'.TokenAbility::ProgrammeRead->value, 'throttle:60,1']);
+        Route::get('events/{schedulingEvent}/programme/source/{revision?}', [ProgrammeController::class, 'confirmedSource'])->name('staff.programmes.source')
+            ->middleware(['token.ability:'.TokenAbility::ProgrammeRead->value, 'throttle:60,1']);
+        Route::get('events/{schedulingEvent}/programme', [ProgrammeController::class, 'snapshot'])
+            ->middleware(['token.ability:'.TokenAbility::ProgrammeRead->value, 'throttle:60,1']);
         Route::middleware('token.ability:'.TokenAbility::ConcertMediaRead->value)->group(function (): void {
             Route::get('studios', [StaffMediaDiscoveryController::class, 'studios']);
             Route::get('concerts', [StaffMediaDiscoveryController::class, 'concerts']);

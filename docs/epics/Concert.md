@@ -1,11 +1,21 @@
 # Concert Epic
 
+> Product direction update: use the [integrated media plan](../specifications/Integrated-Media-Product-Plan.md)
+> and [roadmap](../Roadmap.md) for new scope and sequencing. Earlier status and
+> priorities below describe the previous delivery slice; they do not establish
+> completion of the expanded workflows.
+
 ## Purpose
 
 Provide a secure customer experience for discovering studios, accessing released
 concerts, playing concert media and downloading protected originals.
 
 ## Current Status
+
+The event Programme editor now supports manual drafts, bulk entry, protected PDF
+preview and confirmed preparation snapshots. See the
+[programme milestone](../milestones/Integrated-Media-Event-Programme-Foundations.md).
+Automatic extraction and the new offline uploader are still pending.
 
 The customer discovery, access and playback foundation is implemented. Staff
 studio and concert creation, editing, approval, release, availability and
@@ -18,6 +28,12 @@ authorised, short-lived CloudFront delivery from the dedicated S3 media store.
 Staff media management and the Flutter desktop ingest API are implemented.
 Production readiness still depends on provisioning and verifying the private
 S3 origin, CloudFront signing, origin access control and deployment settings.
+
+The concert photo workflow now bridges verified Mac-uploader programme folders
+into private customer albums. Staff can review previews, rename and order draft
+albums, then group related albums from one studio and release them together.
+Released albums use the native verified-studio customer gallery, favourites and
+quote cart. See [ADR-0039](../decisions/ADR-0039-Concert-Photo-Album-Sync-and-Release-Groups.md).
 
 ## Scope
 
@@ -74,6 +90,8 @@ Work through these areas before beginning another major product capability:
 - [Flutter Desktop Media Ingest API](../specifications/Flutter-Desktop-Media-Ingest-API.md)
 - [ADR-0003 - Desktop Media Ingest and Assignment](../decisions/ADR-0003-Desktop-Media-Ingest-and-Assignment.md)
 - [ADR-0009 - Booking Concert Link and Programme Copy](../decisions/ADR-0009-Booking-Concert-Link-and-Programme-Copy.md)
+- [ADR-0039 - Concert Photo Album Sync and Release Groups](../decisions/ADR-0039-Concert-Photo-Album-Sync-and-Release-Groups.md)
+- [ADR-0040 - Guest Gallery Access and Release Notifications](../decisions/ADR-0040-Guest-Gallery-Access-and-Release-Notifications.md)
 
 ## Notes / Future Work
 
@@ -90,3 +108,12 @@ Work through these areas before beginning another major product capability:
 - Automatic server-side transcoding, archive restoration and deeper streaming
   optimisation remain future enhancements. Local Flutter conversion and secure
   upload are part of production readiness.
+
+
+### Shared customer account access
+
+My Media now includes Add Concert Video. Customers can add currently released
+concerts using existing studio-supplied codes, with persistent account grants and
+unchanged expiry dates. This reuses existing concert delivery; full code-group
+management and separate streaming/download windows remain pending. See
+[Customer Media](../api/Customer-Media.md) and ADR-0029.

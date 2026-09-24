@@ -4,6 +4,23 @@ This folder contains the working documentation for the DancePro V2 Laravel API.
 Documentation should be practical, concise, and maintained alongside the code.
 It should explain why decisions were made and how the system is intended to work.
 
+## Active integrated media plan
+
+- [Roadmap and current next step](Roadmap.md)
+- [Mac uploader preparation](milestones/Mac-Uploader-Preparation.md)
+- [Mac uploader photo review](milestones/Mac-Uploader-Photo-Review.md)
+- [Mac app build and usage](../apps/mac-uploader/README.md)
+- [Agreed product handover](specifications/Integrated-Media-Product-Plan.md)
+- [Programme samples and preparation workflow](specifications/Programme-Preparation.md)
+- [Programme preparation API](api/Programme-Preparation.md)
+- [ADR-0011: Programme drafts and confirmed snapshots](decisions/ADR-0011-Programme-Drafts-and-Confirmed-Snapshots.md)
+- [Stage 1 implementation map](milestones/Integrated-Media-Stage-1-Inspection.md)
+- [Next milestone: event and programme foundations](milestones/Integrated-Media-Event-Programme-Foundations.md)
+
+The handover governs new integrated-media product direction where older proposals
+differ. Existing milestone completion records remain historical evidence, not
+proof that the expanded product is implemented.
+
 ## Structure
 
 ```text
@@ -74,6 +91,7 @@ Current specifications:
 - [Authentication](specifications/Authentication.md)
 - [Download Links](specifications/Download-Links.md)
 - [Competition Downloads](specifications/Competition-Downloads.md)
+- [Media Sales and Loyalty Baseline](specifications/Media-Sales-and-Loyalty-Baseline.md)
 - [DancePro V2 Functional Specification](specifications/DancePro-V2-Functional-Specification.md)
 - [Concerts and Media Database Migration](specifications/DancePro-V2-Concerts-Media-Database-Migration-Spec.md)
 - [Flutter Desktop Media Ingest API](specifications/Flutter-Desktop-Media-Ingest-API.md)
@@ -116,4 +134,15 @@ Current records:
 ## Documentation Principle
 
 Documentation should answer why. The code should answer how. Delivery tooling
-such as GitHub Projects or issues should answer what is being built next.
+such as GitHub Projects or issues can mirror the next work; the active roadmap
+and milestone keep the durable repository record of what is being built next.
+
+- [Programme automatic extraction milestone](milestones/Programme-Automatic-Extraction.md)
+- [ADR-0012: local programme extraction](decisions/ADR-0012-Local-Programme-Extraction.md)
+
+- [Photo contribution exception decision](decisions/ADR-0023-Photo-Contribution-Exceptions.md)
+
+- [Shared concert programme decision](decisions/ADR-0024-Shared-Concert-Programme.md)
+
+- [Competition capture folder decision](decisions/ADR-0025-Competition-Capture-Folder-Additions.md)
+- [Existing competition media videos decision](decisions/ADR-0041-Existing-Competition-Media-Videos.md)

@@ -283,7 +283,7 @@
 <body>
     <header>
         <div class="header-inner">
-            <a class="brand" href="{{ route('crew.availability.index') }}" aria-label="DancePro Crew home"><img src="{{ asset('images/brand/dancepro-logo-inverse.png') }}" alt="DancePro Photography & Video"></a>
+            <a class="brand" href="{{ route('crew.availability.index') }}" aria-label="DancePro Crew home"><img src="{{ asset('images/brand/dancepro-logo-inverse-landscape.png') }}" alt="DancePro Photography & Video"></a>
             <nav class="crew-nav">
                 <a class="{{ request()->routeIs('crew.availability.*', 'crew.assignments.*', 'crew.cover.*') ? 'active' : '' }}" href="{{ route('crew.availability.index') }}">
                     @if($crewNavigationIndicators['shifts'])

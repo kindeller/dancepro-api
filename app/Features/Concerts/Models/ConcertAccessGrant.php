@@ -25,6 +25,11 @@ class ConcertAccessGrant extends Model
         return $this->belongsTo(Concert::class);
     }
 
+    public function codeGroup(): BelongsTo
+    {
+        return $this->belongsTo(ConcertCodeGroup::class, 'concert_code_group_id');
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

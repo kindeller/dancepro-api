@@ -3,6 +3,7 @@
 use App\Features\Auth\Actions\PruneApiIdempotencyRecords;
 use App\Features\Contacts\Actions\ExportContactDirectory;
 use App\Features\Contacts\Actions\ImportContactDirectory;
+use App\Features\Customers\Actions\SendGuestGalleryReleaseNotifications;
 use App\Features\Deployment\Actions\MigratePublicUploads;
 use App\Features\Deployment\Services\DatabaseBackup;
 use App\Features\Deployment\Services\ProductionDependencyCheck;
@@ -11,7 +12,10 @@ use App\Features\Downloads\Actions\PruneDownloadAccesses;
 use App\Features\Notifications\Actions\CreateDailyActionDigests;
 use App\Features\Notifications\Actions\CreateShiftArrivalReminders;
 use App\Features\Operations\Actions\SecureExistingInternalDocuments;
+use App\Features\Payments\Services\CustomerMediaNotifications;
 use App\Features\Scheduling\Actions\RecordScheduledFinishes;
+use App\Features\Tracking\Actions\CreateConcertTrackerAlerts;
+use App\Features\Tracking\Services\ConcertTrackerAutomation;
 use App\Features\Venues\Actions\ImportVenueCatalog;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -94,6 +98,27 @@ Schedule::call(fn () => app(CreateDailyActionDigests::class)->execute())
     ->name('notifications:daily-action-digest')
     ->dailyAt('10:00')
     ->timezone((string) config('app.timezone'))
+    ->withoutOverlapping()
+    ->onOneServer();
+Schedule::call(fn () => app(SendGuestGalleryReleaseNotifications::class)->execute())
+    ->name('customers:guest-gallery-release-notifications')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->onOneServer();
+Schedule::call(fn () => app(CustomerMediaNotifications::class)->sendExpiryReminders())
+    ->name('customers:media-expiry-reminders')
+    ->dailyAt('10:30')
+    ->timezone((string) config('app.timezone'))
+    ->withoutOverlapping()
+    ->onOneServer();
+Schedule::call(fn () => app(CreateConcertTrackerAlerts::class)->execute())
+    ->name('tracker:create-alerts')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
+Schedule::call(fn () => app(ConcertTrackerAutomation::class)->scheduleAutomatic())
+    ->name('tracker:schedule-automatic-email')
+    ->everyFiveMinutes()
     ->withoutOverlapping()
     ->onOneServer();
 Schedule::command('database:backup --prune')

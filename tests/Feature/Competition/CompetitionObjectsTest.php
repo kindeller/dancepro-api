@@ -3,9 +3,17 @@
 namespace Tests\Feature\Competition;
 
 use App\Features\Auth\Support\TokenAbility;
+use App\Features\CompetitionContacts\Models\CompetitionContact;
+use App\Features\Customers\Services\CustomerCompetitionCart;
+use App\Features\Media\Models\MediaAsset;
+use App\Features\Programmes\Models\CompetitionVideoFile;
+use App\Features\Programmes\Models\Programme;
+use App\Features\Programmes\Models\ProgrammeUploadPlan;
+use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Tests\Concerns\AuthenticatesApiTokens;
 use Tests\TestCase;
 
@@ -147,7 +155,7 @@ class CompetitionObjectsTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get('/admin/competitions/objects?prefix=competition-a')
             ->assertOk()
-            ->assertSee('Competition Objects')
+            ->assertSee('Competition Media')
             ->assertSee('display: none !important', false)
             ->assertSee('data-auto-load-url', false)
             ->assertSee('data-limit="250"', false)
@@ -177,6 +185,54 @@ class CompetitionObjectsTest extends TestCase
             ->assertSee('sortObjects();', false)
             ->assertSee('Open competition-a/video-2.mp4 in the AWS Console')
             ->assertSee('prefix=competition-a%2Fvideo-2.mp4', false);
+    }
+
+    public function test_admin_links_existing_event_folder_videos_without_changing_stored_objects(): void
+    {
+        Storage::fake('s3_competitions');
+        $contact = CompetitionContact::create([
+            'name' => 'Express Dance Challenge', 'code' => 'EDC', 'is_active' => true,
+            'organiser_name' => 'Director', 'organiser_email' => 'director@example.test',
+            'organiser_phone' => '0400000000',
+        ]);
+        $event = SchedulingEvent::create([
+            'competition_contact_id' => $contact->id, 'name' => 'Existing video event',
+            'event_type' => 'competition', 'event_date' => '2026-09-04',
+        ]);
+        $programme = Programme::create(['scheduling_event_id' => $event->id]);
+        $day = (string) Str::uuid();
+        $section = (string) Str::uuid();
+        $item = (string) Str::uuid();
+        $snapshot = ['event_type' => 'competition', 'event_code' => 'EDC926', 'nodes' => [
+            ['uuid' => $day, 'kind' => 'day', 'title' => 'Friday', 'date' => '2026-09-04'],
+            ['uuid' => $section, 'kind' => 'section', 'number' => '07', 'title' => 'Jazz', 'parent_uuid' => $day],
+            ['uuid' => $item, 'kind' => 'item', 'number' => '03', 'title' => 'Jessica', 'parent_uuid' => $section],
+        ]];
+        $revision = $programme->revisions()->create(['version' => 1, 'confirmed_at' => now(), 'snapshot' => $snapshot]);
+        ProgrammeUploadPlan::create(['programme_id' => $programme->id, 'programme_revision_id' => $revision->id,
+            'digest' => hash('sha256', json_encode($snapshot)), 'snapshot' => $snapshot]);
+        foreach (['EDC926_07_03.mp4', 'EDC926_07_03a.mp4', '926_133_01.mp4'] as $name) {
+            Storage::disk('s3_competitions')->put('2026/EDC926/'.$name, 'existing video '.$name);
+        }
+
+        $staff = User::factory()->staff()->create();
+        $folder = route('admin.competition.objects.index', ['prefix' => '2026/EDC926']);
+        $this->actingAs($staff)->get($folder)->assertOk()->assertSee('Existing video event')
+            ->assertSee('Link existing videos to gallery')->assertSee('does not move, rename, replace or delete');
+        $this->actingAs($staff)->post(route('admin.competition.objects.videos.sync', $event))
+            ->assertRedirect($folder)->assertSessionHas('status', fn (string $message): bool => str_contains($message, '2 existing videos linked'));
+
+        $this->assertSame(2, MediaAsset::where('storage_disk', 's3_competitions')->count());
+        $this->assertDatabaseHas('media_assets', ['storage_disk' => 's3_competitions',
+            'storage_key' => '2026/EDC926/EDC926_07_03.mp4', 'is_visible' => true]);
+        $this->assertTrue(app(CustomerCompetitionCart::class)->videoAvailable($event, $item));
+        $this->assertSame(0, CompetitionVideoFile::count());
+        foreach (['EDC926_07_03.mp4', 'EDC926_07_03a.mp4', '926_133_01.mp4'] as $name) {
+            Storage::disk('s3_competitions')->assertExists('2026/EDC926/'.$name);
+        }
+
+        $this->actingAs($staff)->post(route('admin.competition.objects.videos.sync', $event))->assertRedirect($folder);
+        $this->assertSame(2, MediaAsset::where('storage_disk', 's3_competitions')->count());
     }
 
     public function test_admin_chunk_endpoint_returns_competition_objects_json(): void

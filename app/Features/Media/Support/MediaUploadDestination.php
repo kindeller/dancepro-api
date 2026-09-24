@@ -28,4 +28,15 @@ class MediaUploadDestination
             throw ValidationException::withMessages(['collection' => 'Uploads require a managed video collection.']);
         }
     }
+
+    public function ensureCompetitionAllowed(string $disk): void
+    {
+        $competitionDisk = (string) config('media.competition_disk');
+
+        if ($disk === '' || $disk !== $competitionDisk || ! config("filesystems.disks.{$disk}")) {
+            throw ValidationException::withMessages([
+                'storage_disk' => 'Competition videos must stay on the configured competition media disk.',
+            ]);
+        }
+    }
 }

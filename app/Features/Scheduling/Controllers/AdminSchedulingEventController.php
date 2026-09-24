@@ -106,7 +106,7 @@ class AdminSchedulingEventController extends Controller
     {
         Gate::authorize('manageScheduling');
 
-        $schedulingEvent->load(['eventTypeDefinition', 'concertBookingItem.booking.items.schedulingEvent', 'studio', 'competitionContact', 'venue', 'roleRequirements.crewRole', 'messages.author', 'messages.reads', 'shifts.availabilityResponses.crewProfile.user', 'shifts.assignments.crewProfile', 'shifts.assignments.role', 'shifts.assignments.checklistCompletions', 'shifts.assignments.timeEntry.audits', 'shifts.assignments.allowances', 'shifts.assignments.shift.schedulingEvent']);
+        $schedulingEvent->load(['eventTypeDefinition', 'concertBookingItem.booking.items.schedulingEvent', 'studio', 'competitionContact', 'venue', 'roleRequirements.crewRole', 'roleSeats.crewRole', 'roleSeats.submittedBy', 'studioFiles.uploadedBy', 'studioFiles.reviewedBy', 'messages.author', 'messages.reads', 'shifts.availabilityResponses.crewProfile.user', 'shifts.assignments.crewProfile', 'shifts.assignments.role', 'shifts.assignments.checklistCompletions', 'shifts.assignments.timeEntry.audits', 'shifts.assignments.allowances', 'shifts.assignments.shift.schedulingEvent']);
         $assignments = $schedulingEvent->shifts->flatMap->assignments;
 
         return view('admin.scheduling-events.show', [

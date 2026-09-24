@@ -54,7 +54,7 @@
             <div class="chat-window-header"><a class="chat-back" style="display:none" href="{{ route('crew.chat.index',['filter'=>$filter]) }}">‹ Back</a><strong>{{ $isEvent ? $selected->crewChatTitle() : ($other?->crewProfile?->preferred_name ?: $other?->name) }}</strong><p>{{ $isEvent ? 'Event chat · assigned crew' : 'Direct chat' }}</p></div>
             <div class="chat-messages" data-chat-messages>
                 @forelse($messages as $message)
-                    <div @if($message->author_user_id !== auth()->id()) data-reactable tabindex="0" aria-label="Message from {{ $message->author->name }}. Hold to react." @endif class="chat-bubble {{ $message->author_user_id === auth()->id() ? 'mine' : '' }} {{ ($message->message_type ?? null) === 'announcement' ? 'announcement' : '' }}">
+                    <div data-message-uuid="{{ $message->uuid }}" @if($message->author_user_id !== auth()->id()) data-reactable tabindex="0" aria-label="Message from {{ $message->author->name }}. Hold to react." @endif class="chat-bubble {{ $message->author_user_id === auth()->id() ? 'mine' : '' }} {{ ($message->message_type ?? null) === 'announcement' ? 'announcement' : '' }}">
                         <strong>{{ $message->author->name }}{{ ($message->message_type ?? null) === 'announcement' ? ' · IMPORTANT UPDATE' : '' }}</strong>
                         @if(filled($message->body))<p>{{ $message->body }}</p>@endif
                         @if(filled($message->attachment_path))
@@ -181,4 +181,37 @@ document.querySelectorAll('[data-reaction-url]').forEach(group=>group.addEventLi
 }));
 </script>
 <script nonce="{{ request()->attributes->get('csp_nonce') }}">const chatSearch=document.querySelector('[data-chat-search]');chatSearch?.addEventListener('input',()=>{const term=chatSearch.value.trim().toLowerCase();document.querySelectorAll('[data-chat-name]').forEach(item=>item.hidden=!item.dataset.chatName.includes(term));});const chatMessages=document.querySelector('[data-chat-messages]');if(chatMessages)requestAnimationFrame(()=>chatMessages.scrollTop=chatMessages.scrollHeight);const newChat=document.querySelector('.chat-new');document.addEventListener('click',event=>{if(newChat?.open&&!newChat.contains(event.target))newChat.removeAttribute('open');});document.addEventListener('keydown',event=>{if(event.key==='Escape'&&newChat?.open){newChat.removeAttribute('open');newChat.querySelector('summary')?.focus();}});</script>
+@if($selectedChat && $selectedChat['kind'] === 'event')
+<script nonce="{{ request()->attributes->get('csp_nonce') }}">
+(() => {
+    const list = document.querySelector('[data-chat-messages]');
+    const known = new Set(Array.from(list.querySelectorAll('[data-message-uuid]'), item => item.dataset.messageUuid));
+    let checking = false;
+    async function checkProgrammeUpdates() {
+        if (document.hidden || checking) return;
+        checking = true;
+        try {
+            const response = await fetch(@json(route('crew.chat.programme-updates', $selectedChat['model'])), {headers: {'Accept': 'application/json'}, cache: 'no-store'});
+            if (!response.ok) return;
+            const result = await response.json();
+            const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+            for (const message of result.data) {
+                if (known.has(message.uuid)) continue;
+                const bubble = document.createElement('div');
+                bubble.className = 'chat-bubble';
+                bubble.dataset.messageUuid = message.uuid;
+                const author = document.createElement('strong'); author.textContent = message.author + ' · PROGRAMME UPDATE';
+                const body = document.createElement('p'); body.textContent = message.body;
+                const time = document.createElement('small'); time.textContent = new Date(message.created_at).toLocaleString();
+                bubble.append(author, body, time); list.append(bubble); known.add(message.uuid);
+            }
+            if (atBottom) list.scrollTop = list.scrollHeight;
+        } catch { /* Keep the existing conversation and draft available offline. */ }
+        finally { checking = false; }
+    }
+    setInterval(checkProgrammeUpdates, 5000);
+    document.addEventListener('visibilitychange', checkProgrammeUpdates);
+})();
+</script>
+@endif
 @endpush

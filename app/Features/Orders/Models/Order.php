@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['uuid', 'user_id', 'customer_email', 'customer_name', 'status', 'currency', 'subtotal_amount', 'total_amount', 'placed_at', 'paid_at', 'fulfilled_at', 'cancelled_at', 'metadata'])]
+#[Fillable(['uuid', 'user_id', 'customer_email', 'customer_name', 'status', 'currency', 'subtotal_amount', 'total_amount', 'tax_amount', 'placed_at', 'paid_at', 'fulfilled_at', 'cancelled_at', 'metadata'])]
 class Order extends Model
 {
     /** @use HasFactory<OrderFactory> */
@@ -26,13 +26,18 @@ class Order extends Model
 
     public function items(): HasMany
     {
-        return $this->hasMany(OrderItem::class);
+        return $this->hasMany(OrderItem::class)->orderBy('id');
+    }
+
+    public function paymentAmount(): int
+    {
+        return (int) ($this->metadata['payment_amount'] ?? $this->total_amount);
     }
 
     protected function casts(): array
     {
         return [
-            'status' => OrderStatus::class, 'subtotal_amount' => 'integer', 'total_amount' => 'integer',
+            'status' => OrderStatus::class, 'subtotal_amount' => 'integer', 'total_amount' => 'integer', 'tax_amount' => 'integer',
             'placed_at' => 'datetime', 'paid_at' => 'datetime', 'fulfilled_at' => 'datetime',
             'cancelled_at' => 'datetime', 'metadata' => 'array',
         ];

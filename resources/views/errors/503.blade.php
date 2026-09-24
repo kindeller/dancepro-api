@@ -216,7 +216,7 @@
     <div class="page">
         <header>
             <div class="brand">
-                <img src="/storage/1024.png" alt="">
+                <img src="/images/brand/dancepro-icon-blue-official.png" alt="">
                 <span>DancePro</span>
             </div>
         </header>
@@ -238,7 +238,7 @@
             </section>
 
             <div class="visual" aria-hidden="true">
-                <img src="/storage/1024.png" alt="">
+                <img src="/images/brand/dancepro-icon-blue-official.png" alt="">
             </div>
         </main>
 

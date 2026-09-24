@@ -50,6 +50,7 @@ class LoginTest extends TestCase
                 TokenAbility::CompetitionObjectsRead->value,
                 TokenAbility::DownloadLinksManage->value,
                 TokenAbility::ConcertMediaRead->value,
+                TokenAbility::ProgrammeRead->value,
                 TokenAbility::ConcertMediaUpload->value,
                 TokenAbility::ConcertMediaUpdate->value,
             ]),

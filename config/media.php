@@ -2,6 +2,7 @@
 
 return [
     'upload_disk' => env('MEDIA_UPLOAD_DISK', 's3_concerts'),
+    'competition_disk' => env('COMPETITION_MEDIA_DISK', 's3_competitions'),
     'legacy_disk' => env('MEDIA_LEGACY_DISK', 's3_concerts_legacy'),
     'upload_url_ttl_minutes' => (int) env('MEDIA_UPLOAD_URL_TTL_MINUTES', 15),
     'upload_record_ttl_hours' => (int) env('MEDIA_UPLOAD_RECORD_TTL_HOURS', 24),

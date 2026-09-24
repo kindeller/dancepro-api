@@ -111,7 +111,7 @@
 </head>
 <body>
     <main>
-        <p class="brand"><img class="brand-mark" src="{{ asset('storage/1024.png') }}" alt=""> DancePro</p>
+        <p class="brand"><img class="brand-mark" src="{{ asset('images/brand/dancepro-icon-blue-official.png') }}" alt=""> DancePro</p>
 
         <div class="content">
             <h1>{{ $heading }}</h1>

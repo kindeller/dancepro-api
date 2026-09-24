@@ -60,7 +60,8 @@ class PasswordResetController extends Controller
         }
 
         return $status === Password::PasswordReset
-            ? redirect()->route('login')->with('status', 'Your password has been reset. You can sign in now.')
+            ? redirect()->route($resetUser?->canAccessCustomer() && ! $resetUser->canAccessAdmin() ? 'customer.login' : 'login')
+                ->with('status', 'Your password has been reset. You can sign in now.')
             : back()->withErrors(['email' => __($status)])->onlyInput('email');
     }
 }

@@ -13,6 +13,33 @@
     @include('admin.studios._form', ['submitLabel' => 'Save studio'])
 </form>
 <section class="card card-pad" style="margin-top:24px">
+    <h2>Customer gallery code</h2>
+    <p class="muted">{{ $studio->gallery_code_hash ? 'A gallery code is set for this studio.' : 'Set a gallery code so customers can add this studio to My Profile.' }} This is separate from the studio’s internal code and concert video codes.</p>
+    <form method="POST" action="{{ route('admin.studios.gallery-code.update', $studio) }}">@csrf
+        <input type="hidden" name="version" value="{{ $studio->gallery_code_version }}">
+        <label>New gallery code<input type="password" name="gallery_code" minlength="6" maxlength="64" required autocomplete="new-password"></label>
+        @error('gallery_code')<p role="alert">{{ $message }}</p>@enderror
+        <p class="muted">Use 6–64 letters, numbers or hyphens. Codes are not case-sensitive. Keep a copy to share with customers; saved codes cannot be displayed. Changing the code keeps studios already verified by customers.</p>
+        <div class="actions"><button>Save gallery code</button></div>
+    </form>
+</section>
+<section class="card card-pad" style="margin-top:24px">
+    <h2>Studio account access</h2><p class="muted">Invite owners, directors and office contacts to the studio communication history. Access activates only for a verified DancePro account using the invited email.</p>
+    <form method="POST" action="{{ route('admin.studios.account-access.store', $studio) }}" class="grid two-col">@csrf
+        <label>Email<input type="email" name="email" required maxlength="255" value="{{ old('email') }}"></label>
+        <label>Access role<select name="role"><option value="owner">Owner</option><option value="director">Director</option><option value="office_contact">Office contact</option></select></label>
+        <div><button>Invite or update access</button></div>
+    </form>
+    <table style="margin-top:18px"><thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Account</th><th></th></tr></thead><tbody>
+    @forelse($studio->accountAccesses as $access)<tr><td>{{ $access->email }}</td><td>{{ str_replace('_', ' ', ucfirst($access->role)) }}</td><td><span class="badge {{ $access->status === 'active' ? 'success' : ($access->status === 'revoked' ? 'revoked' : '') }}">{{ ucfirst($access->status) }}</span></td><td>{{ $access->user?->name ?: 'Awaiting account' }}</td><td>@if($access->status !== 'revoked')<form method="post" action="{{ route('admin.studios.account-access.revoke', [$studio, $access]) }}">@csrf @method('DELETE')<button class="danger">Revoke</button></form>@endif</td></tr>@empty<tr><td colspan="5" class="muted">No studio account access has been granted.</td></tr>@endforelse
+    </tbody></table>
+</section>
+<section class="card card-pad" style="margin-top:24px">
+    <h2>Concert video code groups</h2>
+    <p class="muted">Assign one code to the concerts it should unlock. Group access has separate streaming and download periods.</p>
+    <a class="button secondary" href="{{ route('admin.concert-code-groups.index', $studio) }}">Manage concert video codes</a>
+</section>
+<section class="card card-pad" style="margin-top:24px">
     <h2>Studio logo / cover image</h2>
     @if($studio->coverImageForDisplay())<p><img src="{{ $studio->coverImageForDisplay() }}" alt="Current studio cover" style="max-width:320px;width:100%;border-radius:8px"></p>@endif
     <form method="POST" action="{{ route('admin.branding.studios.cover.store', $studio) }}" enctype="multipart/form-data">@csrf

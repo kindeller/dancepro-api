@@ -381,6 +381,18 @@ Avoid:
 
 # AI Working Style
 
+## Current product plan and progress
+
+Before integrated media work, read `docs/Roadmap.md`, the relevant sections of
+`docs/specifications/Integrated-Media-Product-Plan.md`, and the active milestone
+linked from the roadmap. Treat the supplied plan as agreed direction, not proof
+of implementation. Preserve working legacy behaviour until inspected.
+
+Update the active milestone after each work session with completed steps,
+verification, open decisions and the next action. Resolve questions at the stage
+that needs them; do not reopen settled decisions or mark unverified work complete.
+
+
 When implementing work:
 
 1.  Read this document first.

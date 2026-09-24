@@ -91,9 +91,24 @@ Automatic next-item playback has been manually tested successfully on desktop
 and mobile across multiple browsers. Retest it when the production media
 delivery path replaces the local placeholder response.
 
-Fictional local accounts use `local-demo-password`. The protected “Paper Wings”
-concert uses `paper-wings-demo`. These credentials are for local development
-only and must not be reused in a deployed environment.
+Fictional local accounts use `local-demo-password`. Useful review accounts are:
+
+- `staff@dancepro.test` for the management hub, Concert Tracker and sales reports.
+- `orders.customer@dancepro.test` for a populated My Media account with a dancer,
+  studio, competition registration, completed orders, photos and video.
+- `granted.customer@dancepro.test` for saved concert access.
+
+The public gallery is available at `/galleries`. The released competition uses
+the gallery login code `SAPPHIRE26`, and the protected “Paper Wings” concert uses
+`paper-wings-demo`. All seeded email addresses use reserved `.test` domains. All
+people, studios, events, orders and media are fictional local examples.
+
+The dataset is dated relative to the day it is seeded. It includes a released
+competition, a competition still processing, an event coming soon, and concerts
+at several realistic Tracker stages. Photo files are generated illustrations and
+video items use a short labelled demo clip, so the gallery and playback journeys
+can be reviewed without production media. These credentials are for local
+development only and must not be reused in a deployed environment.
 
 Before finalising a task, complete the project Definition of Done and follow
 the local approval-gated commit workflow in [Git Workflow](Git-Workflow.md).

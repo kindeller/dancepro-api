@@ -18,10 +18,16 @@ class ApiTokenAbilities
             $abilities[] = TokenAbility::CompetitionObjectsRead->value;
             $abilities[] = TokenAbility::DownloadLinksManage->value;
             $abilities[] = TokenAbility::ConcertMediaRead->value;
+            $abilities[] = TokenAbility::ProgrammeRead->value;
             $abilities[] = TokenAbility::ConcertMediaUpload->value;
             $abilities[] = TokenAbility::ConcertMediaUpdate->value;
         }
 
-        return $abilities;
+        if ($user->canAccessCrew()) {
+            $abilities[] = TokenAbility::ProgrammeRead->value;
+            $abilities[] = TokenAbility::ConcertMediaUpload->value;
+        }
+
+        return array_values(array_unique($abilities));
     }
 }

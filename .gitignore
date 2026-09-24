@@ -28,3 +28,11 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Local PDF extraction test bytecode
+__pycache__/
+
+# Native Mac uploader build outputs
+/apps/mac-uploader/.build/
+/apps/mac-uploader/.swiftpm/
+/apps/mac-uploader/dist/

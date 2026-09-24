@@ -13,6 +13,7 @@
         "test:browser:install": "playwright install chromium"
     },
     "dependencies": {
+        "braintree-web": "^3.146.0",
         "hls.js": "^1.7.1"
     },
     "devDependencies": {

@@ -55,6 +55,6 @@ class CrewMobileAssignments
             ->where('scheduling_shift_assignments.crew_profile_id', $profile->id)
             ->where('scheduling_shift_assignments.status', 'published')
             ->when(! $includeCancelled, fn (Builder $query) => $query->whereHas('shift.schedulingEvent', fn (Builder $query) => $query->whereNull('cancelled_at')))
-            ->with(['role', 'timeEntry', 'coverRequests', 'shift.schedulingEvent.eventTypeDefinition', 'shift.schedulingEvent.venue', 'shift.schedulingEvent.studio', 'shift.schedulingEvent.competitionContact', 'shift.schedulingEvent.concertBookingItem']);
+            ->with(['role', 'timeEntry', 'coverRequests', 'shift.schedulingEvent.eventTypeDefinition', 'shift.schedulingEvent.venue', 'shift.schedulingEvent.studio', 'shift.schedulingEvent.competitionContact', 'shift.schedulingEvent.concertBookingItem', 'shift.schedulingEvent.roleSeats']);
     }
 }

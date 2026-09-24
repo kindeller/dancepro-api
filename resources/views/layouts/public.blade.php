@@ -60,16 +60,21 @@
         footer { padding: 28px 0; background: #101820; color: #a9bec8; font-size: 14px; }
         @media (max-width: 850px) { .grid, .utility-grid, .player-grid { grid-template-columns: 1fr; } .hero { padding-top: 48px; background: #101820; } .header-inner, .container { width: min(100% - 28px, 1180px); } }
     </style>
+    @stack('styles')
 </head>
-<body style="--concert-brand: {{ $concert->brand_color ?? $studio->brand_color ?? '#0aa0db' }}">
+<body style="--concert-brand: {{ ($concert ?? null)?->brand_color ?? ($studio ?? null)?->brand_color ?? '#0aa0db' }}">
 <header class="site-header">
     <div class="header-inner">
-        <a class="logo" href="https://www.dancepro.com.au/"><img src="{{ asset('storage/1024.png') }}" alt=""><span>DancePro</span></a>
-        <nav aria-label="Main navigation"><a href="{{ route('studios.index') }}">Studios & concerts</a><a href="{{ route('admin.dashboard') }}">Staff</a></nav>
+        <a class="logo" href="https://www.dancepro.com.au/"><img src="{{ asset('images/brand/dancepro-icon-blue-official.png') }}" alt=""><span>DancePro</span></a>
+        <nav aria-label="Main navigation">@if(auth()->user()?->canAccessCustomer())<a href="{{ route('customer.media.index') }}">My Media</a><a href="{{ route('customer.profile.edit') }}">My Profile</a><a href="{{ route('customer.media.help') }}">Help</a>@elseif(!auth()->check())<a href="{{ route('customer.login') }}">Customer sign in</a>@endif<a href="{{ route('guest-galleries.index') }}">Media galleries</a><a href="{{ route('studios.index') }}">Studios & concerts</a><a href="{{ route('admin.dashboard') }}">Staff</a>
+            @if(auth()->user()?->canAccessCustomer())
+                <form method="POST" action="{{ route('logout') }}" style="margin:0">@csrf<button class="button secondary" type="submit">Sign out</button></form>
+            @endif
+        </nav>
     </div>
 </header>
 <main>@yield('content')</main>
-<footer><div class="container">DancePro · Protected concert media</div></footer>
+<footer><div class="container">DancePro · {{ $footerLabel ?? 'Protected concert media' }}</div></footer>
 @stack('scripts')
 </body>
 </html>

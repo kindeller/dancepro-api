@@ -3,6 +3,7 @@
 namespace App\Features\Auth\Controllers;
 
 use App\Features\Auth\Requests\WebLoginRequest;
+use App\Features\Customers\Services\TransferGuestGalleryActivity;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -17,7 +18,7 @@ class WebAuthController extends Controller
         return view('auth.login');
     }
 
-    public function store(WebLoginRequest $request): RedirectResponse
+    public function store(WebLoginRequest $request, TransferGuestGalleryActivity $guestActivity): RedirectResponse
     {
         $credentials = $request->only('email', 'password');
 
@@ -40,6 +41,8 @@ class WebAuthController extends Controller
                 ->withErrors(['email' => 'This account is inactive.'])
                 ->onlyInput('email');
         }
+
+        $guestActivity->execute($request, $user);
 
         if (config('security.two_factor.enabled') && $user->two_factor_confirmed_at !== null) {
             $request->session()->put('two_factor_login_user_id', $user->id);
@@ -65,11 +68,12 @@ class WebAuthController extends Controller
 
     public function destroy(Request $request): RedirectResponse
     {
+        $loginRoute = $request->user()?->canAccessCustomer() && ! $request->user()->canAccessAdmin() ? 'customer.login' : 'login';
         Auth::logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('login');
+        return redirect()->route($loginRoute);
     }
 }

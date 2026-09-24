@@ -42,6 +42,7 @@ class PublicConcertController extends Controller
 
         return view('public.concerts.show', [
             'concert' => $concert,
+            'canStream' => $access->allowsStreaming($request, $concert),
             'downloadUrls' => $concert->mediaCollections->flatMap->assets->mapWithKeys(fn (MediaAsset $asset) => [
                 $asset->uuid => URL::temporarySignedRoute('concerts.media.download', now()->addMinutes(15), [
                     'concert' => $concert,
@@ -71,7 +72,7 @@ class PublicConcertController extends Controller
         ResolveConcertPlaybackSource $resolvePlayback,
         ConcertCloudFrontSigner $cloudFront,
     ): JsonResponse {
-        $this->authorizeAsset($request, $concert, $asset, $access);
+        $this->authorizeAsset($request, $concert, $asset, $access, true);
         abort_unless($asset->media_type === MediaType::Video, 404);
 
         $local = app()->environment('local');
@@ -116,7 +117,7 @@ class PublicConcertController extends Controller
         ResolveConcertPlaybackSource $resolvePlayback,
         ConcertCloudFrontSigner $cloudFront,
     ): RedirectResponse|BinaryFileResponse {
-        $this->authorizeAsset($request, $concert, $asset, $access);
+        $this->authorizeAsset($request, $concert, $asset, $access, true);
         abort_unless($asset->media_type === MediaType::Video, 404);
 
         $local = app()->environment('local');
@@ -161,12 +162,12 @@ class PublicConcertController extends Controller
         return redirect()->away($cloudFront->signedFileUrl($asset->storage_key, $filenames->for($concert, $asset)));
     }
 
-    private function authorizeAsset(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access): void
+    private function authorizeAsset(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access, bool $streaming = false): void
     {
         abort_unless($concert->isPubliclyAvailable(), 404);
         abort_unless($asset->collection()->where('concert_id', $concert->id)->where('status', MediaCollectionStatus::Published)->exists(), 404);
         abort_unless($asset->status === MediaAssetStatus::Available && $asset->is_visible, 404);
-        abort_unless($access->allows($request, $concert), 403);
+        abort_unless($streaming ? $access->allowsStreaming($request, $concert) : $access->allows($request, $concert), 403);
     }
 
     private function temporaryPlaybackUrl(Concert $concert, MediaAsset $asset, bool $fallback = false): string

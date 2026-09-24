@@ -9,7 +9,8 @@
 @else
     @php($first = $assets->first())
     @php($playerScriptAvailable = file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-    <div class="section-head"><div><div class="eyebrow">Concert media</div><h2>Watch the performance</h2></div><div class="meta">{{ $assets->count() }} items</div></div>
+    <div class="section-head"><div><div class="eyebrow">Concert media</div><h2>{{ $canStream ? 'Watch the performance' : 'Download the performance' }}</h2></div><div class="meta">{{ $assets->count() }} items</div></div>
+    @if($canStream)
     <div class="player-grid">
         <section class="card player"><video id="concert-player" controls preload="metadata" crossorigin="use-credentials" @unless($playerScriptAvailable) src="{{ route('concerts.media.stream', [$concert, $first]) }}" @endunless></video><div class="player-info"><h3 id="player-title">{{ $first->display_name ?? $first->original_filename }}</h3><div class="meta" id="player-status" style="color:#a9bec8">{{ $playerScriptAvailable ? 'Preparing playback…' : 'MP4 playback' }}</div><div class="actions"><label style="margin:0;color:#d9e8ee">Quality <select id="player-quality" disabled><option value="-1">Auto</option></select></label><a id="player-download" class="button" href="{{ $downloadUrls[$first->uuid] }}">Download original</a></div></div></section>
         <aside class="card playlist" aria-label="Concert playlist">
@@ -24,9 +25,14 @@
         @endforeach
         </aside>
     </div>
+    @else
+        <div class="card card-body"><p>Streaming access has ended. Your downloads remain available until the download access period ends.</p>
+            @foreach($assets as $asset)<p><a class="button secondary" href="{{ $downloadUrls[$asset->uuid] }}">Download {{ $asset->display_name ?? $asset->original_filename }}</a></p>@endforeach
+        </div>
+    @endif
 @endif
 <div class="utility-grid">
-    @if($assets->isNotEmpty())<article class="card utility"><h3>Download manager</h3><p class="muted" id="download-status">Ready to download {{ $assets->count() }} originals. Your browser may ask permission for multiple files.</p><div class="actions"><button class="button secondary" id="download-all" type="button">Start</button><button class="button secondary" id="download-pause" type="button" disabled>Pause</button><button class="button secondary" id="download-reset" type="button">Reset</button></div></article>@endif
+    @if($assets->isNotEmpty() && $canStream)<article class="card utility"><h3>Download manager</h3><p class="muted" id="download-status">Ready to download {{ $assets->count() }} originals. Your browser may ask permission for multiple files.</p><div class="actions"><button class="button secondary" id="download-all" type="button">Start</button><button class="button secondary" id="download-pause" type="button" disabled>Pause</button><button class="button secondary" id="download-reset" type="button">Reset</button></div></article>@endif
     <article class="card utility"><h3>Concert program</h3>@if($concert->programForDisplay())<p class="muted">View the program supplied for this concert.</p><a class="button secondary" href="{{ $concert->programForDisplay() }}" target="_blank" rel="noopener">Open program</a>@else<p class="muted">No program is available for this concert.</p>@endif</article>
     <article class="card utility"><h3>Photo gallery</h3>@if($concert->galleryForDisplay())<p class="muted">Continue to the studio's external gallery.</p><a class="button secondary" href="{{ $concert->galleryForDisplay() }}" target="_blank" rel="noopener">Open gallery</a>@else<p class="muted">No external gallery is available.</p>@endif</article>
 </div>
@@ -34,7 +40,7 @@
 @endsection
 
 @push('scripts')
-@if($assets->isNotEmpty())
+@if($assets->isNotEmpty() && $canStream)
     @if($playerScriptAvailable)
         @vite('resources/js/concert-player.js')
     @endif

@@ -27,11 +27,16 @@ class AdminNavigationTest extends TestCase
             ->assertSee('Venue Management')
             ->assertSee('Crew Management')
             ->assertSee('Crew Payments')
+            ->assertSee('Tracker')
+            ->assertSee(route('admin.concert-tracker.index'), false)
             ->assertDontSee('>Payment Settings</a>', false)
             ->assertSee('Media')
             ->assertSee('Media Dashboard')
             ->assertSee('Concert Media')
+            ->assertSee('Concert Photos')
+            ->assertDontSee('>Concert Photo Releases</a>', false)
             ->assertSee('Competition Media')
+            ->assertDontSee('>Competition Videos</a>', false)
             ->assertSee('Download Links');
     }
 

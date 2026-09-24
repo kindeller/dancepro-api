@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['order_id', 'media_collection_id', 'media_asset_id', 'snapshot_storage_disk', 'snapshot_storage_key', 'snapshot_filename', 'snapshot_display_name', 'item_type', 'quantity', 'unit_price_amount', 'total_price_amount', 'metadata'])]
+#[Fillable(['order_id', 'media_collection_id', 'media_asset_id', 'snapshot_storage_disk', 'snapshot_storage_key', 'snapshot_filename', 'snapshot_display_name', 'item_type', 'quantity', 'unit_price_amount', 'total_price_amount', 'tax_rate_basis_points', 'tax_amount', 'metadata'])]
 class OrderItem extends Model
 {
     /** @use HasFactory<OrderItemFactory> */
@@ -38,9 +38,15 @@ class OrderItem extends Model
         return $this->hasMany(DownloadLink::class);
     }
 
+    public function mediaEntitlements(): HasMany
+    {
+        return $this->hasMany(OrderMediaEntitlement::class);
+    }
+
     protected function casts(): array
     {
-        return ['quantity' => 'integer', 'unit_price_amount' => 'integer', 'total_price_amount' => 'integer', 'metadata' => 'array'];
+        return ['quantity' => 'integer', 'unit_price_amount' => 'integer', 'total_price_amount' => 'integer',
+            'tax_rate_basis_points' => 'integer', 'tax_amount' => 'integer', 'metadata' => 'array'];
     }
 
     protected static function newFactory(): OrderItemFactory

@@ -52,9 +52,11 @@ class LocalDevelopmentSeeder extends Seeder
         $this->call([
             ConcertBookingDemoSeeder::class,
             CrewSchedulingDemoSeeder::class,
+            CompetitionGalleryDemoSeeder::class,
             EventOperationsSeeder::class,
             PaymentPlaceholderSeeder::class,
             TimesheetInvoiceDemoSeeder::class,
+            ConcertTrackerDemoSeeder::class,
         ]);
 
         $this->command?->info('Local DancePro development data seeded.');
@@ -102,7 +104,10 @@ class LocalDevelopmentSeeder extends Seeder
                 'name' => $name,
                 'type' => $type->value,
                 'is_active' => $active,
+                'is_admin' => $type === UserType::Staff,
                 'email_verified_at' => now()->subMonths(3),
+                'two_factor_confirmed_at' => $type === UserType::Staff ? now()->subMonths(3) : null,
+                'onboarding_completed_at' => $type === UserType::Customer ? now()->subMonths(2) : null,
                 'password' => self::PASSWORD,
                 'deleted_at' => null,
             ],
@@ -322,9 +327,29 @@ class LocalDevelopmentSeeder extends Seeder
     private function writeLocalPlaceholderFiles(array $assets): void
     {
         foreach ($assets as $asset) {
-            if (! Storage::disk('local')->exists($asset->storage_key)) {
-                Storage::disk('local')->put($asset->storage_key, "DancePro fictional local placeholder for {$asset->display_name}.\n");
-            }
+            $bytes = $asset->extension === 'mp4'
+                ? file_get_contents(database_path('seeders/assets/dancepro-demo-video.mp4'))
+                : $this->placeholderImage($asset->display_name);
+            Storage::disk('local')->put($asset->storage_key, $bytes);
+            $asset->update(['size_bytes' => strlen($bytes)]);
         }
+    }
+
+    private function placeholderImage(string $label): string
+    {
+        $image = imagecreatetruecolor(1200, 800);
+        imagefill($image, 0, 0, imagecolorallocate($image, 18, 107, 143));
+        $white = imagecolorallocate($image, 255, 255, 255);
+        $dark = imagecolorallocate($image, 15, 28, 40);
+        imagefilledellipse($image, 600, 285, 150, 150, $white);
+        imagefilledpolygon($image, [600, 350, 430, 650, 770, 650], 3, $dark);
+        imagestring($image, 5, 35, 35, 'DANCEPRO DEMO MEDIA', $white);
+        imagestring($image, 5, 35, 745, $label, $white);
+        ob_start();
+        imagejpeg($image, null, 88);
+        $bytes = ob_get_clean();
+        imagedestroy($image);
+
+        return $bytes;
     }
 }

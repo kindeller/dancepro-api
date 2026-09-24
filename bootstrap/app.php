@@ -7,6 +7,8 @@ use App\Features\Auth\Middleware\RequireIdempotencyKey;
 use App\Features\Auth\Middleware\RequireTwoFactorAuthentication;
 use App\Features\Crew\Middleware\RequireCompletedCrewOnboarding;
 use App\Features\Crew\Middleware\RequireCrewAccess;
+use App\Features\Customers\Middleware\RequireCustomerMobileAccess;
+use App\Features\Customers\Middleware\RequireCustomerOnboarding;
 use App\Shared\Middleware\AddSecurityHeaders;
 use App\Shared\Middleware\RequireExplicitTokenAbility;
 use App\Shared\Responses\ApiResponse;
@@ -33,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('my/*') ? route('customer.login') : route('login'));
         $middleware->append(AddSecurityHeaders::class);
         $middleware->appendToGroup('web', AuthenticateSession::class);
         $middleware->alias([
@@ -44,6 +47,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'two-factor.required' => RequireTwoFactorAuthentication::class,
             'crew.required' => RequireCrewAccess::class,
             'crew.onboarded' => RequireCompletedCrewOnboarding::class,
+            'customer.onboarded' => RequireCustomerOnboarding::class,
+            'api.customer.onboarded' => RequireCustomerMobileAccess::class,
             'token.ability' => RequireExplicitTokenAbility::class,
         ]);
         $middleware->encryptCookies(except: [
@@ -53,6 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->dontFlash(['login_code', 'concert_code', 'studio_gallery_code', 'gallery_code']);
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

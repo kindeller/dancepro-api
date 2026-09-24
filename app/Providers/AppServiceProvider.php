@@ -10,10 +10,23 @@ use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Models\MediaCollection;
 use App\Features\Media\Policies\MediaAssetPolicy;
 use App\Features\Media\Policies\MediaCollectionPolicy;
+use App\Features\Orders\Models\Order;
+use App\Features\Orders\Observers\OrderObserver;
+use App\Features\Payments\Contracts\PaymentGateway;
+use App\Features\Payments\Models\CustomerMediaNotification;
+use App\Features\Payments\Notifications\CustomerMediaEmail;
+use App\Features\Payments\Services\DisabledPaymentGateway;
+use App\Features\Payments\Services\FakePaymentGateway;
+use App\Features\Programmes\Policies\ProgrammePolicy;
+use App\Features\Tracking\Models\ConcertTrackerAlert;
+use App\Features\Tracking\Models\StudioConversationMessage;
 use App\Models\User;
 use App\Shared\Support\LocalDevelopmentSafety;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Events\NotificationFailed;
+use Illuminate\Notifications\Events\NotificationSent;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -29,6 +42,9 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(AdminExceptionOverview::class);
+        $this->app->bind(PaymentGateway::class, fn () => $this->app->environment(['local', 'testing']) && config('payments.driver') === 'fake'
+            ? app(FakePaymentGateway::class)
+            : app(DisabledPaymentGateway::class));
     }
 
     /**
@@ -101,6 +117,24 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        RateLimiter::for('guest-gallery-registration', function (Request $request): array {
+            $emailAndIp = hash('sha256', mb_strtolower($request->string('email')->toString()).'|'.$request->ip());
+
+            return [
+                Limit::perMinute(4)->by('guest-gallery-registration:'.$emailAndIp),
+                Limit::perHour(30)->by('guest-gallery-registration-ip:'.$request->ip()),
+            ];
+        });
+
+        RateLimiter::for('guest-gallery-unlock', function (Request $request): array {
+            $emailAndIp = hash('sha256', mb_strtolower($request->string('email')->toString()).'|'.$request->ip());
+
+            return [
+                Limit::perMinute(6)->by('guest-gallery-unlock:'.$emailAndIp),
+                Limit::perHour(40)->by('guest-gallery-unlock-ip:'.$request->ip()),
+            ];
+        });
+
         RateLimiter::for('public-download', function (Request $request): array {
             $tokenAndIp = hash('sha256', $request->route('token').'|'.$request->ip());
             $response = function (Request $request, array $headers) {
@@ -128,12 +162,27 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(DownloadLink::class, DownloadLinkPolicy::class);
         Gate::policy(MediaCollection::class, MediaCollectionPolicy::class);
         Gate::policy(MediaAsset::class, MediaAssetPolicy::class);
+        Order::observe(OrderObserver::class);
+        Event::listen(NotificationSent::class, function (NotificationSent $event): void {
+            if ($event->notification instanceof CustomerMediaEmail) {
+                CustomerMediaNotification::query()->whereKey($event->notification->deliveryId)
+                    ->update(['status' => 'sent', 'sent_at' => now()]);
+            }
+        });
+        Event::listen(NotificationFailed::class, function (NotificationFailed $event): void {
+            if ($event->notification instanceof CustomerMediaEmail) {
+                CustomerMediaNotification::query()->whereKey($event->notification->deliveryId)
+                    ->update(['status' => 'failed', 'failed_at' => now()]);
+            }
+        });
 
         Gate::define('viewCompetitionObjects', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('manageStudios', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('manageConcerts', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('manageCrew', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('manageScheduling', fn (User $user): bool => $user->canAccessAdmin());
+        Gate::define('viewProgramme', [ProgrammePolicy::class, 'view']);
+        Gate::define('updateProgramme', [ProgrammePolicy::class, 'update']);
         Gate::define('viewStaffMedia', fn (User $user): bool => $user->canAccessAdmin());
 
         RateLimiter::for('media-uploads', fn (Request $request): Limit => Limit::perMinute(120)
@@ -150,6 +199,12 @@ class AppServiceProvider extends ServiceProvider
             $user = auth()->user();
             $view->with('adminExceptionCount', $user && Gate::allows('manageScheduling')
                 ? app(AdminExceptionOverview::class)->all()->where('severity', 'action')->count()
+                : 0);
+            $view->with('concertTrackerAlertCount', $user && Gate::allows('manageScheduling')
+                ? ConcertTrackerAlert::query()->where('user_id', $user->id)->whereNull('resolved_at')->whereNull('read_at')->count()
+                : 0);
+            $view->with('studioMessageUnreadCount', $user && Gate::allows('manageScheduling')
+                ? StudioConversationMessage::query()->where('direction', 'to_dancepro')->whereNull('staff_read_at')->count()
                 : 0);
         });
     }

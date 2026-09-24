@@ -4,10 +4,13 @@ namespace App\Features\Scheduling\Models;
 
 use App\Features\Bookings\Models\ConcertBookingItem;
 use App\Features\CompetitionContacts\Models\CompetitionContact;
+use App\Features\Media\Models\MediaPriceList;
 use App\Features\Operations\Models\EventMessage;
 use App\Features\Scheduling\Support\AvailabilityRoundStatus;
 use App\Features\Scheduling\Support\SchedulingEventType;
+use App\Features\Studios\Models\ConcertEventRoleSeats;
 use App\Features\Studios\Models\Studio;
+use App\Features\Studios\Models\StudioEventFile;
 use App\Features\Venues\Models\Venue;
 use App\Shared\Models\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -17,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['uuid', 'venue_id', 'studio_id', 'competition_contact_id', 'event_type_definition_id', 'name', 'organiser_name', 'organiser_email', 'organiser_phone', 'logo_path', 'event_type', 'event_date', 'availability_status', 'availability_deadline', 'roster_status', 'roster_published_at', 'admin_notes', 'crew_brief', 'team_leader_notes', 'programme_path', 'cancelled_by_user_id', 'cancelled_at'])]
+#[Fillable(['uuid', 'venue_id', 'studio_id', 'competition_contact_id', 'event_type_definition_id', 'media_price_list_id', 'name', 'organiser_name', 'organiser_email', 'organiser_phone', 'logo_path', 'event_type', 'event_date', 'availability_status', 'availability_deadline', 'roster_status', 'roster_published_at', 'admin_notes', 'crew_brief', 'team_leader_notes', 'programme_path', 'cancelled_by_user_id', 'cancelled_at'])]
 class SchedulingEvent extends Model
 {
     use HasPublicUuid;
@@ -37,6 +40,11 @@ class SchedulingEvent extends Model
         return $this->belongsTo(CompetitionContact::class);
     }
 
+    public function priceList(): BelongsTo
+    {
+        return $this->belongsTo(MediaPriceList::class, 'media_price_list_id');
+    }
+
     public function eventTypeDefinition(): BelongsTo
     {
         return $this->belongsTo(EventTypeDefinition::class);
@@ -50,6 +58,16 @@ class SchedulingEvent extends Model
     public function roleRequirements(): HasMany
     {
         return $this->hasMany(SchedulingEventRoleRequirement::class);
+    }
+
+    public function roleSeats(): HasMany
+    {
+        return $this->hasMany(ConcertEventRoleSeats::class);
+    }
+
+    public function studioFiles(): HasMany
+    {
+        return $this->hasMany(StudioEventFile::class)->orderByDesc('uploaded_at');
     }
 
     public function concertBookingItem(): HasOne

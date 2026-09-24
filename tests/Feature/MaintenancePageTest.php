@@ -13,6 +13,6 @@ class MaintenancePageTest extends TestCase
             ->assertSee('temporarily unavailable')
             ->assertSee('no longer than 30 minutes')
             ->assertSee('There’s no need to contact us')
-            ->assertSee('storage/1024.png');
+            ->assertSee('images/brand/dancepro-icon-blue-official.png');
     }
 }

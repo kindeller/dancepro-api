@@ -31,6 +31,14 @@ return [
 
     'connections' => [
 
+        'programmes' => [
+            'driver' => 'database',
+            'table' => 'jobs',
+            'queue' => 'programmes',
+            'retry_after' => 210,
+            'after_commit' => true,
+        ],
+
         'sync' => [
             'driver' => 'sync',
         ],
@@ -84,6 +92,14 @@ return [
         'failover' => [
             'driver' => 'failover',
             'connections' => [
+
+                'programmes' => [
+                    'driver' => 'database',
+                    'table' => 'jobs',
+                    'queue' => 'programmes',
+                    'retry_after' => 210,
+                    'after_commit' => true,
+                ],
                 'database',
                 'deferred',
             ],

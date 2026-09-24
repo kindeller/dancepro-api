@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['user_id', 'preferred_name', 'phone', 'registration_source', 'terms_accepted_at', 'privacy_accepted_at', 'marketing_consent_at', 'preferences'])]
+#[Fillable(['user_id', 'preferred_name', 'phone', 'registration_source', 'terms_accepted_at', 'privacy_accepted_at', 'policy_version', 'marketing_consent_at', 'preferences'])]
 class CustomerProfile extends Model
 {
     /** @use HasFactory<CustomerProfileFactory> */
