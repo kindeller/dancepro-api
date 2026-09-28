@@ -5,8 +5,6 @@ namespace App\Features\Tracking\Controllers;
 use App\Features\Concerts\Services\ConcertDirectorReviews;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Scheduling\Services\EventAvailability;
-use App\Features\StudioBilling\Models\StudioInvoice;
-use App\Features\StudioBilling\Services\InvoiceTrackerWorkflow;
 use App\Features\Tracking\Actions\UpdateConcertTrackerTask;
 use App\Features\Tracking\Models\ConcertTrackerEmailTemplate;
 use App\Features\Tracking\Requests\ConcertTrackerRequest;
@@ -42,12 +40,8 @@ class AdminConcertTrackerTaskController extends Controller
                     'blockers' => ['Link this event to an approved studio booking before preparing its invoice.'],
                 ]);
             }
-            $invoice = StudioInvoice::where('active_booking_id', $booking->id)->first();
-            if ($invoice) {
-                return to_route('admin.studio-invoices.show', $invoice);
-            }
 
-            return response()->view('admin.studio-invoices.prepare', app(InvoiceTrackerWorkflow::class)->workspace($booking, $request->session()->get('concert_tracker_context', [])));
+            return to_route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']);
         }
         if ($taskKey === 'director_approval') {
             return to_route('admin.concert-tracker.tasks.show', [$schedulingEvent, 'final_release']);

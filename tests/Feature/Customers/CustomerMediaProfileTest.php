@@ -69,7 +69,9 @@ class CustomerMediaProfileTest extends TestCase
         $this->post(route('customer.competitions.store'), ['event_uuid' => (string) Str::uuid(), 'login_code' => 'TEST-CODE'])->assertSessionHasErrors(['login_code' => 'Add a dancer in My Profile first.']);
         $this->assertDatabaseCount('customer_dancers', 0);
         $this->assertDatabaseCount('customer_studios', 0);
-        $this->actingAs(User::factory()->crew()->create())->get(route('customer.profile.edit'))->assertForbidden();
-        $this->post(route('customer.profile.store'), ['action' => 'dancer', 'name' => 'No access'])->assertForbidden();
+        $crew = User::factory()->crew()->create();
+        $this->actingAs($crew)->get(route('customer.profile.edit'))->assertOk();
+        $this->post(route('customer.profile.store'), ['action' => 'dancer', 'name' => 'Crew dancer'])->assertRedirect();
+        $this->assertDatabaseHas('customer_dancers', ['user_id' => $crew->id, 'name' => 'Crew dancer']);
     }
 }

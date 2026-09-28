@@ -38,7 +38,7 @@ class CustomerSupportRequestUpdated extends Notification implements ShouldQueue
             $message->line($request->response_note);
         }
 
-        return $message->action('View help request', route('customer.media.help'))
-            ->line('Reply to this email if you still need assistance.');
+        return $message->action('View help request', route('customer.messages.show', $request))
+            ->line('Open the conversation to reply if you still need assistance.');
     }
 }

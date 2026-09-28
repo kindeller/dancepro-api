@@ -2,17 +2,19 @@
 
 namespace App\Features\Customers\Services;
 
+use App\Features\Customers\Models\CustomerSupportMessage;
 use App\Features\Customers\Models\GuestGalleryAccess;
 use App\Features\Customers\Models\GuestGalleryRegistration;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class CustomerPrivacyData
 {
     private const ACCOUNT_TABLES = [
         'customer_profiles', 'customer_dancers', 'customer_studios', 'customer_competition_registrations',
         'customer_media_selections', 'customer_concert_photo_selections', 'customer_account_emails',
-        'customer_media_notifications', 'customer_support_requests', 'customer_account_activities',
+        'customer_inbox_notifications', 'customer_media_notifications', 'customer_support_requests', 'customer_account_activities',
         'customer_account_notes', 'customer_risk_events', 'customer_privacy_requests',
         'customer_consent_histories', 'customer_login_events', 'customer_engagement_events',
         'concert_access_grants', 'concert_accesses', 'order_media_asset_downloads',
@@ -27,6 +29,7 @@ class CustomerPrivacyData
             $data[$table] = DB::table($table)->where('user_id', $customer->id)->get()
                 ->map(fn ($row) => collect((array) $row)->except(['session_identifier', 'storage_key', 'storage_disk', 'fingerprint', 'deduplication_key'])->all())->all();
         }
+        $data['customer_support_messages'] = CustomerSupportMessage::whereHas('conversation', fn ($query) => $query->where('user_id', $customer->id))->get()->map(fn ($message) => ['uuid' => $message->uuid, 'direction' => $message->direction, 'body' => $message->body, 'sent_at' => $message->sent_at, 'attachment_name' => data_get($message->attachment, 'name')])->all();
         $hash = hash('sha256', mb_strtolower(trim($customer->email)));
         $accesses = GuestGalleryAccess::where('email_hash', $hash)->get();
         $data['guest_gallery_accesses'] = $accesses->map(fn ($access) => $access->makeVisible('email')->toArray())->all();
@@ -41,6 +44,14 @@ class CustomerPrivacyData
     /** Redact account/contact records, preserving order amounts and media identities. */
     public function redact(User $customer, string $anonymousEmail): void
     {
+        DB::table('customer_inbox_notifications')->where('user_id', $customer->id)->update(['subject' => '[redacted]', 'body' => '[redacted]', 'action_url' => null]);
+        $messages = CustomerSupportMessage::whereHas('conversation', fn ($query) => $query->where('user_id', $customer->id))->get();
+        foreach ($messages as $message) {
+            if ($path = data_get($message->attachment, 'path')) {
+                Storage::disk('local')->delete($path);
+            }
+            $message->update(['body' => '[redacted]', 'attachment' => null]);
+        }
         DB::table('customer_profiles')->where('user_id', $customer->id)->update(['preferred_name' => null, 'phone' => null, 'preferences' => null, 'marketing_consent_at' => null]);
         DB::table('customer_media_notifications')->where('user_id', $customer->id)->update(['recipient_email' => $anonymousEmail, 'subject' => '[redacted]', 'metadata' => null]);
         DB::table('customer_risk_events')->where('user_id', $customer->id)->update(['details' => '[redacted]', 'metadata' => null]);

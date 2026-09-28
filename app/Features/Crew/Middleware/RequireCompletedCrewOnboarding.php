@@ -2,7 +2,6 @@
 
 namespace App\Features\Crew\Middleware;
 
-use App\Features\Customers\Support\UserType;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,7 +13,7 @@ class RequireCompletedCrewOnboarding
     {
         $user = $request->user();
 
-        if ($user?->type === UserType::Crew->value && $user->onboarding_completed_at === null && ! $request->routeIs('crew.profile.*', 'crew.contracts.*')) {
+        if ($user?->canAccessCrew() && ! $user->canAccessAdmin() && $user->onboarding_completed_at === null && ! $request->routeIs('crew.profile.*', 'crew.contracts.*')) {
             return redirect()->route('crew.profile.edit')->with('status', 'Please complete your crew profile to continue.');
         }
 

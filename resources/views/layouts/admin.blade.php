@@ -155,7 +155,9 @@
         }
 
         .nav-notification {
-            display: grid;
+            display: inline-grid;
+            flex-shrink: 0;
+            vertical-align: middle;
             min-width: 18px;
             height: 18px;
             padding: 0 5px;
@@ -712,11 +714,11 @@
 
             <nav class="nav" id="admin-navigation" aria-label="Admin navigation">
                 @if(auth()->user()?->crewProfile)
-                    <a href="{{ route('crew.availability.index') }}">My Hub</a>
+                    <a href="{{ route('crew.availability.index') }}">@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['my_hub'], 'key' => 'my_hub', 'label' => 'shift actions needing your response'])My Hub</a>
                 @endif
                 @php($hubManagementActive = request()->routeIs('admin.hub.*', 'admin.exceptions.*', 'admin.studios.*', 'admin.competition-contacts.*', 'admin.crew.*', 'admin.crew-roles.*', 'admin.crew-contracts.*', 'admin.crew-management.*', 'admin.scheduling-events.*', 'admin.event-management.*', 'admin.event-types.*', 'admin.venues.*', 'admin.operations.*', 'admin.payments.*', 'admin.timesheets.*', 'admin.concert-bookings.*', 'admin.concert-booking-events.*'))
                 <details class="nav-group {{ $hubManagementActive ? 'active' : '' }}" @if($hubManagementActive) open @endif>
-                    <summary>Hub management</summary>
+                    <summary>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['hub_management'], 'key' => 'hub_management', 'label' => 'items needing attention'])Hub management</summary>
                     <div class="nav-submenu">
                         @can('manageScheduling')
                             <a href="{{ route('admin.hub.dashboard') }}" @if(request()->routeIs('admin.hub.*')) aria-current="page" @endif>Hub dashboard</a>
@@ -728,16 +730,16 @@
                             <a href="{{ route('admin.crew.index') }}" @if(request()->routeIs('admin.crew.*', 'admin.crew-roles.*', 'admin.crew-contracts.*', 'admin.crew-management.*')) aria-current="page" @endif>Crew management</a>
                         @endcan
                         @can('manageScheduling')
-                            <a href="{{ route('admin.exceptions.index') }}" @if(request()->routeIs('admin.exceptions.*')) aria-current="page" @endif>@if($adminExceptionCount)<span class="nav-notification">{{ $adminExceptionCount }}</span>@endif Exceptions</a>
-                            <a href="{{ route('admin.concert-bookings.index') }}" @if(request()->routeIs('admin.scheduling-events.*', 'admin.event-management.*', 'admin.event-types.*', 'admin.concert-bookings.*', 'admin.concert-booking-events.*')) aria-current="page" @endif>Event management</a>
+                            <a href="{{ route('admin.exceptions.index') }}" @if(request()->routeIs('admin.exceptions.*')) aria-current="page" @endif>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['exceptions'], 'key' => 'exceptions', 'label' => 'exceptions needing attention']) Exceptions</a>
+                            <a href="{{ route('admin.concert-bookings.index') }}" @if(request()->routeIs('admin.scheduling-events.*', 'admin.event-management.*', 'admin.event-types.*', 'admin.concert-bookings.*', 'admin.concert-booking-events.*')) aria-current="page" @endif>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['pending_events'], 'key' => 'pending_events', 'label' => 'events awaiting approval'])Event management</a>
                             <a href="{{ route('admin.venues.index') }}" @if(request()->routeIs('admin.venues.*')) aria-current="page" @endif>Venue management</a>
                             <a href="{{ route('admin.timesheets.index') }}" @if(request()->routeIs('admin.timesheets.*', 'admin.payments.*')) aria-current="page" @endif>Crew payments</a>
                         @endcan
                     </div>
                 </details>
                 @can('manageScheduling')
-                    <a href="{{ route('admin.concert-tracker.index') }}" @if(request()->routeIs('admin.concert-tracker.*')) aria-current="page" @endif>@if($concertTrackerAlertCount)<span class="nav-notification">{{ $concertTrackerAlertCount }}</span>@endif Concert tracker</a>
-                    <a href="{{ route('admin.concert-tracker.studio-communications.index') }}" @if(request()->routeIs('admin.concert-tracker.studio-communications.*')) aria-current="page" @endif>@if($studioMessageUnreadCount)<span class="nav-notification">{{ $studioMessageUnreadCount }}</span>@endif Studio messages</a>
+                    <a href="{{ route('admin.concert-tracker.index', ['year' => $concertTrackerNotificationYear]) }}" @if(request()->routeIs('admin.concert-tracker.*')) aria-current="page" @endif>@if($concertTrackerAttentionCount)<span class="nav-notification" title="Tasks and pending events needing attention in {{ $concertTrackerNotificationYear }}">{{ $concertTrackerAttentionCount }}</span>@endif Concert tracker</a>
+                    <a href="{{ route('admin.concert-tracker.studio-communications.index') }}" @if(request()->routeIs('admin.concert-tracker.studio-communications.*')) aria-current="page" @endif>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['studio_messages'], 'key' => 'studio_messages', 'label' => 'unread studio messages']) Studio messages</a>
                 @endcan
                 @php($competitionPhotosActive = request()->routeIs('admin.competition-gallery.*') || (request()->routeIs('admin.photo-uploads.*') && request()->route('schedulingEvent')?->event_type->value === 'competition'))
                 @php($mediaActive = request()->routeIs('admin.dashboard', 'admin.publicity.*', 'admin.top-pics.*', 'admin.concerts.*', 'admin.concert-photo-gallery.*', 'admin.competition.objects.*', 'admin.competition-gallery.*', 'admin.competition-videos.*', 'admin.download-links.*', 'admin.media-settings.*') || $competitionPhotosActive)
@@ -764,10 +766,10 @@
                     <a href="{{ route('admin.media-sales.index') }}" @if(request()->routeIs('admin.media-sales.*')) aria-current="page" @endif>Sales reports</a>
                 </div></details>
                 @php($customersActive = request()->routeIs('admin.customers.*', 'admin.media-support.*'))
-                <details class="nav-group {{ $customersActive ? 'active' : '' }}" @if($customersActive) open @endif><summary>Customers</summary><div class="nav-submenu">
+                <details class="nav-group {{ $customersActive ? 'active' : '' }}" @if($customersActive) open @endif><summary>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['customers'], 'key' => 'customers', 'label' => 'customer actions needing attention'])Customers</summary><div class="nav-submenu">
                     <a href="{{ route('admin.customers.index') }}" @if(request()->routeIs('admin.customers.*') && !request()->routeIs('admin.customers.follow-ups')) aria-current="page" @endif>Customer accounts</a>
-                    <a href="{{ route('admin.customers.follow-ups') }}" @if(request()->routeIs('admin.customers.follow-ups')) aria-current="page" @endif>Customer follow-ups</a>
-                    <a href="{{ route('admin.media-support.index') }}" @if(request()->routeIs('admin.media-support.*')) aria-current="page" @endif>Customer support</a>
+                    <a href="{{ route('admin.customers.follow-ups') }}" @if(request()->routeIs('admin.customers.follow-ups')) aria-current="page" @endif>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['follow_ups_due'], 'key' => 'follow_ups_due', 'label' => 'customer follow-ups due now'])Customer follow-ups</a>
+                    <a href="{{ route('admin.media-support.index') }}" @if(request()->routeIs('admin.media-support.*')) aria-current="page" @endif>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['support_pending'], 'key' => 'support_pending', 'label' => 'pending customer support requests'])Customer support</a>
                 </div></details>
                 @if(config('security.two_factor.enabled'))<a href="{{ route('account.security') }}">Account security</a>@endif
                 <form method="POST" action="{{ route('logout') }}">

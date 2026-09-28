@@ -31,7 +31,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function homeRouteName(): string
     {
-        return $this->canAccessAdmin() ? 'admin.dashboard' : ($this->type === UserType::Customer->value ? 'customer.media.index' : 'crew.availability.index');
+        return $this->canAccessAdmin() ? 'admin.dashboard' : ($this->type !== UserType::Customer->value && $this->canAccessCrew() ? 'crew.availability.index' : 'customer.media.index');
     }
 
     public function canAccessAdmin(): bool
@@ -41,7 +41,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function canAccessCustomer(): bool
     {
-        return $this->is_active && ($this->type === UserType::Customer->value || $this->canAccessAdmin());
+        return $this->is_active && (in_array($this->type, [UserType::Customer->value, UserType::Crew->value, UserType::Staff->value], true) || $this->canAccessAdmin());
     }
 
     public function canAccessStudioHub(): bool
@@ -59,8 +59,7 @@ class User extends Authenticatable implements MustVerifyEmail
     public function canAccessCrew(): bool
     {
         return $this->is_active
-            && $this->crewProfile !== null
-            && ($this->type === UserType::Crew->value || $this->is_admin);
+            && $this->crewProfile !== null;
     }
 
     public function customerProfile(): HasOne

@@ -1,23 +1,15 @@
 @extends('layouts.admin', [
     'title' => 'Concert tracker',
     'heading' => 'Concert tracker',
-    'subheading' => 'Source-derived progress and the work that needs attention',
+    'subheading' => 'Concert bookings, preparation and delivery',
 ])
 
 @push('styles')
 <style>
-    .tracker-controls { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
+    .tracker-controls { display:flex; align-items:center; justify-content:flex-end; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
     .tracker-tabs { display:flex; gap:0; border-bottom:1px solid var(--line); }
     .tracker-tabs a { padding:10px 16px; color:var(--muted); font-weight:800; text-decoration:none; border:1px solid transparent; border-bottom:0; border-radius:8px 8px 0 0; }
     .tracker-tabs a[aria-current="page"] { color:var(--brand-strong); background:#fff; border-color:var(--line); }
-    .tracker-phase-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:0 0 18px; }
-    .tracker-phase-tabs a { padding:9px 13px; border:1px solid var(--line); border-radius:999px; background:#fff; color:var(--muted); font-weight:800; text-decoration:none; }
-    .tracker-phase-tabs a[aria-current="page"] { color:#fff; }
-    .tracker-phase-tabs .phase-all[aria-current="page"] { background:var(--brand-strong); border-color:var(--brand-strong); }
-    .tracker-phase-tabs .phase-booking[aria-current="page"] { background:#168bb8; border-color:#168bb8; }
-    .tracker-phase-tabs .phase-preparation[aria-current="page"] { background:#b97d00; border-color:#b97d00; }
-    .tracker-phase-tabs .phase-editing[aria-current="page"] { background:#794da5; border-color:#794da5; }
-    .tracker-phase-tabs .phase-completion[aria-current="page"] { background:#27805a; border-color:#27805a; }
     .tracker-summary { display:grid; grid-template-columns:repeat(4,minmax(130px,1fr)); gap:12px; margin-bottom:18px; }
     .tracker-summary .metric { padding:14px 16px; }
     .tracker-summary strong { display:block; margin-top:3px; font-size:25px; }
@@ -35,6 +27,9 @@
     .tracker-communications:hover,.tracker-communications:focus-visible { background:var(--soft);outline:2px solid var(--brand-strong);outline-offset:2px; }
     .tracker-gallery-login { display:inline-flex;flex-wrap:wrap;justify-content:center;gap:5px;align-items:center;min-width:0;max-width:100%;font-size:11px;color:var(--muted); }
     .tracker-gallery-login code { font-size:12px;font-weight:800;color:var(--ink);overflow-wrap:anywhere;user-select:all; }
+    .tracker-access-code { display:block; margin-top:5px; color:var(--brand-strong); font-size:10px; overflow-wrap:anywhere; }
+    .tracker-access-code code { font:inherit; font-weight:800; user-select:all; }
+    .tracker-sheet[aria-busy="true"] { cursor:progress; }
     .tracker-event small, .tracker-status small { display:block; color:var(--muted); margin-top:3px; line-height:1.35; }
     .tracker-status { display:block; min-width:118px; color:var(--ink); text-decoration:none; border-radius:7px; padding:5px; margin:-5px; font-size:12px; }
     .tracker-status:hover { background:var(--soft); text-decoration:none; }
@@ -49,8 +44,8 @@
     .badge.status-near-due { background:#fff2cc; color:#946200; }
     .tracker-task-meta { display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; justify-content:center; color:var(--muted); font-size:11px; }
     .tracker-shared { background:#fbfdfe; }
-    .compact-all th.tracker-task-heading { width:76px; min-width:76px; max-width:76px; height:128px; padding:5px; vertical-align:bottom; }
-    .compact-all th.tracker-task-heading .vertical-label { display:inline-block; writing-mode:vertical-rl; transform:rotate(180deg); white-space:nowrap; line-height:1; }
+    .compact-all th.tracker-task-heading { width:96px; min-width:96px; max-width:96px; height:142px; padding:7px; vertical-align:bottom; }
+    .compact-all th.tracker-task-heading .vertical-label { display:inline-block; writing-mode:vertical-rl; transform:rotate(180deg); white-space:normal; height:128px; max-height:128px; text-wrap:balance; line-height:1.5; font-size:11px; letter-spacing:.02em; }
     .tracker-task-heading { cursor:help; }
     .tracker-heading-tooltip { position:fixed; z-index:1000; width:min(340px,calc(100vw - 24px)); padding:12px 14px; border-radius:8px; background:#10202c; color:#fff; box-shadow:0 10px 28px rgba(16,32,44,.28); font-size:13px; font-weight:650; line-height:1.45; pointer-events:none; opacity:0; transform:translateY(4px); transition:opacity .12s ease,transform .12s ease; }
     .tracker-heading-tooltip[aria-hidden="false"] { opacity:1; transform:translateY(0); }
@@ -69,15 +64,17 @@
     .tracker-section-heading.phase-preparation { border-top-color:#e8ad24; background:#fffbf2; }
     .tracker-section-heading.phase-editing { border-top-color:#9b6bcc; background:#faf7fd; }
     .tracker-section-heading.phase-completion { border-top-color:#42a875; background:#f5fbf8; }
-    .tracker-phase-key { display:none; gap:12px; flex-wrap:wrap; align-items:center; margin-top:10px; color:var(--muted); font-size:12px; font-weight:750; }
-    .tracker-phase-key span { display:inline-flex; gap:6px; align-items:center; }
+    .tracker-phase-key { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:12px; color:var(--muted); font-size:12px; font-weight:750; }
+    .tracker-phase-key a { display:inline-flex; gap:6px; align-items:center; padding:5px 9px; border:1px solid var(--line); border-radius:6px; text-decoration:none; background:#fff; }
+    .tracker-phase-key a[aria-current="page"] { border-color:var(--brand-strong); color:var(--ink); box-shadow:inset 0 -2px var(--brand-strong); }
+    .tracker-phase-key a:hover,.tracker-phase-key a:focus-visible { outline:2px solid var(--brand-strong); outline-offset:1px; }
     .tracker-phase-key i { width:10px; height:10px; border-radius:3px; }
     .tracker-phase-key .booking { background:#33a9d6; }
     .tracker-phase-key .preparation { background:#e8ad24; }
     .tracker-phase-key .editing { background:#9b6bcc; }
     .tracker-phase-key .completion { background:#42a875; }
     .compact-all + * { scroll-margin-top:10px; }
-    .compact-all td { width:88px; min-width:88px; max-width:88px; padding:6px; vertical-align:top; }
+    .compact-all td { width:96px; min-width:96px; max-width:96px; padding:6px; vertical-align:top; }
     .compact-all .tracker-event { width:180px; min-width:180px; max-width:180px; }
     .compact-all .tracker-status { min-width:0; font-size:11px; }
     .compact-all .tracker-status > small { display:none; }
@@ -87,11 +84,14 @@
     .tracker-not-approved { background:#ffe5e8;color:#b42331; }
     .tracker-pending-note { width:360px; max-width:65vw; margin:0; padding:12px; }
     .tracker-studio-heading th { background:#eef7fb; color:var(--brand-strong); font-size:15px; text-align:center; }
-    .content, .topbar { text-align:center; }
+    .content { text-align:center; }
+    .topbar { text-align:left; }
     .content th, .content td, .content input, .content select, .content textarea { text-align:center; }
-    .tracker-tabs, .tracker-phase-tabs, .tracker-phase-key { justify-content:center; }
+    .tracker-tabs, .tracker-phase-key { justify-content:flex-start; }
     .tracker-due-overdue { color:#b42331; font-weight:800; }
-    .tracker-sheet-toolbar { display:flex; align-items:center; justify-content:center; gap:18px; flex-wrap:wrap; }
+    .tracker-sheet-toolbar { display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+    .tracker-sheet-toolbar h2 { margin:0; font-size:18px; }
+    #tracker-fullscreen { margin-left:auto; }
     .tracker-sheet:fullscreen, .tracker-sheet.is-expanded { display:flex; flex-direction:column; box-sizing:border-box; width:100%; height:100%; padding:12px; background:#f5fafc; overflow:hidden; }
     .tracker-sheet.is-expanded { position:fixed; inset:0; z-index:1100; width:100vw; height:100dvh; }
     .tracker-sheet:fullscreen .tracker-table-wrap, .tracker-sheet.is-expanded .tracker-table-wrap { flex:1; max-height:none; }
@@ -105,10 +105,6 @@
 @if($errors->any())<p class="card card-pad" role="alert" style="color:#a62232">{{ $errors->first() }}</p>@endif
 
 <div class="tracker-controls">
-    <nav class="tracker-tabs" aria-label="Tracker view">
-        <a href="{{ route('admin.concert-tracker.index', ['view' => 'date', 'year' => $year, 'phase' => $phase]) }}" @if($view === 'date') aria-current="page" @endif>Date view</a>
-        <a href="{{ route('admin.concert-tracker.index', ['view' => 'studio', 'year' => $year, 'phase' => $phase]) }}" @if($view === 'studio') aria-current="page" @endif>Studio view</a>
-    </nav>
     <div class="toolbar">
         <a class="button secondary" href="{{ route('admin.concert-tracker.templates.index') }}">Email templates</a>
         <a class="button secondary" href="{{ route('admin.concert-tracker.automation.index', ['year' => $year]) }}">Communication schedule</a>
@@ -120,22 +116,30 @@
     </div>
 </div>
 
-<nav class="tracker-phase-tabs" aria-label="Tracker phase">
-    <a class="phase-all" href="{{ route('admin.concert-tracker.index', ['view' => $view, 'year' => $year, 'phase' => 'all']) }}" @if($phase === 'all') aria-current="page" @endif>All tasks</a>
-    @foreach($phases as $phaseKey => $phaseLabel)<a class="phase-{{ $phaseKey }}" href="{{ route('admin.concert-tracker.index', ['view' => $view, 'year' => $year, 'phase' => $phaseKey]) }}" @if($phase === $phaseKey) aria-current="page" @endif>{{ $phaseLabel }}</a>@endforeach
-</nav>
-
-@if($pendingCount)<p class="muted">{{ $pendingCount }} pending {{ $pendingCount === 1 ? 'event' : 'events' }} awaiting booking confirmation. Red studio headings identify pending bookings; task totals cover scheduled events.</p>@endif
-
 <section class="tracker-summary" aria-label="Tracker summary">
-    <a class="card metric" style="text-decoration:none;color:inherit" href="{{ route('admin.concert-tracker.index', ['view' => $view, 'year' => $year, 'phase' => $phase, 'attention' => $attention ? null : 1]) }}"><span class="muted">Needs attention</span><strong style="color:#b42331">{{ $summary['attention'] }}</strong><small>{{ $attention ? 'Show all events' : 'Show overdue, failed and follow-ups' }}</small></a>
+    <a class="card metric" style="text-decoration:none;color:inherit" href="{{ route('admin.concert-tracker.index', ['view' => $view, 'year' => $year, 'phase' => $phase, 'attention' => $attention ? null : 1]) }}"><span class="muted">Needs attention</span><strong style="color:#b42331">{{ $summary['attention'] }}</strong><small>{{ $attention ? 'Show all events' : 'Show pending bookings and tasks needing action' }}</small></a>
     <div class="card metric"><span class="muted">Due within 3 days</span><strong style="color:#946200">{{ $summary['near_due'] }}</strong></div>
     <div class="card metric"><span class="muted">Open</span><strong>{{ $summary['open'] }}</strong></div>
     <div class="card metric"><span class="muted">Complete</span><strong style="color:var(--ok)">{{ $summary['complete'] }}</strong></div>
 </section>
 
 <section class="card tracker-sheet" id="tracker-sheet" aria-label="Concert tracker tasks">
-    <div class="card-pad tracker-section-heading phase-{{ $phase }}"><div class="tracker-sheet-toolbar"><h2 style="margin:0">{{ $attention ? 'Needs attention' : ($phase === 'all' ? 'All concert tasks' : ($phases[$phase] ?? 'Concert production')) }} · {{ $year }}</h2><button type="button" class="secondary" id="tracker-fullscreen" aria-controls="tracker-sheet" aria-pressed="false">⛶ Full screen</button></div><p class="muted" style="margin-bottom:0">Automatic tasks read their source records. Manual tasks support status, assignee, due-date overrides, notes and follow-ups. Click any cell for details.</p>@if($phase === 'all')<div class="tracker-phase-key" style="display:flex" aria-label="Task category colours">@foreach($phases as $phaseKey => $phaseLabel)<span><i class="{{ $phaseKey }}"></i>{{ $phaseLabel }}</span>@endforeach </div>@endif</div>
+    <div class="card-pad tracker-section-heading phase-{{ $phase }}">
+        <div class="tracker-sheet-toolbar">
+            <nav class="tracker-tabs" aria-label="Tracker view">
+                <a href="{{ route('admin.concert-tracker.index', ['view' => 'date', 'year' => $year, 'phase' => $phase, 'attention' => $attention ? 1 : null]) }}" @if($view === 'date') aria-current="page" @endif>Date view</a>
+                <a href="{{ route('admin.concert-tracker.index', ['view' => 'studio', 'year' => $year, 'phase' => $phase, 'attention' => $attention ? 1 : null]) }}" @if($view === 'studio') aria-current="page" @endif>Studio view</a>
+            </nav>
+            <h2>{{ $attention ? 'Needs attention' : ($phase === 'all' ? 'All concert tasks' : ($phases[$phase] ?? 'Concert production')) }} · {{ $year }}</h2>
+            <button type="button" class="secondary" id="tracker-fullscreen" aria-controls="tracker-sheet" aria-pressed="false">⛶ Full screen</button>
+        </div>
+        <nav class="tracker-phase-key" aria-label="Tracker phase">
+            <a class="phase-all" href="{{ route('admin.concert-tracker.index', ['view' => $view, 'year' => $year, 'phase' => 'all', 'attention' => $attention ? 1 : null]) }}" @if($phase === 'all') aria-current="page" @endif>All tasks</a>
+            @foreach($phases as $phaseKey => $phaseLabel)
+                <a href="{{ route('admin.concert-tracker.index', ['view' => $view, 'year' => $year, 'phase' => $phaseKey, 'attention' => $attention ? 1 : null]) }}" @if($phase === $phaseKey) aria-current="page" @endif><i class="{{ $phaseKey }}" aria-hidden="true"></i>{{ $phaseLabel }}</a>
+            @endforeach
+        </nav>
+    </div>
     <div class="tracker-table-wrap" tabindex="0" role="region" aria-label="Scrollable concert tasks"><table class="tracker-table {{ $phase === 'all' ? 'compact-all' : '' }}">
         <thead><tr><th>Event</th>@foreach($definitions as $definition)<th class="tracker-task-heading phase-{{ $definition['phase'] }}" tabindex="0" data-task-label="{{ $definition['numbered_label'] }}" data-task-description="{{ $definition['description'] }}" aria-describedby="tracker-heading-tooltip"><span class="vertical-label">{{ $definition['numbered_label'] }}</span>@if($definition['scope'] === 'booking')<div class="muted" style="font-size:10px">Shared booking task</div>@endif</th>@endforeach</tr></thead>
         <tbody>
@@ -166,7 +170,7 @@
                 @foreach($definitions as $definition)
                     @php($status = $row['tasks'][$definition['key']])
                     @unless($status['skip'])
-                        <td @if($status['rowspan'] > 1) rowspan="{{ $status['rowspan'] }}" class="tracker-shared" @endif>
+                        <td data-task-key="{{ $definition['key'] }}" @if($status['rowspan'] > 1) rowspan="{{ $status['rowspan'] }}" class="tracker-shared" @endif>
                             <a class="tracker-status" href="{{ $status['detailUrl'] }}" title="{{ $status['detail'] }}">
                                 @if($status['photoRoles'] ?? [])
                                     @foreach($status['photoRoles'] as $photoRole)<span class="badge {{ $photoRole['tone'] === 'complete' ? 'success' : 'status-'.$photoRole['tone'] }}">{{ $photoRole['label'] }}</span>@unless($loop->last)<br>@endunless
@@ -180,6 +184,9 @@
                                 @endforeach
                                 @if($status['seatsLabel'] ?? null)
                                     <br><span class="badge status-{{ $status['tone'] }}">{{ $status['seatsLabel'] }}</span>
+                                @endif
+                                @if($status['key'] !== 'not_required' && filled($releaseLogins[$event->id][$definition['key']]['value'] ?? null))
+                                    <span class="tracker-access-code">Access Code: <code>{{ $releaseLogins[$event->id][$definition['key']]['value'] }}</code></span>
                                 @endif
                                 <small>{{ $status['detail'] }}</small>
                                 <span class="tracker-task-meta">
@@ -209,7 +216,7 @@
 <script nonce="{{ request()->attributes->get('csp_nonce') }}">
     (() => {
         const shell = document.getElementById('tracker-sheet');
-        const button = document.getElementById('tracker-fullscreen');
+        let button = document.getElementById('tracker-fullscreen');
         let previousOverflow = '';
         const expanded = () => document.fullscreenElement === shell || shell.classList.contains('is-expanded');
         const updateButton = () => {
@@ -222,7 +229,8 @@
             updateButton();
             button.focus();
         };
-        button.addEventListener('click', async () => {
+        shell.addEventListener('click', async (event) => {
+            if (!event.target.closest('#tracker-fullscreen')) return;
             if (document.fullscreenElement === shell) await document.exitFullscreen();
             else if (shell.classList.contains('is-expanded')) exitFallback();
             else {
@@ -241,9 +249,57 @@
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && shell.classList.contains('is-expanded')) exitFallback();
         });
-        const tooltip = document.getElementById('tracker-heading-tooltip');
-        const headings = document.querySelectorAll('.tracker-task-heading[data-task-description]');
-        if (!tooltip || !headings.length) return;
+        let tooltip = document.getElementById('tracker-heading-tooltip');
+        let navigation;
+        let renderedUrl = window.location.href;
+        const navigate = async (url, push = true) => {
+            navigation?.abort();
+            const controller = new AbortController();
+            navigation = controller;
+            shell.setAttribute('aria-busy', 'true');
+            shell.querySelector('[data-navigation-error]')?.remove();
+            try {
+                const response = await fetch(url, {signal: controller.signal, credentials: 'same-origin', headers: {'Accept': 'text/html'}});
+                if (!response.ok || new URL(response.url).pathname !== window.location.pathname) throw new Error('Tracker unavailable');
+                const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
+                const next = doc.getElementById('tracker-sheet');
+                if (!next || controller.signal.aborted) throw new Error('Tracker unavailable');
+                // Keep the fullscreen element itself mounted so browser fullscreen survives navigation.
+                shell.replaceChildren(...next.childNodes);
+                const summary = doc.querySelector('.tracker-summary');
+                if (summary) document.querySelector('.tracker-summary').replaceWith(summary);
+                button = shell.querySelector('#tracker-fullscreen');
+                tooltip = shell.querySelector('#tracker-heading-tooltip');
+                updateButton();
+                if (push) {
+                    history.replaceState({...history.state, concertTracker: true}, '', renderedUrl);
+                    history.pushState({concertTracker: true}, '', url);
+                }
+                renderedUrl = window.location.href;
+                const selected = [...shell.querySelectorAll('nav a')].find(link => link.href === new URL(url, location.href).href);
+                selected?.focus({preventScroll: true});
+            } catch (error) {
+                if (controller.signal.aborted) return;
+                if (!push) history.replaceState({concertTracker: true}, '', renderedUrl);
+                const notice = document.createElement('p');
+                notice.dataset.navigationError = '';
+                notice.setAttribute('role', 'alert');
+                notice.className = 'card-pad';
+                notice.textContent = 'Could not change the tracker view. Your current view is still open. Please try again.';
+                shell.prepend(notice);
+            } finally {
+                if (navigation === controller) shell.removeAttribute('aria-busy');
+            }
+        };
+        shell.addEventListener('click', event => {
+            const link = event.target.closest('.tracker-phase-key a, .tracker-tabs a');
+            if (!link || !expanded() || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            navigate(link.href);
+        });
+        window.addEventListener('popstate', event => {
+            if (event.state?.concertTracker) navigate(window.location.href, false);
+        });
 
         const show = (heading, x, y) => {
             tooltip.replaceChildren();
@@ -260,16 +316,20 @@
         };
         const hide = () => tooltip.setAttribute('aria-hidden', 'true');
 
-        headings.forEach((heading) => {
-            heading.addEventListener('mouseenter', (event) => show(heading, event.clientX, event.clientY));
-            heading.addEventListener('mousemove', (event) => show(heading, event.clientX, event.clientY));
-            heading.addEventListener('mouseleave', hide);
-            heading.addEventListener('focus', () => {
+        shell.addEventListener('mousemove', event => {
+            const heading = event.target.closest('.tracker-task-heading[data-task-description]');
+            if (heading) show(heading, event.clientX, event.clientY);
+            else hide();
+        });
+        shell.addEventListener('mouseleave', hide);
+        shell.addEventListener('focusin', event => {
+            const heading = event.target.closest('.tracker-task-heading[data-task-description]');
+            if (heading) {
                 const rect = heading.getBoundingClientRect();
                 show(heading, rect.right, rect.top + (rect.height / 2));
-            });
-            heading.addEventListener('blur', hide);
+            }
         });
+        shell.addEventListener('focusout', hide);
     })();
 </script>
 @endpush

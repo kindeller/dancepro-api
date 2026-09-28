@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['uuid', 'name', 'code', 'slug', 'status', 'description', 'cover_image_url', 'cover_image_storage_key', 'cover_image_revision', 'cover_image_mime_type', 'logo_path', 'brand_color', 'contact_name', 'contact_email', 'contact_phone', 'legacy_id', 'notes'])]
+#[Fillable(['uuid', 'name', 'is_school', 'code', 'slug', 'status', 'description', 'cover_image_url', 'cover_image_storage_key', 'cover_image_revision', 'cover_image_mime_type', 'logo_path', 'brand_color', 'contact_name', 'contact_email', 'contact_phone', 'legacy_id', 'notes'])]
 class Studio extends Model
 {
     /** @use HasFactory<StudioFactory> */
@@ -59,7 +59,7 @@ class Studio extends Model
 
     protected function casts(): array
     {
-        return ['status' => StudioStatus::class, 'gallery_code_version' => 'integer', 'gallery_code_encrypted' => 'encrypted'];
+        return ['is_school' => 'boolean', 'status' => StudioStatus::class, 'gallery_code_version' => 'integer', 'gallery_code_encrypted' => 'encrypted'];
     }
 
     protected static function newFactory(): StudioFactory

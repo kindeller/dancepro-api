@@ -8,8 +8,8 @@ show source-derived and manual work together without duplicating completion stat
 
 ## Implemented
 
-- Eighteen operational checkpoints grouped into four phase tabs, plus a compact
-  all-task view with vertical column labels.
+- Eighteen operational checkpoints grouped into four compact phase filters, plus
+  an all-task view with wrapping vertical column labels.
 - Date and studio ordering, with booking-scoped cells merged across related
   concert rows in Studio view.
 - Source-derived states for the unified booking and selected services, roster
@@ -218,6 +218,11 @@ less likely to stop the others. Production setup must include SPF, DKIM, DMARC,
 TLS, bounce and complaint suppression, gradual sending-volume growth and delivery
 monitoring. Tracker replies should be ingested from `admin@dancepro.com.au` and
 linked to their concert communication history.
+
+Hosting confirmed 28 September 2026: Vodien/cPanel, `web203.vodien.com.au`,
+secure IMAP 993 / SMTP 465. This confirms the provider, not a live connection.
+See [Email mailbox routing](../handbook/Email-Mailbox-Routing.md) for the
+confirmed settings and remaining activation work.
 # Studio dress rehearsal portrait requirements
 
 Dress rehearsal portrait events label their booking start as **Shoot time**. The Studio Hub asks the studio to confirm two source requirements before the event: a minimum 8 × 10 metre portrait area with accessible power, a desk and chair; and that teachers or minders will bring every student after rehearsal to be photographed. Each confirmation records the account and completion time and contributes to the event action progress.
@@ -685,7 +690,7 @@ performed during verification.
   existing audit action to record actor/time, preserve the first completion stamp
   on repeat submissions, and turn the tracker cell green. Reopening clears the
   active completion stamp; historical changes remain logged.
-- Crew Hub > My editing lists assigned concert edits. The same editing view and
+- Crew Hub > My Tasks lists assigned concert edits. The same editing view and
   tracker task are used for crew, with assignment/deadline controls read-only.
   Crew may update their own task status and follow-ups, but cannot access another
   editor's task or admin workspaces. Reassignment removes the previous editor's
@@ -878,7 +883,7 @@ queue and remaining review checks before sending the test event's approval link.
   together at the top left, including AJAX replacements. Tracker view context is
   preserved. Event tasks return to their scheduling event; booking-wide tasks
   return to the first active event, or the pending booking event details before
-  scheduling. Crew-only editing keeps its permitted My editing destination.
+  scheduling. Crew-only editing keeps its permitted My Tasks destination.
 - Booking tabs retain their tracker bar inside the active tab. Pending programme,
   title and studio-media tabs now show the correct task heading and a read-only
   pending bar instead of the booking bar or no bar. Duplicate navigation on photo
@@ -913,3 +918,172 @@ screenshots were visually inspected. Render-only database work was rolled back;
 no live emails, invoice sends, payments or releases were performed. No routes or
 migrations changed. Next: walk a representative booking through these pages
 using the existing local email rehearsal and real uploader completion signals.
+
+## Booking invoice tab — 28 September 2026
+
+- Moved 4.2 Invoice & payment into a booking tab with its own task bar and shared
+  tracker/event return controls. Removed invoice preparation from 1.1.
+- Draft creation, quote refresh, editing, discounts, notes, invoice PDF, payment
+  records and history now use that workspace. Send invoice still opens the
+  reviewed email workflow. No email, issuance or payment happens on page load.
+- Tracker and source links open the tab; old invoice URLs redirect there,
+  preserving access to a specific historical invoice. Invoice selection is
+  scoped to the booking and retains existing admin permissions.
+- Added coverage for canonical navigation, saved drafts, tracker filter context,
+  voided invoice history, cross-booking isolation and customer denial.
+
+Verification: `sail artisan test` passes all 894 tests (8,953 assertions),
+including 18 studio billing tests. `sail pint --dirty --test`,
+`git diff --check` and `sail artisan route:list` pass (647 routes). Prepare,
+draft and paid states were rendered and checked in isolated Chrome at 1440px
+and 390px, including task navigation, one tracker bar within the tab, no
+horizontal overflow, and adding/removing invoice lines. Desktop and mobile
+screenshots were visually inspected. Render fixtures were rolled back; no
+invoice was sent and no live payment or email was triggered.
+
+## Studio Hub video actions — 28 September 2026
+
+- Moved Review & release concert video into Your actions for video bookings.
+  It stays grey with an explanation until the current uploads, quality checks
+  and any correction workflow are ready. Only the owner/director gets the link.
+- Review becomes an outstanding action when available and completes on release.
+  Photo-only concerts and DR portraits do not show a video-review action.
+- DancePro progress now has Concert video released with the family-facing
+  concert link and right-hand Access Code badge after approval and release.
+  Reopened uploads withdraw stale release links/codes. Existing photo badges
+  and customer access checks are unchanged.
+- Added regression coverage for waiting, ready, released, reopened, corrections,
+  office-contact permissions and non-video bookings.
+
+Verification: full `sail artisan test` passes 896 tests (8,998 assertions),
+including 20 focused booking/director workflow tests. `sail pint --dirty --test`
+and `git diff --check` pass. Waiting, ready and released presentation states
+were checked in isolated Chrome at 1440px and 390px with no horizontal overflow;
+desktop and mobile screenshots were inspected. Visual fixtures used rolled-back
+transactions. No real emails, approvals, releases or payments were performed.
+No routes or migrations changed. Next: review the placement in the Studio Hub
+and continue the existing full booking-to-delivery rehearsal.
+
+## Studio Hub, invoice and profile layout — 28 September 2026
+
+- Corrected overdue action date styling: the existing overdue labels now turn red
+  on portrait requirements, seating, programme and studio-video rows. Completed
+  actions retain their completion label; invoice balances use overdue red too.
+- Studio invoice list/details share the Hub header and Events/Messages/Invoices
+  tabs. The list starts with current booking estimates, grouped by booking and
+  event dates, using the exact timeline quote cards and calculation path. Cancelled
+  events/bookings are excluded; confirmed family numbers update the estimates.
+  Issued invoice amounts remain their stored, separate invoice values.
+- Studio Hub is a distinct icon/button before adjacent My Media/My Profile links.
+  Sign out lives on My Profile, its redundant My Media return link is removed,
+  and profile tabs use the shared sticky Hub tab style.
+
+Verification: full `sail artisan test` passes 899 tests (9,039 assertions).
+The focused booking, invoice and profile suite passes 38 tests (403 assertions).
+`sail pint --dirty --test` and `git diff --check` pass. Hub tabs, invoice list
+and detail, profile tabs and overdue states were checked at 1440px and 390px
+in Chrome, with no horizontal overflow. Screenshots were inspected and overdue
+dates verified as red. Visual fixture changes were rolled back. No routes or
+migrations changed; no real messages, payments or releases were performed.
+
+## Hub submenu position and summary links — 28 September 2026
+
+- Studio Hub and My Profile submenu navigation retains vertical scroll and the
+  horizontal tab-strip position. This applies to the shared section-tabs pattern;
+  ordinary navigation, anchors and modified/new-tab clicks keep normal behaviour.
+- Restored all three Hub summary boxes to invoice list and detail pages. Shared
+  links open Events, unfinished event actions (expanded), or Messages. Viewing
+  invoices does not mark studio messages read.
+- Added invoice summary/navigation and message-read regression coverage. Desktop
+  and phone browser checks exercised mouse and keyboard tab switching, normal
+  navigation, invoice layouts and red overdue dates; screenshots were inspected.
+- Initial overlapping test runs contended over the shared testing database;
+  verification was rerun as a single full suite. No production data was changed.
+
+Verification: the clean full `sail artisan test` run passed all 900 tests
+(9,056 assertions). `sail pint --dirty --test` and `git diff --check` passed.
+Browser checks passed at 1440px and 390px. No routes or migrations changed.
+Next: review these navigation refinements in the Studio Hub; the proposed
+My Media top-level tabs remain a recommendation, not an implemented change.
+
+## Tracker counts and compact controls — 28 September 2026
+
+- Fixed summary aggregation dropping earlier events when associative task keys
+  were flattened. All events now contribute; shared booking tasks count once,
+  while event-specific seats/tasks retain their separate counts.
+- Pending events contribute to Open and Needs attention and remain visible in
+  both date/studio attention views. Red Ready to release and Corrections states
+  are actionable, alongside overdue work, failures and due follow-ups.
+- Sidebar now uses the same live task-count calculation across all phases for
+  the selected tracker year, rather than the number of unread alert records.
+  Tracker visits refresh immediately; other admin pages cache the count for up
+  to 30 seconds. Alerts history remains separate. Summary cards follow the
+  selected phase and retain totals when filtering rows to Needs attention.
+- Moved Date/Studio tabs into the tracker toolbar, fullscreen to its right, and
+  the phase filters into compact buttons with colour squares inside the sheet.
+  Removed both explanatory paragraphs and the old top phase pills. Left-aligned
+  the page heading and wrapped long vertical task headings to two shorter lines.
+- Regression coverage checks multiple events, shared tasks, pending events in
+  both views, completion/cancellation, year boundaries and sidebar agreement.
+  Desktop/mobile Chrome checks cover layout, wrapping, phase navigation and
+  fullscreen; screenshots were inspected. No booking or event data was changed.
+- The full-suite check also exposed an incomplete programme snapshot without an
+  event type. The shared programme lookup now treats it as unavailable instead
+  of throwing while the sidebar calculates task counts.
+
+Verification: final full `sail artisan test` passes 901 tests (9,086 assertions).
+The focused tracker/bar checks pass 42 tests (712 assertions), and editing checks
+pass 5 tests (94 assertions). `sail pint --dirty --test` and `git diff --check`
+pass. Browser checks passed at 1440px and 390px, including fullscreen. No routes
+or migrations changed. Next: review the compact tracker in normal use.
+
+## Fullscreen filters and release access codes — 28 September 2026
+
+- Expanded phase filters and Date/Studio view links fetch the same server-rendered
+  tracker page and replace its contents without replacing the fullscreen element.
+  Native and fallback fullscreen survive. URLs, summary boxes, keyboard focus,
+  tooltips and browser history follow the new selection. Failed loads retain the
+  current view and explain that the user can retry; normal/new-tab links retain
+  ordinary navigation.
+- Added Access Code badges to applicable photo-release cells using the studio's
+  configured gallery code. Final video-release cells use the current concert or
+  code-group value only after actual release, independent of manual completion.
+  Missing/unrecoverable codes and reopened/unreleased videos show no code.
+- Reused the Studio Hub code validation path and existing admin authorisation.
+  Added regression assertions for both tracker views, video release and renewed
+  upload/review, and unauthorised access.
+
+Verification: full `sail artisan test` passed 901 tests (9,098 assertions);
+focused tracker/director checks passed 44 tests (743 assertions). Formatting and
+whitespace checks passed. Chrome verified native and fallback fullscreen through
+all five phase selections, both views, keyboard activation, Back/Forward,
+tooltips, failed-request retry and exit. Code-cell layouts passed at 1440px and
+390px. No routes or migrations changed, and no live releases were performed.
+
+## Admin navigation notification roll-ups — 28 September 2026
+
+- Added badges to pending support and due customer follow-ups, their queue tabs,
+  and the Customers parent. Pending events now badges its tab, Event management
+  and Hub management; Hub management also includes action exceptions once.
+- Retained the Studio messages unread-message badge and added My Hub's existing
+  red shift-action count to the admin menu. Zero-count badges disappear, and
+  parent counts remain visible while their submenus are collapsed.
+- Shared pending-event eligibility between the approval queue, navigation and
+  tracker, excluding cancelled, declined and already scheduled items. Navigation
+  counts all years; the tracker retains its year filter. Counts reuse one result
+  per request and refresh on the next page load.
+- Added [count definitions and follow-up candidates](../handbook/Admin-Navigation-Notifications.md).
+
+Verification: full `sail artisan test` passed 903 tests (9,149 assertions).
+New feature coverage checks queue/tab agreement, roll-ups, excluded records,
+resolution/read/completion and access restrictions. `sail pint --dirty --test`
+and `git diff --check` passed. Chrome checks passed at 1440px and 390px for
+pending-event, support and follow-up pages, including collapsed-parent badges.
+Temporary layout fixtures were rolled back. No routes or migrations changed.
+
+## Crew header and My Tasks naming — 28 September 2026
+
+- Crew web pages now place the logo, Back to Media / Back to Admin and profile controls in the top header row, with evenly spaced crew navigation below. The menu wraps on narrow screens.
+- My editing is renamed My Tasks in the menu, page title, heading and task return links. It continues to list assigned concert edits; other tracker tasks have not yet been added.
+- Chrome checks passed at 1440, 900 and 390 pixels, including eight menu items with Account security enabled, equal desktop spacing, active My Tasks state and no horizontal overflow or JavaScript errors. Scoped Sail Pint passed. No routes or permissions changed.
+- Full verification: `./vendor/bin/sail artisan test --compact` passed all 919 tests / 9,332 assertions; `git diff --check` passed. Next: select any additional tracker tasks to expose through My Tasks.

@@ -1,10 +1,8 @@
-@extends('layouts.admin',['title'=>'Invoice '.$invoice->number(),'heading'=>'Invoice '.$invoice->number(),'subheading'=>$invoice->bill_to['name']])
-@section('content')
 @include('studio-invoices._styles')
-@if($trackerBar) @include('admin.tracking._task-bar', ['bar' => $trackerBar]) @endif
+<h2>Invoice {{ $invoice->number() }} · {{ $invoice->paymentLabel() }}</h2>
 @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<p role="alert">{{ $errors->first() }}</p>@endif
-<div class="studio-billing-actions" style="margin-top:20px"><a class="button secondary" href="{{ route('admin.studio-invoices.index') }}">All studio invoices</a><a class="button secondary" href="{{ route('admin.concert-bookings.show',$invoice->booking) }}">Event booking</a><a class="button secondary" href="{{ route('admin.studio-invoices.pdf',$invoice) }}">Download PDF</a><a class="button secondary" href="{{ route('admin.studio-invoices.settings') }}">Invoice settings</a></div>
+<div class="studio-billing-actions" style="margin-top:20px"><a class="button secondary" href="{{ route('admin.studio-invoices.index') }}">All studio invoices</a><a class="button secondary" href="{{ route('admin.studio-invoices.pdf',$invoice) }}">Download PDF</a><a class="button secondary" href="{{ route('admin.studio-invoices.settings') }}">Invoice settings</a></div>
 @if($stale)<p class="studio-billing-notice">The booking has changed since this invoice was prepared. {{ $invoice->status==='draft' ? 'Refresh the video quote, or void the draft and create a replacement for custom charges.' : 'This issued invoice retains its original amounts. Review whether a correction is needed.' }}</p>@endif
 @if($invoice->status === 'issued' && $invoice->balanceCents() > 0)<div class="studio-billing-actions"><a class="button" href="{{ route('admin.studio-invoices.email', $invoice) }}">{{ $invoice->sent_at ? 'View invoice email & delivery history' : 'Send invoice email' }}</a><p>{{ $invoice->sent_at ? 'First sent '.$invoice->sent_at->format('j M Y, g:i a').' · '.($invoice->sentBy?->name ?? 'Former account') : 'The invoice is in the Studio Hub. Send its email to start the 14-day payment deadline.' }}</p></div>@endif
 @if($invoice->status !== 'draft') @include('studio-invoices._details') @endif
@@ -21,4 +19,3 @@
 @if($invoice->status!=='void' && $invoice->paidCents()===0 && !$invoice->hasPendingPayment())<details class="studio-billing-form"><summary>Void invoice</summary><form method="POST" action="{{ route('admin.studio-invoices.void',$invoice) }}">@csrf<label>Reason<input name="reason" required maxlength="1000"></label><button>Void invoice</button></form></details>@endif
 <details class="studio-billing-form"><summary>Payment references</summary>@foreach($invoice->payments as $payment)<p style="overflow-wrap:anywhere">{{ ucfirst($payment->status) }} · Attempt {{ $payment->uuid }}@if($payment->provider_transaction_id)<br>Gateway reference: {{ $payment->provider_transaction_id }}@endif</p>@endforeach</details>
 <details class="studio-billing-form"><summary>Invoice history</summary>@foreach($invoice->events as $event)<p>{{ $event->created_at->format('j M Y, g:i a') }} · {{ Str::headline($event->action) }} · {{ $event->user?->name ?? 'System' }} @if(isset($event->details['reason'])) · {{ $event->details['reason'] }} @endif</p>@endforeach</details>
-@endsection

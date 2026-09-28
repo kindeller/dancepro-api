@@ -14,15 +14,18 @@ class InviteCrewMemberRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge(['send_invitation' => $this->boolean('send_invitation')]);
+        if (! $this->filled('existing_email')) {
+            $this->merge(['send_invitation' => $this->boolean('send_invitation')]);
+        }
     }
 
     public function rules(): array
     {
         return [
-            'preferred_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
-            'send_invitation' => ['required', 'boolean'],
+            'existing_email' => ['nullable', 'email', 'max:255'],
+            'preferred_name' => ['required_without:existing_email', Rule::prohibitedIf($this->filled('existing_email')), 'string', 'max:255'],
+            'email' => ['required_without:existing_email', Rule::prohibitedIf($this->filled('existing_email')), 'email', 'max:255', Rule::unique('users', 'email')],
+            'send_invitation' => ['required_without:existing_email', Rule::prohibitedIf($this->filled('existing_email')), 'boolean'],
         ];
     }
 }

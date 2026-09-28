@@ -12,8 +12,14 @@ use Illuminate\Support\Str;
 
 class InviteCrewMember
 {
+    public function __construct(private readonly EnableCrewAccess $enableCrewAccess) {}
+
     public function execute(array $data): CrewProfile
     {
+        if (filled($data['existing_email'] ?? null)) {
+            return $this->enableCrewAccess->execute($data['existing_email']);
+        }
+
         $crewProfile = DB::transaction(function () use ($data): CrewProfile {
             $user = User::query()->create([
                 'name' => $data['preferred_name'],

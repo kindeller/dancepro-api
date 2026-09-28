@@ -101,7 +101,7 @@
 @empty<p class="muted">None.</p>
 @endforelse
 <h2 style="margin-top:24px">Help messages</h2>
-@forelse($supportRequests as $request)<div class="timeline-item"><strong>{{ $request->subject }}</strong><br><span class="muted">{{ ucfirst($request->status) }} · {{ $request->requested_at->format('j M Y') }}</span><p>{{ $request->message }}</p></div>
+@forelse($supportRequests as $request)<div class="timeline-item"><strong><a href="{{ route('admin.media-support.conversation', $request) }}">{{ $request->subject }}</a></strong><br><span class="muted">{{ ucfirst($request->status) }} · {{ $request->requested_at->format('j M Y') }}</span><p>{{ $request->message }}</p></div>
 @empty<p class="muted">None.</p>
 @endforelse
 </section></div>

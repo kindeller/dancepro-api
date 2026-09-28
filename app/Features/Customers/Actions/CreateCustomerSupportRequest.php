@@ -3,6 +3,8 @@
 namespace App\Features\Customers\Actions;
 
 use App\Features\Customers\Models\CustomerSupportRequest;
+use App\Features\Customers\Services\CustomerConversations;
+use App\Features\Customers\Services\CustomerInbox;
 use App\Features\Orders\Models\Order;
 use App\Features\Orders\Models\OrderMediaEntitlement;
 use App\Models\User;
@@ -43,26 +45,39 @@ class CreateCustomerSupportRequest
             $order = $entitlement->orderItem->order;
         }
 
-        return DB::transaction(fn (): CustomerSupportRequest => CustomerSupportRequest::query()->create([
-            'user_id' => $user->id,
-            'order_id' => $order?->id,
-            'order_media_entitlement_id' => $entitlement?->id,
-            'type' => $input['type'],
-            'subject' => $input['subject'],
-            'message' => $input['message'],
-            'status' => 'pending',
-            'requested_at' => now(),
-            'context' => array_filter([
-                'customer_email' => $user->email,
-                'order_uuid' => $order?->uuid,
-                'order_number' => $order?->displayNumber(),
-                'order_status' => $order?->status?->value,
-                'item_name' => $entitlement?->orderItem?->snapshot_display_name,
-                'media_type' => $entitlement?->media_type,
-                'ready_at' => $entitlement?->ready_at?->toIso8601String(),
-                'expired_at' => $entitlement?->expires_at?->toIso8601String(),
-                'download_count' => $entitlement?->download_count,
-            ], fn ($value) => $value !== null),
-        ]));
+        $event = filled($input['event_uuid'] ?? null)
+            ? app(CustomerInbox::class)->events($user)->where('uuid', $input['event_uuid'])->first()
+            : null;
+        if (filled($input['event_uuid'] ?? null) && ! $event) {
+            throw ValidationException::withMessages(['event_uuid' => 'Choose one of your own events.']);
+        }
+
+        return DB::transaction(function () use ($user, $input, $order, $entitlement, $event): CustomerSupportRequest {
+            $request = CustomerSupportRequest::query()->create([
+                'user_id' => $user->id,
+                'order_id' => $order?->id,
+                'order_media_entitlement_id' => $entitlement?->id,
+                'type' => $input['type'],
+                'subject' => $input['subject'],
+                'message' => $input['message'],
+                'status' => 'pending',
+                'requested_at' => now(),
+                'context' => array_filter([
+                    'customer_email' => $user->email,
+                    'event_uuid' => $event?->uuid, 'event_name' => $event?->name,
+                    'order_uuid' => $order?->uuid,
+                    'order_number' => $order?->displayNumber(),
+                    'order_status' => $order?->status?->value,
+                    'item_name' => $entitlement?->orderItem?->snapshot_display_name,
+                    'media_type' => $entitlement?->media_type,
+                    'ready_at' => $entitlement?->ready_at?->toIso8601String(),
+                    'expired_at' => $entitlement?->expires_at?->toIso8601String(),
+                    'download_count' => $entitlement?->download_count,
+                ], fn ($value) => $value !== null),
+            ]);
+            app(CustomerConversations::class)->attach($request->messages()->firstOrFail(), $input['attachment'] ?? null);
+
+            return $request;
+        });
     }
 }

@@ -1,6 +1,6 @@
-@extends('layouts.crew', ['title' => 'My editing'])
+@extends('layouts.crew', ['title' => 'My Tasks'])
 @section('content')
-<h1>My editing</h1>
+<h1>My Tasks</h1>
 <p>Concert edits assigned to you. Open an event to update progress or mark editing complete.</p>
 @forelse($events as $event)
 <article class="card" style="padding:20px;margin-bottom:14px">

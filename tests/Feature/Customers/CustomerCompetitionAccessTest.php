@@ -129,7 +129,10 @@ class CustomerCompetitionAccessTest extends TestCase
         $this->get(route('customer.competitions.show', $event))->assertForbidden();
         $this->register($event, 'NEW-TEST')->assertRedirect();
         $this->actingAs(User::factory()->customer()->create())->post($url, $input)->assertForbidden();
-        $this->actingAs(User::factory()->crew()->create())->get(route('customer.competitions.index'))->assertForbidden();
-        $this->register($event)->assertForbidden();
+        $this->actingAs(User::factory()->crew()->create())->get(route('customer.competitions.index'))->assertOk();
+        $this->get(route('customer.competitions.show', $event))->assertForbidden();
+        $this->register($event)->assertSessionHasErrors('login_code');
+        $this->register($event, 'NEW-TEST')->assertRedirect();
+        $this->get(route('customer.competitions.show', $event))->assertOk();
     }
 }

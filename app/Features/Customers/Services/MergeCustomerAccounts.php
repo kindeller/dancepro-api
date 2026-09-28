@@ -26,13 +26,16 @@ class MergeCustomerAccounts
             if (mb_strtolower($confirmationEmail) !== mb_strtolower($target->email)) {
                 throw ValidationException::withMessages(['confirmation_email' => 'The primary account changed. Review it again.']);
             }
+            if ($source->is_admin || $target->is_admin || $source->crewProfile()->exists() || $target->crewProfile()->exists()) {
+                throw ValidationException::withMessages(['confirmation_email' => 'Accounts with crew or Admin access cannot be merged through customer account management.']);
+            }
             $summary = ['source_name' => $source->name, 'source_email' => $source->email, 'orders' => DB::table('orders')->where('user_id', $source->id)->count(), 'credits' => DB::table('customer_credit_transactions')->where('user_id', $source->id)->count(), 'downloads' => DB::table('order_media_asset_downloads')->where('user_id', $source->id)->count()];
             $this->mergeUnique($source, $target, 'customer_dancers', ['name']);
             $this->mergeUnique($source, $target, 'customer_studios', ['studio_id']);
             $this->mergeUnique($source, $target, 'customer_competition_registrations', ['scheduling_event_id']);
             $this->mergeUnique($source, $target, 'customer_media_selections', ['scheduling_event_id', 'selection_key'], ['is_favourite', 'in_cart']);
             $this->mergeUnique($source, $target, 'customer_concert_photo_selections', ['media_asset_id'], ['is_favourite', 'in_cart']);
-            foreach (['orders', 'customer_credit_transactions', 'customer_media_notifications', 'customer_support_requests', 'order_media_asset_downloads', 'customer_account_emails', 'customer_account_activities', 'customer_account_notes', 'customer_risk_events', 'customer_privacy_requests', 'customer_consent_histories', 'customer_login_events', 'customer_engagement_events', 'concert_access_grants', 'concert_accesses', 'payment_attempts', 'guest_gallery_registrations', 'customer_help_searches'] as $table) {
+            foreach (['orders', 'customer_credit_transactions', 'customer_media_notifications', 'customer_support_requests', 'customer_inbox_notifications', 'order_media_asset_downloads', 'customer_account_emails', 'customer_account_activities', 'customer_account_notes', 'customer_risk_events', 'customer_privacy_requests', 'customer_consent_histories', 'customer_login_events', 'customer_engagement_events', 'concert_access_grants', 'concert_accesses', 'payment_attempts', 'guest_gallery_registrations', 'customer_help_searches'] as $table) {
                 DB::table($table)->where('user_id', $source->id)->update(['user_id' => $target->id]);
             }
             DB::table('customer_account_merges')->insert(['uuid' => (string) Str::uuid(), 'source_user_id' => $source->id, 'target_user_id' => $target->id, 'merged_by_user_id' => $actor->id, 'reason' => $reason, 'summary' => json_encode($summary, JSON_THROW_ON_ERROR), 'merged_at' => now(), 'created_at' => now(), 'updated_at' => now()]);

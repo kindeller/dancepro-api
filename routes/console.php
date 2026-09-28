@@ -3,6 +3,7 @@
 use App\Features\Auth\Actions\PruneApiIdempotencyRecords;
 use App\Features\Contacts\Actions\ExportContactDirectory;
 use App\Features\Contacts\Actions\ImportContactDirectory;
+use App\Features\Customers\Actions\BackfillCustomerInbox;
 use App\Features\Customers\Actions\PruneCustomerMediaArchives;
 use App\Features\Customers\Actions\SendGuestGalleryReleaseNotifications;
 use App\Features\Deployment\Actions\MigratePublicUploads;
@@ -223,3 +224,8 @@ Artisan::command('studio-invoices:reconcile', function (ReconcileStudioInvoicePa
     return self::SUCCESS;
 })->purpose('Reconcile pending studio card payments without submitting new charges');
 Schedule::command('studio-invoices:reconcile')->everyFifteenMinutes()->withoutOverlapping()->onOneServer();
+
+Artisan::command('customers:sync-inbox', function (): void {
+    app(BackfillCustomerInbox::class)->execute();
+    $this->info('Existing customer notices and conversations are available in My Messages. No emails were sent.');
+})->purpose('Idempotently import existing customer correspondence into My Messages');

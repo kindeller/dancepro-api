@@ -8,6 +8,7 @@ use App\Features\Studios\Models\Studio;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class StudioBookingPlans
 {
@@ -18,6 +19,17 @@ class StudioBookingPlans
         abort_unless($this->access->canView($user, $studio), 403);
 
         return $this->query($studio)->latest('created_at')->latest('id')->paginate(12);
+    }
+
+    public function estimates(User $user, Studio $studio): Collection
+    {
+        abort_unless($this->access->canView($user, $studio), 403);
+
+        return $this->query($studio)->where('status', '!=', 'cancelled')->with('items')->latest('created_at')->latest('id')->get()
+            ->map(fn (ConcertBooking $booking): array => [
+                'booking' => $booking,
+                'receipt' => app(CurrentBookingTimeline::class)->summaryForBooking($booking),
+            ])->filter(fn (array $estimate): bool => $estimate['receipt']['quote']['photo_events'] > 0 || $estimate['receipt']['quote']['video_concerts'] > 0)->values();
     }
 
     public function receipt(User $user, Studio $studio, ConcertBooking $booking): array

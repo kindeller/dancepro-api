@@ -33,7 +33,7 @@
                             <td>
                                 <div class="studio-summary">
                                     @if($studio->logo_path)<img class="studio-thumbnail" src="{{ $studio->logoUrl() }}" alt="{{ $studio->name }} logo">@else<div class="studio-thumbnail studio-thumbnail-placeholder" aria-hidden="true">{{ str($studio->code ?: $studio->name)->substr(0, 2)->upper() }}</div>@endif
-                                    <div><strong>{{ $studio->name }}</strong>@if($studio->code)<div class="muted studio-code">{{ $studio->code }}</div>@endif</div>
+                                    <div><strong>{{ $studio->name }}</strong> @if($studio->is_school)<span class="badge">School</span>@endif @if($studio->code)<div class="muted studio-code">{{ $studio->code }}</div>@endif</div>
                                 </div>
                             </td>
                             <td>

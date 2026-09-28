@@ -23,6 +23,7 @@ use App\Features\Bookings\Requests\StoreConcertBookingProgrammeRequest;
 use App\Features\Bookings\Requests\UpdateConcertBookingRequest;
 use App\Features\Bookings\Services\BookingArtwork;
 use App\Features\Bookings\Services\BookingChangeReview;
+use App\Features\Bookings\Services\BookingInvoiceWorkspace;
 use App\Features\Bookings\Services\BookingProgrammeWorkspace;
 use App\Features\Bookings\Services\BookingSeatsAndFamilies;
 use App\Features\Bookings\Services\BookingStudioMediaWorkspace;
@@ -63,19 +64,21 @@ class AdminConcertBookingController extends Controller
         ]);
     }
 
-    public function show(Request $request, ConcertBooking $concertBooking, ReviewBookingStudioContact $reviewContact, BookingChangeReview $changes, BookingTrackerBar $trackerBar, BookingSeatsAndFamilies $seatsAndFamilies, BookingProgrammeWorkspace $programmeWorkspace, BookingStudioMediaWorkspace $studioMediaWorkspace, BookingVideoTitlesWorkspace $videoTitlesWorkspace): View
+    public function show(Request $request, ConcertBooking $concertBooking, ReviewBookingStudioContact $reviewContact, BookingChangeReview $changes, BookingTrackerBar $trackerBar, BookingSeatsAndFamilies $seatsAndFamilies, BookingProgrammeWorkspace $programmeWorkspace, BookingStudioMediaWorkspace $studioMediaWorkspace, BookingVideoTitlesWorkspace $videoTitlesWorkspace, BookingInvoiceWorkspace $invoiceWorkspace): View
     {
         Gate::authorize('manageScheduling');
         $concertBooking->load(['items.eventTypeDefinition', 'items.schedulingEvent.shifts', 'items.schedulingEvent.roleRequirements.crewRole', 'items.schedulingEvent.roleSeats', 'items.schedulingEvent.studioFiles', 'items.venue']);
 
-        $bookingTab = in_array($request->query('tab'), ['seats-families', 'programme', 'studio-media', 'video-titles'], true) ? $request->query('tab') : 'booking';
+        $bookingTab = in_array($request->query('tab'), ['seats-families', 'programme', 'studio-media', 'video-titles', 'invoice'], true) ? $request->query('tab') : 'booking';
         $programmePage = $bookingTab === 'programme' ? $programmeWorkspace->page($concertBooking, $request->string('event')->toString() ?: null, $request->session()->get('concert_tracker_context', [])) : [];
 
         $mediaPage = $bookingTab === 'studio-media' ? $studioMediaWorkspace->page($concertBooking, $request->string('event')->toString() ?: null, $request->user(), $request->session()->get('concert_tracker_context', [])) : [];
 
         $titlesPage = $bookingTab === 'video-titles' ? $videoTitlesWorkspace->page($concertBooking, $request->string('event')->toString() ?: null, $request->session()->get('concert_tracker_context', [])) : [];
 
-        return view('admin.concert-bookings.show', $titlesPage + $mediaPage + $programmePage + $changes->page($concertBooking, $request->string('change_request')->toString() ?: null) + [
+        $invoicePage = $bookingTab === 'invoice' ? $invoiceWorkspace->page($concertBooking, $request->string('invoice')->toString() ?: null, $request->session()->get('concert_tracker_context', [])) : [];
+
+        return view('admin.concert-bookings.show', $invoicePage + $titlesPage + $mediaPage + $programmePage + $changes->page($concertBooking, $request->string('change_request')->toString() ?: null) + [
             'booking' => $concertBooking,
             'seatsAndFamilies' => $seatsAndFamilies,
             'bookingTab' => $bookingTab,
@@ -114,7 +117,7 @@ class AdminConcertBookingController extends Controller
 
         $items = ConcertBookingItem::query()
             ->with(['booking', 'eventTypeDefinition', 'venue', 'schedulingEvent.studio', 'schedulingEvent.competitionContact'])
-            ->where('approval_status', 'pending')
+            ->awaitingApproval()
             ->orderBy('event_date')
             ->orderBy('starts_at')
             ->paginate(50);

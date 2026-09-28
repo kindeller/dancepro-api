@@ -1,5 +1,5 @@
 @extends('layouts.public', ['title' => $title.' · My Media', 'footerLabel' => 'DancePro Media'])
-@section('headerParentUrl', ($selectedFolder ?? null) ? route('customer.media.library.show', ['kind' => $kind, 'event' => $event->uuid]) : route('customer.media.index'))
+@section('headerParentUrl', ($selectedFolder ?? null) ? route('customer.media.library.show', ['kind' => $kind, 'event' => $event->uuid]) : route('customer.media.index', ['tab' => 'purchases']))
 
 @push('styles')
 <style>

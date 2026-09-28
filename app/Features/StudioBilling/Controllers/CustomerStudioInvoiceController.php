@@ -2,6 +2,8 @@
 
 namespace App\Features\StudioBilling\Controllers;
 
+use App\Features\Bookings\Services\StudioBookingPlans;
+use App\Features\Customers\Services\StudioCommunicationHistory;
 use App\Features\StudioBilling\Models\StudioInvoice;
 use App\Features\StudioBilling\Requests\PayStudioInvoiceRequest;
 use App\Features\StudioBilling\Services\PayStudioInvoice;
@@ -16,18 +18,28 @@ class CustomerStudioInvoiceController extends Controller
 {
     public function __construct(private readonly StudioInvoiceAccess $access) {}
 
-    public function index(Request $request, Studio $studio)
+    public function index(Request $request, Studio $studio, StudioBookingPlans $plans, StudioCommunicationHistory $history)
     {
         $this->access->studio($request->user(), $studio);
 
-        return response()->view('customers.studio-invoices.index', ['studio' => $studio, 'invoices' => StudioInvoice::with('payments')->where('studio_id', $studio->id)->where('status', '!=', 'draft')->latest('id')->paginate(20)])->header('Cache-Control', 'private, no-store');
+        return response()->view('customers.studio-invoices.index', [
+            'studio' => $studio,
+            'hub' => $history->forUser($request->user(), $studio, markMessagesRead: false)['hub'],
+            'estimates' => $plans->estimates($request->user(), $studio),
+            'invoices' => StudioInvoice::with('payments')->where('studio_id', $studio->id)->where('status', '!=', 'draft')->latest('id')->paginate(20),
+        ])->header('Cache-Control', 'private, no-store');
     }
 
-    public function show(Request $request, Studio $studio, StudioInvoice $studioInvoice, StudioInvoiceGateway $gateway)
+    public function show(Request $request, Studio $studio, StudioInvoice $studioInvoice, StudioInvoiceGateway $gateway, StudioCommunicationHistory $history)
     {
         $this->access->invoice($request->user(), $studio, $studioInvoice);
 
-        return response()->view('customers.studio-invoices.show', ['studio' => $studio, 'invoice' => $studioInvoice->load('payments'), 'gateway' => $gateway])->header('Cache-Control', 'private, no-store');
+        return response()->view('customers.studio-invoices.show', [
+            'studio' => $studio,
+            'hub' => $history->forUser($request->user(), $studio, markMessagesRead: false)['hub'],
+            'invoice' => $studioInvoice->load('payments'),
+            'gateway' => $gateway,
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     public function token(Request $request, Studio $studio, StudioInvoice $studioInvoice, StudioInvoiceGateway $gateway)

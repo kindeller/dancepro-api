@@ -19,7 +19,7 @@
         <label>Jacket size<input name="jacket_size" value="{{ old('jacket_size', $crewProfile?->jacket_size) }}" maxlength="50" placeholder="e.g. M"></label>
         <label><span>Employment status</span><select name="is_active"><option value="1" @selected(old('is_active', $crewProfile?->user?->is_active ?? true))>Active</option><option value="0" @selected(!old('is_active', $crewProfile?->user?->is_active ?? true))>Inactive</option></select></label>
         <input type="hidden" name="is_admin" value="0">
-        <label style="display:flex;flex-direction:row;align-items:flex-start;gap:8px"><input type="checkbox" name="is_admin" value="1" @checked(old('is_admin', $crewProfile?->user?->is_admin ?? false)) style="width:auto;margin-top:3px"><span><strong>Admin access</strong><span class="muted" style="display:block">Full access to Admin and media instead of My Hub.</span></span></label>
+        <label style="display:flex;flex-direction:row;align-items:flex-start;gap:8px"><input type="checkbox" name="is_admin" value="1" @checked(old('is_admin', $crewProfile?->user?->is_admin ?? false)) style="width:auto;margin-top:3px"><span><strong>Admin access</strong><span class="muted" style="display:block">Full access to Admin, in addition to My Hub and My Media.</span></span></label>
     </div>
 </div>
 

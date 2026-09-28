@@ -28,8 +28,7 @@ class InvoiceTrackerWorkflow
 
     public function status(?ConcertBooking $booking, ?StudioInvoice $invoice): array
     {
-        $sourceUrl = $invoice ? route('admin.studio-invoices.show', $invoice)
-            : ($booking ? route('admin.concert-bookings.show', $booking).'#studio-invoice' : route('admin.studio-invoices.index'));
+        $sourceUrl = $booking ? route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']) : route('admin.studio-invoices.index');
         $paid = $invoice?->status === 'issued' && $invoice->balanceCents() === 0 && ! $invoice->hasPendingPayment();
         $completedAt = $paid ? $invoice->payments->where('status', 'succeeded')->max('paid_at') : null;
         $label = $paid ? 'Paid' : ($invoice?->sent_at ? 'Not paid' : ($booking?->family_count_confirmed_at ? 'Not invoiced' : 'Pending'));

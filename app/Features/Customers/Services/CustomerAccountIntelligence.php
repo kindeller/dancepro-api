@@ -87,6 +87,9 @@ class CustomerAccountIntelligence
         if (mb_strtolower($confirmationEmail) !== mb_strtolower($customer->email)) {
             throw ValidationException::withMessages(['confirmation_email' => 'Enter the customer’s current email address to confirm anonymisation.']);
         }
+        if ($customer->is_admin || $customer->crewProfile()->exists()) {
+            throw ValidationException::withMessages(['confirmation_email' => 'This account also has crew or Admin access. Its employment records must be reviewed before anonymisation.']);
+        }
         DB::transaction(function () use ($customer, $actor, $reason): void {
             $anonymousEmail = 'anonymised-'.$customer->id.'-'.Str::lower(Str::random(12)).'@deleted.invalid';
             $anonymousName = 'Anonymised customer '.$customer->id;

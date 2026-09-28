@@ -105,6 +105,49 @@ class ConcertTrackerTest extends TestCase
             ->assertSee('aria-current="page"', false);
     }
 
+    public function test_summary_counts_every_event_shared_tasks_once_and_pending_events_in_both_views(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-01'));
+        [$staff, $first, $second, $booking] = $this->fixture();
+        $overdue = ConcertTrackerTask::create([
+            'scope_type' => 'event', 'scope_id' => $first->id, 'task_key' => 'concert_week_email',
+            'status' => 'waiting', 'due_date_override' => '2026-08-31',
+        ]);
+        ConcertTrackerTask::create([
+            'scope_type' => 'event', 'scope_id' => $second->id, 'task_key' => 'concert_week_email',
+            'status' => 'waiting', 'due_date_override' => '2026-09-03',
+        ]);
+        $pending = $booking->replicate(['uuid']);
+        $pending->fill(['status' => 'pending', 'studio_id' => $first->studio_id])->save();
+        foreach (['2026-10-18', '2026-10-19'] as $date) {
+            $item = $first->concertBookingItem->replicate(['uuid']);
+            $item->fill(['concert_booking_id' => $pending->id, 'scheduling_event_id' => null, 'approval_status' => 'pending', 'event_date' => $date])->save();
+        }
+        $tracker = app(ConcertTracker::class);
+        foreach (['date', 'studio'] as $view) {
+            $page = $tracker->page($view, 2026, 'booking');
+            $this->assertSame(['attention' => 3, 'near_due' => 1, 'complete' => 1, 'open' => 7], $page['summary']);
+            $this->assertCount(4, $page['rows']);
+            $this->assertCount(3, $tracker->page($view, 2026, 'booking', true)['rows']);
+        }
+        ConcertTrackerAlert::create(['user_id' => $staff->id, 'type' => 'test', 'dedupe_key' => 'old-alert', 'title' => 'Old alert', 'body' => 'Independent notification', 'url' => '/admin/concert-tracker']);
+        $response = $this->actingAs($staff)->get(route('admin.concert-tracker.index', ['year' => 2026]))->assertOk();
+        $doc = new \DOMDocument;
+        @$doc->loadHTML($response->getContent());
+        $xpath = new \DOMXPath($doc);
+        $badge = $xpath->query('//span[@class="nav-notification"][contains(@title,"Tasks and pending events")]')->item(0);
+        $this->assertSame((string) $response->viewData('summary')['attention'], $badge->textContent);
+        $this->assertSame(1, $xpath->query('//*[@id="tracker-sheet"]//nav[@aria-label="Tracker view"]')->length);
+        $this->assertSame(1, $xpath->query('//*[@id="tracker-sheet"]//nav[@aria-label="Tracker phase"]')->length);
+        $response->assertDontSee('Automatic tasks read their source records')->assertDontSee('pending events awaiting booking confirmation');
+
+        $overdue->update(['status' => 'complete', 'completed_at' => now()]);
+        $this->assertSame(['attention' => 2, 'near_due' => 1, 'complete' => 2, 'open' => 6], $tracker->page('date', 2026, 'booking')['summary']);
+        $pending->update(['status' => 'cancelled']);
+        $this->assertSame(0, $tracker->page('date', 2026, 'booking')['summary']['attention']);
+        $this->assertSame(0, $tracker->page('date', 2027, 'all')['summary']['open']);
+    }
+
     public function test_programme_cell_opens_upload_directly_and_replaces_due_date_with_upload_audit(): void
     {
         [$staff, $event] = $this->fixture();
@@ -784,7 +827,7 @@ class ConcertTrackerTest extends TestCase
         $this->assertSame(1, $page['pendingCount']);
         $this->assertTrue($page['rows']->first()['pending']);
         $this->assertTrue($page['rows']->first()['bookingItem']->is($item));
-        $this->assertCount(2, $tracker->page('studio', 2026, 'all')['rows']);
+        $this->assertCount(3, $tracker->page('studio', 2026, 'all')['rows']);
         $this->actingAs($staff)->get(route('admin.concert-tracker.index', ['year' => 2026, 'view' => 'date']))
             ->assertOk()->assertSee('Pending opening night')
             ->assertSee('class="tracker-event-heading tracker-pending-heading"', false)
@@ -952,6 +995,7 @@ class ConcertTrackerTest extends TestCase
         [$staff, $event] = $this->fixture('INTERNAL-ONLY');
         $studio = $event->studio;
         app(SaveStudioGalleryCode::class)->execute($studio, $staff, 'PHOTO-LOGIN', 0);
+        $event->concertBookingItem->booking->update(['wants_concert_photography' => true]);
         foreach (['date', 'studio'] as $view) {
             $page = app(ConcertTracker::class)->page($view, 2026, 'booking');
             $html = view('admin.tracking._event-column', ['row' => $page['rows']->first(), 'galleryLogins' => $page['galleryLogins']])->render();
@@ -962,6 +1006,12 @@ class ConcertTrackerTest extends TestCase
             $this->assertStringNotContainsString('INTERNAL-ONLY', $html);
             $this->assertStringContainsString('aria-label="Communications for Junior Concert"', $html);
             $this->assertStringContainsString(route('admin.concert-tracker.communications.show', $event), $html);
+            $response = $this->actingAs($staff)->get(route('admin.concert-tracker.index', ['year' => 2026, 'view' => $view, 'phase' => 'completion']))->assertOk();
+            $doc = new \DOMDocument;
+            @$doc->loadHTML($response->getContent());
+            $codes = (new \DOMXPath($doc))->query('//td[@data-task-key="photo_release"]//span[@class="tracker-access-code"]');
+            $this->assertCount(2, $codes);
+            $this->assertStringContainsString('Access Code: PHOTO-LOGIN', $codes->item(0)->textContent);
         }
         $this->actingAs(User::factory()->customer()->create())->get(route('admin.concert-tracker.index', ['year' => 2026]))->assertForbidden()->assertDontSee('PHOTO-LOGIN');
     }

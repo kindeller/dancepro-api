@@ -133,7 +133,11 @@ class ConcertEditingTest extends TestCase
         $customer = User::factory()->customer()->create();
         CrewProfile::factory()->create(['user_id' => $customer->id]);
         $task->update(['assignee_user_id' => $customer->id]);
-        $this->actingAs($customer)->get($programmeUrl)->assertForbidden();
+        $this->actingAs($customer)->get($programmeUrl)->assertOk()->assertDownload('Programme.pdf');
+        $this->get(route('concert-editing.download', [$other, 'kind' => 'programme']))->assertForbidden();
+        $customerWithoutCrew = User::factory()->customer()->create();
+        $task->update(['assignee_user_id' => $customerWithoutCrew->id]);
+        $this->actingAs($customerWithoutCrew)->get($programmeUrl)->assertForbidden();
     }
 
     public function test_titles_download_uses_only_the_current_published_package(): void

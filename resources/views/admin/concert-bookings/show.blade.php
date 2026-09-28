@@ -24,10 +24,13 @@
     <a href="{{ route('admin.concert-bookings.show', [$booking, 'tab' => 'programme']) }}" @if($bookingTab === 'programme') aria-current="page" @endif>2.2 Prepare programme</a>
     <a href="{{ route('admin.concert-bookings.show', [$booking, 'tab' => 'video-titles']) }}" @if($bookingTab === 'video-titles') aria-current="page" @endif>2.3 Video titles</a>
     <a href="{{ route('admin.concert-bookings.show', [$booking, 'tab' => 'studio-media']) }}" @if($bookingTab === 'studio-media') aria-current="page" @endif>2.5 Studio videos & slideshows</a>
+    <a href="{{ route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']) }}" @if($bookingTab === 'invoice') aria-current="page" @endif>4.2 Invoice &amp; payment</a>
 </nav>
-<section aria-label="{{ match ($bookingTab) { 'programme' => '2.2 Prepare programme', 'video-titles' => '2.3 Video titles', 'studio-media' => '2.5 Studio videos & slideshows', 'seats-families' => '1.3 Seats & families numbers', default => '1.1 Booking & services' } }}" class="booking-task-page">
+<section aria-label="{{ match ($bookingTab) { 'invoice' => '4.2 Invoice & payment', 'programme' => '2.2 Prepare programme', 'video-titles' => '2.3 Video titles', 'studio-media' => '2.5 Studio videos & slideshows', 'seats-families' => '1.3 Seats & families numbers', default => '1.1 Booking & services' } }}" class="booking-task-page">
 @if($trackerBar) @include('admin.tracking._task-bar', ['bar' => $trackerBar]) @endif
-@if($bookingTab === 'programme')
+@if($bookingTab === 'invoice')
+    @include('admin.concert-bookings._invoice-workspace')
+@elseif($bookingTab === 'programme')
     <div class="toolbar" style="margin:18px 0"><a class="button secondary" href="{{ route('admin.scheduling-events.index') }}">← Back to event availability</a></div>
     @if($programmeWorkspace)
         <form method="get" class="card card-pad" style="margin-bottom:18px">
@@ -47,7 +50,6 @@
     @if($seatsAndFamilies->concerts($booking)->isEmpty())<p class="card card-pad">Seats and family numbers are not required for DR portraits.</p>@endif
 @else
 @include('admin.concert-bookings._change-review')
-@include('admin.studio-invoices._booking')
 <form method="POST" action="{{ route('admin.concert-bookings.update', $booking) }}" class="booking-edit-form">
     @csrf @method('PUT')
     @if($changeRequest && in_array($changeRequest->status, ['requested', 'in_review']))
@@ -176,6 +178,7 @@
 @push('scripts')
 <script nonce="{{ request()->attributes->get('csp_nonce') }}">
     const bookingForm = document.querySelector('.booking-edit-form');
+    if (location.hash === '#studio-invoice' && !new URLSearchParams(location.search).has('tab')) { const url = new URL(location.href); url.searchParams.set('tab', 'invoice'); url.hash = ''; location.replace(url); }
     if (location.hash === '#seats-families' && !new URLSearchParams(location.search).has('tab')) { const url = new URL(location.href); url.searchParams.set('tab', 'seats-families'); url.hash = ''; location.replace(url); }
     const bookingValues = () => bookingForm ? JSON.stringify([...new FormData(bookingForm).entries()]) : '';
     const initialBookingValues = bookingValues();

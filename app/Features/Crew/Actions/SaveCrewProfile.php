@@ -19,7 +19,7 @@ class SaveCrewProfile
             $user->fill([
                 'name' => $data['preferred_name'],
                 'email' => $data['email'],
-                'type' => UserType::Crew->value,
+                'type' => $user->exists ? $user->type : UserType::Crew->value,
                 'is_active' => $data['is_active'],
                 'is_admin' => $data['is_admin'],
             ]);

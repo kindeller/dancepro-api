@@ -44,6 +44,7 @@ class SaveStudioRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:255'],
+            'is_school' => ['sometimes', 'boolean'],
             'code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Z0-9][A-Z0-9_-]*$/', Rule::unique('studios', 'code')->ignore($studio)],
             'slug' => ['nullable', 'string', 'max:255', Rule::unique('studios', 'slug')->ignore($studio)],
             'status' => ['required', Rule::enum(StudioStatus::class)],

@@ -13,7 +13,7 @@ class SharedConcertProgramme
     public function current(Programme $programme): ?ProgrammeUploadPlan
     {
         $revision = $programme->revisions()->orderByDesc('version')->first();
-        if (! $revision || $revision->snapshot['event_type'] !== 'concert') {
+        if (! $revision || ($revision->snapshot['event_type'] ?? null) !== 'concert') {
             return null;
         }
         $plans = ProgrammeUploadPlan::where('programme_id', $programme->id)->where('programme_revision_id', $revision->id);

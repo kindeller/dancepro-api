@@ -15,6 +15,7 @@ use App\Features\Studios\Models\Studio;
 use App\Features\Studios\Models\StudioAccountAccess;
 use App\Features\Tracking\Jobs\SendConcertTrackerEmail;
 use App\Features\Tracking\Models\ConcertTrackerEmailDelivery;
+use App\Features\Tracking\Models\StudioConversationMessage;
 use App\Features\Tracking\Services\ConcertTracker;
 use App\Features\Venues\Models\Venue;
 use App\Models\User;
@@ -36,7 +37,7 @@ class StudioInvoiceTest extends TestCase
         $invoice = StudioInvoice::sole();
         $this->assertSame(300000, $invoice->total_cents);
         $this->assertSame('100001', $invoice->number());
-        $this->get(route('admin.studio-invoices.show', $invoice))->assertOk()->assertSee('Send invoice');
+        $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']))->assertOk()->assertSee('Send invoice');
         $this->get(route('admin.studio-invoices.index'))->assertOk();
         $this->get(route('admin.studio-invoices.settings'))->assertOk();
         $this->actingAs($customer)->get(route('customer.studio-invoices.show', [$studio, $invoice]))->assertNotFound();
@@ -142,14 +143,16 @@ class StudioInvoiceTest extends TestCase
         $this->actingAs($staff);
 
         $this->get(route('admin.concert-tracker.tasks.show', [$event, 'invoice_sent']))
+            ->assertRedirect(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']));
+        $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']))
             ->assertOk()->assertSee('Create draft invoice')->assertSee('Tracker task controls');
         $this->get(route('admin.concert-tracker.tasks.show', [$event, 'payment_received']))
             ->assertRedirect(route('admin.concert-tracker.tasks.show', [$event, 'invoice_sent']));
         $this->assertDatabaseCount('studio_invoices', 0);
         $invoice = app(StudioInvoices::class)->create($booking, $staff, true, 'video');
         $this->get(route('admin.concert-tracker.tasks.show', [$event, 'invoice_sent']))
-            ->assertRedirect(route('admin.studio-invoices.show', $invoice));
-        $this->get(route('admin.studio-invoices.show', $invoice))->assertOk()->assertSee('Tracker task controls')->assertSee('Discount (AUD');
+            ->assertRedirect(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']));
+        $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']))->assertOk()->assertSee('Tracker task controls')->assertSee('Discount (AUD');
         $this->post(route('admin.studio-invoices.issue', $invoice))->assertRedirect(route('admin.studio-invoices.email', $invoice));
         $this->get(route('admin.studio-invoices.email', $invoice))->assertOk()->assertSee('VIEW AND PAY INVOICE')->assertSee('Tracker task controls');
     }
@@ -159,12 +162,12 @@ class StudioInvoiceTest extends TestCase
         [$booking, , $staff] = $this->fixture();
         $event = $booking->items()->where('item_type', 'concert')->first()->schedulingEvent;
         $booking->update(['status' => 'pending']);
-        $this->actingAs($staff)->get(route('admin.concert-tracker.tasks.show', [$event, 'invoice_sent']))
-            ->assertOk()->assertSee('Review booking')->assertDontSee('#studio-invoice');
+        $this->actingAs($staff)->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']))
+            ->assertOk()->assertSee('Review booking')->assertDontSee('Create draft invoice');
 
         $booking->update(['status' => 'approved', 'studio_id' => null]);
-        $this->get(route('admin.concert-tracker.tasks.show', [$event, 'invoice_sent']))
-            ->assertOk()->assertSee('Review booking')->assertDontSee('#studio-invoice');
+        $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']))
+            ->assertOk()->assertSee('Review booking')->assertDontSee('Create draft invoice');
     }
 
     public function test_tracker_reads_invoice_and_settled_balance_not_manual_completion(): void
@@ -283,7 +286,7 @@ class StudioInvoiceTest extends TestCase
         $this->assertStringStartsWith('Paid 16 Oct 2026', $status['activity']);
         $this->assertStringNotContainsString('Sent', $status['activity']);
         $this->assertNull($status['dueDate']);
-        $this->get(route('admin.studio-invoices.show', $invoice))->assertOk()->assertSee('Transfer')->assertSee('Download PDF');
+        $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']))->assertOk()->assertSee('Transfer')->assertSee('Download PDF');
         $this->actingAs($customer)->get(route('admin.studio-invoices.email', $invoice))->assertForbidden();
     }
 
@@ -309,11 +312,52 @@ class StudioInvoiceTest extends TestCase
         $service = app(StudioInvoices::class);
         $invoice = $service->create($booking, $staff, true, 'video');
         StudioBillingSetting::query()->update(['abn' => null]);
-        $this->actingAs($staff)->get(route('admin.studio-invoices.show', $invoice))->assertOk()
+        $this->actingAs($staff)->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']))->assertOk()
             ->assertSee('Resolve these requirements before sending the invoice')
             ->assertSee('Set all invoice business details before issuing.')
             ->assertSee('Task navigation')->assertSee('Back to event');
         $this->assertContains('Set all invoice business details before issuing.', $service->issueBlockers($invoice));
+    }
+
+    public function test_invoice_tab_is_the_single_draft_workspace_and_preserves_tracker_context(): void
+    {
+        [$booking, , $staff] = $this->fixture();
+        $url = route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']);
+        $this->actingAs($staff)->get(route('admin.concert-bookings.show', $booking))
+            ->assertOk()->assertSee('4.2 Invoice &amp; payment', false)->assertDontSee('Create draft invoice');
+        $this->post(route('admin.studio-invoices.store', $booking), ['kind' => 'video', 'is_test' => true])
+            ->assertSessionHasNoErrors()->assertRedirect($url);
+        $invoice = $booking->fresh()->activeStudioInvoice;
+        $context = ['view' => 'studio', 'year' => 2026, 'phase' => 'completion'];
+        $this->withSession(['concert_tracker_context' => $context])->get($url)
+            ->assertOk()->assertSeeInOrder(['Booking tasks', '4.2 Invoice &amp; payment', 'Tracker task controls', 'Edit draft'], false)
+            ->assertSee(route('admin.concert-tracker.index', $context))
+            ->assertDontSee('action="'.route('admin.concert-bookings.update', $booking).'"', false);
+        $this->get(route('admin.studio-invoices.show', $invoice))
+            ->assertRedirect(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice', 'invoice' => $invoice->uuid]));
+        $this->from($url)->patch(route('admin.studio-invoices.update', $invoice), [
+            'lines' => [['description' => 'Concert video', 'quantity' => 1, 'unit_amount' => '3000.00']],
+            'discount_amount' => '50.00', 'notes' => 'Reviewed in booking',
+        ])->assertSessionHasNoErrors()->assertRedirect($url);
+        $this->get($url)->assertOk()->assertSee('Reviewed in booking')->assertSee('50.00');
+        $this->assertDatabaseCount('studio_invoices', 1);
+    }
+
+    public function test_invoice_tab_restricts_invoice_selection_to_the_booking_and_keeps_void_history(): void
+    {
+        [$booking, , $staff, $customer] = $this->fixture();
+        $service = app(StudioInvoices::class);
+        $invoice = $service->create($booking, $staff, true, 'video');
+        $service->void($invoice, $staff, 'Replace draft');
+        $url = route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']);
+        $this->actingAs($staff)->get($url)->assertOk()->assertSee('Create draft invoice')->assertSee('Other invoices for this booking');
+        $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice', 'invoice' => $invoice->uuid]))
+            ->assertOk()->assertSee('Replace draft')->assertSee('Create replacement invoice')->assertDontSee('Edit draft');
+        $otherBooking = $booking->replicate();
+        $otherBooking->uuid = (string) Str::uuid();
+        $otherBooking->save();
+        $this->get(route('admin.concert-bookings.show', [$otherBooking, 'tab' => 'invoice', 'invoice' => $invoice->uuid]))->assertNotFound();
+        $this->actingAs($customer)->get($url)->assertForbidden();
     }
 
     private function issued(ConcertBooking $booking, User $staff): StudioInvoice
@@ -323,6 +367,38 @@ class StudioInvoiceTest extends TestCase
         $service->issue($invoice, $staff);
 
         return $invoice->fresh();
+    }
+
+    public function test_invoice_pages_show_linked_hub_summary_without_marking_messages_read(): void
+    {
+        [$booking, $studio, $staff, $customer] = $this->fixture();
+        $message = StudioConversationMessage::create([
+            'studio_id' => $studio->id, 'direction' => 'from_dancepro', 'channel' => 'web',
+            'subject' => 'Booking update', 'body' => 'Please check your event details.', 'sent_at' => now(),
+        ]);
+        $this->actingAs($staff)->post(route('admin.studio-invoices.store', $booking), ['kind' => 'video', 'is_test' => 1]);
+        $invoice = StudioInvoice::sole();
+        $this->post(route('admin.studio-invoices.issue', $invoice))->assertSessionHasNoErrors();
+
+        $eventsUrl = route('customer.studio-communications.index', [$studio, 'tab' => 'events']);
+        $actionsUrl = route('customer.studio-communications.index', [$studio, 'tab' => 'events', 'actions' => 1]);
+        $messagesUrl = route('customer.studio-communications.index', [$studio, 'tab' => 'messages']);
+        foreach ([route('customer.studio-invoices.index', $studio), route('customer.studio-invoices.show', [$studio, $invoice])] as $url) {
+            $response = $this->actingAs($customer)->get($url)->assertOk()
+                ->assertSee('Studio hub summary')->assertSee('actions remaining');
+            $doc = new \DOMDocument;
+            @$doc->loadHTML($response->getContent());
+            $links = (new \DOMXPath($doc))->query('//a[@class="hub-stat"]');
+            $this->assertCount(3, $links);
+            $this->assertSame([$eventsUrl.'#events', $actionsUrl.'#events', $messagesUrl.'#messages'], array_map(fn ($link) => $link->getAttribute('href'), iterator_to_array($links)));
+            $this->assertNull($message->fresh()->studio_read_at);
+        }
+
+        $actions = $this->get($actionsUrl)->assertOk();
+        $doc = new \DOMDocument;
+        @$doc->loadHTML($actions->getContent());
+        $this->assertGreaterThan(0, (new \DOMXPath($doc))->query('//details[contains(@class,"hub-card")][@open]')->length);
+        $this->get($messagesUrl)->assertOk()->assertSee('Booking update');
     }
 
     private function fixture(): array

@@ -17,6 +17,19 @@ class CustomerAccountMediaSelections
         private readonly MediaCommerceSettings $settings,
     ) {}
 
+    public function counts(User $user): array
+    {
+        $competitionSelections = CustomerMediaSelection::where('user_id', $user->id);
+        $concertSelections = CustomerConcertPhotoSelection::where('user_id', $user->id);
+
+        return [
+            'favourites' => (clone $competitionSelections)->where('is_favourite', true)->count()
+                + (clone $concertSelections)->where('is_favourite', true)->count(),
+            'cart' => (clone $competitionSelections)->where('in_cart', true)->count()
+                + (clone $concertSelections)->where('in_cart', true)->count(),
+        ];
+    }
+
     public function forUser(User $user, string $mode, ?string $focusKind = null, ?string $focusEvent = null): array
     {
         $flag = $mode === 'favourites' ? 'is_favourite' : 'in_cart';

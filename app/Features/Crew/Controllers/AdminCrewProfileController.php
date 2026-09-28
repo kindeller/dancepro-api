@@ -55,6 +55,10 @@ class AdminCrewProfileController extends Controller
     {
         $crewProfile = $inviteCrewMember->execute($request->validated());
 
+        if ($request->filled('existing_email')) {
+            return redirect()->route('admin.crew.edit', $crewProfile)->with('status', 'My Hub enabled for the existing account. They can use the same sign-in for My Hub and My Media.');
+        }
+
         return redirect()->route('admin.crew.index')->with('status', $crewProfile->user->invitation_sent_at
             ? "Crew member created and invitation sent to {$crewProfile->user->email}."
             : 'Crew member created without sending an invitation. You can add their existing details and invite them later.');

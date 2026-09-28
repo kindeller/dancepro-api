@@ -59,8 +59,8 @@ class CustomerMediaSupportTest extends TestCase
         $this->assertSame('photo', $request->context['media_type']);
         $this->assertDatabaseHas('customer_support_requests', ['status' => 'pending', 'order_media_entitlement_id' => $entitlement->id]);
 
-        $this->actingAs($customer)->get(route('customer.media.help'))
-            ->assertOk()->assertSee('Please restore my photos')->assertSee('pending');
+        $this->actingAs($customer)->get(route('customer.messages.show', $request))
+            ->assertOk()->assertSee('Please restore my photos')->assertSee('Awaiting DancePro reply');
     }
 
     public function test_expired_download_link_opens_the_preselected_reactivation_form(): void

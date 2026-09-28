@@ -1148,6 +1148,29 @@ Messages include appropriate:
 - Reactivation confirmation.
 - Support replies.
 
+Customer accounts use **My Messages**, between My Media and My Profile:
+
+- **Notifications:** automated media/order updates and gallery announcements.
+- **Conversations:** personal account emails and customer-support threads.
+- **New message:** Subject and Message, with optional topic, owned event/order
+  context, expired media and attachment in a collapsed Advanced options section.
+
+My Media, My Messages, My Profile, Help and Studio Hub share the blue eyebrow,
+heading and description format. The customer header uses the supplied full
+DancePro logo; Studio Hub retains its studio logo and notification boxes.
+Email preferences are preselected for customers without a saved choice; saved
+opt-outs are preserved, and news/offers still require a saved consent before sending.
+
+Tabs share the account heading, layout and scroll retention. Unread counts are
+shown per tab and combined in the main menu. Replies reopen the existing admin
+support request. Customer correspondence stays separate from Studio Hub production
+correspondence. See [My Messages](../handbook/Customer-Messages.md).
+
+The agreed email roles remain info (general), admin (studio), orders (orders),
+and notifications (automated From). Vodien/cPanel hosting was confirmed on
+28 September 2026; live mailbox ingestion is not enabled yet.
+See [Email mailbox routing](../handbook/Email-Mailbox-Routing.md).
+
 Avoid redundant “complete order” and “additional media” messages.
 
 No promotional customer email programme is planned.
@@ -2236,9 +2259,11 @@ package is exposed through customer routes. See ADR-0056.
 
 Studio Hub progress follow-up (27 September 2026): Authorised studio managers see
 available photo-gallery and concert-video login codes in compact right-hand
-“Access Code:” badges in their respective release rows. Video codes remain hidden
-until studio-owner approval is recorded on the concert; removing approval hides
-the badge again. Missing codes produce no extra text row. Newly saved studio/group codes retain encrypted display copies alongside
+“Access Code:” badges in their respective release rows. Video codes and the concert link remain hidden
+until the studio has approved and released the current concert video; removing
+approval or reopening the upload hides them again. Review & release concert
+video appears under Your actions, greyed out until review is ready. The separate
+Concert video released milestone remains under DancePro progress. Missing codes produce no extra text row. Newly saved studio/group codes retain encrypted display copies alongside
 existing hashes; legacy hash-only codes require re-entry once. Existing individual
 concert encrypted passwords are reused. This does not change publication, account
 verification, media entitlement or code-group access periods. See ADR-0057.
@@ -2278,3 +2303,22 @@ an explicit Finished Uploading signal, and records which final exports include
 studio videos/slideshows. Readiness also requires editing and quality completion.
 This is a private review workflow; sending and publication remain separate. See
 Concert-Tracker.md for the current MP4 upload size limits and verification.
+
+Studio Hub navigation follow-up (28 September 2026): Invoices shares the Hub
+header and tabs and displays current timeline quote/minimum-spend cards per
+booking above issued invoices. Overdue action dates are red. Studio Hub is a
+distinct navigation button before My Media and My Profile. Profile uses the Hub
+tab style and owns Sign out; its extra My Media return link is removed.
+
+Customer navigation follow-up (28 September 2026): My Media has three page tabs:
+My Events (galleries, recommendations, Add media), My Purchases (Photos/Videos),
+and My Orders (history and receipts). The tabs share Studio Hub/Profile styling
+and preserve scroll position. Favourites and Cart remain utility actions.
+
+### Shared account access and school classification (28 September 2026)
+
+On the web, crew members can open personal Media from **Back to Media**, and Media shows a distinct **My Hub** button alongside Studio Hub when applicable. One account can hold customer, crew, studio and Admin access together; adding crew access does not replace their customer records. Crew and customer mobile apps remain separate with app-specific token scopes. Admins can enable My Hub for an existing account from Crew Management, grant Admin access through the crew editor, and manage studio-specific access from the studio editor.
+
+Studio records now support **Organisation type: Dance studio / School**. This identifies schools for future pricing and features, without recalculating existing quotes or invoices. School discount rates remain to be supplied. See [Account access and schools](../handbook/Account-Access-and-Schools.md).
+
+Crew web navigation uses a top row for the logo, return links and profile, with crew menu items spread across the lower row. My editing is renamed **My Tasks** in navigation, headings and return links; its current scope remains assigned concert editing.

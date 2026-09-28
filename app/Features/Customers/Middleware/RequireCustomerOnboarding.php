@@ -2,7 +2,6 @@
 
 namespace App\Features\Customers\Middleware;
 
-use App\Features\Customers\Support\UserType;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -12,7 +11,7 @@ class RequireCustomerOnboarding
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        if ($user?->type !== UserType::Customer->value) {
+        if (! $user || $user->canAccessAdmin()) {
             return $next($request);
         }
         if (! $user->hasVerifiedEmail()) {

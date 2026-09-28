@@ -3,10 +3,9 @@
 namespace App\Features\Customers\Controllers;
 
 use App\Features\Customers\Actions\AddCustomerConcertVideo;
-use App\Features\Customers\Models\CustomerConcertPhotoSelection;
-use App\Features\Customers\Models\CustomerMediaSelection;
 use App\Features\Customers\Requests\AddConcertVideoRequest;
 use App\Features\Customers\Requests\CustomerCompetitionsRequest;
+use App\Features\Customers\Requests\CustomerMediaIndexRequest;
 use App\Features\Customers\Services\CustomerAccountMediaSelections;
 use App\Features\Customers\Services\CustomerMedia;
 use App\Features\Customers\Services\CustomerRecommendedMedia;
@@ -20,20 +19,15 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerMediaController extends Controller
 {
-    public function index(CustomerCompetitionsRequest $request, CustomerMedia $media): Response
+    public function index(CustomerMediaIndexRequest $request, CustomerMedia $media, CustomerAccountMediaSelections $selections): Response
     {
         $notifications = $request->user()->notifications()->latest()->limit(10)->get();
         $request->user()->unreadNotifications->markAsRead();
-        $competitionSelections = CustomerMediaSelection::where('user_id', $request->user()->id);
-        $concertSelections = CustomerConcertPhotoSelection::where('user_id', $request->user()->id);
-        $selectionCounts = [
-            'favourites' => (clone $competitionSelections)->where('is_favourite', true)->count()
-                + (clone $concertSelections)->where('is_favourite', true)->count(),
-            'cart' => (clone $competitionSelections)->where('in_cart', true)->count()
-                + (clone $concertSelections)->where('in_cart', true)->count(),
-        ];
+        $selectionCounts = $selections->counts($request->user());
 
-        return response()->view('customers.media.index', $media->forUser($request->user()) + compact('notifications', 'selectionCounts'))
+        $mediaTab = $request->validated('tab') ?? 'events';
+
+        return response()->view('customers.media.index', $media->forUser($request->user()) + compact('notifications', 'selectionCounts', 'mediaTab'))
             ->header('Cache-Control', 'private, no-store');
     }
 

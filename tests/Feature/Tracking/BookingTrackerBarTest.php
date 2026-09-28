@@ -131,7 +131,8 @@ class BookingTrackerBarTest extends TestCase
         // Keep the task open so the attention filter can exercise follow-up resolution.
         $this->patch(route('admin.concert-bookings.tracker.update', $booking), ['panel' => 'status', 'status_override' => 'waiting']);
         $tracker = app(ConcertTracker::class);
-        $this->assertCount(1, $tracker->page('date', 2026, 'booking', true)['rows']);
+        // The other pending booking also needs attention, independently of this follow-up.
+        $this->assertCount(2, $tracker->page('date', 2026, 'booking', true)['rows']);
         $attentionBefore = $tracker->page('date', 2026, 'booking')['summary']['attention'];
         app(CreateConcertTrackerAlerts::class)->execute();
         $this->assertDatabaseHas('concert_tracker_alerts', ['concert_tracker_task_id' => ConcertTrackerTask::firstOrFail()->id, 'type' => 'follow_up_due', 'resolved_at' => null]);

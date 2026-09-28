@@ -1,5 +1,5 @@
 @extends('layouts.public', ['title' => 'Checkout · DancePro', 'footerLabel' => 'DancePro Media'])
-@section('headerParentUrl', $order->status->value === 'draft' ? route('customer.media.cart') : route('customer.media.orders'))
+@section('headerParentUrl', $order->status->value === 'draft' ? route('customer.media.cart') : route('customer.media.orders.index'))
 
 @push('styles')
 <style>

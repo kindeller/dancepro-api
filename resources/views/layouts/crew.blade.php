@@ -14,21 +14,24 @@
         h2 { margin-bottom:6px; font-size:20px; }
         h3 { margin-bottom:3px; font-size:17px; }
         header { position:sticky; z-index:100; top:0; background:var(--dark); color:white; box-shadow:0 2px 8px rgba(11,32,43,.16); }
-        .header-inner { display:flex; align-items:center; justify-content:space-between; max-width:980px; margin:auto; padding:13px 20px; }
-        .brand { display:flex; align-items:center; width:150px; height:34px; color:white; text-decoration:none; }
+        .header-inner { max-width:980px; margin:auto; padding:13px 20px; }
+        .header-top { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; }
+        .brand { flex-shrink:0; display:flex; align-items:center; width:150px; height:34px; color:white; text-decoration:none; }
         .brand img { display:block; width:100%; height:100%; object-fit:contain; object-position:left center; }
-        .crew-nav { display:flex; align-items:center; gap:4px; margin-left:auto; margin-right:14px; }
-        .crew-nav a { padding:5px 8px; border-radius:4px; color:#bcd0d9; font-size:11px; font-weight:700; text-decoration:none; }
+        .crew-nav { display:grid; grid-template-columns:repeat(auto-fit,minmax(100px,1fr)); align-items:stretch; gap:4px; margin-top:12px; padding-top:10px; border-top:1px solid #29414d; }
+        .crew-nav a { display:flex; align-items:center; justify-content:center; text-align:center; min-height:34px; padding:5px 8px; border-radius:4px; color:#bcd0d9; font-size:11px; font-weight:700; text-decoration:none; }
         .crew-nav a.active { background:#153b4d; color:white; }
         .nav-indicator { display:inline-block; width:7px; height:7px; margin-right:2px; border-radius:50%; vertical-align:1px; box-shadow:0 0 0 2px rgba(255,255,255,.12); }
         .nav-indicator.shifts { background:#ef4444; }
         .nav-indicator.timesheets { background:#f2bd4c; }
         .nav-indicator.chat { background:#20a9df; }
-        .user-menu { display:flex; align-items:center; gap:10px; }
+        .user-menu { display:flex; flex-wrap:wrap; align-items:center; gap:10px; max-width:100%; margin-left:auto; }
         .admin-return { display:inline-flex; align-items:center; min-height:30px; padding:5px 9px; border:1px solid #54707d; border-radius:5px; color:#dce9ee; font-size:11px; font-weight:800; text-decoration:none; white-space:nowrap; }
         .admin-return:hover { border-color:#8bb5c7; background:#153b4d; color:white; }
         .user-profile-link { display:inline-flex; align-items:center; gap:6px; padding:5px 7px; border-radius:5px; color:#dce9ee; font-size:12px; font-weight:800; text-decoration:none; white-space:nowrap; }
         .user-profile-link:hover,.user-profile-link.active { background:#153b4d; color:white; }
+        .user-profile-link span { overflow-wrap:anywhere; white-space:normal; }
+        .user-profile-link { min-width:0; max-width:100%; }
         .user-profile-link svg { width:15px; height:15px; flex:0 0 15px; }
         main { max-width:980px; margin:auto; padding:24px 20px 50px; }
         section { margin-top:24px; }
@@ -256,9 +259,6 @@
             .detail-grid { grid-template-columns:1fr 1fr; }
             .detail-grid > div:last-child { grid-column:1/-1; }
             .shift-action { align-items:stretch; flex-direction:column; }
-            .header-inner { flex-wrap:wrap; }
-            .crew-nav { order:3; width:100%; margin:8px 0 0; flex-wrap:wrap; }
-            .crew-nav a { flex:1; text-align:center; }
             .profile-grid,.vehicle-row { grid-template-columns:1fr 1fr; }
             .invoice-overview { grid-template-columns:1fr; }
             .resource-grid { grid-template-columns:1fr; }
@@ -284,15 +284,29 @@
     @include('layouts.partials.local-account-switcher')
     <header>
         <div class="header-inner">
-            <a class="brand" href="{{ route('crew.availability.index') }}" aria-label="DancePro Crew home"><img src="{{ asset('images/brand/dancepro-logo-inverse-landscape.png') }}" alt="DancePro Photography & Video"></a>
-            <nav class="crew-nav">
+            <div class="header-top">
+                <a class="brand" href="{{ route('crew.availability.index') }}" aria-label="DancePro Crew home"><img src="{{ asset('images/brand/dancepro-logo-inverse-landscape.png') }}" alt="DancePro Photography & Video"></a>
+                <div class="user-menu">
+                    @if(auth()->user()?->canAccessCustomer())
+                        <a class="admin-return" href="{{ route('customer.media.index') }}">Back to Media</a>
+                    @endif
+                    @if(auth()->user()?->canAccessAdmin())
+                        <a class="admin-return" href="{{ route('admin.dashboard') }}">Back to Admin</a>
+                    @endif
+                    <a class="user-profile-link {{ request()->routeIs('crew.profile.*') ? 'active' : '' }}" href="{{ route('crew.profile.edit') }}" title="Open My Profile" aria-label="Open My Profile for {{ auth()->user()?->name }}">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>
+                        <span>{{ auth()->user()?->name }}</span>
+                    </a>
+                </div>
+            </div>
+            <nav class="crew-nav" aria-label="Crew navigation">
                 <a class="{{ request()->routeIs('crew.availability.*', 'crew.assignments.*', 'crew.cover.*') ? 'active' : '' }}" href="{{ route('crew.availability.index') }}">
                     @if($crewNavigationIndicators['shifts'])
                         <span class="nav-indicator shifts" title="{{ $crewNavigationIndicators['shifts'] }} shift actions" aria-label="{{ $crewNavigationIndicators['shifts'] }} shift actions"></span>
                     @endif
                     My Shifts
                 </a>
-                <a class="{{ request()->routeIs('crew.editing.*') ? 'active' : '' }}" href="{{ route('crew.editing.index') }}">My editing</a>
+                <a class="{{ request()->routeIs('crew.editing.*') ? 'active' : '' }}" href="{{ route('crew.editing.index') }}">My Tasks</a>
                 <a class="{{ request()->routeIs('crew.timesheets.*') ? 'active' : '' }}" href="{{ route('crew.timesheets.index') }}">
                     @if($crewNavigationIndicators['timesheets'])
                         <span class="nav-indicator timesheets" title="{{ $crewNavigationIndicators['timesheets'] }} pending timesheets or invoices" aria-label="{{ $crewNavigationIndicators['timesheets'] }} pending timesheets or invoices"></span>
@@ -312,15 +326,7 @@
                     <a href="{{ route('account.security') }}">Account security</a>
                 @endif
             </nav>
-            <div class="user-menu">
-                @if(auth()->user()?->canAccessAdmin())
-                    <a class="admin-return" href="{{ route('admin.dashboard') }}">Back to Admin</a>
-                @endif
-                <a class="user-profile-link {{ request()->routeIs('crew.profile.*') ? 'active' : '' }}" href="{{ route('crew.profile.edit') }}" title="Open My Profile" aria-label="Open My Profile for {{ auth()->user()?->name }}">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>
-                    <span>{{ auth()->user()?->name }}</span>
-                </a>
-            </div>
+
         </div>
     </header>
     @if(session('status'))<div class="notice">{{ session('status') }}</div>@endif

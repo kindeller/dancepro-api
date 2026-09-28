@@ -454,3 +454,106 @@ The checks cover hidden unapproved individual/group codes, approval revealing
 only the applicable concert code, and withdrawal hiding it again. Scoped Pint,
 whitespace checks, and desktop/mobile browser layout checks passed. Preview-only
 demonstration codes and approvals were rolled back; no live values were changed.
+
+## My Media page tabs — 28 September 2026
+
+- Added the agreed My Events, My Purchases and My Orders page tabs using the same
+  shared sticky tab style and scroll retention as Studio Hub and My Profile.
+- My Events keeps event galleries, recommendations and Add media. My Purchases
+  isolates purchased media and retains the Photos/Videos filter. My Orders uses
+  the existing private, paginated history and links paid orders to their receipt.
+- Shared Favourites/Cart actions and counts remain available on all three tabs.
+  Purchased galleries return to My Purchases. Fixed the existing receipt back
+  route to the named order-history endpoint. No entitlement/payment rules changed.
+- Removed the redundant My Media return link from Help. The shared scroll script
+  uses the page CSP nonce so it also works when script restrictions are enforced.
+- Focused customer media/profile/help verification passed 20 tests (218 assertions).
+  Browser checks passed for desktop/phone tabs, keyboard Photos/Videos switching,
+  correct content isolation, scroll retention and removal of the Help link.
+  Final full-suite verification follows below.
+
+Final verification: full `sail artisan test` passed 900 tests (9,071 assertions).
+`sail pint --dirty --test` and `git diff --check` passed. All three tabs and scroll
+retention passed rendered Chrome checks at 1440px and 390px, without JavaScript
+errors or horizontal overflow. Final screenshots were reviewed; order-description
+contrast was corrected. No routes or migrations changed. Next: user review of the
+three-tab navigation, then continue the existing customer delivery rehearsal.
+
+## My Messages — 28 September 2026
+
+- Added Notifications, Conversations and New message, using the shared account
+  navigation, heading, tabs and scroll retention. My Messages sits between My
+  Media and My Profile; unread badges combine notices and conversations.
+- Existing automated delivery records project to one inbox entry per source.
+  Delivery updates preserve read state. Personal account emails become support
+  conversations; new replies reopen the existing admin Pending queue. Studio
+  booking/production correspondence remains in Studio Hub.
+- Added immutable thread messages, customer/admin replies, optional owned
+  event/order context and private authenticated attachment downloads. Existing
+  reactivation decisions remain audited and now appear in conversation history.
+- Help keeps its configurable guidance and FAQ. Contact us opens New message;
+  old download-reactivation links retain their context. Customer support and
+  customer account history link directly to the same conversation page.
+- Migration applied locally; rollback SQL reviewed without removing data.
+  `customers:sync-inbox` backfilled existing correspondence without sending mail.
+  Repeated backfills are idempotent and do not restore anonymised messages.
+  Merges, privacy exports and redaction cover inbox messages and attachments.
+- Focused verification passed 26 tests / 322 assertions, covering ownership,
+  attachments, source deduplication, same-second replies, unread state, merges,
+  privacy, navigation and the Help settings regression.
+- Vodien/cPanel provider and server settings are confirmed and recorded in
+  [Email mailbox routing](../handbook/Email-Mailbox-Routing.md), preserving the
+  existing info/admin/orders/notifications role plan. **External email-app reply
+  ingestion remains unimplemented and unconnected.** Secure credential handling,
+  the IMAP adapter and an authorised live round-trip test are remaining work.
+  The repository-required credential skill was unavailable; passwords were not
+  accessed and no mailboxes, DNS or transports were changed.
+- See [ADR-0058](../decisions/ADR-0058-Customer-Messages-Inbox.md) and
+  [My Messages handbook](../handbook/Customer-Messages.md).
+
+Final verification: full `sail artisan test --compact` passed **910 tests /
+9,251 assertions**. Scoped `sail pint --test`, full `sail artisan route:list`
+and `git diff --check` passed. Rendered Chrome checks at 1440px and 390px passed
+all three tabs and the conversation page, scroll retention, absence of horizontal
+page overflow and JavaScript errors. Screenshots reviewed; temporary layout
+records were rolled back. Existing unrelated working-tree changes were preserved;
+no commit or external email send was performed.
+
+## Customer account presentation refinements — 28 September 2026
+
+- New message shows Subject and Message, with Topic, Event, Order, Expired media
+  and Attachment in a collapsed Advanced options section above them. Optional
+  field validation errors automatically open the section; ordinary enquiries
+  submit with the existing general topic without opening it.
+- Preference checkboxes now use the delivery service's defaults and honour saved
+  opt-outs, including legacy download-email choices. News/offers is preselected
+  only without a saved choice; viewing the form never creates marketing consent.
+  Saving records each first choice (including opting out) in consent history.
+  Updated the obsolete description to explain unticking and saving preferences.
+- Copied the exact supplied inverse landscape logo into a dedicated customer
+  header asset. The logo retains its transparency and proportions, replacing
+  the roundel plus separately typeset DancePro text.
+- My Media, My Messages, My Profile, Help and Studio Hub now share one heading
+  partial for the blue eyebrow, heading and description. Studio Hub uses the
+  same typography and spacing, retains its studio image, and places its three
+  notification boxes below the identity to leave room for long studio names.
+- No routes, database migrations, email transports or mailbox connections changed.
+  Existing unrelated work remains untouched. Next: user review of these account
+  screens; Vodien integration remains the separate open item described above.
+
+Verification: full `sail artisan test --compact` passed **911 tests / 9,262
+assertions**. Scoped Pint and `git diff --check` passed. Chrome checks across all
+five pages at 1440px, 900px and 390px confirmed matching heading styles, correctly
+loaded/proportioned logos, retained Studio Hub boxes, no horizontal page overflow,
+keyboard expansion/collapse, hidden optional fields, valid simple-message forms
+and checked initial preferences. Reviewed desktop/mobile screenshots. Logo asset
+SHA-256 matches the supplied original. All temporary preview data was rolled back.
+
+## Shared web accounts and school classification — 28 September 2026
+
+- Media and Crew Hub now have reciprocal My Hub / Back to Media links; Studio Hub and Admin links remain available according to each account's permissions.
+- Active crew/staff accounts can use personal Media with existing content access checks. Non-admin Media access requires verified email. Existing customer accounts can be enabled for My Hub by an admin without changing credentials, purchases, customer type or studio permissions, and without sending mail.
+- Crew onboarding applies to linked customer accounts too. Customer-only merge/anonymisation tools prevent disconnecting crew or Admin records.
+- Studio create/edit supports a persisted School classification and directory badge. Existing studios default to Dance studio. Pricing is unchanged until school discount rules are agreed.
+- Verification: `./vendor/bin/sail artisan test --compact` passed all 919 tests / 9,332 assertions. Scoped Sail Pint and `git diff --check` passed. School migration applied locally; rollback removes only the new classification column (reviewed). Chrome checks passed for four pages at 1440, 900 and 390 pixels, including navigation visibility, wrapping and form interaction, with no JavaScript errors. Mobile app navigation is unchanged.
+- Next: agree school discount rates and their applicability to minimum spends/video quotes before adding automatic pricing.

@@ -3,6 +3,7 @@
 namespace App\Features\Bookings\Models;
 
 use App\Features\Bookings\Support\ConcertBookingItemType;
+use App\Features\Bookings\Support\ConcertBookingStatus;
 use App\Features\Concerts\Models\Concert;
 use App\Features\Scheduling\Models\EventTypeDefinition;
 use App\Features\Scheduling\Models\SchedulingEvent;
@@ -10,6 +11,7 @@ use App\Features\Venues\Models\Venue;
 use App\Models\User;
 use App\Shared\Models\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -18,6 +20,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class ConcertBookingItem extends Model
 {
     use HasPublicUuid;
+
+    public function scopeAwaitingApproval(Builder $query): Builder
+    {
+        return $query->where('approval_status', 'pending')->whereNull('scheduling_event_id')->whereNull('cancelled_at')
+            ->whereHas('booking', fn (Builder $booking) => $booking->whereIn('status', [ConcertBookingStatus::Pending, ConcertBookingStatus::Approved]));
+    }
 
     public function booking(): BelongsTo
     {

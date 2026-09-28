@@ -1,5 +1,4 @@
-@extends('layouts.public', ['title' => 'My orders · DancePro', 'footerLabel' => 'DancePro Media'])
-@section('headerParentUrl', route('customer.media.index'))
+@extends('layouts.public', ['title' => 'My Orders · DancePro', 'footerLabel' => 'DancePro Media'])
 
 @push('styles')
 <style>
@@ -12,8 +11,11 @@
 @endpush
 
 @section('content')
-<section class="hero" style="padding:38px 0"><div class="container"><h1>My orders</h1><p class="lead">Your orders, complimentary media and download availability.</p></div></section>
+@include('customers.media._header')
+@include('customers.media._tabs', ['mediaTab' => 'orders'])
 <section class="section"><div class="container">
+    @include('customers.media._actions')
+    <h2>My Orders</h2><p class="muted">Your order history, receipts and download availability.</p>
     @if($orders->count() === 0)<div class="empty"><p>You have no orders yet.</p></div>
     @else<div class="order-list">
         @foreach($orders as $order)
@@ -42,9 +44,10 @@
                         </li>
                     @endforeach
                 </ul>
+                @if(in_array($order->status->value, ['paid', 'fulfilled'], true))<p><a class="button secondary" href="{{ route('customer.checkout.show', $order) }}">View receipt</a></p>@endif
                 @if($order->status->value === 'pending')<p>Payment is pending. Media will appear after the order is paid and fulfilled.</p>
                 @elseif($order->status->value === 'paid')<p>Payment received. Some media may still be preparing.</p>
-                @else<p>Media is ready in My Media.</p>@endif
+                @else<p>Media is ready in <a href="{{ route('customer.media.index', ['tab' => 'purchases']) }}">My Purchases</a>.</p>@endif
             </article>
         @endforeach
     </div>

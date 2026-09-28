@@ -43,10 +43,6 @@
     .account-notifications { display:grid; gap:10px; margin-bottom:22px; }
     .account-notification { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:15px 18px; border:1px solid #9bdcf4; border-radius:10px; background:#eefaff; text-decoration:none; }
     .account-notification strong { display:block; }
-    .media-account-actions { display:flex; justify-content:flex-end; gap:9px; margin-bottom:22px; }
-    .media-account-actions a { display:inline-flex; align-items:center; gap:8px; }
-    .media-account-actions svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-    .media-account-count { display:grid; min-width:23px; height:23px; place-items:center; padding:0 6px; border-radius:999px; background:#087bab; color:#fff; font-size:12px; }
     .media-access-dialog { width:min(560px,calc(100% - 28px)); padding:0; border:0; border-radius:16px; background:#fff; color:var(--ink); box-shadow:0 24px 80px #07151d66; }
     .media-access-dialog::backdrop { background:#07151db8; backdrop-filter:blur(2px); }
     .media-access-dialog-head { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; padding:22px 24px 18px; border-bottom:1px solid var(--line); }
@@ -56,12 +52,14 @@
     .media-access-event { margin:0 0 16px; padding:12px 14px; border-radius:9px; background:#edf8fc; color:#075f84; font-weight:800; }
     .media-access-dialog .error { margin-top:10px; color:#b42318; }
 </style>
-<section class="hero"><div class="container"><div class="eyebrow">Your DancePro account</div><h1>My Media</h1><p class="lead">Your competition galleries and concert media, together.</p></div></section>
+@include('customers.media._header')
+@include('customers.media._tabs')
 <section class="section"><div class="container">
-    <nav class="media-account-actions" aria-label="Saved media"><a class="button secondary" href="{{ route('customer.media.favourites') }}">♡ Favourites @if($selectionCounts['favourites'])<span class="media-account-count">{{ $selectionCounts['favourites'] }}</span>@endif</a><a class="button secondary" href="{{ route('customer.media.cart') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 11h11.5l2-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>Cart @if($selectionCounts['cart'])<span class="media-account-count">{{ $selectionCounts['cart'] }}</span>@endif</a></nav>
+    @include('customers.media._actions')
     @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
     @if($notifications->isNotEmpty())<div class="account-notifications" aria-label="Account notifications">@foreach($notifications as $notification)<a class="account-notification" href="{{ $notification->data['url'] ?? route('customer.media.index') }}"><span><strong>{{ $notification->data['title'] ?? 'DancePro update' }}</strong><span class="meta">{{ $notification->data['body'] ?? '' }}</span></span><span aria-hidden="true">→</span></a>@endforeach</div>@endif
     @if($creditBalance > 0)<div class="account-credit"><div><strong style="font-size:16px;color:inherit">Account credit</strong><div class="meta">Available to use on your next DancePro media order.</div></div><strong>${{ number_format($creditBalance / 100, 2) }}</strong></div>@endif
+    @if($mediaTab === 'events')
     <section class="card card-body" style="margin-bottom:32px" aria-labelledby="add-media-heading">
         <h2 id="add-media-heading">Add media</h2>
         <div class="add-media-options">
@@ -143,8 +141,10 @@
             </div>
         @endforeach
     </section>
+    @endif
+    @if($mediaTab === 'purchases')
     <section class="media-section" aria-labelledby="purchased-heading" data-media-tabs>
-        <div class="media-section-head"><h2 id="purchased-heading">My Media</h2><a class="button secondary" href="{{ route('customer.media.orders.index') }}">My orders</a>
+        <div class="media-section-head"><h2 id="purchased-heading">My Purchases</h2>
             <div class="media-tabs" role="tablist" aria-label="Purchased media">
                 <button type="button" role="tab" id="purchased-photos-tab" aria-controls="purchased-photos" aria-selected="true" data-media-tab="purchased-photos">Photos</button>
                 <button type="button" role="tab" id="purchased-videos-tab" aria-controls="purchased-videos" aria-selected="false" tabindex="-1" data-media-tab="purchased-videos">Videos</button>
@@ -172,6 +172,8 @@
             </div>
         @endforeach
     </section>
+    @endif
+    @if($mediaTab === 'events')
     <section class="media-section" aria-labelledby="events-heading">
         <div class="media-section-head"><h2 id="events-heading">My Events</h2></div>
         @if(empty($events))
@@ -217,6 +219,7 @@
             </form>
         </div>
     </dialog>
+    @endif
 </div></section>
 @endsection
 @push('scripts')

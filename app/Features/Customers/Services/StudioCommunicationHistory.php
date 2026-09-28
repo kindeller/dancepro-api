@@ -39,12 +39,14 @@ class StudioCommunicationHistory
         return compact('studios', 'latest', 'unread', 'threads');
     }
 
-    public function forUser(User $user, Studio $studio): array
+    public function forUser(User $user, Studio $studio, bool $markMessagesRead = true): array
     {
         abort_unless($this->canView($user, $studio), 403);
 
-        StudioConversationMessage::query()->where('studio_id', $studio->id)
-            ->where('direction', 'from_dancepro')->whereNull('studio_read_at')->update(['studio_read_at' => now()]);
+        if ($markMessagesRead) {
+            StudioConversationMessage::query()->where('studio_id', $studio->id)
+                ->where('direction', 'from_dancepro')->whereNull('studio_read_at')->update(['studio_read_at' => now()]);
+        }
 
         $deliveries = ConcertTrackerEmailDelivery::query()
             ->with('event')
@@ -77,7 +79,7 @@ class StudioCommunicationHistory
         ]))->sortByDesc('occurred_at')->values();
 
         $events = $this->studioEvents($studio);
-        $hub = $this->hub($events, $communications, $studio);
+        $hub = $this->hub($events, $communications, $studio, $user);
 
         return compact('studio', 'communications', 'events', 'hub');
     }
@@ -216,11 +218,11 @@ class StudioCommunicationHistory
             ->orderByDesc('event_date')->get();
     }
 
-    private function hub(Collection $events, Collection $communications, Studio $studio): array
+    private function hub(Collection $events, Collection $communications, Studio $studio, User $user): array
     {
         $progress = $this->tracker->statusesForEvents($events);
         $photoLogin = $this->loginCodes->photo($studio);
-        $eventCards = $events->map(function (SchedulingEvent $event) use ($progress, $studio, $photoLogin): array {
+        $eventCards = $events->map(function (SchedulingEvent $event) use ($progress, $studio, $photoLogin, $user): array {
             $sourceTasks = $progress->get($event->id);
             $sourceState = fn (string $key): string => match ($sourceTasks->get($key)['key'] ?? 'not_started') {
                 'complete', 'not_required' => 'complete',
@@ -271,6 +273,8 @@ class StudioCommunicationHistory
                     'published' => $assignment->status === 'published',
                 ])->filter(fn (array $person): bool => filled($person['name']))
                 ->unique(fn (array $person): string => $person['name'].'|'.$person['role'])->values();
+            $videoReleased = $videoRequired && $concert?->approved_at && $sourceState('final_release') === 'complete';
+            $videoReview = $videoRequired ? $this->videoReviewAction($event, $user, $videoReleased) : null;
             $production = collect([
                 [
                     'label' => 'Booking confirmed',
@@ -295,15 +299,15 @@ class StudioCommunicationHistory
                         ? route('customer.concerts.photos.show', $concert) : null,
                 ] : null,
                 $videoRequired ? [
-                    'label' => 'Review & release concert video',
-                    'loginCode' => $concert?->approved_at ? $this->loginCodes->video($concert, $studio) : null,
-                    'status' => $sourceState('final_release'),
-                    'detail' => 'DancePro',
-                    'url' => auth()->user() && app(ConcertDirectorReviews::class)->canReview(auth()->user(), $event)
-                        ? route('customer.concert-review.show', $event) : null,
+                    'label' => 'Concert video released',
+                    'loginCode' => $videoReleased ? $this->loginCodes->video($concert, $studio) : null,
+                    'status' => $videoReleased ? 'complete' : 'waiting',
+                    'detail' => $videoReleased ? 'Share the access code with your dancers and families.' : 'Waiting for studio review and release.',
+                    'url' => $videoReleased ? route('concerts.show', $concert) : null,
                 ] : null,
             ])->filter()->values();
             $checklist = collect([
+                $videoReview && ($videoReview['url'] || $videoReleased) ? $this->hubTask('video_review', $videoReview['label'], $videoReleased, null, $videoReview['instruction']) : null,
                 $this->hubTask('booking', 'Check booking details', $bookingItem?->approval_status === 'approved', null,
                     'Review the date, venue, times and booked services. Send a change request if anything is incorrect.'),
                 $portraitRequired ? $this->hubTask('portrait_requirements', 'Confirm portrait shoot requirements', $portraitRequirementsComplete, $concertDate?->copy()->subDay(),
@@ -335,6 +339,7 @@ class StudioCommunicationHistory
                 'files' => $files,
                 'crew' => $crew,
                 'production' => $production,
+                'videoReview' => $videoReview,
                 'changeRequests' => $event->studioBookingChangeRequests,
                 'checklist' => $checklist,
                 'completeCount' => $checklist->where('complete', true)->count(),
@@ -349,6 +354,28 @@ class StudioCommunicationHistory
             'upcomingCount' => $eventCards->filter(fn (array $card): bool => $card['event']->event_date?->copy()->endOfDay()->isFuture() ?? false)->count(),
             'actionCount' => $eventCards->sum(fn (array $card): int => $card['totalCount'] - $card['completeCount']),
             'messageCount' => $communications->count(),
+        ];
+    }
+
+    private function videoReviewAction(SchedulingEvent $event, User $user, bool $released): array
+    {
+        $reviews = app(ConcertDirectorReviews::class);
+        $canReview = $reviews->canReview($user, $event);
+        $data = $released ? null : $reviews->page($event);
+        $ready = ! $released && $canReview && $data['canRelease'];
+
+        return [
+            'label' => 'Review & release concert video',
+            'complete' => $released,
+            'status' => $released ? 'Complete' : ($ready ? 'Ready for review' : 'Not ready'),
+            'instruction' => match (true) {
+                $released => 'Your concert video has been released to dancers and families.',
+                ! $canReview => 'The studio owner or director will review and release this concert video.',
+                $ready => 'Watch your concert video, request any corrections, then approve its release to families.',
+                $data['review']->revision > 0 => 'DancePro is preparing your corrections. We will email you when the updated video is ready.',
+                default => 'DancePro is preparing your concert video. We will email you when it is ready for review.',
+            },
+            'url' => $ready ? route('customer.concert-review.show', $event) : null,
         ];
     }
 

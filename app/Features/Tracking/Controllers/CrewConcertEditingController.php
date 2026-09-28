@@ -30,7 +30,7 @@ class CrewConcertEditingController extends Controller
         $trackerBar = array_replace($bar->editingPage($detail), [
             'eventUrl' => null, 'lockedPanels' => ['due', 'assignment'], 'assignees' => collect(),
             'statuses' => array_diff_key(BookingTrackerBar::STATUSES, ['not_required' => true]),
-            'returnUrl' => route('crew.editing.index'), 'returnLabel' => '← My editing',
+            'returnUrl' => route('crew.editing.index'), 'returnLabel' => '← My Tasks',
             'updateUrl' => route('crew.editing.update', $schedulingEvent),
         ]);
 

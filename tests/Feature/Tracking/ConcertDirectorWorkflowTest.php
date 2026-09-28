@@ -8,6 +8,7 @@ use App\Features\Concerts\Models\Concert;
 use App\Features\Concerts\Models\ConcertDirectorReview;
 use App\Features\Concerts\Services\ConcertDirectorReviews;
 use App\Features\Customers\Models\CustomerStudio;
+use App\Features\Customers\Services\StudioCommunicationHistory;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Models\MediaCollection;
 use App\Features\Media\Services\ConcertPhotoReleases;
@@ -194,6 +195,85 @@ class ConcertDirectorWorkflowTest extends TestCase
         $status = app(ConcertTracker::class)->detail($event->fresh(), 'video_uploaded')['status'];
         $this->assertSame('complete', $status['tone']);
         $this->assertNull($status['dueDate']);
+    }
+
+    public function test_hub_separates_review_action_from_released_video_and_hides_it_until_ready(): void
+    {
+        [$staff, $director, $event, $concert, $batch] = $this->fixture();
+        $trackerCode = fn () => app(ConcertTracker::class)->page('date', 2026, 'completion')['releaseLogins'][$event->id]['final_release'];
+        $this->assertNull($trackerCode());
+        $hubUrl = route('customer.studio-communications.index', $event->studio);
+        $reviewUrl = route('customer.concert-review.show', $event);
+        $videoUrl = route('concerts.show', $concert);
+        $card = fn () => app(StudioCommunicationHistory::class)->forUser($director, $event->studio)['hub']['events']->first();
+        $batch->update(['completed_at' => null]);
+        $waiting = $card();
+        $this->assertNull($waiting['videoReview']['url']);
+        $this->assertSame('Not ready', $waiting['videoReview']['status']);
+        $this->assertNull($waiting['checklist']->firstWhere('key', 'video_review'));
+        $this->assertNull($waiting['production']->firstWhere('label', 'Concert video released')['url']);
+        $this->assertNull($waiting['production']->firstWhere('label', 'Concert video released')['loginCode']);
+        $this->actingAs($director)->get($hubUrl)->assertOk()
+            ->assertSeeInOrder(['Your actions', 'Review &amp; release concert video', 'DancePro progress', 'Concert video released'], false)
+            ->assertSee('aria-disabled="true"', false)->assertDontSee('href="'.$reviewUrl.'"', false);
+
+        $batch->update(['completed_at' => now()]);
+        $ready = $card();
+        $this->assertSame($reviewUrl, $ready['videoReview']['url']);
+        $this->assertSame('Ready for review', $ready['videoReview']['status']);
+        $this->assertFalse($ready['checklist']->firstWhere('key', 'video_review')['complete']);
+        $this->get($hubUrl)->assertOk()->assertSee('href="'.$reviewUrl.'"', false)->assertDontSee('href="'.$videoUrl.'"', false);
+
+        $this->post(route('customer.concert-review.release', $event), ['revision' => 0, 'batch_uuid' => $batch->uuid, 'confirm_release' => true])
+            ->assertSessionHasNoErrors();
+        $released = $card();
+        $this->assertTrue($released['videoReview']['complete']);
+        $this->assertNull($released['videoReview']['url']);
+        $this->assertTrue($released['checklist']->firstWhere('key', 'video_review')['complete']);
+        $milestone = $released['production']->firstWhere('label', 'Concert video released');
+        $this->assertSame('complete', $milestone['status']);
+        $this->assertSame($videoUrl, $milestone['url']);
+        $this->assertNotEmpty($milestone['loginCode']['value']);
+        $this->assertSame($milestone['loginCode']['value'], $trackerCode()['value']);
+        $response = $this->actingAs($staff)->get(route('admin.concert-tracker.index', ['year' => 2026, 'phase' => 'completion']))->assertOk();
+        $doc = new \DOMDocument;
+        @$doc->loadHTML($response->getContent());
+        $code = (new \DOMXPath($doc))->query('//td[@data-task-key="final_release"]//span[@class="tracker-access-code"]')->item(0);
+        $this->assertNotNull($code);
+        $this->assertStringContainsString($milestone['loginCode']['value'], $code->textContent);
+        $this->actingAs($director);
+        $this->get($hubUrl)->assertOk()->assertSee('href="'.$videoUrl.'"', false)
+            ->assertSee('Access Code:')->assertSee($milestone['loginCode']['value']);
+
+        // Reopening the upload must withdraw the old release link and code.
+        ConcertVideoBatch::create(['scheduling_event_id' => $event->id, 'created_by_user_id' => $director->id, 'manifest_hash' => str_repeat('b', 64)]);
+        $reopened = $card();
+        $this->assertNull($trackerCode());
+        $this->assertNull($reopened['videoReview']['url']);
+        $this->assertFalse($reopened['videoReview']['complete']);
+        $this->assertNull($reopened['production']->firstWhere('label', 'Concert video released')['loginCode']);
+        $this->get($hubUrl)->assertOk()->assertDontSee('href="'.$videoUrl.'"', false)->assertDontSee($milestone['loginCode']['value']);
+    }
+
+    public function test_hub_review_waits_for_corrections_and_respects_director_permissions_and_booked_services(): void
+    {
+        [$admin, $director, $event, , $batch] = $this->fixture();
+        $hub = fn () => app(StudioCommunicationHistory::class)->forUser($director, $event->studio)['hub']['events']->first();
+        $reviews = app(ConcertDirectorReviews::class);
+        $reviews->feedback($event, $director, ['revision' => 0, 'batch_uuid' => $batch->uuid, 'feedback' => 'Correct the title.']);
+        $this->assertNull($hub()['videoReview']['url']);
+        $this->assertStringContainsString('corrections', $hub()['videoReview']['instruction']);
+        $reviews->checks($event, $admin, ['revision' => 1, 'batch_uuid' => $batch->uuid, 'corrections_complete' => true, 'corrections_uploaded' => true]);
+        $this->assertNull($hub()['videoReview']['url']);
+        $this->actingAs($admin)->post(route('admin.concert-tracker.tasks.email.send', [$event, 'director_corrections']), ['recipient_email' => $director->email])->assertSessionHasNoErrors();
+        (new SendConcertTrackerEmail(ConcertTrackerEmailDelivery::latest('id')->firstOrFail()->id))->handle();
+        $this->assertNotNull($hub()['videoReview']['url']);
+        StudioAccountAccess::where('user_id', $director->id)->update(['role' => 'office_contact']);
+        $this->assertNull($hub()['videoReview']['url']);
+        $this->assertStringContainsString('owner or director', $hub()['videoReview']['instruction']);
+        $event->concertBookingItem->booking->update(['wants_concert_videography' => false]);
+        $this->assertNull($hub()['videoReview']);
+        $this->assertNull($hub()['production']->firstWhere('label', 'Concert video released'));
     }
 
     private function fixture(): array

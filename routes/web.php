@@ -33,6 +33,7 @@ use App\Features\Crew\Controllers\CrewContractController;
 use App\Features\Crew\Controllers\CrewDirectoryController;
 use App\Features\Crew\Controllers\CrewProfileController;
 use App\Features\Customers\Controllers\AdminCustomerAccountController;
+use App\Features\Customers\Controllers\AdminCustomerConversationController;
 use App\Features\Customers\Controllers\AdminCustomerSupportController;
 use App\Features\Customers\Controllers\CustomerAccountController;
 use App\Features\Customers\Controllers\CustomerCompetitionController;
@@ -42,6 +43,7 @@ use App\Features\Customers\Controllers\CustomerConcertPhotoSelectionController;
 use App\Features\Customers\Controllers\CustomerMediaController;
 use App\Features\Customers\Controllers\CustomerMediaHelpController;
 use App\Features\Customers\Controllers\CustomerMediaLibraryController;
+use App\Features\Customers\Controllers\CustomerMessagesController;
 use App\Features\Customers\Controllers\CustomerOnboardingController;
 use App\Features\Customers\Controllers\CustomerOrderController;
 use App\Features\Customers\Controllers\CustomerProfileController;
@@ -279,6 +281,15 @@ Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])
     ->get('my/studios/{studio}/communications/attachments/{attachment}', [CustomerStudioCommunicationController::class, 'attachment'])
     ->name('customer.studio-communications.attachments.show');
 
+Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])->prefix('my/messages')->name('customer.messages.')->group(function (): void {
+    Route::get('/', [CustomerMessagesController::class, 'index'])->name('index');
+    Route::post('/', [CustomerMessagesController::class, 'store'])->middleware('throttle:5,1')->name('store');
+    Route::post('notifications/{notification}/read', [CustomerMessagesController::class, 'read'])->name('read');
+    Route::get('attachments/{message}', [CustomerMessagesController::class, 'attachment'])->name('attachment');
+    Route::get('conversations/{conversation}', [CustomerMessagesController::class, 'show'])->name('show');
+    Route::post('conversations/{conversation}', [CustomerMessagesController::class, 'reply'])->middleware('throttle:10,1')->name('reply');
+});
+
 Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])->prefix('my/media')->name('customer.media.')->group(function (): void {
     Route::get('/', [CustomerMediaController::class, 'index'])->name('index');
     Route::get('favourites', [CustomerMediaController::class, 'favourites'])->name('favourites');
@@ -507,6 +518,9 @@ Route::middleware(['auth', 'admin.required', 'two-factor.required'])
         Route::get('orders', [AdminOrderController::class, 'index'])->name('orders.index');
         Route::get('orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
         Route::get('orders/{order}/items/{item}/thumbnail', [AdminOrderController::class, 'thumbnail'])->name('orders.items.thumbnail');
+        Route::get('media/customer-support/conversations/{conversation}', [AdminCustomerConversationController::class, 'show'])->name('media-support.conversation');
+        Route::post('media/customer-support/conversations/{conversation}', [AdminCustomerConversationController::class, 'reply'])->name('media-support.reply');
+        Route::get('media/customer-support/attachments/{message}', [AdminCustomerConversationController::class, 'attachment'])->name('media-support.attachment');
         Route::get('media/customer-support', [AdminCustomerSupportController::class, 'index'])->name('media-support.index');
         Route::patch('media/customer-support/{supportRequest}', [AdminCustomerSupportController::class, 'resolve'])->name('media-support.resolve');
         Route::get('customers', [AdminCustomerAccountController::class, 'index'])->name('customers.index');

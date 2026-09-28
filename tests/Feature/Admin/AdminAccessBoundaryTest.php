@@ -64,13 +64,11 @@ class AdminAccessBoundaryTest extends TestCase
             ->assertDontSee('Back to Admin');
     }
 
-    public function test_inactive_crew_and_non_admin_non_crew_accounts_cannot_access_crew_routes(): void
+    public function test_inactive_accounts_and_accounts_without_crew_profiles_cannot_access_crew_routes(): void
     {
         $inactiveCrew = User::factory()->crew()->inactive()->create();
         CrewProfile::factory()->for($inactiveCrew)->create();
         $customer = User::factory()->customer()->create();
-        CrewProfile::factory()->for($customer)->create();
-
         foreach ([$inactiveCrew, $customer] as $user) {
             $this->actingAs($user)
                 ->get('/crew/directory')

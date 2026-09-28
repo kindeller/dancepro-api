@@ -2,8 +2,14 @@
 
 namespace App\Providers;
 
+use App\Features\Admin\Services\AdminNavigationIndicators;
 use App\Features\Auth\Services\LocalAccountSwitcher;
 use App\Features\Crew\Services\CrewNavigationIndicators;
+use App\Features\Customers\Models\CustomerAccountEmail;
+use App\Features\Customers\Models\CustomerSupportRequest;
+use App\Features\Customers\Observers\CustomerInboxSourceObserver;
+use App\Features\Customers\Observers\CustomerSupportRequestObserver;
+use App\Features\Customers\Services\CustomerInbox;
 use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Downloads\Policies\DownloadLinkPolicy;
 use App\Features\Exceptions\Services\AdminExceptionOverview;
@@ -20,11 +26,13 @@ use App\Features\Payments\Services\DisabledPaymentGateway;
 use App\Features\Payments\Services\FakePaymentGateway;
 use App\Features\Programmes\Policies\ProgrammePolicy;
 use App\Features\Tracking\Models\ConcertTrackerAlert;
-use App\Features\Tracking\Models\StudioConversationMessage;
+use App\Features\Tracking\Models\ConcertTrackerEmailDelivery;
+use App\Features\Tracking\Services\ConcertTracker;
 use App\Models\User;
 use App\Shared\Support\LocalDevelopmentSafety;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Notifications\Events\NotificationFailed;
 use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Event;
@@ -53,6 +61,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        CustomerSupportRequest::observe(CustomerSupportRequestObserver::class);
+        foreach ([CustomerMediaNotification::class, CustomerAccountEmail::class, ConcertTrackerEmailDelivery::class, DatabaseNotification::class] as $source) {
+            $source::observe(CustomerInboxSourceObserver::class);
+        }
+        View::composer('layouts.public', function (ViewContract $view): void {
+            $view->with('customerInboxCounts', auth()->user()?->canAccessCustomer()
+                ? app(CustomerInbox::class)->counts(auth()->user()) : ['notifications' => 0, 'conversations' => 0, 'total' => 0]);
+        });
         if ($this->app->environment('local')) {
             $this->app->make(LocalDevelopmentSafety::class)->assertSafe();
         }
@@ -166,14 +182,14 @@ class AppServiceProvider extends ServiceProvider
         Order::observe(OrderObserver::class);
         Event::listen(NotificationSent::class, function (NotificationSent $event): void {
             if ($event->notification instanceof CustomerMediaEmail) {
-                CustomerMediaNotification::query()->whereKey($event->notification->deliveryId)
-                    ->update(['status' => 'sent', 'sent_at' => now()]);
+                CustomerMediaNotification::find($event->notification->deliveryId)
+                    ?->update(['status' => 'sent', 'sent_at' => now()]);
             }
         });
         Event::listen(NotificationFailed::class, function (NotificationFailed $event): void {
             if ($event->notification instanceof CustomerMediaEmail) {
-                CustomerMediaNotification::query()->whereKey($event->notification->deliveryId)
-                    ->update(['status' => 'failed', 'failed_at' => now()]);
+                CustomerMediaNotification::find($event->notification->deliveryId)
+                    ?->update(['status' => 'failed', 'failed_at' => now()]);
             }
         });
 
@@ -202,16 +218,19 @@ class AppServiceProvider extends ServiceProvider
             });
         }
 
+        View::composer(['layouts.admin', 'admin.event-management._tabs', 'admin.media.support', 'admin.customers.follow-ups'], function (ViewContract $view): void {
+            $view->with('adminNavigationIndicators', app(AdminNavigationIndicators::class)->for(auth()->user()));
+        });
+
         View::composer('layouts.admin', function (ViewContract $view): void {
             $user = auth()->user();
-            $view->with('adminExceptionCount', $user && Gate::allows('manageScheduling')
-                ? app(AdminExceptionOverview::class)->all()->where('severity', 'action')->count()
-                : 0);
             $view->with('concertTrackerAlertCount', $user && Gate::allows('manageScheduling')
                 ? ConcertTrackerAlert::query()->where('user_id', $user->id)->whereNull('resolved_at')->whereNull('read_at')->count()
                 : 0);
-            $view->with('studioMessageUnreadCount', $user && Gate::allows('manageScheduling')
-                ? StudioConversationMessage::query()->where('direction', 'to_dancepro')->whereNull('staff_read_at')->count()
+            $trackerYear = request()->routeIs('admin.concert-tracker.index') ? (int) request('year', now()->year) : now()->year;
+            $view->with('concertTrackerNotificationYear', $trackerYear);
+            $view->with('concertTrackerAttentionCount', $user && Gate::allows('manageScheduling')
+                ? app(ConcertTracker::class)->notificationCount($trackerYear)
                 : 0);
         });
     }

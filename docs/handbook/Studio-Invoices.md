@@ -2,11 +2,11 @@
 
 ## Staff workflow
 
-1. Open an approved **Event booking** linked to a studio. Under **Studio invoice**, choose **Confirmed video quote** or **Custom invoice**, then **Create draft invoice**. Video invoices require confirmed final family numbers. Prices include GST: $1,500 per concert or $15 per unique family, whichever is greater.
-2. Review the lines, quantities, prices and due date. The default due date is seven days after the last active event. Drafts are private. Custom lines can cover agreed adjustments; never invoice a photography shortfall without the separate minimum-spend/resolution review.
+1. Open an approved **Event booking** linked to a studio. Open the **4.2 Invoice & payment** booking tab, choose **Confirmed video quote** or **Custom invoice**, then **Create draft invoice**. Video invoices require confirmed final family numbers. Prices include GST: $1,500 per concert or $15 per unique family, whichever is greater.
+2. Review the draft lines, quantities, prices, discount and notes in that same tab. The invoice email starts a 14-day payment deadline; the tracker asks for it to be sent seven days before the final event. Drafts are private. Custom lines can cover agreed adjustments; never invoice a photography shortfall without the separate minimum-spend/resolution review.
 3. **Invoice settings** contains the business name, ABN, optional address and bank details. The local installation was initialised from the supplied Square example. Verify these details before real use. Saving settings only affects subsequently issued invoices.
-4. **Issue invoice to Studio Hub** makes the invoice visible to authorised studio contacts. Issuing does not automatically email anyone. Use the existing reviewed communication workflow to notify them; no invoice PDF is automatically attached to those messages.
-5. Use **Sales & reports > Studio invoices** for balances/history and **Download PDF**. **Record received payment** records money already received by bank transfer or elsewhere, including partial payments. It does not charge the studio.
+4. **Send invoice** saves the draft, makes it visible to authorised studio contacts, and opens the invoice email template. Review and send the email to start the payment deadline. The email links to the Studio Hub; no invoice PDF is automatically attached.
+5. The **4.2 Invoice & payment** tab also contains **Download PDF**, payment details and invoice history. **Sales & reports > Studio invoices** links to the same booking workspace. **Record received payment** records money already received by bank transfer or elsewhere, including partial payments. It does not charge the studio.
 6. Void only an unpaid invoice with no pending payment. Paid invoice corrections need the future credit-note/refund workflow. A mistaken manual receipt can be reversed with a reason; this is only a ledger correction.
 
 One active invoice per booking is supported. Repeated create clicks reopen it. Include related services as additional lines rather than creating duplicate invoices. Voided invoices remain visible in history. Sequential display numbers can have gaps and are distinct from retail order numbers.
@@ -17,7 +17,9 @@ One active invoice per booking is supported. Repeated create clicks reopen it. I
 
 Live card checkout uses Braintree Hosted Fields and 3DS2. The outstanding amount comes from the server. Accepted payments can remain **Payment pending** until settlement; **Check payment status** and scheduled reconciliation update it. Do not pay again while pending. An uncertain result is deliberately held until verified by the provider. A payment pending with no matching transaction needs staff/provider investigation; it must not be casually reset to permit another charge.
 
-The tracker derives **Invoice** from issuance and **Payment received** from the settled/recorded balance, with the actual invoice due date for payment follow-up. Email delivery or manually changing an old tracker task cannot invent a receipt. The timeline exposes those same statuses. Tracker task buttons reflect their destination: Create invoice from booking when no invoice exists, Open draft invoice for a draft, and Open studio invoice once issued. Bookings awaiting approval or a studio association offer Review booking instead.
+The tracker combines financial state in **4.2 Invoice & payment**: Pending until final family numbers are confirmed, Not invoiced until the first invoice email is sent, Not paid while a balance remains, and Paid once settled. The first email starts the 14-day payment deadline; reminders do not reset it. Manual tracker changes cannot invent a receipt.
+
+The tracker cell, invoice list and old invoice URLs all open the booking invoice tab. It shows creation requirements when no active invoice exists, the editor for a draft, and the invoice plus payment details once issued. Old voided invoices remain accessible through **Other invoices for this booking**; selecting one cannot expose another booking's invoice. Opening the tab does not create an invoice. The tracker bar and its Back to concert tracker / Back to event controls stay inside the tab.
 
 ## Setup and boundaries
 
@@ -42,3 +44,16 @@ The tracker derives **Invoice** from issuance and **Payment received** from the 
 - New migration applied locally; rollback reviewed in child-to-parent order. It only removes the new billing tables.
 - Rendered admin, customer and draft screens at 1440px and 390px with no page overflow. Draft add/remove controls worked. Single-page and three-page PDFs were rendered and inspected; the invoice link and QR are generated from the authorised Hub route.
 - No real card charge, customer invoice issuance or outbound customer email was performed. PDF/UI review records were rolled back. Braintree sandbox/live credentials and an actual 3DS payment remain an external activation check.
+
+The Studio Hub **Invoices** tab uses the same header and navigation as Events and
+Messages. **Quotes & minimum spends** appears above issued invoices, with a
+separate expandable summary for each saved, non-cancelled booking. These are the
+same current quote cards shown on the Event timeline: cancelled events are
+excluded and confirmed family numbers replace estimates. They do not alter any
+issued invoice. Drafts stay private. Overdue, unpaid issued invoices show their
+due date in red; PDF and payment actions remain on the invoice.
+
+The invoice list and invoice detail retain the three Studio Hub summary links:
+Events, actions remaining and Messages. Actions remaining opens the Events page
+with unfinished events expanded. Reading an invoice does not mark messages read.
+Studio Hub and My Profile submenu tabs preserve scroll position when switching.

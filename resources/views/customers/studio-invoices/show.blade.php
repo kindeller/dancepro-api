@@ -1,7 +1,10 @@
 @extends('layouts.public',['title'=>'Invoice '.$invoice->number(),'footerLabel'=>'Studio Hub'])
 @section('headerParentUrl',route('customer.studio-invoices.index',$studio))
+@include('customers.studios._styles')
 @section('content')
 @include('studio-invoices._styles')
+@include('customers.studios._header')
+@include('customers.studios._tabs', ['tab' => 'invoices'])
 <section class="section"><div class="container" style="max-width:1000px"><div class="studio-billing-actions"><a class="button secondary" href="{{ route('customer.studio-invoices.pdf',[$studio,$invoice]) }}">Download PDF</a></div>
 @if(session('status'))<p class="studio-billing-notice" role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<div class="studio-billing-notice" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif

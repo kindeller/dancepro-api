@@ -96,7 +96,7 @@ class BookingDeliveryConnectionsTest extends TestCase
         $portraitCard = $hub->first(fn ($row) => $row['event']->id === $portrait->scheduling_event_id);
         $this->assertSame('complete', $portraitCard['production']->firstWhere('label', 'Photo gallery released')['status']);
         $videoCard = $hub->first(fn ($row) => $row['event']->id === $video->scheduling_event_id);
-        $this->assertSame('waiting', $videoCard['production']->firstWhere('label', 'Review & release concert video')['status']);
+        $this->assertSame('waiting', $videoCard['production']->firstWhere('label', 'Concert video released')['status']);
         $states = app(ConcertTracker::class)->statusesForEvents(collect([$video->schedulingEvent]));
         $this->assertSame('not_started', $states[$video->scheduling_event_id]['final_release']['key']);
         $this->assertDatabaseCount('concert_tracker_tasks', 0);
@@ -230,16 +230,20 @@ class BookingDeliveryConnectionsTest extends TestCase
         $this->actingAs($customer)->get($url)->assertOk()->assertSee('PHOTO-HUB-TEST')
             ->assertDontSee('VIDEO-HUB-TEST')->assertDontSee('GROUP-HUB-TEST');
         $first->update(['approved_at' => now(), 'approved_by_user_id' => $customer->id]);
+        $this->get($url)->assertOk()->assertDontSee('VIDEO-HUB-TEST')->assertDontSee('GROUP-HUB-TEST');
+        $first->update(['status' => 'published', 'is_enabled' => true, 'published_at' => now()]);
         $this->get($url)->assertOk()->assertSee('VIDEO-HUB-TEST')->assertDontSee('GROUP-HUB-TEST');
-        $booking->items[2]->concert->update(['approved_at' => now(), 'approved_by_user_id' => $customer->id]);
+        $booking->items[2]->concert->update(['approved_at' => now(), 'approved_by_user_id' => $customer->id, 'status' => 'published', 'is_enabled' => true, 'published_at' => now()]);
+        app(ManageConcertCodeGroup::class)->release($group, $customer, ['version' => $group->version]);
         $hub = app(StudioCommunicationHistory::class)->forUser($customer, $studio->fresh())['hub']['events'];
         foreach ($hub as $card) {
             $this->assertSame('PHOTO-HUB-TEST', $card['production']->firstWhere('label', 'Photo gallery released')['loginCode']['value']);
         }
         $portrait = $hub->firstWhere('event.id', $booking->items[0]->scheduling_event_id);
-        $this->assertNull($portrait['production']->firstWhere('label', 'Review & release concert video'));
-        $this->assertSame('VIDEO-HUB-TEST', $hub->firstWhere('event.id', $booking->items[1]->scheduling_event_id)['production']->firstWhere('label', 'Review & release concert video')['loginCode']['value']);
-        $this->assertSame('GROUP-HUB-TEST', $hub->firstWhere('event.id', $booking->items[2]->scheduling_event_id)['production']->firstWhere('label', 'Review & release concert video')['loginCode']['value']);
+        $this->assertNull($portrait['production']->firstWhere('label', 'Concert video released'));
+        $this->assertNull($portrait['videoReview']);
+        $this->assertSame('VIDEO-HUB-TEST', $hub->firstWhere('event.id', $booking->items[1]->scheduling_event_id)['production']->firstWhere('label', 'Concert video released')['loginCode']['value']);
+        $this->assertSame('GROUP-HUB-TEST', $hub->firstWhere('event.id', $booking->items[2]->scheduling_event_id)['production']->firstWhere('label', 'Concert video released')['loginCode']['value']);
         $url = route('customer.studio-communications.index', $studio);
         $this->actingAs($customer)->get($url)->assertOk()->assertHeader('Cache-Control', 'no-store, private')
             ->assertSee('Photo gallery login code')->assertSee('Concert video login code')->assertSee('PHOTO-HUB-TEST')->assertSee('VIDEO-HUB-TEST')->assertSee('GROUP-HUB-TEST');
@@ -264,6 +268,47 @@ class BookingDeliveryConnectionsTest extends TestCase
         $this->get($url)->assertOk()->assertDontSee('OUTDATED-CODE');
         app(SaveStudioGalleryCode::class)->execute($studio->fresh(), $staff, 'REPLACEMENT-CODE', 0);
         $this->get($url)->assertOk()->assertSee('REPLACEMENT-CODE')->assertDontSee('OUTDATED-CODE');
+    }
+
+    public function test_studio_invoice_estimates_match_the_current_timeline_and_exclude_other_studios(): void
+    {
+        [$booking, $studio, $staff, $customer] = $this->fixture();
+        app(ApproveConcertBooking::class)->execute($booking, $staff, null);
+        $booking->items[0]->update(['cancelled_at' => now()]);
+        $booking->update(['final_family_count' => 250, 'family_count_confirmed_at' => now()]);
+        $current = app(CurrentBookingTimeline::class)->forBooking($booking->fresh(), $studio);
+        $this->assertSame(140000, $current['quote']['photo_minimum_cents']);
+        $this->assertSame(375000, $current['quote']['video_quote_cents']);
+        $other = Studio::factory()->create();
+        $url = route('customer.studio-invoices.index', $studio);
+        $response = $this->actingAs($customer)->get($url)->assertOk()->assertHeader('Cache-Control', 'no-store, private')
+            ->assertSee('Studio Hub sections')->assertSee('Quotes &amp; minimum spends', false)
+            ->assertSee('$1,400.00')->assertSee('$3,750.00')->assertSee('250 confirmed families.')
+            ->assertDontSee('Rehearsal event 1')->assertSee('Rehearsal event 2')->assertSee('No invoices yet');
+        $this->assertCount(1, $response->viewData('estimates'));
+        $this->assertSame($current['quote'], $response->viewData('estimates')->first()['receipt']['quote']);
+        $this->get(route('customer.studio-invoices.index', $other))->assertForbidden();
+        $booking->update(['status' => 'cancelled']);
+        $this->get($url)->assertOk()->assertDontSee('Quotes &amp; minimum spends', false);
+    }
+
+    public function test_hub_action_due_dates_have_red_overdue_styling_only_after_the_deadline(): void
+    {
+        [$booking, $studio, $staff, $customer] = $this->fixture();
+        app(ApproveConcertBooking::class)->execute($booking, $staff, null);
+        $url = route('customer.studio-communications.index', $studio);
+        $this->travelTo(now()->setDate(2026, 10, 30)->startOfDay());
+        $response = $this->actingAs($customer)->get($url)->assertOk();
+        $document = new \DOMDocument;
+        @$document->loadHTML($response->getContent());
+        $xpath = new \DOMXPath($document);
+        $overdue = $xpath->query('//div[contains(@class,"check-due") and contains(@class,"overdue")]');
+        $this->assertGreaterThan(0, $overdue->length);
+        foreach ($overdue as $date) {
+            $this->assertStringContainsString('Overdue', $date->textContent);
+        }
+        $this->travelTo(now()->setDate(2026, 10, 1)->startOfDay());
+        $this->get($url)->assertOk()->assertDontSee('class="check-due overdue"', false);
     }
 
     private function fixture(): array

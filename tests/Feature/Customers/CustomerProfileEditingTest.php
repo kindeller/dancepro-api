@@ -5,8 +5,10 @@ namespace Tests\Feature\Customers;
 use App\Features\Customers\Models\CustomerCompetitionRegistration;
 use App\Features\Customers\Models\CustomerDancer;
 use App\Features\Customers\Models\CustomerStudio;
+use App\Features\Customers\Services\CustomerCommunicationPreferences;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Studios\Models\Studio;
+use App\Features\Studios\Models\StudioAccountAccess;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -28,6 +30,26 @@ class CustomerProfileEditingTest extends TestCase
         $this->get(route('customer.profile.edit', ['tab' => 'preferences']))
             ->assertOk()->assertSee('Save preferences')->assertDontSee('Add or verify studio');
         $this->get(route('customer.profile.edit', ['tab' => 'wrong']))->assertSessionHasErrors('tab');
+    }
+
+    public function test_customer_navigation_groups_media_and_profile_and_keeps_sign_out_in_profile(): void
+    {
+        $user = User::factory()->customer()->create();
+        $studio = Studio::factory()->create();
+        StudioAccountAccess::create(['studio_id' => $studio->id, 'user_id' => $user->id, 'email' => $user->email, 'status' => 'active', 'role' => 'owner']);
+        $response = $this->actingAs($user)->get(route('customer.profile.edit'))->assertOk()
+            ->assertSee('section-tabs profile-tabs', false)->assertDontSee('← My Media')->assertSee('Sign out');
+        $document = new \DOMDocument;
+        @$document->loadHTML($response->getContent());
+        $xpath = new \DOMXPath($document);
+        $nav = $xpath->query('//nav[@aria-label="Main navigation"]')->item(0);
+        $this->assertMatchesRegularExpression('/Studio Hub\s+My Media\s+My Messages\s+My Profile\s+Help/', $nav->textContent);
+        $this->assertStringNotContainsString('Sign out', $nav->textContent);
+        $this->assertSame(1, $xpath->query('//nav[@aria-label="Main navigation"]/a[@class="studio-hub-link"]')->length);
+        $this->assertSame(1, $xpath->query('//main//form[@action="'.route('logout').'"]')->length);
+        $this->get(route('customer.media.index'))->assertOk()->assertDontSee('action="'.route('logout').'"', false);
+        $this->post(route('logout'))->assertRedirect();
+        $this->assertGuest();
     }
 
     public function test_details_update_only_owned_profile_and_safe_account_fields(): void
@@ -61,6 +83,24 @@ class CustomerProfileEditingTest extends TestCase
         $this->post(route('customer.profile.store'), array_replace($input, ['marketing_email' => 0]))->assertRedirect();
         $this->assertNull($profile->fresh()->marketing_consent_at);
         $this->post(route('customer.profile.store'), ['action' => 'preferences', 'media_ready_email' => 'wrong'])->assertSessionHasErrors(['media_ready_email', 'expiry_reminders_email', 'marketing_email']);
+    }
+
+    public function test_email_preferences_start_checked_and_preserve_saved_opt_outs(): void
+    {
+        $user = User::factory()->customer()->create();
+        $url = route('customer.profile.edit', ['tab' => 'preferences']);
+        $response = $this->actingAs($user)->get($url)->assertOk();
+        $this->assertSame(['media_ready_email' => true, 'expiry_reminders_email' => true, 'marketing_email' => true], $response->viewData('emailPreferences'));
+        $this->assertFalse(CustomerCommunicationPreferences::enabled($user->fresh(), 'marketing_email'));
+        $this->post(route('customer.profile.store'), ['action' => 'preferences', 'media_ready_email' => 0, 'expiry_reminders_email' => 0, 'marketing_email' => 0])->assertRedirect();
+        $this->assertSame(['media_ready_email' => false, 'expiry_reminders_email' => false, 'marketing_email' => false], $this->get($url)->assertOk()->viewData('emailPreferences'));
+        $this->assertDatabaseHas('customer_consent_histories', ['user_id' => $user->id, 'channel' => 'marketing_email', 'granted' => false]);
+        $this->post(route('customer.profile.store'), ['action' => 'preferences', 'media_ready_email' => 1, 'expiry_reminders_email' => 1, 'marketing_email' => 1])->assertRedirect();
+        $this->assertTrue(CustomerCommunicationPreferences::enabled($user->fresh(), 'marketing_email'));
+
+        $legacy = User::factory()->customer()->create();
+        $legacy->customerProfile()->create(['preferences' => ['download_email' => false]]);
+        $this->assertSame(['media_ready_email' => false, 'expiry_reminders_email' => false, 'marketing_email' => false], $this->actingAs($legacy)->get($url)->assertOk()->viewData('emailPreferences'));
     }
 
     public function test_dancer_editing_normalizes_aliases_and_rejects_cross_account_changes(): void

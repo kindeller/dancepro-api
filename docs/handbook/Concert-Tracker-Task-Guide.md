@@ -1,10 +1,18 @@
 # Concert tracker task guide
 
-Updated 27 September 2026. The same instructions are available under **Task instructions** on each task page.
+Updated 28 September 2026. The same instructions are available under **Task instructions** on each task page.
 
-Use **Back to tracker** and **Back to event** in the top-left of the tracker bar. The first preserves your tracker view; the second opens the scheduling event. Booking-wide tasks use the first active event; pending bookings link to their event details until scheduling exists. Crew-only editing retains its authorised My editing navigation.
+Use **Back to tracker** and **Back to event** in the top-left of the tracker bar. The first preserves your tracker view; the second opens the scheduling event. Booking-wide tasks use the first active event; pending bookings link to their event details until scheduling exists. Crew-only editing retains its authorised My Tasks navigation.
 
 The tracker bar changes responsibility, deadlines and follow-up notes. Automatic statuses follow their source records. Clearing a custom deadline restores the standard task deadline. Yellow means due within three days; red means overdue or a specifically flagged action. Photo uploads have their own waiting/uploading rules. Grey means not required.
+
+Date view, Studio view and the compact coloured phase filters are inside the tracker box. Full screen is at the right of the same toolbar. The all-task headers wrap to two shorter vertical lines; hover or focus a heading for its task instructions.
+
+While expanded, phase filters and Date/Studio view update the sheet without leaving fullscreen. Browser Back/Forward restores those selections. If a view cannot load, the current sheet stays open with a retry message. Cell 4.1 shows the configured photo access code for applicable photo tasks. Cell 4.3 shows the video access code only after the current video is released; reopening uploads withdraws it until release again.
+
+Summary boxes count tasks for the selected year and phase, before the Needs attention filter is applied. Shared booking tasks count once; event-specific seats and tasks count per event. Each pending event adds one open task and one Needs attention notification in All tasks/Booking, in both views. Needs attention also includes overdue or failed work, due unresolved follow-ups, and red action states such as Ready to release and Corrections. Complete and Not required tasks do not need attention. Open includes unfinished tasks already counted in Needs attention or Due within 3 days; these boxes are not additive.
+
+The sidebar badge counts Needs attention across all phases for the selected tracker year (the current year elsewhere), rather than unread alerts. It matches the All tasks summary. Opening the tracker refreshes the count immediately; other admin pages cache it for up to 30 seconds. The separate Alerts page continues to show notification history and unread alerts.
 
 Emails marked **Test** are captured locally and are not delivered to real recipients. Queued or scheduled is not sent. Read delivery history before using the protected resend action.
 
@@ -105,6 +113,8 @@ Emails marked **Test** are captured locally and are not delivered to real recipi
 3. Release publishes the gallery and opens an announcement for registered studio accounts. Review and send it separately; gallery release alone does not email customers.
 
 ## 4.2 Invoice & payment
+
+Opens the **4.2 Invoice & payment** tab in the booking, with its tracker bar above the draft editor or issued invoice. Draft creation, discounts, notes, PDF downloads and payment history all stay in this workspace.
 
 1. Approve and link the booking to its studio, and confirm final family numbers before preparing the video invoice.
 2. Review the draft, prices, discounts and notes. Send invoice saves it to the Studio Hub and opens the invoice email; send that email to start the 14-day payment deadline.

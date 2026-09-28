@@ -6,7 +6,6 @@ use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Bookings\Models\ConcertBookingItem;
 use App\Features\Bookings\Services\BookingSeatsAndFamilies;
 use App\Features\Bookings\Support\ConcertBookingItemType;
-use App\Features\Bookings\Support\ConcertBookingStatus;
 use App\Features\Concerts\Models\ConcertDirectorReview;
 use App\Features\Concerts\Services\ConcertDirectorReviews;
 use App\Features\Customers\Services\StudioHubLoginCodes;
@@ -32,6 +31,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class ConcertTracker
 {
@@ -45,29 +45,30 @@ class ConcertTracker
     public function page(string $view, int $year, string $phase, bool $attention = false): array
     {
         $definitions = $this->catalog->forPhase($phase);
-        $events = $this->events($year);
-        $sources = $this->sources($events);
-        $overrides = $this->overrides($events);
-        $rows = $events->map(fn (SchedulingEvent $event): array => $this->row($event, $definitions, $sources, $overrides));
+        $rows = $this->rowsForYear($year);
+        $yearSummary = $this->summary($rows);
+        request()->attributes->set('concert_tracker_attention_'.$year, $yearSummary['attention']);
+        Cache::put('concert-tracker-attention:v2:'.$year, $yearSummary['attention'], now()->addSeconds(30));
 
-        if ($view === 'date') {
-            $rows = $rows->concat($this->pendingRows($year))->sortBy([
-                ['event_date', 'asc'], ['name', 'asc'],
-            ])->values();
-        }
+        $rows = $rows->filter(fn (array $row): bool => ! $row['pending'] || $definitions->contains('key', 'booking_received'))
+            ->map(function (array $row) use ($definitions): array {
+                $row['tasks'] = $row['tasks']->only($definitions->pluck('key')->all());
+
+                return $row;
+            })->values();
         $pendingCount = $rows->where('pending', true)->count();
 
         if ($view === 'studio') {
             $rows = $rows->sort(function (array $left, array $right): int {
-                $studioOrder = strcasecmp($left['event']->studio?->name ?? 'zzzz', $right['event']->studio?->name ?? 'zzzz');
+                $studioOrder = strcasecmp($left['pending'] ? $left['name'] : ($left['event']->studio?->name ?? 'zzzz'), $right['pending'] ? $right['name'] : ($right['event']->studio?->name ?? 'zzzz'));
 
-                return $studioOrder !== 0 ? $studioOrder : ($left['event']->event_date <=> $right['event']->event_date);
+                return $studioOrder !== 0 ? $studioOrder : ($left['event_date'] <=> $right['event_date']);
             })->values();
         }
 
         $summary = $this->summary($rows);
         if ($attention) {
-            $rows = $rows->filter(fn (array $row): bool => $row['tasks']->contains(fn (array $task): bool => $this->needsAttention($task)))->values();
+            $rows = $rows->filter(fn (array $row): bool => $row['pending'] || $row['tasks']->contains(fn (array $task): bool => $this->needsAttention($task)))->values();
         }
 
         if ($view === 'studio') {
@@ -77,10 +78,42 @@ class ConcertTracker
         $codes = app(StudioHubLoginCodes::class);
         $galleryLogins = $rows->map(fn (array $row) => $row['pending'] ? $row['bookingItem']->booking->studio : $row['event']->studio)
             ->filter()->unique('id')->mapWithKeys(fn ($studio): array => [$studio->id => $codes->photo($studio)]);
+        $releaseLogins = $rows->reject(fn (array $row): bool => $row['pending'])->mapWithKeys(function (array $row) use ($codes, $galleryLogins): array {
+            $event = $row['event'];
+            $concert = $event->concertBookingItem?->concert;
+
+            return [$event->id => [
+                'photo_release' => $galleryLogins->get($event->studio_id),
+                'final_release' => $event->studio && $row['tasks']->has('final_release') && $this->videoReleased($event, $concert)
+                    ? $codes->video($concert, $event->studio) : null,
+            ]];
+        });
 
         $phases = ConcertTrackerTaskCatalog::PHASES;
 
-        return compact('view', 'year', 'phase', 'attention', 'phases', 'definitions', 'rows', 'summary', 'pendingCount', 'galleryLogins');
+        return compact('view', 'year', 'phase', 'attention', 'phases', 'definitions', 'rows', 'summary', 'pendingCount', 'galleryLogins', 'releaseLogins');
+    }
+
+    public function notificationCount(int $year): int
+    {
+        if (request()->attributes->has('concert_tracker_attention_'.$year)) {
+            return request()->attributes->get('concert_tracker_attention_'.$year);
+        }
+
+        // Other admin pages need only a count; opening the tracker always refreshes it.
+        return Cache::remember('concert-tracker-attention:v2:'.$year, now()->addSeconds(30),
+            fn (): int => $this->summary($this->rowsForYear($year))['attention']);
+    }
+
+    private function rowsForYear(int $year): Collection
+    {
+        $events = $this->events($year);
+        $sources = $this->sources($events);
+        $overrides = $this->overrides($events);
+        $definitions = $this->catalog->all();
+
+        return $events->map(fn (SchedulingEvent $event): array => $this->row($event, $definitions, $sources, $overrides))
+            ->concat($this->pendingRows($year))->sortBy([['event_date', 'asc'], ['name', 'asc']])->values();
     }
 
     public function statusesForEvents(Collection $events): Collection
@@ -258,11 +291,8 @@ class ConcertTracker
     private function pendingRows(int $year): Collection
     {
         $items = ConcertBookingItem::query()
-            ->where('approval_status', 'pending')
-            ->whereNull('scheduling_event_id')
-            ->whereNull('cancelled_at')
+            ->awaitingApproval()
             ->whereYear('event_date', $year)
-            ->whereHas('booking', fn ($query) => $query->whereIn('status', [ConcertBookingStatus::Pending, ConcertBookingStatus::Approved]))
             ->with('booking.studio')
             ->get();
         $tasks = ConcertTrackerTask::query()->with('assignee')->where('scope_type', 'booking')
@@ -648,9 +678,14 @@ class ConcertTracker
         foreach ($definitions->where('scope', 'booking') as $definition) {
             $start = 0;
             while ($start < $rows->count()) {
+                if ($rows[$start]['pending']) {
+                    $start++;
+
+                    continue;
+                }
                 $scopeKey = $rows[$start]['tasks'][$definition['key']]['scopeKey'];
                 $end = $start + 1;
-                while ($end < $rows->count() && $rows[$end]['tasks'][$definition['key']]['scopeKey'] === $scopeKey
+                while ($end < $rows->count() && ! $rows[$end]['pending'] && $rows[$end]['tasks'][$definition['key']]['scopeKey'] === $scopeKey
                     && $rows[$end]['event']->studio_id === $rows[$start]['event']->studio_id) {
                     $end++;
                 }
@@ -674,19 +709,24 @@ class ConcertTracker
 
     private function summary(Collection $rows): array
     {
-        $tasks = $rows->flatMap(fn (array $row) => $row['tasks'])->unique(fn (array $task): string => $task['scopeKey'].':'.$task['definition']['key']);
+        $tasks = $rows->flatMap(fn (array $row) => $row['tasks']->values())->unique(fn (array $task): string => $task['scopeKey'].':'.$task['definition']['key']);
+        $pending = $rows->where('pending', true)->count();
 
         return [
-            'attention' => $tasks->filter(fn (array $task): bool => $this->needsAttention($task))->count(),
+            'attention' => $pending + $tasks->filter(fn (array $task): bool => $this->needsAttention($task))->count(),
             'near_due' => $tasks->where('nearDue', true)->count(),
             'complete' => $tasks->where('key', 'complete')->count(),
-            'open' => $tasks->reject(fn (array $task): bool => in_array($task['key'], ['complete', 'not_required'], true))->count(),
+            'open' => $pending + $tasks->reject(fn (array $task): bool => in_array($task['key'], ['complete', 'not_required'], true))->count(),
         ];
     }
 
     private function needsAttention(array $task): bool
     {
-        return $task['overdue'] || $task['key'] === 'failed'
+        if (in_array($task['key'], ['complete', 'not_required'], true)) {
+            return false;
+        }
+
+        return $task['overdue'] || $task['tone'] === 'overdue' || $task['key'] === 'failed'
             || ($task['override']?->follow_up_status !== 'resolved' && $task['override']?->follow_up_date?->lte(today()) && ! in_array($task['key'], ['complete', 'not_required'], true));
     }
 

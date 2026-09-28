@@ -12,6 +12,7 @@
 <div class="grid two-col">
     <div class="grid">
         <label>Name<input name="name" value="{{ old('name', $studio?->name ?? ($defaults['name'] ?? '')) }}" maxlength="255" required></label>
+        <label>Organisation type<select name="is_school"><option value="0" @selected(!old('is_school', $studio?->is_school ?? false))>Dance studio</option><option value="1" @selected(old('is_school', $studio?->is_school ?? false))>School</option></select><span class="muted">Identify schools for school-specific pricing and features. This setting does not change existing quotes or invoices.</span></label>
         <label>Studio code<input name="code" value="{{ old('code', $studio?->code ?? ($defaults['code'] ?? '')) }}" maxlength="50" pattern="[A-Za-z0-9][A-Za-z0-9_-]*" placeholder="e.g. FCD"><span class="muted">Optional unique internal code. Letters are saved in uppercase.</span></label>
         <label>Slug<input name="slug" value="{{ old('slug', $studio?->slug ?? ($defaults['slug'] ?? '')) }}" maxlength="255" placeholder="Generated automatically when blank"></label>
         @if($studio)

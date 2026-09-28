@@ -41,6 +41,7 @@ class CustomerMediaProfile
 
         return $this->forUser($user) + [
             'account' => $user, 'profile' => $user->customerProfile,
+            'emailPreferences' => app(CustomerCommunicationPreferences::class)->formDefaults($user),
             'registeredStudios' => $links->pluck('studio')->filter()->sortBy('name'),
             'verifiedStudioIds' => $links->whereNotNull('access_verified_at')->pluck('studio_id')->all(),
             'communicationStudioIds' => $links->filter(fn (CustomerStudio $link): bool => $link->studio !== null && $this->communicationHistory->canView($user, $link->studio))->pluck('studio_id')->all(),

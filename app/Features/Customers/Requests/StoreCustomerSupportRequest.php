@@ -18,6 +18,8 @@ class StoreCustomerSupportRequest extends FormRequest
             'type' => ['required', Rule::in(['general', 'download_reactivation'])],
             'order_id' => ['nullable', 'integer', 'exists:orders,id'],
             'order_media_entitlement_id' => ['nullable', 'integer', 'required_if:type,download_reactivation', 'exists:order_media_entitlements,id'],
+            'event_uuid' => ['nullable', 'uuid'],
+            'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf,txt', 'max:10240'],
             'subject' => ['required', 'string', 'max:255'],
             'message' => ['required', 'string', 'max:5000'],
         ];

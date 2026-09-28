@@ -111,7 +111,7 @@ class CustomerMediaNotifications
             'user_id' => $user->id, 'order_id' => $order?->id,
             'order_media_entitlement_id' => $entitlement?->id, 'type' => $type,
             'recipient_email' => $user->email, 'subject' => $subject, 'status' => 'queued',
-            'queued_at' => now(), 'metadata' => $metadata,
+            'queued_at' => now(), 'metadata' => array_merge($metadata, ['body' => $body, 'action_label' => $actionLabel, 'action_url' => $actionUrl]),
         ]);
         if ($delivery->wasRecentlyCreated) {
             $user->notify((new CustomerMediaEmail($delivery->id, $subject, $body, $actionLabel, $actionUrl))->afterCommit());

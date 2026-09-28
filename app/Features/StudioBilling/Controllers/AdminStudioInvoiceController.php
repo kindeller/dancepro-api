@@ -7,7 +7,6 @@ use App\Features\StudioBilling\Models\StudioBillingSetting;
 use App\Features\StudioBilling\Models\StudioInvoice;
 use App\Features\StudioBilling\Models\StudioInvoicePayment;
 use App\Features\StudioBilling\Requests\ManageStudioInvoiceRequest;
-use App\Features\StudioBilling\Services\BookingInvoiceSource;
 use App\Features\StudioBilling\Services\InvoiceTrackerWorkflow;
 use App\Features\StudioBilling\Services\PayStudioInvoice;
 use App\Features\StudioBilling\Services\StudioInvoicePdf;
@@ -30,14 +29,14 @@ class AdminStudioInvoiceController extends Controller
     {
         $invoice = $invoices->create($concertBooking, $request->user(), $request->boolean('is_test'), $request->validated('kind'));
 
-        return redirect()->route('admin.studio-invoices.show', $invoice);
+        return to_route('admin.concert-bookings.show', [$concertBooking, 'tab' => 'invoice']);
     }
 
-    public function show(Request $request, StudioInvoice $studioInvoice, BookingInvoiceSource $source, InvoiceTrackerWorkflow $workflow, StudioInvoices $invoices)
+    public function show(StudioInvoice $studioInvoice)
     {
         Gate::authorize('manageScheduling');
 
-        return view('admin.studio-invoices.show', ['invoice' => $studioInvoice->load('studio', 'booking', 'payments', 'events.user'), 'issueBlockers' => $studioInvoice->status === 'draft' ? $invoices->issueBlockers($studioInvoice) : [], 'stale' => $studioInvoice->source_hash !== $source->hash($studioInvoice->booking)] + $workflow->workspace($studioInvoice->booking, $request->session()->get('concert_tracker_context', [])));
+        return to_route('admin.concert-bookings.show', [$studioInvoice->booking, 'tab' => 'invoice', 'invoice' => $studioInvoice->uuid]);
     }
 
     public function email(Request $request, StudioInvoice $studioInvoice, InvoiceTrackerWorkflow $workflow, EmailBranding $branding)

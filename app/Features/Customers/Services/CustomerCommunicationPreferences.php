@@ -8,6 +8,22 @@ use Illuminate\Support\Facades\DB;
 
 class CustomerCommunicationPreferences
 {
+    public function formDefaults(User $user): array
+    {
+        $profile = $user->customerProfile;
+        $preferences = $profile?->preferences ?? [];
+        $hasSavedEmailChoices = collect(['media_ready_email', 'expiry_reminders_email', 'download_email', 'marketing_email'])
+            ->contains(fn ($key) => array_key_exists($key, $preferences));
+        $hasMarketingChoice = $hasSavedEmailChoices || CustomerConsentHistory::where('user_id', $user->id)->where('channel', 'marketing_email')->exists();
+
+        return [
+            'media_ready_email' => self::enabled($user, 'media_ready_email'),
+            'expiry_reminders_email' => self::enabled($user, 'expiry_reminders_email'),
+            // Preselection is not recorded consent. Sending news still requires a saved opt-in.
+            'marketing_email' => $profile?->marketing_consent_at !== null || ! $hasMarketingChoice,
+        ];
+    }
+
     public static function enabled(User $user, string $channel): bool
     {
         if ($channel === 'marketing_email') {
@@ -32,7 +48,7 @@ class CustomerCommunicationPreferences
                 'expiry_reminders_email' => (bool) ($input['expiry_reminders_email'] ?? $input['download_email'] ?? false),
             ];
             foreach ($values as $channel => $granted) {
-                if (self::enabled($user, $channel) !== $granted) {
+                if (self::enabled($user, $channel) !== $granted || ! CustomerConsentHistory::where('user_id', $user->id)->where('channel', $channel)->exists()) {
                     CustomerConsentHistory::create([
                         'user_id' => $user->id, 'actor_user_id' => $actor?->id,
                         'channel' => $channel, 'granted' => $granted, 'source' => $source,

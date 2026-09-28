@@ -1,23 +1,19 @@
 @extends('layouts.public', ['title' => 'My Profile', 'footerLabel' => 'DancePro Media'])
 @push('styles')
 <style>
-    .profile-tabs { display:flex; overflow-x:auto; margin:0 0 28px; border-bottom:2px solid #cddbe1; }
-    .profile-tabs a { flex:0 0 auto; padding:12px 22px; border-radius:9px 9px 0 0; color:#38505d; font-weight:800; text-decoration:none; }
-    .profile-tabs a[aria-current="page"] { margin-bottom:-2px; border:2px solid #cddbe1; border-bottom-color:#fff; background:#fff; color:#087eae; }
     .profile-page { max-width:820px; }
     .profile-page>.card { margin:0; }
-    @media(max-width:600px) { .profile-tabs a { padding:11px 15px; } }
 </style>
 @endpush
 @section('content')
-<section class="hero"><div class="container"><h1>My Profile</h1><p class="lead">Your details, dancers, studios and preferences.</p></div></section>
-<section class="section"><div class="container">
-    <p><a href="{{ route('customer.media.index') }}">← My Media</a></p>
-    <nav class="profile-tabs" aria-label="Profile sections">
+<section class="hero"><div class="container">@include('customers._heading', ['heading' => 'My Profile', 'description' => 'Your details, dancers, studios and preferences.'])</div></section>
+<nav class="section-tabs profile-tabs" aria-label="Profile sections"><div class="container">
         @foreach(['details' => 'My details', 'dancers' => 'My dancers', 'studios' => 'My studios', 'preferences' => 'Email preferences'] as $key => $label)
             <a href="{{ route('customer.profile.edit', ['tab' => $key]) }}" @if($profileTab === $key) aria-current="page" @endif>{{ $label }}</a>
         @endforeach
-    </nav>
+</div></nav>
+<section class="section"><div class="container">
+    <form method="POST" action="{{ route('logout') }}" style="display:flex;justify-content:flex-end;margin-bottom:20px">@csrf<button class="button secondary" type="submit">Sign out</button></form>
     @if(session('status'))<p role="status" class="card card-body">{{ session('status') }}</p>@endif
     @if($errors->any())<div role="alert" class="card card-body" style="border-color:#b42318;margin-bottom:20px"><strong>Please check your changes.</strong><ul>@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
     <div class="profile-page">
@@ -29,7 +25,7 @@
                 <label>Name<input name="name" required maxlength="255" autocomplete="name" value="{{ old('action') === 'details' ? old('name') : $account->name }}"></label>
                 <label>Preferred name <span class="meta">(optional)</span><input name="preferred_name" maxlength="100" autocomplete="nickname" value="{{ old('action') === 'details' ? old('preferred_name') : $profile?->preferred_name }}"></label>
                 <label>Phone <span class="meta">(optional)</span><input name="phone" type="tel" maxlength="40" autocomplete="tel" value="{{ old('action') === 'details' ? old('phone') : $profile?->phone }}"></label>
-                <div><span class="meta">Account email</span><p style="overflow-wrap:anywhere;margin:6px 0">{{ $account->email }}</p><p class="meta">To change your account email, send a request through Help.</p></div>
+                <div><span class="meta">Account email</span><p style="overflow-wrap:anywhere;margin:6px 0">{{ $account->email }}</p><p class="meta">To change your account email, send us a message through My Messages.</p></div>
                 <div><button class="button">Save details</button></div>
             </form>
         </section>
@@ -39,11 +35,11 @@
             <form method="POST" action="{{ route('customer.profile.store', ['tab' => 'preferences']) }}" style="display:grid;gap:16px">@csrf
                 <input type="hidden" name="action" value="preferences">
                 @foreach(['media_ready_email' => 'Let me know when my media is ready', 'expiry_reminders_email' => 'Remind me before my downloads expire', 'marketing_email' => 'Send me DancePro news and offers'] as $key => $label)
-                    @php($enabled = old('action') === 'preferences' ? old($key, false) : ($key === 'marketing_email' ? $profile?->marketing_consent_at !== null : ($profile?->preferences[$key] ?? false)))
+                    @php($enabled = old('action') === 'preferences' ? old($key, false) : $emailPreferences[$key])
                     <input type="hidden" name="{{ $key }}" value="0">
                     <label style="display:flex;gap:10px;align-items:start"><input type="checkbox" name="{{ $key }}" value="1" @checked($enabled)>{{ $label }}</label>
                 @endforeach
-                <p class="meta">Your choices are saved here. Media-ready and expiry emails will start when those notifications become available.</p>
+                <p class="meta">Untick any emails you don’t want, then save your preferences. You can change these choices at any time.</p>
                 <div><button class="button">Save preferences</button></div>
             </form>
         </section>

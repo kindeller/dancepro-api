@@ -73,8 +73,13 @@ class CustomerMediaTest extends TestCase
 
         $this->actingAs($user)->get(route('customer.media.index'))->assertOk()
             ->assertSee('Recommended Media')->assertSee('My Dancers')->assertSee('My Studio')
-            ->assertSee('Photos')->assertSee('Videos')->assertSee('My Events')->assertSee('Purchased concert');
-        $this->actingAs($other)->get(route('customer.media.index'))->assertOk()
+            ->assertSee('My Events')->assertSee('Purchased concert')->assertSee('Add media')
+            ->assertDontSee('id="purchased-heading"', false);
+        $this->get(route('customer.media.index', ['tab' => 'purchases']))->assertOk()
+            ->assertSee('My Purchases')->assertSee('Photos')->assertSee('Videos')->assertSee('Purchased concert')
+            ->assertDontSee('Recommended Media')->assertDontSee('id="add-media-heading"', false)
+            ->assertDontSee('id="events-heading"', false);
+        $this->actingAs($other)->get(route('customer.media.index', ['tab' => 'purchases']))->assertOk()
             ->assertSee('No purchased photos are linked to your account yet.');
     }
 
@@ -120,7 +125,7 @@ class CustomerMediaTest extends TestCase
         $this->assertCount(2, $album['folders']);
         $this->assertSame(1, $album['folders']->firstWhere('title', 'Routine one')['assets']->count());
         $this->assertCount(1, app(CustomerPurchasedMedia::class)->forUser($user)['photos']);
-        $this->actingAs($user)->get(route('customer.media.index'))->assertOk()->assertSee('View media →')
+        $this->actingAs($user)->get(route('customer.media.index', ['tab' => 'purchases']))->assertOk()->assertSee('View media →')
             ->assertSee(route('customer.media.library.thumbnail', ['kind' => 'competition', 'event' => $event->uuid, 'asset' => $first->uuid]), false);
         $this->get(route('customer.media.library.show', ['kind' => 'competition', 'event' => $event->uuid]))->assertOk()
             ->assertSee('Routine one')->assertSee('Routine two')->assertDontSee('First photo')->assertDontSee('Second photo')
@@ -210,7 +215,11 @@ class CustomerMediaTest extends TestCase
         $foreign = Order::factory()->paid()->create(['user_id' => $other->id]);
         $this->actingAs($user)->get(route('customer.media.orders.index'))->assertOk()
             ->assertSee('Order '.$mine->displayNumber())->assertSee('$45.00')->assertDontSee('Order '.$foreign->displayNumber())
+            ->assertSee('My Media sections')->assertSee('My Purchases')->assertSee('View receipt')
+            ->assertSee(route('customer.checkout.show', $mine), false)
             ->assertHeader('Cache-Control', 'no-store, private');
+        $this->get(route('customer.checkout.show', $mine))->assertOk()->assertSee('Order '.$mine->displayNumber());
+        $this->get(route('customer.checkout.show', $foreign))->assertNotFound();
     }
 
     public function test_my_events_combines_verified_studio_photos_and_video_access_once(): void
@@ -301,12 +310,12 @@ class CustomerMediaTest extends TestCase
         $this->assertDatabaseCount('concert_access_grants', 1);
     }
 
-    public function test_customer_access_routes_require_active_customer_account(): void
+    public function test_customer_access_routes_allow_active_crew_but_reject_inactive_accounts(): void
     {
         $this->get(route('customer.media.index'))->assertRedirect(route('customer.login'));
         $this->add()->assertRedirect(route('customer.login'));
-        $this->actingAs(User::factory()->crew()->create())->get(route('customer.media.index'))->assertForbidden();
-        $this->add()->assertForbidden();
+        $this->actingAs(User::factory()->crew()->create())->get(route('customer.media.index'))->assertOk();
+        $this->add()->assertSessionHasErrors('concert_code');
         $this->actingAs(User::factory()->customer()->inactive()->create())->get(route('customer.media.index'))->assertForbidden();
         $this->add()->assertForbidden();
     }
