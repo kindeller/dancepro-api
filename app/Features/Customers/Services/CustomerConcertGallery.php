@@ -86,7 +86,7 @@ class CustomerConcertGallery
         $group = $requestedGroup ? $groups->firstWhere('id', $requestedGroup->id) : $groups->first();
         abort_if($requestedGroup && ! $group, 404);
 
-        return $group?->displayCoverAsset();
+        return $group?->galleryFolderCoverAsset();
     }
 
     public function publicCover(Concert $concert, ConcertPhotoReleaseGroup $group, ConcertPhotoPreview $preview): StreamedResponse

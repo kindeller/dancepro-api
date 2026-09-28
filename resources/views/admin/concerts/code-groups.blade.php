@@ -4,7 +4,7 @@
 @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
 <section class="card card-pad">
     <h2>Create code group</h2>
-    <p class="muted">Set a code and choose concerts from the same studio and year. The code stays hidden after saving. Release the group when the access period should start.</p>
+    <p class="muted">Set a code and choose concerts from the same studio and year. Newly saved codes are encrypted and shown to authorised studio managers in Studio Hub. Re-enter an older code once to make it displayable. Release the group when the access period should start.</p>
     <form method="POST" action="{{ route('admin.concert-code-groups.store', $studio) }}">@csrf
         <label>Group name<input name="name" value="{{ old('name') }}" maxlength="120" required placeholder="Junior concerts"></label>
         <label>Year<input name="year" type="number" min="1900" max="2200" value="{{ old('year', now()->year) }}" required></label>

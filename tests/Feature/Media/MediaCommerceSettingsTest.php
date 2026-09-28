@@ -181,7 +181,7 @@ class MediaCommerceSettingsTest extends TestCase
 
         $this->actingAs(User::factory()->staff()->create())
             ->get(route('admin.media-settings.index', ['tab' => 'help']))
-            ->assertOk()->assertSee('Help Centre insights')->assertSee('Searches with no answer')->assertSee('Article feedback');
+            ->assertOk()->assertSee('Help insights')->assertSee('Searches with no answer')->assertSee('Article feedback');
     }
 
     public function test_inactive_future_and_expired_codes_cannot_be_quoted(): void

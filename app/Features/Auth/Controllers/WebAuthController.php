@@ -3,6 +3,7 @@
 namespace App\Features\Auth\Controllers;
 
 use App\Features\Auth\Requests\WebLoginRequest;
+use App\Features\Customers\Services\RecordCustomerLogin;
 use App\Features\Customers\Services\TransferGuestGalleryActivity;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -18,11 +19,13 @@ class WebAuthController extends Controller
         return view('auth.login');
     }
 
-    public function store(WebLoginRequest $request, TransferGuestGalleryActivity $guestActivity): RedirectResponse
+    public function store(WebLoginRequest $request, TransferGuestGalleryActivity $guestActivity, RecordCustomerLogin $loginEvents): RedirectResponse
     {
         $credentials = $request->only('email', 'password');
 
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            $loginEvents->execute($request, $request->string('email')->toString(), null, false);
+
             return back()
                 ->withErrors(['email' => 'The provided credentials could not be verified.'])
                 ->onlyInput('email');
@@ -30,6 +33,7 @@ class WebAuthController extends Controller
 
         /** @var User $user */
         $user = $request->user();
+        $loginEvents->execute($request, $user->email, $user, true);
 
         if (! $user->is_active) {
             Auth::logout();

@@ -17,9 +17,9 @@
     <p class="muted">{{ $studio->gallery_code_hash ? 'A gallery code is set for this studio.' : 'Set a gallery code so customers can add this studio to My Profile.' }} This is separate from the studio’s internal code and concert video codes.</p>
     <form method="POST" action="{{ route('admin.studios.gallery-code.update', $studio) }}">@csrf
         <input type="hidden" name="version" value="{{ $studio->gallery_code_version }}">
-        <label>New gallery code<input type="password" name="gallery_code" minlength="6" maxlength="64" required autocomplete="new-password"></label>
+        <label>New gallery code<input type="password" name="gallery_code" minlength="3" maxlength="64" required autocomplete="new-password"></label>
         @error('gallery_code')<p role="alert">{{ $message }}</p>@enderror
-        <p class="muted">Use 6–64 letters, numbers or hyphens. Codes are not case-sensitive. Keep a copy to share with customers; saved codes cannot be displayed. Changing the code keeps studios already verified by customers.</p>
+        <p class="muted">Use 3–64 letters, numbers or hyphens. Codes are not case-sensitive. Newly saved codes are encrypted and shown to authorised studio managers in Studio Hub. Re-enter an older code once to make it displayable. Changing the code keeps studios already verified by customers.</p>
         <div class="actions"><button>Save gallery code</button></div>
     </form>
 </section>
@@ -54,7 +54,7 @@
 <section style="margin-top:24px">
     <div class="toolbar">
         <div>
-            <h2>Associated Concerts</h2>
+            <h2>Associated concerts</h2>
             <div class="muted">{{ $studio->concerts->count() }} {{ Str::plural('concert', $studio->concerts->count()) }} assigned to {{ $studio->name }}.</div>
         </div>
         <a class="button" href="{{ route('admin.concerts.create', ['studio_id' => $studio->id]) }}">Add concert</a>

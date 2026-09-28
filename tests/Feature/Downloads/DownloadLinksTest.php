@@ -9,6 +9,7 @@ use App\Features\Downloads\Services\DownloadUrlSigner;
 use App\Features\Downloads\Support\DownloadLinkStatus;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Mockery\MockInterface;
 use RuntimeException;
@@ -188,6 +189,37 @@ class DownloadLinksTest extends TestCase
             'download_link_id' => $downloadLink->id,
             'was_successful' => true,
             'failure_reason' => null,
+        ]);
+    }
+
+    public function test_local_public_downloads_are_served_as_file_attachments(): void
+    {
+        $this->app['env'] = 'local';
+        Storage::fake('s3');
+        Storage::disk('s3')->put('folder/image.jpg', 'local image bytes');
+
+        $token = Str::random(64);
+        $downloadLink = DownloadLink::factory()->create([
+            'storage_disk' => 's3',
+            'storage_key' => 'folder/image.jpg',
+            'original_filename' => 'dance-photo.jpg',
+            'token_hash' => hash('sha256', $token),
+            'first_opened_at' => null,
+            'last_opened_at' => null,
+            'download_count' => 0,
+        ]);
+
+        $response = $this->get('/download/'.$token);
+
+        $response->assertOk()->assertDownload('dance-photo.jpg');
+        $this->assertSame('local image bytes', $response->streamedContent());
+
+        $downloadLink->refresh();
+        $this->assertNotNull($downloadLink->first_opened_at);
+        $this->assertSame(1, $downloadLink->download_count);
+        $this->assertDatabaseHas('download_accesses', [
+            'download_link_id' => $downloadLink->id,
+            'was_successful' => true,
         ]);
     }
 

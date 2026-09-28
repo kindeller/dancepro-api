@@ -10,11 +10,16 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CompetitionCustomerPreview
 {
-    public function __construct(private readonly CompetitionGallery $gallery, private readonly CompetitionSectionReadiness $readiness, private readonly CompetitionProgrammeNodes $nodes) {}
+    public function __construct(
+        private readonly CompetitionGallery $gallery,
+        private readonly CompetitionSectionReadiness $readiness,
+        private readonly CompetitionProgrammeNodes $nodes,
+        private readonly CompetitionFolderCovers $folderCovers,
+    ) {}
 
     public function browse(SchedulingEvent $event, ?string $folder, string $imageRoute = 'admin.competition-gallery.customer-preview.image'): array
     {
-        $data = $this->gallery->browse($event, $folder);
+        $data = $this->gallery->browse($event, $folder, false);
         $ready = array_keys(array_filter($data['sectionReadiness'], fn ($section) => $section['ready']));
         $allowed = array_fill_keys($ready, true);
         foreach ($data['nodes'] as $node) {
@@ -27,8 +32,9 @@ class CompetitionCustomerPreview
         }
         abort_if($data['selected'] && ! isset($allowed[$data['selected']['uuid']]), 404);
         $children = array_values(array_filter($data['children'], fn ($node) => isset($allowed[$node['uuid']])));
+        $children = $this->folderCovers->apply($children, $data['nodes'], $event, $allowed);
         $coverUrl = $event->crewLogoUrl();
-        if ($data['presentation']['cover_uuid']) {
+        if ($data['selected'] && $data['presentation']['cover_uuid']) {
             $photoGallery = ProgrammePhotoGallery::where('scheduling_event_id', $event->id)->first();
             $item = $photoGallery ? ProgrammePhotoFile::inGallery($photoGallery)
                 ->where('programme_photo_files.uuid', $data['presentation']['cover_uuid'])->addSelect('contributions.item_uuid')->first()?->item_uuid : null;

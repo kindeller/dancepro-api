@@ -10,8 +10,8 @@
         <form class="filters" method="GET" action="{{ route('admin.competition-contacts.index') }}">
             <label>Search<input name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Competition, organiser or email"></label>
             <label>Status<select name="status"><option value="">Any status</option><option value="active" @selected(($filters['status'] ?? '') === 'active')>Active</option><option value="inactive" @selected(($filters['status'] ?? '') === 'inactive')>Inactive</option></select></label>
-            <button type="submit">Filter</button>
-            <a class="button secondary" href="{{ route('admin.competition-contacts.index') }}">Reset</a>
+            <button type="submit">Apply filters</button>
+            <a class="button secondary" href="{{ route('admin.competition-contacts.index') }}">Clear filters</a>
         </form>
         <a class="button" href="{{ route('admin.competition-contacts.create') }}">Add competition contact</a>
     </div>

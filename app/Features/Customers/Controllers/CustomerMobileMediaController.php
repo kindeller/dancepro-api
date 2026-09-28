@@ -91,8 +91,17 @@ class CustomerMobileMediaController extends Controller
         return ApiResponse::success('Concert media returned.', [
             'event' => ['uuid' => $concert->uuid, 'name' => $concert->name, 'date' => $concert->event_date?->toDateString()],
             'can_stream' => $canStream, 'can_download' => true,
+            'download_behaviour' => [
+                'primary_destination' => 'encrypted_app_storage',
+                'offline_playback' => true,
+                'native_library_export' => true,
+                'native_library_export_requires_user_action' => true,
+                'repeat_download_requires_confirmation' => true,
+            ],
             'videos' => $concert->mediaCollections->flatMap->assets->filter(fn ($asset) => $asset->media_type->value === 'video')
                 ->map(fn ($asset) => ['uuid' => $asset->uuid, 'title' => $asset->display_name ?? $asset->original_filename,
+                    'size_bytes' => $asset->size_bytes, 'offline_status' => 'not_downloaded',
+                    'can_save_to_native_library' => true,
                     'playback_url' => $canStream ? route('api.v1.customer.concerts.playback', [$concert, $asset]) : null,
                     'download_url' => route('api.v1.customer.concerts.download', [$concert, $asset])])->values()->all(),
         ]);

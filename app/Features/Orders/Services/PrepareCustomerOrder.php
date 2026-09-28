@@ -3,6 +3,7 @@
 namespace App\Features\Orders\Services;
 
 use App\Features\Customers\Services\CompetitionOrderCatalogue;
+use App\Features\Customers\Services\CustomerAccountMediaSelections;
 use App\Features\Customers\Services\CustomerCompetitionAccess;
 use App\Features\Customers\Services\CustomerCompetitionCart;
 use App\Features\Customers\Services\CustomerConcertPhotoCart;
@@ -32,7 +33,85 @@ class PrepareCustomerOrder
         private readonly MediaPriceLists $priceLists,
         private readonly OrderDiscounts $discounts,
         private readonly CustomerCredits $credits,
+        private readonly CustomerAccountMediaSelections $accountSelections,
     ) {}
+
+    /** @param list<string> $includedGroups */
+    public function accountCart(User $user, array $includedGroups, ?string $discountCode = null, bool $useAccountCredit = false): Order
+    {
+        return DB::transaction(function () use ($user, $includedGroups, $discountCode, $useAccountCredit): Order {
+            $this->lockCustomer($user);
+            $requested = collect($includedGroups)->filter()->unique()->values();
+            $groups = collect($this->accountSelections->forUser($user, 'cart')['groups'])
+                ->filter(fn (array $group): bool => $requested->contains($this->groupKey($group)))
+                ->values();
+
+            if ($requested->isEmpty() || $groups->count() !== $requested->count()) {
+                throw ValidationException::withMessages(['cart_groups' => 'Select at least one current event cart to continue.']);
+            }
+
+            $components = [];
+            $snapshots = [];
+            foreach ($groups as $group) {
+                $kind = $group['kind'];
+                $event = $group['event'];
+                if ($kind === 'competition') {
+                    abort_unless($this->competitionAccess->allows($user, $event), 403);
+                    $groupComponents = $this->competitionComponents($event, $group['selections'], $group['lineAmounts']);
+                } else {
+                    $groupComponents = $this->concertComponents($group['selections'], $group['lineAmounts']);
+                }
+                $components = [...$components, ...$groupComponents];
+                $snapshots[] = [
+                    'kind' => $kind,
+                    'source_uuid' => $event->uuid,
+                    'selection_ids' => $group['selections']->pluck('id')->map(fn ($id): int => (int) $id)->sort()->values()->all(),
+                    'subtotal' => (int) $group['subtotal'],
+                    'bulk_eligible_subtotal' => (int) $group['bulk_eligible_subtotal'],
+                ];
+            }
+
+            $subtotal = array_sum(array_column($snapshots, 'subtotal'));
+            $code = $this->discounts->quote($discountCode, $user, $subtotal);
+            $remainingCode = (int) ($code['amount'] ?? 0);
+            $remainingSubtotal = $subtotal;
+            $total = 0;
+            $bulkDiscount = 0;
+            foreach ($snapshots as $index => &$snapshot) {
+                $codeAmount = $index === array_key_last($snapshots) ? $remainingCode
+                    : ($remainingSubtotal === 0 ? 0 : intdiv($snapshot['subtotal'] * $remainingCode, $remainingSubtotal));
+                $remainingCode -= $codeAmount;
+                $remainingSubtotal -= $snapshot['subtotal'];
+                $qualifying = max(0, $snapshot['bulk_eligible_subtotal'] - $codeAmount);
+                $percent = $this->settings->discountPercent($qualifying);
+                $eventBulkDiscount = intdiv($qualifying * $percent, 100);
+                $snapshot += [
+                    'discount_code_amount' => $codeAmount,
+                    'bulk_discount_percent' => $percent,
+                    'bulk_discount_amount' => $eventBulkDiscount,
+                    'total' => $snapshot['subtotal'] - $codeAmount - $eventBulkDiscount,
+                ];
+                $bulkDiscount += $eventBulkDiscount;
+                $total += $snapshot['total'];
+            }
+            unset($snapshot);
+
+            $credit = $this->credits->availableForOrder($user, $total, $useAccountCredit);
+            $quote = [
+                'subtotal' => $subtotal,
+                'bulk_eligible_subtotal' => array_sum(array_column($snapshots, 'bulk_eligible_subtotal')),
+                'bulk_discount_amount' => $bulkDiscount,
+                'code_discount' => $code,
+                'total' => $total,
+                'account_credit_amount' => $credit,
+                'payment_total' => $total - $credit,
+            ];
+
+            return $this->store($user, 'account_cart', 'selected-events', $quote, $components, [
+                'cart_groups' => $snapshots,
+            ]);
+        });
+    }
 
     public function competition(User $user, SchedulingEvent $event, ?string $discountCode = null, bool $useAccountCredit = false): Order
     {
@@ -116,6 +195,64 @@ class PrepareCustomerOrder
     private function lockCustomer(User $user): void
     {
         User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+    }
+
+    private function groupKey(array $group): string
+    {
+        return $group['kind'].':'.$group['event']->uuid;
+    }
+
+    private function competitionComponents(SchedulingEvent $event, Collection $selections, array $lineAmounts): array
+    {
+        $components = [];
+        foreach ($selections as $selection) {
+            $price = (int) $lineAmounts[$selection->id];
+            $product = $selection->product;
+            $metadata = ['product' => $product, 'item_uuid' => $selection->item_uuid,
+                'selection_key' => $selection->selection_key, 'event_kind' => 'competition',
+                'event_uuid' => $event->uuid];
+            $priceList = $this->priceLists->competition($event, $selection->item_uuid);
+            $packagePrice = (int) $priceList->price('competition_routine_package');
+            $videoPrice = (int) $priceList->price('competition_routine_video');
+            $taxRate = $priceList->productIncludesGst('competition_'.$product) ? $priceList->gst_rate_basis_points : 0;
+
+            if (in_array($product, ['photo', 'routine_photos', 'routine_package'], true)) {
+                $routine = $this->competitionCatalogue->readyRoutine($event, $selection->item_uuid);
+                $assets = $routine['assets'];
+                if ($product === 'photo') {
+                    $assets = $assets->where('metadata.programme_photo_file_uuid', $selection->photo_uuid)->values();
+                    $this->requireAssets($assets);
+                }
+                $photoPrice = $product === 'routine_package' && $price === $packagePrice ? $price - $videoPrice : $price;
+                $components[] = $this->component('photo', $photoPrice, $routine['collection'], $assets, $metadata, $taxRate);
+            }
+            if (in_array($product, ['routine_video', 'routine_package'], true)
+                && ! ($product === 'routine_package' && $price !== $packagePrice)) {
+                [$collection, $assets] = $this->readyCompetitionVideo($event, $selection->item_uuid);
+                if ($product === 'routine_video') {
+                    $this->requireAssets($assets);
+                }
+                $components[] = $this->component('video', $videoPrice, $collection, $assets, $metadata, $taxRate);
+            }
+        }
+
+        return $components;
+    }
+
+    private function concertComponents(Collection $selections, array $lineAmounts): array
+    {
+        $components = [];
+        foreach ($selections as $selection) {
+            $asset = $selection->asset;
+            $price = (int) $lineAmounts[$selection->id];
+            $priceList = $this->priceLists->concert($selection->concert, $asset->collection);
+            $components[] = $this->component('photo', $price, $asset->collection, collect([$asset]), [
+                'product' => 'concert_photo', 'concert_uuid' => $selection->concert->uuid,
+                'event_kind' => 'concert', 'event_uuid' => $selection->concert->uuid,
+            ], $priceList->productIncludesGst('concert_photo') ? $priceList->gst_rate_basis_points : 0);
+        }
+
+        return $components;
     }
 
     /** @return array{0: ?MediaCollection, 1: Collection<int, MediaAsset>} */
@@ -207,9 +344,27 @@ class PrepareCustomerOrder
         $remainingAfterCredit = $paymentTotal;
         $last = count($components) - 1;
         $lines = [];
+        $eventBudgets = [];
+        foreach ($selectionSnapshot['cart_groups'] ?? [] as $group) {
+            $key = $group['kind'].':'.$group['source_uuid'];
+            $eventBudgets[$key] = ['remaining' => $group['total'], 'subtotal' => $group['subtotal'], 'total' => $group['total']];
+        }
+        $lastByEvent = [];
+        foreach ($components as $index => $component) {
+            $key = data_get($component, 'metadata.event_kind').':'.data_get($component, 'metadata.event_uuid');
+            $lastByEvent[$key] = $index;
+        }
         foreach ($components as $index => $component) {
             $amount = $index === $last ? $remaining
-                : intdiv($component['unit_price_amount'] * $quote['total'], $subtotal);
+                : ($subtotal === 0 ? 0 : intdiv($component['unit_price_amount'] * $quote['total'], $subtotal));
+            $key = data_get($component, 'metadata.event_kind').':'.data_get($component, 'metadata.event_uuid');
+            if (isset($eventBudgets[$key])) {
+                $budget = &$eventBudgets[$key];
+                $amount = $lastByEvent[$key] === $index ? $budget['remaining']
+                    : ($budget['subtotal'] === 0 ? 0 : intdiv($component['unit_price_amount'] * $budget['total'], $budget['subtotal']));
+                $budget['remaining'] -= $amount;
+                unset($budget);
+            }
             $remaining -= $amount;
             $amountAfterCredit = $index === $last ? $remainingAfterCredit
                 : ($quote['total'] === 0 ? 0 : intdiv($amount * $paymentTotal, $quote['total']));

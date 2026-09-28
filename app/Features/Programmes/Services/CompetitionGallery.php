@@ -14,7 +14,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CompetitionGallery
 {
-    public function __construct(private readonly CompetitionProgrammeNodes $programmeNodes, private readonly ProgrammePhotoPreview $previews, private readonly CompetitionSectionReadiness $readiness, private readonly CompetitionGallerySettings $settings) {}
+    public function __construct(
+        private readonly CompetitionProgrammeNodes $programmeNodes,
+        private readonly ProgrammePhotoPreview $previews,
+        private readonly CompetitionSectionReadiness $readiness,
+        private readonly CompetitionGallerySettings $settings,
+        private readonly CompetitionFolderCovers $folderCovers,
+    ) {}
 
     public function events(): array
     {
@@ -25,7 +31,7 @@ class CompetitionGallery
         return compact('events', 'presentation');
     }
 
-    public function browse(SchedulingEvent $event, ?string $folder): array
+    public function browse(SchedulingEvent $event, ?string $folder, bool $withFolderCovers = true): array
     {
         abort_unless($event->event_type->value === 'competition', 404);
         $programme = Programme::where('scheduling_event_id', $event->id)->first();
@@ -52,6 +58,9 @@ class CompetitionGallery
             ? ($node['parent_uuid'] ?? null) === $selected['uuid']
             : $node['kind'] === ($showDays ? 'day' : 'section'))->values()->all();
         usort($children, fn ($a, $b) => $a['kind'] === 'day' ? strcmp($a['date'], $b['date']) : strnatcasecmp($a['number'] ?? '', $b['number'] ?? ''));
+        if ($withFolderCovers) {
+            $children = $this->folderCovers->apply($children, $nodes, $event);
+        }
         $breadcrumbs = [];
         $ancestor = $selected;
         while ($ancestor) {

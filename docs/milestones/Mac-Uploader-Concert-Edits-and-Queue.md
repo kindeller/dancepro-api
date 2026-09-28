@@ -1,5 +1,33 @@
 # Mac uploader: concert editing, offline queue and app icon
 
+## Post-upload Top Pics sync (26 September 2026)
+
+Implemented a durable metadata queue for uploaded photo stars and removals, with
+automatic background sync while signed in, including on the event list. Changes
+survive offline operation and app restart. The two-second worker sends only pending
+metadata; failed requests back off from five seconds to at most one minute. The
+review footer shows pending/syncing/synced status, errors and optional Retry sync.
+
+Upload acknowledgement always queues a reconciliation, covering stars changed
+during transfer and reused verified reservations. Revision-matched acknowledgements
+cannot discard newer local edits. Older review sidecars reconcile once on opening.
+One cached library actor per event coordinates review and background writes.
+
+The protected, event-scoped endpoint accepts at most 100 verified-file changes,
+updates canonical records for deduplicated receipts and audits actual changes.
+It does not copy images, change customer visibility or reopen completed uploads.
+Publicity uses these flags on its next page load; TV playback remains separate work.
+
+Next: connect TV pairing/playlists and cached playback to this shared catalogue.
+
+Verification: all **744 Laravel tests / 6,834 assertions** and **89 Swift tests**
+passed. Coverage includes true offline retry, restart/legacy-sidecar recovery,
+stale acknowledgements, edits during upload, removal, response validation,
+cross-event and account permissions, batch rollback, duplicate receipts and
+unchanged original bytes/completion. Scoped Pint, route registration and whitespace
+checks passed. The local Mac app was rebuilt; running copies must be reopened.
+No migrations, production deployment, TV playback or commits were included.
+
 Date: 2026-09-21
 
 ## Implemented for one owner review
@@ -1147,3 +1175,23 @@ Verification: all 581 Laravel tests passed (4,986 assertions), scoped Pint passe
 hashes, stale admin saves, no plaintext/history leak, invalid/internal codes,
 legacy association re-verification, account isolation and unchanged verified access
 after code rotation. Existing public concert pages retain their separate rules.
+
+## Published video titles (27 September 2026)
+
+The uploader now offers **Download Video Titles…** alongside selected and prepared
+concerts, plus **Video Titles…** in concert review. An online request checks that
+2.3 Video Titles is ready; the saved ZIP contains the exact 4K JPEGs published in
+the browser. The user chooses where to save it and Finder reveals the archive.
+It can then be opened for editing offline. This does not change programme folders
+or upload any titles as photos.
+
+The API requires existing programme access and `programmes:read`. The client
+checks event/revision identity, a pinned same-origin package URL, size and SHA-256
+before writing a file. A changed programme requires refreshing the selected event
+(or updating the prepared programme); an unpublished/stale package produces a
+clear message. A running older uploader must be reopened using the rebuilt app.
+
+Verification for video-title downloads: 90 Swift tests passed, including stale
+revision, wrong event/URL, oversize manifest and damaged download rejection.
+The release app was rebuilt successfully. Laravel's full suite passed 861 tests
+with 8,318 assertions; browser-generated ZIPs passed the server archive validator.

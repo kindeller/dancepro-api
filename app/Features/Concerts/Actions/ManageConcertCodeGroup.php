@@ -22,7 +22,7 @@ class ManageConcertCodeGroup
                 $group = ConcertCodeGroup::create([
                     'studio_id' => $studio->id, 'year' => $input['year'], 'name' => trim($input['name']),
                     'code_hash' => Hash::make(strtoupper(trim($input['code']))), 'created_by_user_id' => $actor->id,
-                    'version' => 1,
+                    'code_encrypted' => strtoupper(trim($input['code'])), 'version' => 1,
                 ]);
                 Concert::whereIn('id', $concerts->pluck('id'))->update(['concert_code_group_id' => $group->id]);
                 $this->record($group, $actor, 'created');
@@ -74,6 +74,7 @@ class ManageConcertCodeGroup
             $group = ConcertCodeGroup::whereKey($group->id)->lockForUpdate()->firstOrFail();
             $this->checkVersion($group, $input);
             $group->code_hash = Hash::make(strtoupper(trim($input['code'])));
+            $group->code_encrypted = strtoupper(trim($input['code']));
             $group->version++;
             $group->save();
             $this->record($group, $actor, 'code_changed');

@@ -20,7 +20,7 @@ class Studio extends Model
     /** @use HasFactory<StudioFactory> */
     use HasFactory, HasPublicUuid, SoftDeletes;
 
-    protected $hidden = ['gallery_code_hash'];
+    protected $hidden = ['gallery_code_hash', 'gallery_code_encrypted'];
 
     public function concerts(): HasMany
     {
@@ -59,7 +59,7 @@ class Studio extends Model
 
     protected function casts(): array
     {
-        return ['status' => StudioStatus::class, 'gallery_code_version' => 'integer'];
+        return ['status' => StudioStatus::class, 'gallery_code_version' => 'integer', 'gallery_code_encrypted' => 'encrypted'];
     }
 
     protected static function newFactory(): StudioFactory

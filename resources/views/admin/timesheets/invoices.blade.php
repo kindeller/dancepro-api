@@ -1,4 +1,4 @@
-@extends('layouts.admin', ['title'=>'Crew Payments · Invoices','heading'=>'Crew Payments','subheading'=>'App-generated contractor invoices appear here immediately after crew accept their preview.'])
+@extends('layouts.admin', ['title'=>'Crew payments · Invoices','heading'=>'Crew payments','subheading'=>'App-generated contractor invoices appear here immediately after crew accept their preview.'])
 @section('content')
 @include('admin.timesheets._tabs')
 <div class="card"><table><thead><tr><th>Invoice</th><th>Crew</th><th>Work</th><th>Period</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>

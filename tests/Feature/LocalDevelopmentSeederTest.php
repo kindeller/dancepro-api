@@ -42,6 +42,13 @@ class LocalDevelopmentSeederTest extends TestCase
 
         $counts = $this->domainCounts();
 
+        $realisticConcertAlbums = MediaCollection::query()->whereNotNull('concert_id')
+            ->where('metadata->realistic_demo', true)->get();
+        if ($realisticConcertAlbums->isNotEmpty()) {
+            $juniorConcert = Concert::query()->where('uuid', '75000000-0000-4000-8000-000000000001')->firstOrFail();
+            $this->assertSame([$juniorConcert->id], $realisticConcertAlbums->pluck('concert_id')->unique()->values()->all());
+        }
+
         $this->assertGreaterThanOrEqual(5, User::query()->count());
         $this->assertSame(3, CustomerProfile::query()->count());
         $this->assertGreaterThanOrEqual(4, Studio::query()->count());
@@ -97,7 +104,7 @@ class LocalDevelopmentSeederTest extends TestCase
         $concertTracker = $this->get(route('admin.concert-tracker.index'));
         $this->assertSame(200, $concertTracker->getStatusCode(), 'Concert tracker redirected to '.$concertTracker->headers->get('Location'));
         $concertTracker
-            ->assertSee('Aurora Matinee - TRACKER DEMO')->assertSee('Aurora Spring Gala - TRACKER DEMO');
+            ->assertSee('Aurora Matinee')->assertSee('Aurora Spring Gala');
         $mediaSales = $this->get(route('admin.media-sales.index'));
         $this->assertSame(200, $mediaSales->getStatusCode(), 'Media sales redirected to '.$mediaSales->headers->get('Location'));
         $mediaSales->assertSee('$108.00');

@@ -3,10 +3,14 @@
 namespace App\Features\Customers\Controllers;
 
 use App\Features\Customers\Actions\AddCustomerConcertVideo;
+use App\Features\Customers\Models\CustomerConcertPhotoSelection;
+use App\Features\Customers\Models\CustomerMediaSelection;
 use App\Features\Customers\Requests\AddConcertVideoRequest;
 use App\Features\Customers\Requests\CustomerCompetitionsRequest;
+use App\Features\Customers\Services\CustomerAccountMediaSelections;
 use App\Features\Customers\Services\CustomerMedia;
 use App\Features\Customers\Services\CustomerRecommendedMedia;
+use App\Features\Payments\Services\CustomerCredits;
 use App\Features\Programmes\Services\CompetitionCustomerPreview;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Http\Controllers\Controller;
@@ -18,7 +22,35 @@ class CustomerMediaController extends Controller
 {
     public function index(CustomerCompetitionsRequest $request, CustomerMedia $media): Response
     {
-        return response()->view('customers.media.index', $media->forUser($request->user()))->header('Cache-Control', 'private, no-store');
+        $notifications = $request->user()->notifications()->latest()->limit(10)->get();
+        $request->user()->unreadNotifications->markAsRead();
+        $competitionSelections = CustomerMediaSelection::where('user_id', $request->user()->id);
+        $concertSelections = CustomerConcertPhotoSelection::where('user_id', $request->user()->id);
+        $selectionCounts = [
+            'favourites' => (clone $competitionSelections)->where('is_favourite', true)->count()
+                + (clone $concertSelections)->where('is_favourite', true)->count(),
+            'cart' => (clone $competitionSelections)->where('in_cart', true)->count()
+                + (clone $concertSelections)->where('in_cart', true)->count(),
+        ];
+
+        return response()->view('customers.media.index', $media->forUser($request->user()) + compact('notifications', 'selectionCounts'))
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function cart(CustomerCompetitionsRequest $request, CustomerAccountMediaSelections $selections, CustomerCredits $credits): Response
+    {
+        return response()->view('customers.media.selections', $selections->forUser(
+            $request->user(), 'cart', $request->validated('focus_kind'), $request->validated('focus_event')
+        ) + ['creditBalance' => $credits->balance($request->user())])
+            ->header('Cache-Control', 'private, no-store')->header('X-Robots-Tag', 'noindex, nofollow');
+    }
+
+    public function favourites(CustomerCompetitionsRequest $request, CustomerAccountMediaSelections $selections): Response
+    {
+        return response()->view('customers.media.selections', $selections->forUser(
+            $request->user(), 'favourites', $request->validated('focus_kind'), $request->validated('focus_event')
+        ))
+            ->header('Cache-Control', 'private, no-store')->header('X-Robots-Tag', 'noindex, nofollow');
     }
 
     public function addConcert(AddConcertVideoRequest $request, AddCustomerConcertVideo $add): RedirectResponse

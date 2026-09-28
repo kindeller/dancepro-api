@@ -2,6 +2,7 @@
 
 namespace App\Features\Customers\Services;
 
+use App\Features\Customers\Models\CustomerConcertPhotoSelection;
 use App\Features\Customers\Models\CustomerMediaSelection;
 use App\Features\Media\Models\MediaCollection;
 use App\Features\Media\Services\MediaCommerceSettings;
@@ -57,10 +58,6 @@ class CustomerCompetitionCart
 
         $key = $product.':'.($photo ?? $item);
         $state = DB::transaction(function () use ($user, $event, $key, $product, $item, $photo, $action): array {
-            if ($action === 'add' && CustomerMediaSelection::where('user_id', $user->id)->where('in_cart', true)
-                ->where('scheduling_event_id', '!=', $event->id)->exists()) {
-                throw ValidationException::withMessages(['cart' => 'Finish or clear your current competition cart before starting another event.']);
-            }
             $selection = CustomerMediaSelection::firstOrCreate([
                 'user_id' => $user->id, 'scheduling_event_id' => $event->id, 'selection_key' => $key,
             ], ['product' => $product, 'item_uuid' => $item, 'photo_uuid' => $photo]);
@@ -77,9 +74,11 @@ class CustomerCompetitionCart
 
         return $state + [
             'cart_count' => CustomerMediaSelection::where('user_id', $user->id)
-                ->where('scheduling_event_id', $event->id)->where('in_cart', true)->count(),
+                ->where('in_cart', true)->count()
+                + CustomerConcertPhotoSelection::where('user_id', $user->id)->where('in_cart', true)->count(),
             'favourite_count' => CustomerMediaSelection::where('user_id', $user->id)
-                ->where('scheduling_event_id', $event->id)->where('is_favourite', true)->count(),
+                ->where('is_favourite', true)->count()
+                + CustomerConcertPhotoSelection::where('user_id', $user->id)->where('is_favourite', true)->count(),
         ];
     }
 
@@ -93,10 +92,6 @@ class CustomerCompetitionCart
         abort_unless($validCount === count($photoUuids), 404);
 
         DB::transaction(function () use ($user, $event, $itemUuid, $photoUuids, $action): void {
-            if ($action === 'add' && CustomerMediaSelection::where('user_id', $user->id)->where('in_cart', true)
-                ->where('scheduling_event_id', '!=', $event->id)->exists()) {
-                throw ValidationException::withMessages(['cart' => 'Finish or clear your current competition cart before starting another event.']);
-            }
             foreach ($photoUuids as $photoUuid) {
                 $selection = CustomerMediaSelection::firstOrCreate([
                     'user_id' => $user->id, 'scheduling_event_id' => $event->id, 'selection_key' => 'photo:'.$photoUuid,

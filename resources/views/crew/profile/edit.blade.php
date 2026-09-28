@@ -13,7 +13,7 @@
     <div><div class="crew-hub-brand"><img src="{{ asset('images/brand/dancepro-icon-blue.png') }}" alt=""><span>CREW HUB</span></div><h1>My Profile</h1><p class="muted">Keep your contact, payment and safety information current.</p></div>
     <div class="profile-account-actions">
         <button type="button" class="button secondary" id="open-password-dialog">Change password</button>
-        <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="button secondary">Log out</button></form>
+        <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="button secondary">Sign out</button></form>
     </div>
 </div>
 

@@ -1,11 +1,11 @@
-@extends('layouts.admin', ['title' => 'Concerts', 'heading' => 'Concerts', 'subheading' => 'Manage release, approval, availability, access, and presentation.'])
+@extends('layouts.admin', ['title' => 'Concert media', 'heading' => 'Concert media', 'subheading' => 'Manage concert videos, access codes, release dates and customer presentation.'])
 @section('content')
 <div class="toolbar">
     <form class="filters" method="GET" action="{{ route('admin.concerts.index') }}">
         <label>Search<input name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Concert or venue"></label>
         <label>Studio<select name="studio_id"><option value="">All studios</option>@foreach($studios as $studio)<option value="{{ $studio->id }}" @selected((string)($filters['studio_id'] ?? '') === (string)$studio->id)>{{ $studio->name }}</option>@endforeach</select></label>
         <label>Status<select name="status"><option value="">Any status</option>@foreach($statuses as $status)<option value="{{ $status->value }}" @selected(($filters['status'] ?? '') === $status->value)>{{ ucfirst($status->value) }}</option>@endforeach</select></label>
-        <button type="submit">Filter</button><a class="button secondary" href="{{ route('admin.concerts.index') }}">Reset</a>
+        <button type="submit">Apply filters</button><a class="button secondary" href="{{ route('admin.concerts.index') }}">Clear filters</a>
     </form>
     <a class="button" href="{{ route('admin.concerts.create') }}">Add concert</a>
 </div>

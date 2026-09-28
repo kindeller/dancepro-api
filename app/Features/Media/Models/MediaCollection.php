@@ -62,6 +62,15 @@ class MediaCollection extends Model
                 ->where('is_visible', true)->orderBy('sort_order')->orderBy('id')->first();
     }
 
+    public function galleryFolderCoverAsset(): ?MediaAsset
+    {
+        $query = $this->assets()->where('media_type', 'photo')->where('status', 'available')
+            ->where('is_visible', true);
+
+        return (clone $query)->where('metadata->is_top_pic', true)->orderBy('sort_order')->orderBy('id')->first()
+            ?? (clone $query)->orderBy('sort_order')->orderBy('id')->first();
+    }
+
     public function concertPhotoReleaseGroups(): BelongsToMany
     {
         return $this->belongsToMany(ConcertPhotoReleaseGroup::class, 'concert_photo_release_group_collections')->withTimestamps();

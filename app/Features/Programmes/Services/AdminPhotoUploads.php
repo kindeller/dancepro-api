@@ -21,12 +21,22 @@ class AdminPhotoUploads
         $plan = $planUuid ? $plans->firstWhere('uuid', $planUuid) : ($plans->firstWhere('id', $gallery?->programme_upload_plan_id) ?? $plans->first());
         abort_if($planUuid && ! $plan, 404);
         $progress = $plan ? $this->progress->forEvent($event, $plan->uuid) : null;
+        $roster = app(ProgrammePhotographers::class)->forEvent($event);
+        $photoRoles = collect($this->roles->forEvent($event)['roles'])->where('media_type', 'photo');
+        $uploadSummary = [
+            'photographers' => collect($roster['photographers'])->unique('crew_uuid')->count(),
+            'roles' => $photoRoles->count(),
+            'verified' => collect($progress['photographers'] ?? [])->sum('verified_file_count'),
+            'pending' => collect($progress['photographers'] ?? [])->sum('pending_file_count'),
+        ];
+        $uploadSummary['registered'] = $uploadSummary['verified'] + $uploadSummary['pending'];
+        $uploadSummary['percent'] = $uploadSummary['registered'] ? (int) floor(100 * $uploadSummary['verified'] / $uploadSummary['registered']) : null;
         $roleDetails = [];
         $scopeNodes = $plan ? app(CompetitionProgrammeNodes::class)->nodes($plan) : [];
         if ($plan) {
             $nodes = collect(app(CompetitionProgrammeNodes::class)->nodes($plan))->keyBy('uuid');
             $contributions = ProgrammePhotoContribution::with('role')->where('programme_upload_plan_id', $plan->id)->get();
-            foreach ($this->roles->forEvent($event)['roles'] as $role) {
+            foreach ($photoRoles as $role) {
                 if ($role['media_type'] !== 'photo') {
                     continue;
                 }
@@ -42,6 +52,6 @@ class AdminPhotoUploads
             ->where('audits.event_uuid', $event->uuid)->whereIn('audits.action', ['contribution_waive', 'contribution_reinstate', 'waiver_reopened'])
             ->select('audits.*', 'users.name as actor_name', 'crew_roles.name as role_name')->orderByDesc('audits.id')->limit(50)->get();
 
-        return compact('event', 'plans', 'plan', 'progress', 'roleDetails', 'history', 'scopeNodes');
+        return compact('event', 'plans', 'plan', 'progress', 'roleDetails', 'history', 'scopeNodes', 'roster', 'uploadSummary');
     }
 }

@@ -5,15 +5,15 @@
     <a class="button secondary" href="{{ route('admin.competition-gallery.show', $event) }}">← Back to gallery</a>
 </div>
 <section class="card card-pad" style="margin-bottom:20px">
-    <h2>Customer event login code</h2>
+    <h2>Event media access code</h2>
     <p class="muted">{{ $presentation['login_code_configured'] ? 'A login code is set for this event.' : 'Set a login code so customers can access this event after selecting it.' }} This is separate from the media code.</p>
     <form method="POST" action="{{ route('admin.competition-gallery.settings.update', $event) }}" class="grid">
         @csrf
         <input type="hidden" name="action" value="login_code">
         <input type="hidden" name="version" value="{{ $presentation['version'] }}">
-        <label>New event login code<input type="password" name="login_code" required minlength="6" maxlength="64" autocomplete="new-password"></label>
+        <label>New event media access code<input type="password" name="login_code" required minlength="6" maxlength="64" autocomplete="new-password"></label>
         <p class="muted">Use 6–64 letters, numbers or hyphens. Codes are not case-sensitive. Keep a copy to share with customers; saved codes cannot be displayed. Changing the code keeps existing verified registrations.</p>
-        <div><button>Save login code</button></div>
+        <div><button>Save access code</button></div>
     </form>
 </section>
 <div class="grid two-col">
@@ -58,7 +58,7 @@
         @php($after = json_decode($change->after, true))
         <div style="border-top:1px solid var(--line);padding:10px 0">
             <strong>{{ $change->actor_name ?? 'Former administrator' }}</strong> · {{ $change->created_at }}
-            @if($after['login_code_changed'] ?? false)<div>Changed the customer event login code.</div>@endif
+            @if($after['login_code_changed'] ?? false)<div>Changed the event media access code.</div>@endif
             @if(($before['display_title'] ?? null) !== ($after['display_title'] ?? null))
                 <div>Title: {{ $before['display_title'] ?? 'Event name' }} → {{ $after['display_title'] ?? 'Event name' }}</div>
             @endif

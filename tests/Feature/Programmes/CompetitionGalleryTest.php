@@ -84,7 +84,7 @@ class CompetitionGalleryTest extends TestCase
         $f = $this->fixture();
         SchedulingEvent::create(['name' => 'Concert excluded', 'event_type' => 'concert', 'event_date' => '2026-09-04']);
         SchedulingEvent::create(['name' => 'Cancelled excluded', 'event_type' => 'competition', 'event_date' => '2026-09-04', 'cancelled_at' => now()]);
-        $this->get(route('admin.competition-gallery.index'))->assertOk()->assertSee('Competition Photos')
+        $this->get(route('admin.competition-gallery.index'))->assertOk()->assertSee('Competition photos')
             ->assertSee('Gallery test')->assertSee($this->url($f), false)->assertDontSee('Concert excluded')->assertDontSee('Cancelled excluded');
         $this->get($this->url($f))->assertOk()->assertSee(route('admin.competition-gallery.index'), false);
         $this->actingAs(User::factory()->create(['type' => 'crew', 'is_admin' => false]));
@@ -110,7 +110,7 @@ class CompetitionGalleryTest extends TestCase
         $this->assertSame('private', $f['gallery']->fresh()->visibility);
     }
 
-    public function test_cover_uses_only_own_verified_photo_and_can_restore_event_logo(): void
+    public function test_gallery_cover_uses_only_own_verified_photo_while_event_list_keeps_the_event_logo(): void
     {
         Storage::fake('local');
         $f = $this->fixture();
@@ -126,14 +126,31 @@ class CompetitionGalleryTest extends TestCase
         $this->post($url, ['action' => 'cover', 'version' => 0, 'photo_uuid' => $photo->uuid])->assertRedirect();
         $this->assertDatabaseHas('competition_gallery_settings', ['scheduling_event_id' => $f['event']->id, 'cover_photo_uuid' => $photo->uuid]);
         $coverUrl = route('admin.competition-gallery.image', ['schedulingEvent' => $f['event'], 'photo' => $photo->uuid, 'size' => 'thumbnail']);
-        $this->get(route('admin.competition-gallery.index'))->assertOk()->assertSee($coverUrl, false)->assertDontSee($photo->storage_key);
+        $this->get(route('admin.competition-gallery.index'))->assertOk()->assertDontSee($coverUrl, false)->assertDontSee($photo->storage_key);
+        $this->get(route('admin.competition-gallery.settings', $f['event']))->assertOk()->assertSee($coverUrl, false);
         $this->get($this->url($f, $f['item']))->assertOk()->assertSee('Current cover');
         $photo->update(['status' => 'reserved']);
-        $this->get(route('admin.competition-gallery.index'))->assertOk()->assertDontSee($coverUrl, false);
+        $this->get(route('admin.competition-gallery.settings', $f['event']))->assertOk()->assertDontSee($coverUrl, false);
         $photo->update(['status' => 'verified']);
         $this->post($url, ['action' => 'reset_cover', 'version' => 1])->assertRedirect();
         $this->assertDatabaseHas('competition_gallery_settings', ['scheduling_event_id' => $f['event']->id, 'cover_photo_uuid' => null]);
         $this->assertSame('verified', $photo->fresh()->status);
+    }
+
+    public function test_backend_folder_cards_use_the_same_static_photo_covers_as_customer_galleries(): void
+    {
+        Storage::fake('local');
+        $f = $this->fixture(true);
+        $photo = $this->photo($f, 'competition-photographer-p1', ['is_top_pic' => true]);
+        $thumbnail = route('admin.competition-gallery.image', [
+            'schedulingEvent' => $f['event'],
+            'photo' => $photo->uuid,
+            'size' => 'thumbnail',
+        ]);
+
+        $this->get($this->url($f))->assertOk()->assertSee($thumbnail, false);
+        $this->get($this->url($f, $f['day']))->assertOk()->assertSee($thumbnail, false);
+        $this->get($this->url($f, $f['section']))->assertOk()->assertSee($thumbnail, false);
     }
 
     public function test_gallery_settings_require_admin_and_reject_non_competitions(): void
@@ -176,7 +193,7 @@ class CompetitionGalleryTest extends TestCase
         CustomerCompetitionRegistration::create(['user_id' => $customer->id,
             'scheduling_event_id' => $f['event']->id, 'access_verified_at' => now()]);
         $this->get($album)->assertOk()->assertSee($image, false)->assertSee('gallery-photo-viewer')
-            ->assertSee('Watermarked preview')->assertDontSee('Customer Preview')->assertDontSee('/admin/scheduling-events/', false);
+            ->assertSee('Watermarked preview')->assertDontSee('Customer preview')->assertDontSee('/admin/scheduling-events/', false);
         $this->get($image)->assertOk()->assertHeader('Content-Type', 'image/jpeg');
         $this->readyForPreview($f, false);
         $this->get($album)->assertNotFound();
@@ -211,40 +228,32 @@ class CompetitionGalleryTest extends TestCase
             ->assertDontSee('data-select-action', false)->assertSee("event.key === 'Escape'", false)
             ->assertSee('Save selected to favourites');
         $input = ['product' => 'photo', 'item_uuid' => $f['item'], 'photo_uuid' => $photo->uuid];
+        $globalFavourites = route('customer.media.favourites', ['focus_kind' => 'competition', 'focus_event' => $f['event']->uuid]);
+        $globalCart = route('customer.media.cart', ['focus_kind' => 'competition', 'focus_event' => $f['event']->uuid]);
         $this->post($url, $input + ['action' => 'favourite'])->assertRedirect();
-        $this->get(route('customer.competitions.favourites', $f['event']))->assertOk()
+        $this->get($globalFavourites)->assertOk()
             ->assertSee('07 Jazz 12 & Under')->assertSee('03 Jessica Smith')
-            ->assertSee('>Photo</p>', false)->assertSee('Add to cart')
-            ->assertSee('selection-list is-favourites')->assertSee('selection-thumbnail-link')
-            ->assertSee('aria-label="View photo of 03 Jessica Smith"', false)
-            ->assertSee('selection-icon-button is-favourite', false)
-            ->assertSee('data-selection-preview', false)->assertSee('id="selection-photo-viewer"', false)
-            ->assertSee('data-preview-form', false)->assertSee('data-selection-kind="cart"', false)
-            ->assertSee('data-selection-kind="favourite"', false)
-            ->assertSee('event.preventDefault();', false)
-            ->assertSee(route('customer.competitions.image', ['schedulingEvent' => $f['event'], 'photo' => $photo->uuid, 'size' => 'thumbnail']), false)
-            ->assertSee('photo='.$photo->uuid, false)->assertSee('competition-tab-count');
+            ->assertSee('Individual photo')->assertSee('Add to cart')
+            ->assertSee('event-selection-items is-favourites', false)
+            ->assertSee(route('customer.competitions.image', ['schedulingEvent' => $f['event'], 'photo' => $photo->uuid, 'size' => 'thumbnail']), false);
         $this->get(route('customer.competitions.show', ['schedulingEvent' => $f['event'],
             'folder' => $f['item'], 'page' => 1, 'photo' => $photo->uuid]))->assertOk()
             ->assertSee('focusIndex >= 0', false)->assertSee($photo->uuid);
         $this->post($url, $input + ['action' => 'add'])->assertRedirect();
         $this->get($album)->assertOk()->assertSee('Remove this photo from cart')
             ->assertSee('Remove this photo from favourites');
-        $this->get(route('customer.competitions.favourites', $f['event']))->assertOk()
-            ->assertSee('Saved favourites')->assertSee('competition-tabs')->assertDontSee('Subtotal');
-        $this->get(route('customer.competitions.cart', $f['event']))->assertOk()
+        $this->get($globalFavourites)->assertOk()
+            ->assertSee('Favourites')->assertDontSee('Event subtotal');
+        $this->get($globalCart)->assertOk()
             ->assertSee('07 Jazz 12 & Under')->assertSee('03 Jessica Smith')
-            ->assertSee('Individual photo · $10')->assertSee('$10.00')
-            ->assertSee('data-selection-preview', false)->assertSee('aria-label="Remove from cart"', false)
-            ->assertDontSee('>View</a>', false)
-            ->assertSee('photo='.$photo->uuid, false)->assertDontSee('Saved favourites');
+            ->assertSeeText('Individual photo')->assertSee('$10.00')->assertSee('aria-label="Remove from cart"', false)
+            ->assertDontSee('Saved favourites');
         $this->assertDatabaseCount('customer_media_selections', 1);
         $this->post($url, ['action' => 'add', 'product' => 'routine_photos', 'item_uuid' => $f['item']])->assertRedirect();
-        $this->get(route('customer.competitions.cart', $f['event']))->assertOk()
-            ->assertSee('Included in another cart item')->assertSee('$40.00');
+        $this->get($globalCart)->assertOk()->assertSee('$40.00');
         $this->post($url, ['action' => 'add', 'product' => 'routine_package', 'item_uuid' => $f['item']])->assertRedirect();
-        $this->get(route('customer.competitions.cart', $f['event']))->assertOk()
-            ->assertSee('Routine package · $45')->assertSee('$45.00');
+        $this->get($globalCart)->assertOk()
+            ->assertSeeText('Routine package')->assertSee('$45.00');
 
         $other = $this->fixture();
         $otherPhoto = $this->photo($other, 'competition-photographer-p1');
@@ -300,7 +309,7 @@ class CompetitionGalleryTest extends TestCase
 
         $this->post($url, $batch + ['action' => 'add'])->assertRedirect();
         $this->assertDatabaseCount('customer_media_selections', 2);
-        $this->get(route('customer.competitions.cart', $f['event']))->assertOk()->assertSee('$20.00');
+        $this->get(route('customer.media.cart', ['focus_kind' => 'competition', 'focus_event' => $f['event']->uuid]))->assertOk()->assertSee('$20.00');
         $this->post($url, $batch + ['action' => 'favourite'])->assertRedirect();
         $this->assertSame(2, CustomerMediaSelection::where('user_id', $customer->id)
             ->where('is_favourite', true)->where('in_cart', true)->count());
@@ -313,7 +322,7 @@ class CompetitionGalleryTest extends TestCase
         $this->assertDatabaseCount('customer_media_selections', 2);
     }
 
-    public function test_competition_pages_share_logo_and_icon_tabs_with_separate_favourites_and_cart(): void
+    public function test_competition_pages_share_logo_tabs_and_link_to_account_wide_favourites_and_cart(): void
     {
         Storage::fake('local');
         $f = $this->fixture();
@@ -334,10 +343,11 @@ class CompetitionGalleryTest extends TestCase
             ->assertSee('Whole Event')->assertSee('Favourites')->assertSee('Cart')
             ->assertSee($studio->logoUrl(), false)->assertSee($f['event']->crewLogoUrl(), false)
             ->assertSee('href="'.route('customer.competitions.show', $f['event']).'" aria-current="page"', false);
-        $this->get(route('customer.competitions.favourites', $f['event']))->assertOk()
-            ->assertSee('href="'.route('customer.competitions.favourites', $f['event']).'" aria-current="page"', false);
-        $this->get(route('customer.competitions.cart', $f['event']))->assertOk()
-            ->assertSee('href="'.route('customer.competitions.cart', $f['event']).'" aria-current="page"', false);
+        $album->assertSee(route('customer.media.favourites', ['focus_kind' => 'competition', 'focus_event' => $f['event']->uuid]))
+            ->assertSee(route('customer.media.cart', ['focus_kind' => 'competition', 'focus_event' => $f['event']->uuid]));
+        $this->get(route('customer.competitions.favourites', $f['event']))->assertRedirect(
+            route('customer.media.favourites', ['focus_kind' => 'competition', 'focus_event' => $f['event']->uuid])
+        );
     }
 
     public function test_ready_competition_photos_enter_an_idempotent_private_order_catalogue(): void
@@ -468,6 +478,10 @@ class CompetitionGalleryTest extends TestCase
         $this->actingAs($customer);
         $list = route('customer.competitions.studios', $f['event']);
         $customerAlbum = route('customer.competitions.show', ['schedulingEvent' => $f['event'], 'folder' => $f['item']]);
+        $this->get($list)->assertOk()->assertSee('No ready studio routines yet')->assertDontSee($customerAlbum, false);
+        $snapshot = $f['plan']->snapshot;
+        $snapshot['nodes'][1]['title'] = 'Jazz Small Group 12 & Under';
+        $f['plan']->update(['snapshot' => $snapshot]);
         $this->get($list)->assertOk()->assertSee('My Studios’ Routines')->assertSee($customerAlbum, false)
             ->assertSee($studio->name)->assertDontSee($otherStudio->name)->assertHeader('X-Robots-Tag', 'noindex, nofollow');
         $this->get(route('customer.competitions.show', $f['event']))->assertOk()->assertSee($list, false);
@@ -534,7 +548,11 @@ class CompetitionGalleryTest extends TestCase
         $this->get(route('admin.competition-gallery.customer-preview', ['schedulingEvent' => $f['event'], 'folder' => $secondSection]))->assertNotFound();
         $this->get(route('admin.competition-gallery.image', ['schedulingEvent' => $f['event'], 'photo' => $hidden->uuid]))->assertOk();
         $this->post(route('admin.competition-gallery.settings.update', $f['event']), ['action' => 'cover', 'version' => 1, 'photo_uuid' => $first->uuid])->assertRedirect();
-        $this->get($root)->assertOk()->assertSee(route('admin.competition-gallery.customer-preview.image', ['schedulingEvent' => $f['event'], 'photo' => $first->uuid, 'size' => 'thumbnail']), false);
+        $f['event']->update(['logo_path' => 'events/competition-logo.png']);
+        $coverUrl = route('admin.competition-gallery.customer-preview.image', ['schedulingEvent' => $f['event'], 'photo' => $first->uuid, 'size' => 'thumbnail']);
+        $this->get($root)->assertOk()->assertSee($f['event']->fresh()->crewLogoUrl(), false)->assertSee($coverUrl, false);
+        $this->get(route('admin.competition-gallery.customer-preview', ['schedulingEvent' => $f['event'], 'folder' => $f['day']]))
+            ->assertOk()->assertSee($coverUrl, false);
         $f['programme']->revisions()->create(['version' => 2, 'confirmed_at' => now(), 'snapshot' => $snapshot]);
         $this->get($root)->assertOk()->assertSee('Photos are being prepared')->assertDontSee($first->uuid);
         $this->get(route('admin.competition-gallery.customer-preview.image', ['schedulingEvent' => $f['event'], 'photo' => $first->uuid]))->assertNotFound();

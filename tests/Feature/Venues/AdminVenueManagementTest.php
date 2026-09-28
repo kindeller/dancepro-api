@@ -24,7 +24,7 @@ class AdminVenueManagementTest extends TestCase
 
         $this->actingAs($staff)->get(route('admin.venues.index'))
             ->assertOk()
-            ->assertSee('Venue Management')
+            ->assertSee('Venue management')
             ->assertSee('Regal Theatre')
             ->assertSee('Expand map for Regal Theatre')
             ->assertSee($regal->mapUrl(), false)

@@ -45,9 +45,9 @@
         </section>
 
         <section class="workflow-step {{ $nextChecklist['completed_at'] ? 'complete' : '' }}">
-            <span class="workflow-number">2</span><h3>Pre-Start Checks</h3>
+            <span class="workflow-number">2</span><h3>Pre-start checks</h3>
             @if($nextChecklist['total'] > 0)
-                <button type="button" data-open-prestart>Open Pre-Start Checks</button>
+                <button type="button" data-open-prestart>Open Pre-start checks</button>
                 <strong data-next-checklist-complete @if(!$nextChecklist['completed_at']) hidden @endif>✓ Checks completed {{ $nextChecklist['completed_at']?->format('g:i a') }}</strong>
                 <span class="muted" data-next-checklist-summary @if($nextChecklist['completed_at']) hidden @endif>{{ $nextChecklist['done'] }} of {{ $nextChecklist['total'] }} complete</span>
             @else
@@ -90,7 +90,7 @@
 @if($nextChecklist['total'] > 0)
 <dialog class="prestart-dialog" data-prestart-dialog aria-labelledby="prestart-dialog-title">
     <div class="prestart-dialog-heading">
-        <div><p class="eyebrow">{{ $nextEvent->name }}</p><h2 id="prestart-dialog-title">Pre-Start Checks</h2><p class="muted">Complete these checks before the event begins.</p></div>
+        <div><p class="eyebrow">{{ $nextEvent->name }}</p><h2 id="prestart-dialog-title">Pre-start checks</h2><p class="muted">Complete these checks before the event begins.</p></div>
         <button type="button" class="secondary" data-close-prestart aria-label="Close pre-start checks">Close</button>
     </div>
     <div class="prestart-progress"><strong data-prestart-progress>{{ $nextChecklist['done'] }} of {{ $nextChecklist['total'] }} complete</strong></div>

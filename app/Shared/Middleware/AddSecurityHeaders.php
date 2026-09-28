@@ -31,7 +31,7 @@ final class AddSecurityHeaders
                 ? 'Content-Security-Policy-Report-Only'
                 : 'Content-Security-Policy';
 
-            $response->headers->set($header, $this->contentSecurityPolicy($cspNonce));
+            $response->headers->set($header, $this->contentSecurityPolicy($cspNonce, $request->routeIs('customer.studio-invoices.show')));
         }
 
         if (app()->environment('production') && parse_url((string) config('app.url'), PHP_URL_SCHEME) === 'https') {
@@ -41,7 +41,7 @@ final class AddSecurityHeaders
         return $response;
     }
 
-    private function contentSecurityPolicy(string $nonce): string
+    private function contentSecurityPolicy(string $nonce, bool $invoicePayment = false): string
     {
         return implode('; ', [
             "default-src 'self'",
@@ -49,7 +49,7 @@ final class AddSecurityHeaders
             "object-src 'none'",
             "frame-ancestors 'self'",
             "form-action 'self'",
-            "script-src 'self' 'nonce-{$nonce}' https://maps.googleapis.com https://maps.gstatic.com",
+            "script-src 'self' 'nonce-{$nonce}' https://maps.googleapis.com https://maps.gstatic.com".($invoicePayment ? ' https://js.braintreegateway.com https://songbird.cardinalcommerce.com https://songbirdstag.cardinalcommerce.com' : ''),
             "script-src-attr 'unsafe-inline'",
             "style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://fonts.googleapis.com",
             "font-src 'self' data: https://fonts.bunny.net https://fonts.gstatic.com",

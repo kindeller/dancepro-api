@@ -155,7 +155,7 @@ class CompetitionObjectsTest extends TestCase
         $this->actingAs(User::factory()->create())
             ->get('/admin/competitions/objects?prefix=competition-a')
             ->assertOk()
-            ->assertSee('Competition Media')
+            ->assertSee('Competition media')
             ->assertSee('display: none !important', false)
             ->assertSee('data-auto-load-url', false)
             ->assertSee('data-limit="250"', false)

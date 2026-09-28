@@ -1,7 +1,7 @@
 @extends('layouts.admin', [
-    'title' => 'Download Links',
-    'heading' => 'Download Links',
-    'subheading' => 'Inspect generated tracking links, status, expiry, and access counts.',
+    'title' => 'Download links',
+    'heading' => 'Download links',
+    'subheading' => 'Review download links, expiry dates and access counts.',
 ])
 
 @section('content')
@@ -20,11 +20,11 @@
                     @endforeach
                 </select>
             </label>
-            <button type="submit">Filter</button>
-            <a class="button secondary" href="{{ route('admin.download-links.index') }}">Reset</a>
+            <button type="submit">Apply filters</button>
+            <a class="button secondary" href="{{ route('admin.download-links.index') }}">Clear filters</a>
         </form>
 
-        <a class="button" href="{{ route('admin.download-links.create') }}">Create links</a>
+        <a class="button" href="{{ route('admin.download-links.create') }}">Create download links</a>
     </div>
 
     <div class="card">

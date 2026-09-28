@@ -53,11 +53,14 @@ class CompetitionOrderCatalogue
             foreach ($files as $index => $file) {
                 $thumbnail = $this->photoPreview->key($file, 'thumbnail', $event);
                 $assetUuid = Uuid::uuid5($file->uuid, 'customer-catalogue-photo')->toString();
-                $asset = MediaAsset::firstOrCreate(['uuid' => $assetUuid], [
-                    'media_collection_id' => $collection->id,
-                    'media_type' => MediaType::Photo,
+                $asset = MediaAsset::firstOrNew([
                     'storage_disk' => $file->storage_disk,
                     'storage_key' => $file->storage_key,
+                ]);
+                $asset->uuid ??= $assetUuid;
+                $asset->fill([
+                    'media_collection_id' => $collection->id,
+                    'media_type' => MediaType::Photo,
                     'original_filename' => $file->file_name,
                     'display_name' => $file->file_name,
                     'status' => 'available',
@@ -71,6 +74,7 @@ class CompetitionOrderCatalogue
                     'verified_at' => $file->verified_at,
                     'metadata' => ['programme_photo_file_uuid' => $file->uuid],
                 ]);
+                $asset->save();
                 abort_unless($asset->media_collection_id === $collection->id
                     && ($asset->metadata['programme_photo_file_uuid'] ?? null) === $file->uuid, 409);
                 $assets->push($asset);

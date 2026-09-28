@@ -19,6 +19,7 @@ class AuthorizePurchasedMediaDownload
 
         abort_unless($entitlement->assets()->where('media_assets.id', $asset->id)->exists(), 404);
 
+        abort_if($entitlement->revoked_at !== null, 404);
         abort_unless($entitlement->ready_at !== null, 404);
         abort_if($entitlement->expires_at === null || $entitlement->expires_at->isPast(), 410,
             'This download period has ended.');

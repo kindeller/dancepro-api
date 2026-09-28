@@ -6,13 +6,15 @@ final class UploadStubState: @unchecked Sendable {
   private var requests: [String] = []
   private var hold = false
   private var transientFailures = 0
+  private var offline = false
 
-  func configure(_ responses: [String: Data], hold: Bool = false, transientFailures: Int = 0) {
+  func configure(_ responses: [String: Data], hold: Bool = false, transientFailures: Int = 0, offline: Bool = false) {
     lock.lock()
     defer { lock.unlock() }
     self.responses = responses
     self.hold = hold
     self.transientFailures = transientFailures
+    self.offline = offline
     requests = []
   }
   func paths() -> [String] {
@@ -24,6 +26,7 @@ final class UploadStubState: @unchecked Sendable {
     lock.lock()
     defer { lock.unlock() }
     requests.append(path)
+    if offline { return (URLError.notConnectedToInternet.rawValue, Data()) }
     if path.hasSuffix("/content") {
       if hold { return nil }
       if transientFailures > 0 {
@@ -45,6 +48,10 @@ final class PhotoUploadProtocol: URLProtocol, @unchecked Sendable {
   override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
   override func startLoading() {
     guard let url = request.url, let (status, data) = Self.state.response(url.path) else { return }
+    if status < 0 {
+      client?.urlProtocol(self, didFailWithError: URLError(URLError.Code(rawValue: status)))
+      return
+    }
     let response = HTTPURLResponse(
       url: url, statusCode: status, httpVersion: "HTTP/1.1",
       headerFields: ["Content-Type": "application/json"])!

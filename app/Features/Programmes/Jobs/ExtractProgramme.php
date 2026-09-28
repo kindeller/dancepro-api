@@ -31,11 +31,20 @@ class ExtractProgramme implements ShouldQueue
         if ($extraction->status !== 'queued') {
             return;
         }
-        $extraction->update(['status' => 'processing']);
+        $claimed = ProgrammeExtraction::whereKey($extraction->id)->where('status', 'queued')->update(['status' => 'processing', 'message' => 'Opening the PDF…']);
+        if (! $claimed) {
+            return;
+        }
+        $started = microtime(true);
         try {
             $programme = Programme::findOrFail($extraction->programme_id);
             $source = ProgrammeSource::findOrFail($extraction->programme_source_id);
-            $result = $extractor->extract($source, $programme->event->event_type->value, $programme->event->event_date?->year);
+            $result = $extractor->extract($source, $programme->event->event_type->value, $programme->event->event_date?->year, function (int $page, int $total, bool $ocr) use ($extraction): void {
+                ProgrammeExtraction::whereKey($extraction->id)->where('status', 'processing')->update([
+                    'message' => ($ocr ? 'Reading scanned page ' : 'Reading text on page ').$page.' of '.$total.'…',
+                ]);
+            });
+            $result['duration_seconds'] = round(microtime(true) - $started, 2);
             DB::transaction(function () use ($extraction, $result, $save): void {
                 $programme = Programme::whereKey($extraction->programme_id)->lockForUpdate()->firstOrFail();
                 $items = collect($result['nodes'])->where('kind', 'item')->count();

@@ -195,7 +195,8 @@ class LocalMediaStorage
 
     private function assertKey(string $key): void
     {
-        abort_unless((bool) preg_match('#^[0-9a-f-]{36}/media/[0-9a-f-]{36}/(?:original|stream|thumbnail)/[a-zA-Z0-9._/-]+$#', $key)
+        abort_unless(((bool) preg_match('#^[0-9a-f-]{36}/media/[0-9a-f-]{36}/(?:original|stream|thumbnail)/[a-zA-Z0-9._/-]+$#', $key)
+            || (bool) preg_match('#^concert-uploads/[0-9a-f-]{36}/[0-9a-f-]{36}/[0-9a-f-]{36}\.mp4$#', $key))
             && ! str_contains($key, '..'), 404);
     }
 

@@ -14,9 +14,9 @@ class PhotoUploadProgress
 {
     public function __construct(private readonly ProgrammeUploadRoles $photographers, private readonly PhotoContributionScope $scope, private readonly SharedConcertProgramme $shared) {}
 
-    public function forEvent(SchedulingEvent $event, string $planUuid): array
+    public function forEvent(SchedulingEvent $event, string $planUuid, bool $includeUploaders = true): array
     {
-        return DB::transaction(function () use ($event, $planUuid): array {
+        return DB::transaction(function () use ($event, $planUuid, $includeUploaders): array {
             $event = SchedulingEvent::whereKey($event->id)->lockForUpdate()->firstOrFail();
             $programme = Programme::where('scheduling_event_id', $event->id)->lockForUpdate()->firstOrFail();
             $plan = ProgrammeUploadPlan::where('programme_id', $programme->id)->where('uuid', $planUuid)->firstOrFail();
@@ -59,14 +59,14 @@ class PhotoUploadProgress
                     $waived === $count => 'waived', $complete + $waived === $count => 'complete_with_exceptions',
                     $verified + $pending + $complete + $waived > 0 => 'receiving', default => 'missing',
                 };
-                $uploaders = DB::table('programme_photo_files as files')->leftJoin('users', 'users.id', '=', 'files.uploaded_by_user_id')
+                $uploaders = $includeUploaders ? DB::table('programme_photo_files as files')->leftJoin('users', 'users.id', '=', 'files.uploaded_by_user_id')
                     ->whereIn('files.programme_photo_contribution_id', $own->whereIn('item_uuid', array_keys($expected))->pluck('id'))
                     ->where('files.status', 'verified')->whereNotNull('files.verified_at')
                     ->select('users.name')->selectRaw('COUNT(*) AS submissions')
                     ->selectRaw('SUM(CASE WHEN files.duplicate_of_file_id IS NOT NULL THEN 1 ELSE 0 END) AS duplicates')
                     ->groupBy('files.uploaded_by_user_id', 'users.name')->get()
                     ->map(fn ($row) => ['name' => $row->name ?? 'Earlier uploads (account not recorded)',
-                        'submission_count' => (int) $row->submissions, 'duplicate_count' => (int) $row->duplicates])->all();
+                        'submission_count' => (int) $row->submissions, 'duplicate_count' => (int) $row->duplicates])->all() : [];
                 $people[] = [
                     'id' => $person['id'], 'role_uuid' => $person['role_uuid'],
                     'name' => $person['name'], 'role_name' => $person['role_name'], 'status' => $status,

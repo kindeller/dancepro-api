@@ -1,10 +1,21 @@
 @extends('layouts.admin', ['title' => 'Photo uploads', 'heading' => 'Photo uploads', 'subheading' => $event->name])
 
+@push('styles')
+<style>
+.upload-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0}.upload-metrics>div{padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--soft)}.upload-metrics span,.upload-metrics small{display:block;color:var(--muted);font-size:12px}.upload-metrics strong{display:block;font-size:26px}.upload-role-table{overflow-x:auto;margin-top:16px}.upload-role-table table{min-width:760px}.upload-role-table td{vertical-align:top}.upload-role-table small{display:block;color:var(--muted);font-size:12px;margin-top:4px}.upload-role-table progress{display:block;width:110px;margin-top:6px}.upload-percentage progress{display:block;width:100%;height:14px;margin-top:8px}progress{accent-color:#009fd4}@media(max-width:700px){.upload-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+@endpush
+
 @section('content')
+@if($trackerBar)
+    @include('admin.tracking._task-bar', ['bar' => $trackerBar])
+@endif
 <div class="toolbar" style="margin-bottom:16px">
-    <a class="button secondary" href="{{ $event->event_type->value === 'competition' ? route('admin.competition-gallery.show', $event) : route('admin.scheduling-events.show', $event) }}">{{ $event->event_type->value === 'competition' ? 'Back to gallery' : 'Back to event' }}</a>
+    @unless($trackerBar)<a class="button secondary" href="{{ $event->event_type->value === 'competition' ? route('admin.competition-gallery.show', $event) : route('admin.scheduling-events.show', $event) }}">{{ $event->event_type->value === 'competition' ? 'Back to gallery' : 'Back to event' }}</a>@endunless
+    @if($trackerBar)<a class="button secondary" href="{{ route('admin.concert-photo-gallery.show', $event) }}">Photo gallery</a>@endif
     <span class="badge">Private gallery</span>
 </div>
+@include('admin.programmes._photo-upload-overview')
 @if(!$plan)
     <div class="card card-pad"><p>No working programme has been connected yet. Prepare the event and begin uploading from the Mac app first.</p></div>
 @else
@@ -60,7 +71,7 @@
     @endforeach
     @if($progress['unfilled'])
         <section class="card card-pad" style="margin-bottom:18px"><h2>Unfilled staffing roles</h2>
-            <p class="muted">Upload exceptions do not change Crew Management assignments.</p>
+            <p class="muted">Upload exceptions do not change Crew management assignments.</p>
             @foreach($progress['unfilled'] as $role)<p>{{ $role['date'] }} · {{ ucfirst($role['period']) }} · {{ $role['role_name'] }} · {{ $role['missing_count'] }} unfilled</p>@endforeach
         </section>
     @endif

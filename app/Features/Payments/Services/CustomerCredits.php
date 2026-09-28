@@ -88,7 +88,7 @@ class CustomerCredits
             'user_id' => $order->user_id,
             'amount' => -$amount,
             'kind' => 'order_redemption',
-            'note' => 'Applied to order '.$order->uuid,
+            'note' => 'Applied to order '.$order->displayNumber(),
         ]);
     }
 }

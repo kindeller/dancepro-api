@@ -20,24 +20,24 @@ class AdminNavigationTest extends TestCase
             ->assertOk()
             ->assertSee('My Hub')
             ->assertSee('href="'.route('crew.availability.index').'">My Hub</a>', false)
-            ->assertSee('Hub Management')
+            ->assertSee('Hub management')
             ->assertSee(route('admin.hub.dashboard'), false)
             ->assertSee('Exceptions')
-            ->assertSee('Event Management', false)
-            ->assertSee('Venue Management')
-            ->assertSee('Crew Management')
-            ->assertSee('Crew Payments')
-            ->assertSee('Tracker')
+            ->assertSee('Event management', false)
+            ->assertSee('Venue management')
+            ->assertSee('Crew management')
+            ->assertSee('Crew payments')
+            ->assertSee('Concert tracker')
             ->assertSee(route('admin.concert-tracker.index'), false)
-            ->assertDontSee('>Payment Settings</a>', false)
+            ->assertDontSee('>Payment settings</a>', false)
             ->assertSee('Media')
-            ->assertSee('Media Dashboard')
-            ->assertSee('Concert Media')
-            ->assertSee('Concert Photos')
+            ->assertSee('Media dashboard')
+            ->assertSee('Concert media')
+            ->assertSee('Concert photos')
             ->assertDontSee('>Concert Photo Releases</a>', false)
-            ->assertSee('Competition Media')
+            ->assertSee('Competition media')
             ->assertDontSee('>Competition Videos</a>', false)
-            ->assertSee('Download Links');
+            ->assertSee('Download links');
     }
 
     public function test_admin_layout_has_an_accessible_mobile_navigation_toggle(): void
@@ -76,11 +76,11 @@ class AdminNavigationTest extends TestCase
         ] as $url) {
             $this->actingAs($staff)->get($url)
                 ->assertOk()
-                ->assertSee('Event Bookings')
-                ->assertSee('Pending Events')
-                ->assertSee('Event Availability')
-                ->assertSee('Event Types')
-                ->assertSee('Pre-Start Checks');
+                ->assertSee('Event bookings')
+                ->assertSee('Pending events')
+                ->assertSee('Event availability')
+                ->assertSee('Event types')
+                ->assertSee('Pre-start checks');
         }
 
         $this->actingAs($staff)->get(route('admin.concert-bookings.index'))
@@ -94,7 +94,7 @@ class AdminNavigationTest extends TestCase
 
         $this->actingAs($staff)->get(route('admin.hub.dashboard'))
             ->assertOk()
-            ->assertSee('Event Availability')
+            ->assertSee('Event availability')
             ->assertSee(route('admin.scheduling-events.index', ['fullscreen' => 1]), false);
 
         $this->actingAs($staff)->get(route('admin.scheduling-events.index', ['fullscreen' => 1]))
@@ -118,11 +118,11 @@ class AdminNavigationTest extends TestCase
             $this->actingAs($staff)->get($url)
                 ->assertOk()
                 ->assertSee('Crew')
-                ->assertSee('Roles')
-                ->assertSee('Contracts')
-                ->assertSee('Recognitions &amp; Rewards', false)
-                ->assertSee('Training')
-                ->assertSee('Resources');
+                ->assertSee('Crew roles')
+                ->assertSee('Crew contracts')
+                ->assertSee('Recognitions &amp; rewards', false)
+                ->assertSee('Crew training')
+                ->assertSee('Crew resources');
         }
     }
 
@@ -133,10 +133,10 @@ class AdminNavigationTest extends TestCase
         foreach ([route('admin.timesheets.index'), route('admin.timesheets.invoices.index'), route('admin.payments.index')] as $url) {
             $this->actingAs($staff)->get($url)
                 ->assertOk()
-                ->assertSee('Crew Payments')
+                ->assertSee('Crew payments')
                 ->assertSee('Timesheets')
                 ->assertSee('Invoices')
-                ->assertSee('Payment Settings');
+                ->assertSee('Payment settings');
         }
     }
 

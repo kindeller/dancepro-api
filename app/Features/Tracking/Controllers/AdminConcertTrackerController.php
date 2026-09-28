@@ -16,6 +16,7 @@ class AdminConcertTrackerController extends Controller
         $year = (int) ($input['year'] ?? now()->year);
         $phase = $input['phase'] ?? 'all';
         $attention = $request->boolean('attention');
+        $request->session()->put('concert_tracker_context', compact('view', 'year', 'phase', 'attention'));
 
         return response()->view('admin.tracking.concert-tracker', $tracker->page($view, $year, $phase, $attention))
             ->header('Cache-Control', 'private, no-store');

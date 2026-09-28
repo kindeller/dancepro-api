@@ -34,9 +34,9 @@ class EventOperationsTest extends TestCase
             ->assertSee('data-programme-picker="competition-programme-upload"', false);
 
         $this->actingAs($staff)->get(route('admin.crew-management.resources'))
-            ->assertOk()->assertSee('Add handbook or role resource')->assertDontSee('Add Pre-Start Checks template');
+            ->assertOk()->assertSee('Add handbook or role resource')->assertDontSee('Add Pre-start checks template');
         $this->actingAs($staff)->get(route('admin.event-management.checklists'))
-            ->assertOk()->assertSee('Add Pre-Start Checks template')->assertDontSee('Add handbook or role resource');
+            ->assertOk()->assertSee('Add Pre-start checks template')->assertDontSee('Add handbook or role resource');
 
         $this->actingAs($staff)->post(route('admin.operations.resources.store'), [
             'section_number' => 3, 'title' => 'Videography', 'resource_type' => 'handbook',
@@ -151,11 +151,11 @@ class EventOperationsTest extends TestCase
         $this->actingAs($crewUser)->get(route('crew.assignments.show', $assignment))
             ->assertOk()->assertSee('Check in with the team leader.')->assertSee('Video guide')->assertDontSee('Photo only guide')->assertSee('Record and review a test clip.');
         $this->actingAs($crewUser)->get(route('crew.availability.index', ['view' => 'upcoming']))
-            ->assertOk()->assertSee('Open Pre-Start Checks')->assertSee('0 of 1 complete');
+            ->assertOk()->assertSee('Open Pre-start checks')->assertSee('0 of 1 complete');
         $this->actingAs($crewUser)->putJson(route('crew.assignments.checklist.toggle', [$assignment, $item]), ['completed' => true])->assertOk();
         $this->assertDatabaseHas('assignment_checklist_completions', ['scheduling_shift_assignment_id' => $assignment->id, 'checklist_template_item_id' => $item->id, 'completed_by_user_id' => $crewUser->id]);
         $this->actingAs($crewUser)->get(route('crew.availability.index', ['view' => 'upcoming']))
-            ->assertOk()->assertSee('Checks completed')->assertSee('Open Pre-Start Checks');
+            ->assertOk()->assertSee('Checks completed')->assertSee('Open Pre-start checks');
         $this->actingAs($otherUser)->get(route('crew.assignments.show', $assignment))->assertForbidden();
     }
 

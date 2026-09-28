@@ -298,6 +298,35 @@ Before implementation, confirm:
 - Promotion shown, accepted and ignored
 - Notification delivery, open, click and attributed purchase
 
+## Gallery engagement reporting implemented
+
+The admin **Sales > Events** report now groups engagement by the exact
+competition or concert gallery. It combines account activity with email-only
+guest gallery access and reports:
+
+- unique gallery visitors;
+- visitors with current favourites;
+- visitors with current cart items;
+- visitors with paid orders and visitors without paid orders;
+- order count and paid sales allocated to the event; and
+- complimentary media separately from paid orders.
+
+Competition rows show the event once. Concert galleries are grouped under a
+studio row: the studio totals count each visitor once across all its concert
+events, while the indented event rows contain only that event's albums and
+activity. Studio totals also have a combined visitor report.
+
+The event name opens the backend gallery. **View activity** opens the gallery
+visitor report with account or guest identity, first and last activity, view
+count, current favourite and cart counts, complimentary items, linked orders
+and event-level paid value. Staff can search and filter the visitor list and
+export the matching rows as CSV.
+
+Order attribution uses event identifiers preserved on order items, which lets
+one account-wide checkout contribute its individual lines to the correct
+events without counting the whole transaction against every event. Older
+competition orders can fall back to their order-level event identifier.
+
 ### Discount and credit reporting
 
 - Bulk discount value and affected orders
@@ -354,4 +383,3 @@ Before relying on new reporting for commercial decisions:
 - [ADR-0044: Studio-principal photo pricing](../decisions/ADR-0044-Studio-Principal-Photo-Pricing.md)
 - [ADR-0045: Reusable media price lists](../decisions/ADR-0045-Reusable-Media-Price-Lists.md)
 - [ADR-0046: Customer account credit ledger](../decisions/ADR-0046-Customer-Account-Credit-Ledger.md)
-

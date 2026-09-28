@@ -76,7 +76,7 @@ class GuestGalleryAccessManager
             ->when($eventId, fn ($query) => $query->where('scheduling_event_id', $eventId))
             ->when($concertId, fn ($query) => $query->where('concert_id', $concertId))
             ->where('expires_at', '>', now())->latest('id')->first();
-        abort_unless($access, 403, 'Enter your email and gallery login code to view this gallery.');
+        abort_unless($access, 403, 'Enter your email and gallery access code to view this gallery.');
         $access->update(['last_used_at' => now()]);
 
         return $access;

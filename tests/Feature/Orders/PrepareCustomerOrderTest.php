@@ -6,6 +6,7 @@ use App\Features\Concerts\Models\Concert;
 use App\Features\Customers\Models\CustomerConcertPhotoSelection;
 use App\Features\Customers\Models\CustomerMediaSelection;
 use App\Features\Customers\Services\CompetitionOrderCatalogue;
+use App\Features\Customers\Services\CustomerAccountMediaSelections;
 use App\Features\Customers\Services\CustomerCompetitionAccess;
 use App\Features\Customers\Services\CustomerCompetitionCart;
 use App\Features\Customers\Services\CustomerConcertPhotoCart;
@@ -182,5 +183,69 @@ class PrepareCustomerOrderTest extends TestCase
         $this->assertNotSame($order->id, $gstFreeOrder->id);
         $this->assertSame(0, $gstFreeOrder->tax_amount);
         $this->assertSame(0, $gstFreeOrder->items->first()->tax_rate_basis_points);
+    }
+
+    public function test_account_cart_combines_selected_events_with_one_code_credit_and_payment_total(): void
+    {
+        $user = User::factory()->customer()->create();
+        $staff = User::factory()->staff()->create();
+        $firstEvent = SchedulingEvent::create(['name' => 'First event', 'event_type' => 'competition', 'event_date' => now()]);
+        $secondEvent = SchedulingEvent::create(['name' => 'Second event', 'event_type' => 'competition', 'event_date' => now()]);
+        $firstItem = (string) Str::uuid();
+        $secondItem = (string) Str::uuid();
+        $firstSelection = CustomerMediaSelection::create([
+            'user_id' => $user->id, 'scheduling_event_id' => $firstEvent->id,
+            'selection_key' => 'routine_photos:'.$firstItem, 'product' => 'routine_photos',
+            'item_uuid' => $firstItem, 'in_cart' => true,
+        ]);
+        $secondSelection = CustomerMediaSelection::create([
+            'user_id' => $user->id, 'scheduling_event_id' => $secondEvent->id,
+            'selection_key' => 'routine_photos:'.$secondItem, 'product' => 'routine_photos',
+            'item_uuid' => $secondItem, 'in_cart' => true,
+        ]);
+        $firstCollection = MediaCollection::factory()->forCompetition($firstEvent->id)->create(['media_type' => MediaType::Photo]);
+        $secondCollection = MediaCollection::factory()->forCompetition($secondEvent->id)->create(['media_type' => MediaType::Photo]);
+        $firstPhoto = MediaAsset::factory()->create(['media_collection_id' => $firstCollection->id, 'media_type' => MediaType::Photo]);
+        $secondPhoto = MediaAsset::factory()->create(['media_collection_id' => $secondCollection->id, 'media_type' => MediaType::Photo]);
+
+        $groups = collect([
+            ['kind' => 'competition', 'event' => $firstEvent, 'selections' => collect([$firstSelection]),
+                'lineAmounts' => [$firstSelection->id => 4000], 'subtotal' => 4000, 'bulk_eligible_subtotal' => 4000],
+            ['kind' => 'competition', 'event' => $secondEvent, 'selections' => collect([$secondSelection]),
+                'lineAmounts' => [$secondSelection->id => 4500], 'subtotal' => 4500, 'bulk_eligible_subtotal' => 4500],
+        ]);
+        $this->mock(CustomerAccountMediaSelections::class)->shouldReceive('forUser')->once()
+            ->withArgs(fn (User $account, string $mode): bool => $account->is($user) && $mode === 'cart')
+            ->andReturn(['groups' => $groups]);
+        $this->mock(CustomerCompetitionAccess::class)->shouldReceive('allows')->twice()->andReturn(true);
+        $this->mock(CompetitionOrderCatalogue::class)->shouldReceive('readyRoutine')->twice()->andReturn(
+            ['collection' => $firstCollection, 'assets' => collect([$firstPhoto])],
+            ['collection' => $secondCollection, 'assets' => collect([$secondPhoto])],
+        );
+        MediaDiscountCode::create(['code' => 'GROUP10', 'discount_type' => 'fixed', 'percent' => null,
+            'amount' => 1000, 'enabled' => true]);
+        app(CustomerCredits::class)->grant($user, 1500, $staff, 'Grouped checkout credit');
+
+        $order = app(PrepareCustomerOrder::class)->accountCart($user, [
+            'competition:'.$firstEvent->uuid,
+            'competition:'.$secondEvent->uuid,
+        ], 'group10', true);
+
+        $this->assertSame('account_cart', $order->metadata['kind']);
+        $this->assertSame(8500, $order->subtotal_amount);
+        $this->assertSame(6000, $order->total_amount);
+        $this->assertSame(6000, $order->paymentAmount());
+        $this->assertSame(1000, $order->metadata['discount_code_amount']);
+        $this->assertSame(1500, $order->metadata['account_credit_amount']);
+        $this->assertCount(2, $order->metadata['cart_groups']);
+        foreach ($order->metadata['cart_groups'] as $group) {
+            $this->assertSame($group['total'], $order->items->filter(fn ($item) => $item->metadata['event_uuid'] === $group['source_uuid'])->sum('total_price_amount'));
+        }
+        $this->assertSame(7500, $order->items->sum('total_price_amount'));
+        $this->assertSame(6000, $order->items->sum(fn ($item): int => $item->metadata['net_after_account_credit']));
+
+        $order->update(['status' => OrderStatus::Paid, 'paid_at' => now()]);
+        $this->assertModelMissing($firstSelection);
+        $this->assertModelMissing($secondSelection);
     }
 }

@@ -18,6 +18,12 @@ class ValidatePayableOrder
             return;
         }
 
+        if (($metadata['kind'] ?? null) === 'account_cart') {
+            $this->validateAccountCart($order, $metadata['cart_groups'] ?? []);
+
+            return;
+        }
+
         $expected = $this->ids($metadata['cart_selection_ids'] ?? []);
         $current = match ($metadata['kind'] ?? null) {
             'competition' => $this->competitionSelectionIds($order),
@@ -26,10 +32,51 @@ class ValidatePayableOrder
         };
 
         if ($expected === [] || $expected !== $current) {
-            throw ValidationException::withMessages([
-                'payment' => 'Your cart changed after this order was prepared. Return to the cart and review the updated order.',
-            ]);
+            $this->cartChanged();
         }
+    }
+
+    private function validateAccountCart(Order $order, mixed $groups): void
+    {
+        if (! is_array($groups) || $groups === []) {
+            $this->cartChanged();
+        }
+        foreach ($groups as $group) {
+            if (! is_array($group)) {
+                $this->cartChanged();
+            }
+            $expected = $this->ids($group['selection_ids'] ?? []);
+            $current = match ($group['kind'] ?? null) {
+                'competition' => $this->competitionGroupSelectionIds($order, $group['source_uuid'] ?? null),
+                'concert' => $this->concertGroupSelectionIds($order, $group['source_uuid'] ?? null),
+                default => [],
+            };
+            if ($expected === [] || $expected !== $current) {
+                $this->cartChanged();
+            }
+        }
+    }
+
+    private function competitionGroupSelectionIds(Order $order, ?string $eventUuid): array
+    {
+        $event = SchedulingEvent::query()->where('uuid', $eventUuid)->first();
+
+        return $event ? $this->ids(CustomerMediaSelection::query()->where('user_id', $order->user_id)
+            ->where('scheduling_event_id', $event->id)->where('in_cart', true)->pluck('id')->all()) : [];
+    }
+
+    private function concertGroupSelectionIds(Order $order, ?string $concertUuid): array
+    {
+        return $this->ids(CustomerConcertPhotoSelection::query()->where('user_id', $order->user_id)
+            ->where('in_cart', true)->whereHas('concert', fn ($query) => $query->where('uuid', $concertUuid))
+            ->pluck('id')->all());
+    }
+
+    private function cartChanged(): never
+    {
+        throw ValidationException::withMessages([
+            'payment' => 'Your cart changed after this order was prepared. Return to the cart and review the updated order.',
+        ]);
     }
 
     private function competitionSelectionIds(Order $order): array

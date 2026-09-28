@@ -1,7 +1,7 @@
 @extends('layouts.admin', [
-    'title' => 'Competition Media',
-    'heading' => 'Competition Media',
-    'subheading' => 'Browse the existing competition storage used by the live app.',
+    'title' => 'Competition media',
+    'heading' => 'Competition media',
+    'subheading' => 'Browse stored competition files and create tracked download links.',
 ])
 
 @section('content')
@@ -61,7 +61,7 @@
             class="button secondary"
             href="{{ route('admin.download-links.create') }}"
         >
-            Create links <span id="competition-selection-count"></span>
+            Create download links <span id="competition-selection-count"></span>
         </a>
 
         @if($videoEvent)

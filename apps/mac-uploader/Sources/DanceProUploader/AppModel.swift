@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import PreparationCore
+import UniformTypeIdentifiers
 
 struct LocalEvent: Identifiable {
   let url: URL
@@ -32,6 +33,30 @@ final class AppModel: ObservableObject {
   private var page = 0
   private var bookmarks: [Data] = []
   private var accessed: [URL] = []
+  private var reviewModels: [String: PhotoReviewModel] = [:]
+
+  private func reviewModel(for local: LocalEvent) throws -> PhotoReviewModel {
+    if let existing = reviewModels[local.id] { return existing }
+    let created = try PhotoReviewModel(local: local)
+    reviewModels[local.id] = created
+    return created
+  }
+
+  // Runs while the app is open, including on the event list. Reuse each library
+  // actor so background acknowledgements cannot overwrite active review edits.
+  func syncTopPics() async {
+    for local in locals where reviewModels[local.id] == nil {
+      _ = try? reviewModel(for: local)
+    }
+    for model in Array(reviewModels.values) {
+      guard !Task.isCancelled else { return }
+      await model.syncTopPics(client: try? client())
+    }
+  }
+
+  func retryTopPics(_ review: PhotoReviewModel) async {
+    await review.syncTopPics(client: try? client(), retryNow: true)
+  }
 
   init() {
     loadLocalEvents()
@@ -131,6 +156,25 @@ final class AppModel: ObservableObject {
     }
   }
 
+  func downloadVideoTitles(_ programme: Programme) async {
+    guard !busy else { return }
+    let panel = NSSavePanel()
+    panel.allowedContentTypes = [.zip]
+    panel.nameFieldStringValue = "Video titles \(programme.eventUuid).zip"
+    panel.title = "Save Video Titles"
+    panel.message = "Download the titles published as ready in DancePro."
+    guard await panel.begin() == .OK, let destination = panel.url else { return }
+    let accessing = destination.startAccessingSecurityScopedResource()
+    defer { if accessing { destination.stopAccessingSecurityScopedResource() } }
+    await perform("Downloading video titles…") {
+      let bytes = try await TitleCardDownloads.download(
+        client: self.client(), eventUuid: programme.eventUuid, revisionUuid: programme.revisionUuid)
+      try bytes.write(to: destination, options: .atomic)
+      self.message = "Video titles saved. Open the ZIP to access the JPEGs."
+      NSWorkspace.shared.activateFileViewerSelecting([destination])
+    }
+  }
+
   func prepare() async {
     guard let programme, let session else { return }
     let panel = NSOpenPanel()
@@ -196,7 +240,7 @@ final class AppModel: ObservableObject {
       let manifest = try ProgrammeCoding.decoder().decode(
         PreparedEvent.self, from: Data(contentsOf: root.appendingPathComponent("preparation.json")))
       let local = LocalEvent(url: root, manifest: manifest)
-      let review = try PhotoReviewModel(local: local)
+      let review = try reviewModel(for: local)
       if accessing { accessed.append(root) }
       self.review = review
     } catch {
@@ -206,7 +250,7 @@ final class AppModel: ObservableObject {
   }
 
   func openReview(_ local: LocalEvent) {
-    do { review = try PhotoReviewModel(local: local) } catch {
+    do { review = try reviewModel(for: local) } catch {
       self.error = error.localizedDescription
     }
   }
@@ -231,6 +275,14 @@ final class AppModel: ObservableObject {
     do { review.startUploads(client: try client()) } catch {
       review.error = error.localizedDescription
     }
+  }
+
+  func uploadConcertVideos(_ video: ConcertVideoUploadModel) async {
+    do { await video.upload(client: try client()) } catch { video.error = error.localizedDescription }
+  }
+
+  func finishConcertVideos(_ video: ConcertVideoUploadModel) async {
+    do { await video.finish(client: try client()) } catch { video.error = error.localizedDescription }
   }
 
   func uploadVideos(_ video: VideoUploadModel, roleUuid: String) async {

@@ -43,7 +43,7 @@ class GuestConcertGalleryController extends Controller
 
         return response()->view('customers.concerts.cart', $selections->forStudio($guestAccess, $concert->studio) + [
             'concertRoutes' => $this->routes(), 'concertBackUrl' => route('guest-galleries.concerts.show', $concert),
-            'guestCheckout' => true,
+            'guestCheckout' => true, 'activeTab' => $request->validated('tab') ?? 'cart',
         ])->header('Cache-Control', 'private, no-store')->header('X-Robots-Tag', 'noindex, nofollow');
     }
 

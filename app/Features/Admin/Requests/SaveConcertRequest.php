@@ -26,7 +26,7 @@ class SaveConcertRequest extends FormRequest
         return [
             'studio_id' => ['required', 'integer', Rule::exists('studios', 'id')->whereNull('deleted_at')],
             'concert_booking_item_id' => ['nullable', 'integer', Rule::exists('concert_booking_items', 'id')
-                ->where('item_type', ConcertBookingItemType::Concert->value)
+                ->whereIn('item_type', [ConcertBookingItemType::Concert->value, ConcertBookingItemType::DressRehearsal->value])
                 ->whereNull('cancelled_at'),
                 Rule::unique('concerts', 'concert_booking_item_id')->ignore($concert)],
             'name' => ['required', 'string', 'max:255'],

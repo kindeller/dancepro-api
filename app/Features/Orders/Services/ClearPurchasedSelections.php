@@ -19,6 +19,13 @@ class ClearPurchasedSelections
         }
 
         $metadata = $order->metadata;
+        if (($metadata['kind'] ?? null) === 'account_cart') {
+            foreach ($metadata['cart_groups'] ?? [] as $group) {
+                $this->clearGroup($order, $group);
+            }
+
+            return;
+        }
         $selectionIds = $this->ids($metadata['cart_selection_ids'] ?? []);
         if ($selectionIds === []) {
             return;
@@ -38,6 +45,28 @@ class ClearPurchasedSelections
                     ->where('studio_id', $studio->id)
                     ->whereIn('id', $selectionIds)->delete();
             }
+        }
+    }
+
+    private function clearGroup(Order $order, mixed $group): void
+    {
+        if (! is_array($group)) {
+            return;
+        }
+        $ids = $this->ids($group['selection_ids'] ?? []);
+        if ($ids === []) {
+            return;
+        }
+        if (($group['kind'] ?? null) === 'competition') {
+            $event = SchedulingEvent::where('uuid', $group['source_uuid'] ?? null)->first();
+            if ($event) {
+                CustomerMediaSelection::where('user_id', $order->user_id)
+                    ->where('scheduling_event_id', $event->id)->whereIn('id', $ids)->delete();
+            }
+        } elseif (($group['kind'] ?? null) === 'concert') {
+            CustomerConcertPhotoSelection::where('user_id', $order->user_id)
+                ->whereHas('concert', fn ($query) => $query->where('uuid', $group['source_uuid'] ?? null))
+                ->whereIn('id', $ids)->delete();
         }
     }
 

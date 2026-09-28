@@ -139,9 +139,9 @@
             <input name="password" type="password" autocomplete="current-password" required>
         </label>
 
-        <label style="display:flex;align-items:center;gap:8px;">
-            <input name="remember" type="checkbox" value="1" style="width:auto;min-height:auto;">
-            Remember this browser
+        <label class="choice">
+            <input name="remember" type="checkbox" value="1">
+            <span>Remember this browser</span>
         </label>
 
         <button type="submit">Sign in</button>

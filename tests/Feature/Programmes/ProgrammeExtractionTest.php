@@ -145,7 +145,12 @@ class ProgrammeExtractionTest extends TestCase
         $pdf->loadHtml('<html><body><h1>ACT 1</h1><table style="width:100%;font-size:18px"><tr><td style="width:50%">1. Opening</td><td>Senior Jazz</td></tr><tr><td>3. Long title<br>continued here</td><td>Teen Ballet</td></tr></table><div style="page-break-before:always"></div><h1>ACT 2</h1><table style="width:100%;font-size:18px"><tr><td style="width:50%">1. Finale</td><td>Everyone</td></tr></table></body></html>');
         $pdf->render();
         Storage::disk('local')->put($programme->source->path, $pdf->output());
-        $result = app(ProgrammePdfExtractor::class)->extract($programme->source, 'concert');
+        $progress = [];
+        $result = app(ProgrammePdfExtractor::class)->extract($programme->source, 'concert', null, function ($page, $total, $ocr) use (&$progress): void {
+            $progress[] = [$page, $total, $ocr];
+        });
+        // The short second page uses the existing OCR fallback (<40 characters).
+        $this->assertSame([[1, 2, false], [2, 2, true]], $progress);
         $items = collect($result['nodes'])->where('kind', 'item')->values();
         $this->assertSame(['1', '3', '1'], $items->pluck('number')->all());
         $this->assertSame(['Opening', 'Long title continued here', 'Finale'], $items->pluck('title')->all());
@@ -159,6 +164,22 @@ class ProgrammeExtractionTest extends TestCase
         $process = new Process(['python3', '-m', 'unittest', 'discover', '-s', 'tests/Unit/Programmes', '-p', 'test_*.py'], base_path());
         $process->run();
         $this->assertTrue($process->isSuccessful(), $process->getErrorOutput());
+    }
+
+    public function test_progress_distinguishes_queue_waits_and_recovers_a_stopped_reader(): void
+    {
+        [$programme, $extraction, $user] = $this->prepare();
+        $extraction->update(['updated_at' => now()->subMinutes(2)]);
+        $this->actingAs($user)->getJson($this->url($programme->event).'/extraction')->assertOk()
+            ->assertJsonPath('data.status', 'queued')->assertJsonPath('data.message', 'Still waiting for the programme reader to start. The worker may be busy or unavailable; your PDF is saved. This page will keep checking.');
+        $extraction->update(['status' => 'processing', 'message' => 'Reading scanned page 2 of 5…']);
+        $this->getJson($this->url($programme->event).'/extraction')->assertJsonPath('data.message', 'Reading scanned page 2 of 5…');
+        $extraction->update(['updated_at' => now()->subMinutes(5)]);
+        $this->getJson($this->url($programme->event).'/extraction')->assertJsonPath('data.status', 'failed');
+        $this->get($this->url($programme->event))->assertOk()->assertSee('Read PDF again');
+        $this->post($this->url($programme->event))->assertRedirect();
+        $this->assertSame('queued', $extraction->fresh()->status);
+        Storage::disk('local')->assertExists($programme->source->path);
     }
 
     private function event(): SchedulingEvent

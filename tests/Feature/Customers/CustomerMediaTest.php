@@ -15,6 +15,7 @@ use App\Features\Orders\Models\OrderItem;
 use App\Features\Orders\Services\ActivateOrderMediaEntitlement;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Studios\Models\Studio;
+use App\Features\Studios\Models\StudioAccountAccess;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -41,8 +42,22 @@ class CustomerMediaTest extends TestCase
         $user = User::factory()->customer()->create();
         $event = SchedulingEvent::create(['name' => 'Saved competition', 'event_type' => 'competition', 'event_date' => '2026-09-04']);
         CustomerCompetitionRegistration::create(['user_id' => $user->id, 'scheduling_event_id' => $event->id, 'access_verified_at' => now()]);
-        $this->actingAs($user)->get(route('customer.media.index'))->assertOk()->assertSee('My Media')->assertSee('Add media')->assertSee('Saved competition')->assertSee(route('customer.profile.edit'), false);
+        $this->actingAs($user)->get(route('customer.media.index'))->assertOk()->assertSee('My Media')->assertSee('Add media')->assertSee('Saved competition')->assertSee(route('customer.profile.edit'), false)
+            ->assertDontSee('<a class="header-back"', false)->assertSee('aria-current="page"', false);
         $this->actingAs(User::factory()->customer()->create())->get(route('customer.media.index'))->assertOk()->assertDontSee('Saved competition');
+    }
+
+    public function test_studio_hub_navigation_is_visible_only_with_active_management_access(): void
+    {
+        $customer = User::factory()->customer()->create();
+        $studio = Studio::factory()->create();
+
+        $this->actingAs($customer)->get(route('customer.media.index'))->assertOk()->assertDontSee('Studio Hub');
+        StudioAccountAccess::query()->create([
+            'studio_id' => $studio->id, 'user_id' => $customer->id, 'email' => $customer->email,
+            'role' => 'director', 'status' => 'active', 'activated_at' => now(),
+        ]);
+        $this->get(route('customer.media.index'))->assertOk()->assertSee('Studio Hub');
     }
 
     public function test_media_home_separates_recommendations_purchases_and_browsing_access(): void
@@ -63,7 +78,22 @@ class CustomerMediaTest extends TestCase
             ->assertSee('No purchased photos are linked to your account yet.');
     }
 
-    public function test_competition_purchases_from_multiple_orders_share_one_flat_event_album(): void
+    public function test_media_home_links_to_account_wide_favourites_and_cart(): void
+    {
+        $user = User::factory()->customer()->create();
+
+        $this->actingAs($user)->get(route('customer.media.index'))->assertOk()
+            ->assertSee(route('customer.media.favourites'), false)
+            ->assertSee(route('customer.media.cart'), false);
+        $this->get(route('customer.media.favourites'))->assertOk()
+            ->assertSee('Your favourites are empty.')->assertSee('Media saved across all your events.')
+            ->assertSee('account-selection-links');
+        $this->get(route('customer.media.cart'))->assertOk()
+            ->assertSee('Your cart is empty.')->assertSee('Media saved across all your events.')
+            ->assertSee('account-selection-links');
+    }
+
+    public function test_competition_purchases_from_multiple_orders_merge_into_routine_folders(): void
     {
         Storage::fake('local');
         $user = User::factory()->customer()->create();
@@ -87,14 +117,43 @@ class CustomerMediaTest extends TestCase
 
         $album = app(CustomerPurchasedMedia::class)->albumForUser($user, 'competition', $event->uuid);
         $this->assertSame(2, $album['assets']->count());
+        $this->assertCount(2, $album['folders']);
+        $this->assertSame(1, $album['folders']->firstWhere('title', 'Routine one')['assets']->count());
         $this->assertCount(1, app(CustomerPurchasedMedia::class)->forUser($user)['photos']);
         $this->actingAs($user)->get(route('customer.media.index'))->assertOk()->assertSee('View media →')
             ->assertSee(route('customer.media.library.thumbnail', ['kind' => 'competition', 'event' => $event->uuid, 'asset' => $first->uuid]), false);
         $this->get(route('customer.media.library.show', ['kind' => 'competition', 'event' => $event->uuid]))->assertOk()
-            ->assertSee('First photo')->assertSee('Second photo')->assertDontSee('Routine one')->assertDontSee('Routine two');
+            ->assertSee('Routine one')->assertSee('Routine two')->assertDontSee('First photo')->assertDontSee('Second photo')
+            ->assertDontSee('← My Media');
+        $this->get(route('customer.media.library.show', ['kind' => 'competition', 'event' => $event->uuid, 'routine' => $firstCollection->uuid]))->assertOk()
+            ->assertSee('Competition routine')->assertSee('Routine one')->assertSee('First photo')->assertDontSee('Second photo');
         $this->get(route('customer.media.library.thumbnail', ['kind' => 'competition', 'event' => $event->uuid, 'asset' => $first->uuid]))
             ->assertOk()->assertHeader('Cache-Control', 'no-store, private');
         $this->actingAs($other)->get(route('customer.media.library.show', ['kind' => 'competition', 'event' => $event->uuid]))->assertNotFound();
+    }
+
+    public function test_concert_purchases_are_grouped_by_routine_across_orders(): void
+    {
+        $user = User::factory()->customer()->create();
+        $concert = Concert::factory()->published()->create(['name' => 'Junior showcase']);
+        $opening = MediaCollection::factory()->create(['concert_id' => $concert->id, 'competition_id' => null,
+            'name' => '01 Opening routine', 'media_type' => MediaType::Photo]);
+        $finale = MediaCollection::factory()->create(['concert_id' => $concert->id, 'competition_id' => null,
+            'name' => '12 Finale', 'media_type' => MediaType::Photo]);
+        $first = MediaAsset::factory()->create(['media_collection_id' => $opening->id, 'display_name' => 'Opening one']);
+        $second = MediaAsset::factory()->create(['media_collection_id' => $opening->id, 'display_name' => 'Opening two']);
+        $third = MediaAsset::factory()->create(['media_collection_id' => $finale->id, 'display_name' => 'Finale one']);
+        foreach ([$first, $second, $third] as $asset) {
+            $order = Order::factory()->paid()->create(['user_id' => $user->id]);
+            OrderItem::factory()->create(['order_id' => $order->id, 'media_collection_id' => $asset->media_collection_id,
+                'media_asset_id' => $asset->id]);
+        }
+
+        $root = route('customer.media.library.show', ['kind' => 'concert', 'event' => $concert->uuid]);
+        $this->actingAs($user)->get($root)->assertOk()->assertSee('Junior showcase')
+            ->assertSee('01 Opening routine')->assertSee('12 Finale')->assertDontSee('Opening one');
+        $this->get(route('customer.media.library.show', ['kind' => 'concert', 'event' => $concert->uuid, 'routine' => $opening->uuid]))->assertOk()
+            ->assertSee('Junior showcase')->assertSee('01 Opening routine')->assertSee('Opening one')->assertSee('Opening two')->assertDontSee('Finale one');
     }
 
     public function test_new_order_entitlement_freezes_the_exact_purchased_photo_set(): void
@@ -116,6 +175,33 @@ class CustomerMediaTest extends TestCase
         $this->assertSame([$first->uuid], $album['assets']->pluck('uuid')->all());
     }
 
+    public function test_download_all_caches_a_shared_competition_archive_and_records_each_asset(): void
+    {
+        Storage::fake('local');
+        $user = User::factory()->customer()->create();
+        $event = SchedulingEvent::create(['name' => 'Archive competition', 'event_type' => 'competition', 'event_date' => '2026-09-04']);
+        CustomerCompetitionRegistration::create(['user_id' => $user->id, 'scheduling_event_id' => $event->id, 'access_verified_at' => now()]);
+        $collection = MediaCollection::factory()->forCompetition($event->id)->create(['media_type' => MediaType::Photo]);
+        $assets = collect([
+            MediaAsset::factory()->create(['media_collection_id' => $collection->id, 'media_type' => MediaType::Photo, 'storage_disk' => 'local', 'storage_key' => 'originals/one.jpg', 'original_filename' => 'one.jpg', 'size_bytes' => 3]),
+            MediaAsset::factory()->create(['media_collection_id' => $collection->id, 'media_type' => MediaType::Photo, 'storage_disk' => 'local', 'storage_key' => 'originals/two.jpg', 'original_filename' => 'two.jpg', 'size_bytes' => 3]),
+        ]);
+        Storage::disk('local')->put('originals/one.jpg', 'one');
+        Storage::disk('local')->put('originals/two.jpg', 'two');
+        $order = Order::factory()->paid()->create(['user_id' => $user->id]);
+        $item = OrderItem::factory()->create(['order_id' => $order->id, 'media_collection_id' => $collection->id, 'media_asset_id' => null]);
+        app(ActivateOrderMediaEntitlement::class)->execute($item, 'photo', $assets);
+
+        $url = route('customer.media.library.download-all', ['kind' => 'competition', 'event' => $event->uuid]);
+        $this->actingAs($user)->get($url)->assertOk()->assertDownload('archive-competition.zip');
+        $this->get($url)->assertOk()->assertDownload('archive-competition.zip');
+
+        $this->assertDatabaseCount('customer_media_archives', 1);
+        $this->assertDatabaseHas('customer_media_archives', ['scope' => 'shared', 'asset_count' => 2, 'download_count' => 2]);
+        $this->assertDatabaseHas('order_media_asset_downloads', ['media_asset_id' => $assets[0]->id, 'download_count' => 2]);
+        $this->assertDatabaseHas('order_media_asset_downloads', ['media_asset_id' => $assets[1]->id, 'download_count' => 2]);
+    }
+
     public function test_order_history_is_private_and_lists_only_the_customer_orders(): void
     {
         $user = User::factory()->customer()->create();
@@ -123,7 +209,7 @@ class CustomerMediaTest extends TestCase
         $mine = Order::factory()->paid()->create(['user_id' => $user->id, 'total_amount' => 4500]);
         $foreign = Order::factory()->paid()->create(['user_id' => $other->id]);
         $this->actingAs($user)->get(route('customer.media.orders.index'))->assertOk()
-            ->assertSee($mine->uuid)->assertSee('$45.00')->assertDontSee($foreign->uuid)
+            ->assertSee('Order '.$mine->displayNumber())->assertSee('$45.00')->assertDontSee('Order '.$foreign->displayNumber())
             ->assertHeader('Cache-Control', 'no-store, private');
     }
 

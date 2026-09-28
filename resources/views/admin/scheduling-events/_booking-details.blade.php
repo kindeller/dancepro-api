@@ -54,7 +54,7 @@
             <dl class="detail-list">
                 <dt>Multiple concerts</dt><dd>{{ $booking->multiple_concert_relationship ?: 'Not supplied' }}</dd>
                 <dt>Postal address</dt><dd style="white-space:pre-line">{{ $booking->postal_address ?: 'Not supplied' }}</dd>
-                <dt>Previous video feedback</dt><dd style="white-space:pre-line">{{ $booking->previous_video_feedback ?: 'Not supplied' }}</dd>
+                <dt>Feedback and requests</dt><dd style="white-space:pre-line">{{ $booking->previous_video_feedback ?: 'Not supplied' }}</dd>
             </dl>
         </div>
     </div>

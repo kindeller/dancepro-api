@@ -13,6 +13,7 @@ use App\Features\Tracking\Models\ConcertTrackerTask;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class StoreStudioEventFiles
@@ -20,18 +21,28 @@ class StoreStudioEventFiles
     public function __construct(private readonly OperationsFileStorage $storage) {}
 
     /** @param list<UploadedFile> $files */
-    public function execute(SchedulingEvent $event, User $user, string $kind, array $files): void
+    public function execute(SchedulingEvent $event, User $user, string $kind, array $files, ?string $replaceUuid = null): void
     {
+        if ($replaceUuid && (count($files) !== 1 || ! $event->studioFiles()->where('uuid', $replaceUuid)->where('kind', $kind)->where('is_current', true)->exists())) {
+            throw ValidationException::withMessages(['replace_uuid' => 'Choose one replacement file for a current file belonging to this event.']);
+        }
         foreach ($files as $file) {
-            $this->store($event, $user, $kind, $file);
+            $this->store($event, $user, $kind, $file, $replaceUuid);
         }
     }
 
-    private function store(SchedulingEvent $event, User $user, string $kind, UploadedFile $file): void
+    private function store(SchedulingEvent $event, User $user, string $kind, UploadedFile $file, ?string $replaceUuid): void
     {
         $path = $this->storage->store($file, 'studio-event-files/'.$event->uuid.'/'.$kind);
         try {
-            DB::transaction(function () use ($event, $user, $kind, $file, $path): void {
+            DB::transaction(function () use ($event, $user, $kind, $file, $path, $replaceUuid): void {
+                if ($replaceUuid) {
+                    $previous = $event->studioFiles()->where('uuid', $replaceUuid)->where('kind', $kind)->lockForUpdate()->first();
+                    if (! $previous?->is_current) {
+                        throw ValidationException::withMessages(['replace_uuid' => 'This file has already been replaced. Reload the booking.']);
+                    }
+                    $previous->update(['is_current' => false, 'status' => 'superseded']);
+                }
                 if ($kind === 'programme') {
                     StudioEventFile::where('scheduling_event_id', $event->id)->where('kind', 'programme')->where('is_current', true)
                         ->update(['is_current' => false, 'status' => 'superseded']);
@@ -54,7 +65,7 @@ class StoreStudioEventFiles
                 } else {
                     ConcertTrackerTask::updateOrCreate(
                         ['scope_type' => 'event', 'scope_id' => $event->id, 'task_key' => 'slideshow_received'],
-                        ['status' => 'in_progress'],
+                        ['status' => 'in_progress', 'completed_by_user_id' => null, 'completed_at' => null],
                     );
                 }
             });

@@ -107,6 +107,9 @@ class ConcertCodeGroupTest extends TestCase
             'version' => $group->fresh()->version, 'code' => 'NEW-CODE',
         ])->assertRedirect();
         $this->assertTrue(Hash::check('NEW-CODE', $group->fresh()->code_hash));
+        $this->assertSame('NEW-CODE', $group->fresh()->code_encrypted);
+        $this->assertArrayNotHasKey('code_encrypted', $group->fresh()->toArray());
+        $this->assertStringNotContainsString('NEW-CODE', $group->fresh()->getRawOriginal('code_encrypted'));
         $this->assertTrue(app(CustomerConcertAccess::class)->allows($customer, $concert->fresh()));
         $this->assertSame(['created', 'released', 'code_changed'], DB::table('concert_code_group_changes')->orderBy('id')->pluck('action')->all());
         $this->assertStringNotContainsString('NEW-CODE', DB::table('concert_code_group_changes')->get()->toJson());

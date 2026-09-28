@@ -26,6 +26,11 @@ specific media represented at order creation.
 - Repeated preparation of an unchanged cart reuses its draft. A changed cart
   creates a new draft and cancels earlier drafts for that source. Paid orders
   and their item snapshots are never rewritten by cart preparation.
+- Present orders to customers and staff with a numeric number derived from the
+  immutable database sequence, starting at 100001. UUIDs remain the route,
+  integration and internal audit identifiers. Numeric order numbers are for
+  display, communication, search and exports; gaps are allowed and numbers are
+  never reused.
 - Do not interpret a draft as a sale or a download right. Before submitting a
   payment, the checkout workflow must verify that the draft is still current,
   the amount is unchanged and the selected media remains orderable. Only a

@@ -22,6 +22,53 @@ final class PhotoReviewModel: ObservableObject {
   private var uploadTask: Task<Void, Never>?
   @Published var queuedIDs = Set<String>()
   private let library: PhotoLibrary
+  @Published var pendingTopPicCount = 0
+  @Published var syncingTopPics = false
+  @Published var topPicSyncError: String?
+  private var nextTopPicAttempt = Date.distantPast
+  private var topPicFailures = 0
+  private var checkingTopPics = false
+
+  var topPicSyncStatus: String {
+    if syncingTopPics { return "Syncing Top Pics…" }
+    if pendingTopPicCount > 0 { return "Top Pics: \(pendingTopPicCount) changes pending" }
+    return "Top Pics: all uploaded changes synced"
+  }
+
+  func syncTopPics(client: APIClient?, retryNow: Bool = false, now: Date = Date()) async {
+    guard !checkingTopPics else { return }
+    checkingTopPics = true
+    defer { checkingTopPics = false }
+    let changes = await library.pendingTopPicChanges()
+    pendingTopPicCount = changes.count
+    guard !changes.isEmpty else {
+      topPicSyncError = nil
+      topPicFailures = 0
+      nextTopPicAttempt = .distantPast
+      return
+    }
+    guard let client else {
+      topPicSyncError = "Sign in to sync. Changes are saved on this Mac."
+      return
+    }
+    guard retryNow || now >= nextTopPicAttempt else { return }
+    syncingTopPics = true
+    defer { syncingTopPics = false }
+    do {
+      let batch = Array(changes.prefix(100))
+      try await client.syncTopPics(manifest: local.manifest, changes: batch)
+      try await library.acknowledgeTopPicChanges(batch)
+      pendingTopPicCount = await library.pendingTopPicChanges().count
+      topPicSyncError = nil
+      topPicFailures = 0
+      nextTopPicAttempt = .distantPast
+    } catch {
+      // Keep the durable queue intact on network errors, expiry or a bad receipt.
+      topPicFailures += 1
+      nextTopPicAttempt = now.addingTimeInterval(min(60, 5 * pow(2, Double(min(topPicFailures - 1, 4)))))
+      topPicSyncError = error.localizedDescription + " Changes are saved; retrying automatically."
+    }
+  }
   @Published var movingPhotos = false
   @Published var moveSelection = Set<String>()
   private let dragSession = UUID().uuidString
@@ -391,6 +438,7 @@ final class PhotoReviewModel: ObservableObject {
     defer { refreshing = false }
     do {
       let snapshot = try await library.scan()
+      pendingTopPicCount = await library.pendingTopPicChanges().count
       guard !Task.isCancelled else { return }
       applySnapshot(snapshot)
     } catch {

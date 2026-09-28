@@ -1,13 +1,13 @@
 @extends('layouts.admin', [
-    'title' => 'Download Link Detail',
-    'heading' => 'Download Link Detail',
+    'title' => 'Download link details',
+    'heading' => 'Download link details',
     'subheading' => $downloadLink->storage_key,
 ])
 
 @section('content')
     <section class="grid two-col">
         <div class="card card-pad">
-            <h2>Link Metadata</h2>
+            <h2>Link details</h2>
             <dl class="detail-list" style="margin-top: 16px;">
                 <dt>UUID</dt>
                 <dd>{{ $downloadLink->uuid }}</dd>
@@ -39,7 +39,7 @@
         </div>
 
         <div class="card card-pad">
-            <h2>Security State</h2>
+            <h2>Access status</h2>
             <p class="muted">The original public token is not stored, so existing tracking URLs cannot be re-displayed after creation.</p>
 
             @if ($downloadLink->status !== 'revoked')
@@ -67,7 +67,7 @@
 
     <section class="card" style="margin-top: 18px;">
         <div class="card-pad">
-            <h2>Access History</h2>
+            <h2>Access history</h2>
         </div>
         <table>
             <thead>

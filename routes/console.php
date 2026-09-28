@@ -3,6 +3,7 @@
 use App\Features\Auth\Actions\PruneApiIdempotencyRecords;
 use App\Features\Contacts\Actions\ExportContactDirectory;
 use App\Features\Contacts\Actions\ImportContactDirectory;
+use App\Features\Customers\Actions\PruneCustomerMediaArchives;
 use App\Features\Customers\Actions\SendGuestGalleryReleaseNotifications;
 use App\Features\Deployment\Actions\MigratePublicUploads;
 use App\Features\Deployment\Services\DatabaseBackup;
@@ -14,7 +15,9 @@ use App\Features\Notifications\Actions\CreateShiftArrivalReminders;
 use App\Features\Operations\Actions\SecureExistingInternalDocuments;
 use App\Features\Payments\Services\CustomerMediaNotifications;
 use App\Features\Scheduling\Actions\RecordScheduledFinishes;
+use App\Features\StudioBilling\Services\ReconcileStudioInvoicePayments;
 use App\Features\Tracking\Actions\CreateConcertTrackerAlerts;
+use App\Features\Tracking\Actions\RehearseConcertEmail;
 use App\Features\Tracking\Services\ConcertTrackerAutomation;
 use App\Features\Venues\Actions\ImportVenueCatalog;
 use Illuminate\Foundation\Inspiring;
@@ -88,6 +91,8 @@ Artisan::command('api:prune-idempotency', function (PruneApiIdempotencyRecords $
 })->purpose('Remove expired mobile API idempotency records');
 
 Schedule::command('downloads:prune-accesses')->daily()->withoutOverlapping();
+Schedule::call(fn () => app(PruneCustomerMediaArchives::class)->execute())
+    ->name('customers:prune-media-archives')->hourly()->withoutOverlapping()->onOneServer();
 Schedule::command('api:prune-idempotency')->hourly()->withoutOverlapping()->onOneServer();
 Schedule::call(fn () => app(CreateShiftArrivalReminders::class)->execute())
     ->name('notifications:shift-arrival-reminders')
@@ -204,3 +209,17 @@ Artisan::command('shifts:record-scheduled-finishes', function (RecordScheduledFi
 })->purpose('Fill missing clock-outs with scheduled finish times after a two-hour grace period');
 
 Schedule::command('shifts:record-scheduled-finishes')->everyMinute()->withoutOverlapping()->onOneServer();
+
+Artisan::command('tracker:rehearse-email {delivery : Delivery UUID} {--at= : Simulated date/time for this message only}', function (RehearseConcertEmail $rehearse): int {
+    $delivery = $rehearse->execute($this->argument('delivery'), $this->option('at'));
+    $this->info('Test email status: '.$delivery->status.'. Local inbox: http://localhost:8025');
+
+    return self::SUCCESS;
+})->purpose('Capture one simulated tracker email locally without processing other queued jobs');
+
+Artisan::command('studio-invoices:reconcile', function (ReconcileStudioInvoicePayments $reconcile): int {
+    $this->info('Checked '.$reconcile->execute().' studio invoice(s) with pending Braintree payments.');
+
+    return self::SUCCESS;
+})->purpose('Reconcile pending studio card payments without submitting new charges');
+Schedule::command('studio-invoices:reconcile')->everyFifteenMinutes()->withoutOverlapping()->onOneServer();

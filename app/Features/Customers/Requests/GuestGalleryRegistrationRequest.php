@@ -20,6 +20,13 @@ class GuestGalleryRegistrationRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['email' => ['required', 'email', 'max:255'], 'notification_consent' => ['accepted']];
+        if ($this->user()) {
+            return [];
+        }
+
+        return [
+            'email' => ['required', 'email', 'max:255'],
+            'notification_consent' => ['required', 'accepted'],
+        ];
     }
 }

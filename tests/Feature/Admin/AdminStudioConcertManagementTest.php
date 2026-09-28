@@ -224,7 +224,7 @@ class AdminStudioConcertManagementTest extends TestCase
         $this->actingAs($staff)
             ->get(route('admin.studios.edit', $studio))
             ->assertOk()
-            ->assertSee('Associated Concerts')
+            ->assertSee('Associated concerts')
             ->assertSee('Fictional Linked Concert')
             ->assertSee(route('admin.concerts.edit', $concert), false)
             ->assertSee(route('concerts.show', $concert), false)

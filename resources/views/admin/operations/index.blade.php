@@ -1,4 +1,4 @@
-@extends('layouts.admin', ['title' => 'Event resources', 'heading' => 'Event resources & checklists', 'subheading' => 'Reusable handbook files, role guides and pre-start checklist templates.'])
+@extends('layouts.admin', ['title' => 'Event resources & checklists', 'heading' => 'Event resources & checklists', 'subheading' => 'Reusable handbook files, role guides and pre-start checklist templates.'])
 @section('content')
 <div class="grid two-col">
 <section class="card card-pad"><h2>Add handbook or role resource</h2><form method="POST" action="{{ route('admin.operations.resources.store') }}" enctype="multipart/form-data" class="grid">@csrf

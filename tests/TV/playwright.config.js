@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({testDir:'.',testMatch:'player.spec.js',workers:1,retries:0,reporter:'list',use:{baseURL:'http://localhost',headless:true},timeout:30000});

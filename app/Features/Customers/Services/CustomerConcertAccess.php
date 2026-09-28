@@ -28,13 +28,17 @@ class CustomerConcertAccess
 
     public function grants(User $user): Builder
     {
-        return ConcertAccessGrant::where('user_id', $user->id)->where('source', 'password')
+        return ConcertAccessGrant::where('user_id', $user->id)
             ->whereIn('status', ['active', 'claimed'])->whereNull('revoked_at')
             ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()));
     }
 
     public function matches(ConcertAccessGrant $grant, Concert $concert): bool
     {
+        if ($grant->source->value !== 'password') {
+            return $grant->concert_id === $concert->id;
+        }
+
         if ($grant->concert_code_group_id !== null) {
             $group = $grant->codeGroup;
 

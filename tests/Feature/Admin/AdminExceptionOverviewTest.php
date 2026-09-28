@@ -36,8 +36,8 @@ class AdminExceptionOverviewTest extends TestCase
             ->assertSee('Published crew assignments')
             ->assertSee('Open cover requests')
             ->assertSee('Pending invoices')
-            ->assertSee('Upcoming Events')
-            ->assertSee('Needs Attention');
+            ->assertSee('Upcoming events')
+            ->assertSee('Needs attention');
     }
 
     public function test_customer_cannot_view_the_exception_overview(): void

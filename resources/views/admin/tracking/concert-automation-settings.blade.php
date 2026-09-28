@@ -5,7 +5,7 @@
 ])
 
 @section('content')
-<div class="toolbar" style="margin-bottom:18px"><a class="button secondary" href="{{ route('admin.concert-tracker.index') }}">← Concert Tracker</a><a class="button secondary" href="{{ route('admin.concert-tracker.automation.index') }}">Communication schedule</a></div>
+<div class="toolbar" style="margin-bottom:18px"><a class="button secondary" href="{{ route('admin.concert-tracker.index') }}">← Concert tracker</a><a class="button secondary" href="{{ route('admin.concert-tracker.automation.index') }}">Communication schedule</a></div>
 @if(session('status'))<p class="card card-pad" role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<p class="card card-pad" role="alert" style="color:#a62232">{{ $errors->first() }}</p>@endif
 

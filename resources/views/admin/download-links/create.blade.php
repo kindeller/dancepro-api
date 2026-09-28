@@ -1,21 +1,21 @@
 @extends('layouts.admin', [
-    'title' => 'Create Download Links',
-    'heading' => 'Create Download Links',
-    'subheading' => 'Paste private S3 object keys and generate public Laravel tracking URLs.',
+    'title' => 'Create download links',
+    'heading' => 'Create download links',
+    'subheading' => 'Create tracked download links for selected media files.',
 ])
 
 @section('content')
     @if (session('created_links'))
         <section class="card" style="margin-bottom: 18px;">
             <div class="card-pad">
-                <h2>New Tracking URLs</h2>
-                <p class="muted">These URLs are shown once because raw tokens are not stored.</p>
+                <h2>New download links</h2>
+                <p class="muted">Copy these links now. The full links are only shown once.</p>
             </div>
             <table>
                 <thead>
                     <tr>
                         <th>Storage key</th>
-                        <th>Tracking URL</th>
+                        <th>Download link</th>
                         <th>Expires</th>
                     </tr>
                 </thead>
@@ -71,8 +71,8 @@
         </div>
 
         <div style="margin-top: 16px;">
-            <button type="submit">Generate tracking URLs</button>
-            <a class="button secondary" href="{{ route('admin.download-links.index') }}">Back to table</a>
+            <button type="submit">Create download links</button>
+            <a class="button secondary" href="{{ route('admin.download-links.index') }}">Back to download links</a>
         </div>
     </form>
 

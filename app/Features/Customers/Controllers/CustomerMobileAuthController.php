@@ -10,6 +10,7 @@ use App\Features\Customers\Requests\AcceptCustomerPolicyRequest;
 use App\Features\Customers\Requests\CustomerMobileLoginRequest;
 use App\Features\Customers\Requests\RegisterCustomerRequest;
 use App\Features\Customers\Services\CustomerMobileAccount;
+use App\Features\Customers\Services\RecordCustomerLogin;
 use App\Http\Controllers\Controller;
 use App\Shared\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -33,10 +34,11 @@ class CustomerMobileAuthController extends Controller
         return ApiResponse::success('Account created. Verify your email to continue.', $account->forUser($user), 201);
     }
 
-    public function login(CustomerMobileLoginRequest $request, IssueCustomerMobileToken $issue, CustomerMobileAccount $account): JsonResponse
+    public function login(CustomerMobileLoginRequest $request, IssueCustomerMobileToken $issue, CustomerMobileAccount $account, RecordCustomerLogin $loginEvents): JsonResponse
     {
         $result = $issue->execute($request->validated());
         if ($result['status'] !== 'passed') {
+            $loginEvents->execute($request, $request->validated('email'), null, false, 'mobile');
             $status = $result['status'];
 
             return match ($status) {
@@ -45,6 +47,8 @@ class CustomerMobileAuthController extends Controller
                 default => ApiResponse::error('Two-factor authentication is required or invalid.', ['two_factor' => [$status]], 422),
             };
         }
+
+        $loginEvents->execute($request, $result['user']->email, $result['user'], true, 'mobile');
 
         return ApiResponse::success('Logged in.', ['token' => $result['token'], 'token_type' => 'Bearer',
             'expires_at' => $result['expires_at']->toIso8601String(), 'user' => $account->forUser($result['user'])]);

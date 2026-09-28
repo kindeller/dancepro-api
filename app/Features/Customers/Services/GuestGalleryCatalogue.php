@@ -97,7 +97,7 @@ class GuestGalleryCatalogue
             if (! $concert) {
                 return null;
             }
-            $cover = $group->displayCoverAsset();
+            $cover = $group->galleryFolderCoverAsset();
 
             return [
                 'type' => 'concert', 'title' => $group->name, 'subtitle' => $group->studio->name,

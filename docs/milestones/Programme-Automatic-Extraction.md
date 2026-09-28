@@ -115,3 +115,42 @@ includes punctuation/slashes, whitespace, accents, raw title preservation in dra
 and snapshots, competition compatibility, blank cleaned titles and reapproval of
 older numbered snapshots. Build, Pint and `git diff --check` passed. Browser visual
 verification remains subject to the previously documented connector restriction.
+
+## Reader reliability and scanned columns — 27 September 2026
+
+A local runtime audit found no dedicated programme worker in the running container,
+leaving two reads queued. The configured programme image was rebuilt and activated;
+Poppler, Tesseract and the Supervisor worker were verified after recreation. Compose
+now mounts the repository Supervisor configuration so the worker configuration stays
+in sync. Other environments must rebuild this image and run the dedicated worker too.
+
+The reader reports page-by-page text/OCR progress. Polling queries only the current
+source extraction instead of loading the full editor and all revisions, and retries
+transient connection failures automatically. Queued jobs distinguish waiting from
+reading; a processing record with no update for four minutes is recoverable as failed
+(the job timeout is three minutes). An atomic claim prevents duplicate job execution.
+Original PDFs, concurrent edits, retained suggestions and explicit approval remain protected.
+
+Scanned concert rows now use vertical overlap as well as top coordinates, supporting
+mixed title/class font sizes and oversized PDF pages. Repeated dance-class columns
+can identify an unnumbered list when a decorative Act label is unreadable. Isolated
+credit lines are excluded, and class prefixes prevent wide title spacing from splitting
+a title into the class column. Inferred layouts and OCR still carry review warnings.
+
+Observed local comparison across five retained PDF sources (not a general benchmark):
+three text PDFs retained 32, 33 and 29 entries in 0.05–0.06 seconds. Two uploads of the
+same two-page scan previously returned zero entries; both now return 38 in about
+1.7 seconds. The scan's 36 title/class pairs, interval and finale were compared against
+both rendered pages. OCR still leaves a stray symbol beside one title, so spelling and
+punctuation need human review. The two stuck live drafts recovered with 38 and 32
+entries; neither was approved. No external AI provider or network OCR was introduced.
+
+Browser polling was exercised through a failed response and verified to resume with
+page progress. Synthetic fixtures cover mixed font sizes, heading-free pairs, credits
+and title/class spacing in addition to the existing competition and concert layouts.
+
+Verification: the final full Sail suite passed 856 tests / 8,262 assertions, including
+nine synthetic Python layout cases and real PDF extraction with progress reporting.
+Scoped Sail Pint, Vite build and whitespace checks passed. Browser checks verified
+progress recovery after a failed request and the tracker audit display. No routes or
+migrations changed; no live emails were sent and no programme was approved.

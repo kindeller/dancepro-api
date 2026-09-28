@@ -1,4 +1,4 @@
-@extends('layouts.admin', ['title' => 'Venue Management', 'heading' => 'Venue Management', 'subheading' => 'Manage reusable venue details, access maps and operational information.'])
+@extends('layouts.admin', ['title' => 'Venue management', 'heading' => 'Venue management', 'subheading' => 'Manage reusable venue details, access maps and operational information.'])
 
 @section('content')
     <div class="card card-pad" style="margin-bottom:20px">

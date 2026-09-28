@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['uuid', 'scope_type', 'scope_id', 'task_key', 'status', 'assignee_user_id', 'due_date_override', 'follow_up_date', 'completed_by_user_id', 'completed_at'])]
+#[Fillable(['uuid', 'scope_type', 'scope_id', 'task_key', 'status', 'status_override', 'follow_up_status', 'assignee_user_id', 'due_date_override', 'follow_up_date', 'completed_by_user_id', 'completed_at'])]
 class ConcertTrackerTask extends Model
 {
     use HasPublicUuid;
@@ -37,6 +37,7 @@ class ConcertTrackerTask extends Model
     protected function casts(): array
     {
         return [
+            'quality_checks' => 'array',
             'due_date_override' => 'date',
             'follow_up_date' => 'date',
             'completed_at' => 'datetime',

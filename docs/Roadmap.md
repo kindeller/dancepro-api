@@ -38,6 +38,7 @@ it does not prevent isolated local foundation work.
 ## Current work and next step
 
 - Inspection: [Stage 1 implementation map](milestones/Integrated-Media-Stage-1-Inspection.md).
+- Publicity TV pilot: [Fire OS slideshows and screen pairing](milestones/Publicity-TV-Slideshows.md).
 - Active customer web milestone: [Customer web gallery](milestones/Customer-Web-Gallery.md).
 - Customer access and shared API foundation: [Customer access and mobile API](milestones/Customer-Access-and-Mobile-API.md).
 - Uploader milestone: [Mac uploader concert edits and local queue](milestones/Mac-Uploader-Concert-Edits-and-Queue.md).
@@ -158,6 +159,16 @@ it does not prevent isolated local foundation work.
   product structure and operating processes are stable.
   See [ADR-0022](decisions/ADR-0022-Event-Role-Uploader-Identity.md).
 
+## Customer operations audit implementation — September 2026
+
+The first audit implementation pass adds shared preference/financial definitions,
+six grouped customer pages, complete paginated histories, a canonical all-order
+workspace and a customer follow-up queue. Media, Sales & reports, and Customers
+have distinct navigation groups. Remaining payment, permission, retention and
+large-data work is tracked in the
+[customer/sales audit](handbook/Customer-Sales-Workflow-Audit-2026-09-26.md#implementation-status--first-pass-26-september-2026).
+Live payments remain the last stage.
+
 ## Decisions already settled
 
 The complete rules remain in the product plan. In particular: Mac-only uploader;
@@ -166,6 +177,18 @@ independent of paths; all required photographer contributions verified before
 competition photo release; private video HOLD uploads; Braintree; no historical
 ShootProof migration; no first-version facial recognition. Prices and access
 periods are recorded in the product plan and must not be inferred from old docs.
+
+Concert Tracker 3.2 now uses a dedicated concert-editing workspace with the shared
+tracker bar, editor assignment and audited completion. Assigned crew reach the
+same workspace from My editing; their access is restricted to their assignments.
+See [Concert Tracker](milestones/Concert-Tracker.md) for verification and next steps.
+
+Concert Tracker 3.2 now provides editing-source downloads; 3.3 supports automatic
+saving of 20 quality checks with admin-only Complete all; 3.4 tracks a laptop
+concert-video queue, verification, explicit upload completion and studio-media
+inclusions. The Mac uploader supports private MP4 exports up to 5 GiB each;
+large-file multipart UI remains a follow-up. Director notification/publication
+remain separate actions.
 
 ## Open decisions
 

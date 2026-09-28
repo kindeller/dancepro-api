@@ -2,17 +2,26 @@
 
 namespace Tests\Feature\Tracking;
 
+use App\Features\Bookings\Actions\ApproveConcertBooking;
 use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Bookings\Models\ConcertBookingItem;
+use App\Features\Bookings\Support\ConcertBookingItemType;
+use App\Features\Concerts\Models\Concert;
+use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Customers\Models\CustomerStudio;
+use App\Features\Media\Models\MediaCollection;
 use App\Features\Programmes\Models\Programme;
 use App\Features\Programmes\Models\ProgrammeSource;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Studios\Actions\SaveStudioGalleryCode;
+use App\Features\Studios\Actions\StoreStudioEventFiles;
 use App\Features\Studios\Models\ConcertEventRoleSeats;
 use App\Features\Studios\Models\Studio;
 use App\Features\Studios\Models\StudioAccountAccess;
+use App\Features\Studios\Models\StudioBookingChangeRequest;
 use App\Features\Studios\Models\StudioContact;
+use App\Features\Studios\Models\StudioEventAcknowledgement;
 use App\Features\Studios\Models\StudioEventFile;
 use App\Features\Studios\Notifications\StudioAccountInvitation;
 use App\Features\Tracking\Actions\CreateConcertTrackerAlerts;
@@ -29,7 +38,10 @@ use App\Features\Tracking\Models\StudioConversationAttachment;
 use App\Features\Tracking\Services\ConcertTracker;
 use App\Features\Tracking\Services\ConcertTrackerAutomation;
 use App\Features\Tracking\Services\EmailContentFormatter;
+use App\Features\Tracking\Support\ConcertTrackerTaskCatalog;
+use App\Features\Venues\Models\Venue;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Mail;
@@ -67,19 +79,19 @@ class ConcertTrackerTest extends TestCase
             'view' => 'studio', 'year' => 2026, 'phase' => 'booking',
         ]))->assertOk()
             ->assertSee('Booking &amp; services', false)
-            ->assertSee('Final numbers received')
+            ->assertSee('Seats &amp; families numbers', false)
             ->assertSee('rowspan="2"', false)
             ->assertSeeInOrder([$first->name, $second->name]);
 
-        foreach (['preparation' => 'Photo uploads', 'editing' => 'Director corrections', 'completion' => 'Payment received'] as $phase => $task) {
+        foreach (['preparation' => 'Post-concert email', 'editing' => 'Director corrections', 'completion' => 'Invoice & payment'] as $phase => $task) {
             $this->get(route('admin.concert-tracker.index', ['year' => 2026, 'phase' => $phase]))
                 ->assertOk()->assertSee($task);
         }
 
         $this->get(route('admin.concert-tracker.index', ['year' => 2026, 'phase' => 'all']))
             ->assertOk()
-            ->assertSee('Complete automatically from the unified booking record.')
-            ->assertSee('Record and resolve anything preventing delivery');
+            ->assertSee('Approval status follows the unified booking record; email delivery is logged alongside it.')
+            ->assertDontSee('Video holds/missing media');
     }
 
     public function test_tracker_opens_on_all_tasks_by_default(): void
@@ -99,7 +111,7 @@ class ConcertTrackerTest extends TestCase
         $programme = Programme::create(['scheduling_event_id' => $event->id, 'updated_by_user_id' => $staff->id]);
 
         $empty = app(ConcertTracker::class)->page('date', 2026, 'all')['rows']->firstWhere(fn (array $row): bool => $row['event']->is($event))['tasks']['programme_prepared'];
-        $this->assertSame(route('admin.programmes.show', $event), $empty['detailUrl']);
+        $this->assertSame(route('admin.concert-bookings.show', [$event->concertBookingItem->booking, 'tab' => 'programme', 'event' => $event->uuid]), $empty['detailUrl']);
         $this->assertNotNull($empty['dueDate']);
         $this->actingAs($staff)->get($empty['detailUrl'])->assertOk()
             ->assertSee('open ><summary>Upload source PDF', false);
@@ -208,7 +220,7 @@ class ConcertTrackerTest extends TestCase
         ]);
 
         Mail::assertSent(ConcertTrackerMessage::class, fn (ConcertTrackerMessage $mail): bool => str_contains((string) $mail->accountUrl, $studio->uuid));
-        $this->actingAs($customer)->get(route('customer.studio-communications.index', $studio))
+        $this->actingAs($customer)->get(route('customer.studio-communications.index', [$studio, 'tab' => 'messages']))
             ->assertOk()->assertSee($delivery->subject)->assertSee('The studio details are confirmed.')
             ->assertSee('From DancePro')->assertSee('Sent to DancePro');
         $this->post(route('customer.studio-communications.store', $studio), [
@@ -257,8 +269,10 @@ class ConcertTrackerTest extends TestCase
         $this->assertSame($customer->id, $access->user_id);
         $this->assertDatabaseHas('customer_studios', ['user_id' => $customer->id, 'studio_id' => $studio->id]);
         Notification::assertSentOnDemand(StudioAccountInvitation::class);
+        $this->actingAs($customer)->get(route('customer.studio-hub'))
+            ->assertRedirect(route('customer.studio-communications.index', $studio));
 
-        $this->delete(route('admin.studios.account-access.revoke', [$studio, $access]))
+        $this->actingAs($staff)->delete(route('admin.studios.account-access.revoke', [$studio, $access]))
             ->assertRedirect()->assertSessionHas('status', 'Studio account access revoked. Customer media and purchases are unchanged.');
         $this->assertSame('revoked', $access->fresh()->status);
         $this->actingAs($customer)->get(route('customer.studio-communications.index', $studio))->assertForbidden();
@@ -285,8 +299,9 @@ class ConcertTrackerTest extends TestCase
             ['crew_role_id' => $video->id, 'quantity' => 1],
         ]);
 
-        $this->actingAs($customer)->get(route('customer.studio-communications.index', $event->studio))
-            ->assertOk()->assertSee('Event details')->assertSee('Photographer P1')->assertSee('Videographer');
+        $this->actingAs($customer)->get(route('customer.studio-communications.index', [$event->studio, 'tab' => 'files']))
+            ->assertOk()->assertSee('Events')->assertSee('Photographer P1')->assertSee('Videographer')
+            ->assertSee('Row A: 12, 13, 14');
         $this->post(route('customer.studio-events.seats.store', [$event->studio, $event]), [
             'roles' => [
                 'concert-photographer-p1' => [['row' => 'H', 'seat' => '12']],
@@ -302,8 +317,80 @@ class ConcertTrackerTest extends TestCase
         $this->assertCount(5, ConcertEventRoleSeats::where('crew_role_id', $video->id)->firstOrFail()->seats);
 
         $this->post(route('customer.studio-events.seats.store', [$event->studio, $event]), [
+            'roles' => [
+                'concert-photographer-p1' => ['seating' => 'Row H: 12, 13'],
+                'concert-videographer' => ['seating' => "Row J: 20, 21, 22\nRow K: 1, 2"],
+            ],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame([
+            ['row' => 'J', 'seat' => '20'], ['row' => 'J', 'seat' => '21'], ['row' => 'J', 'seat' => '22'],
+            ['row' => 'K', 'seat' => '1'], ['row' => 'K', 'seat' => '2'],
+        ], ConcertEventRoleSeats::where('crew_role_id', $video->id)->firstOrFail()->seats);
+
+        $this->post(route('customer.studio-events.seats.store', [$event->studio, $event]), [
             'roles' => ['concert-videographer' => [['row' => 'J', 'seat' => '20']]],
         ])->assertSessionHasErrors('roles.concert-videographer');
+    }
+
+    public function test_studio_can_confirm_dress_rehearsal_portrait_requirements(): void
+    {
+        [, $event, $otherEvent, $booking] = $this->fixture();
+        $otherEvent->concertBookingItem()->delete();
+        $otherEvent->delete();
+        $event->concertBookingItem->update(['item_type' => ConcertBookingItemType::DressRehearsal]);
+        $booking->update(['wants_concert_videography' => false, 'wants_portrait_photography' => true]);
+        $customer = User::factory()->customer()->create(['email' => 'portrait-director@example.test']);
+        StudioAccountAccess::create([
+            'studio_id' => $event->studio_id, 'user_id' => $customer->id, 'email' => $customer->email,
+            'role' => 'director', 'status' => 'active', 'activated_at' => now(),
+        ]);
+
+        $this->actingAs($customer)->get(route('customer.studio-communications.index', $event->studio))
+            ->assertOk()->assertSee('Shoot time')->assertDontSee('Curtain up')
+            ->assertSee('Provide a minimum 8 × 10 metre space')
+            ->assertSee('Ensure all students are brought by their teacher or minder');
+        $this->post(route('customer.studio-events.requirements.store', [$event->studio, $event]), [
+            'requirements' => ['portrait_space', 'portrait_dancers'],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('studio_event_acknowledgements', 2);
+        $this->assertSame($customer->id, StudioEventAcknowledgement::firstOrFail()->completed_by_user_id);
+        $this->get(route('customer.studio-communications.index', $event->studio))
+            ->assertOk()->assertSee('Confirm portrait shoot requirements')->assertSee('Complete');
+    }
+
+    public function test_studio_can_request_a_structured_booking_change_and_management_can_resolve_it(): void
+    {
+        [$staff, $event] = $this->fixture();
+        $customer = User::factory()->customer()->create(['email' => 'change-request@example.test']);
+        StudioAccountAccess::create([
+            'studio_id' => $event->studio_id, 'user_id' => $customer->id, 'email' => $customer->email,
+            'role' => 'director', 'status' => 'active', 'activated_at' => now(),
+        ]);
+
+        $item = $event->concertBookingItem;
+        $this->actingAs($customer)->post(route('customer.studio-events.booking-changes.store', [$event->studio, $event]), [
+            'booking' => [
+                'event_date' => $event->event_date->format('Y-m-d'),
+                'venue_name' => $item->venue_name,
+                'starts_at' => '18:30',
+                'finishes_at' => Carbon::parse($item->finishes_at)->format('H:i'),
+                'access_time' => null,
+                'services_present' => true,
+                'services' => ['photography', 'videography'],
+            ],
+            'details' => 'Please confirm the later curtain-up time.',
+        ])->assertRedirect(route('customer.studio-communications.index', [$event->studio, 'tab' => 'events']));
+
+        $change = StudioBookingChangeRequest::firstOrFail();
+        $this->assertSame('requested', $change->status);
+        $this->assertDatabaseHas('concert_tracker_alerts', ['scheduling_event_id' => $event->id, 'type' => 'studio_booking_change']);
+        $this->get(route('customer.studio-communications.index', [$event->studio, 'tab' => 'events']))
+            ->assertOk()->assertSee('Change requested')->assertSee('Curtain up: 18:00 → 18:30')
+            ->assertSee('Please confirm the later curtain-up time.');
+
+        $this->actingAs($staff)->patch(route('admin.concert-tracker.booking-changes.review', $change), ['status' => 'completed'])
+            ->assertRedirect()->assertSessionHasErrors('status');
+        $this->assertSame('requested', $change->fresh()->status);
     }
 
     public function test_studio_can_submit_one_current_programme_and_multiple_event_videos_for_review(): void
@@ -341,6 +428,13 @@ class ConcertTrackerTest extends TestCase
         $videos = StudioEventFile::where('kind', 'studio_video')->get();
         $this->assertCount(2, $videos);
         $this->assertDatabaseHas('concert_tracker_tasks', ['scope_id' => $event->id, 'task_key' => 'slideshow_received', 'status' => 'in_progress']);
+
+        ConcertTrackerTask::where('scope_id', $event->id)->where('task_key', 'slideshow_received')->update(['status' => 'complete']);
+        $status = app(ConcertTracker::class)->page('date', 2026, 'all')['rows']->first()['tasks']['slideshow_received'];
+        $this->assertSame('in_progress', $status['key']);
+        $this->assertSame('0 of 2 studio videos approved.', $status['detail']);
+        $this->assertTrue($status['sourceDriven']);
+        ConcertTrackerTask::where('scope_id', $event->id)->where('task_key', 'slideshow_received')->update(['status' => 'in_progress']);
 
         $this->actingAs($staff)->patch(route('admin.concert-tracker.studio-event-files.review', $videos[0]), ['status' => 'approved'])
             ->assertRedirect()->assertSessionHasNoErrors();
@@ -388,7 +482,8 @@ class ConcertTrackerTest extends TestCase
         $this->assertSame('cancelled', $delivery->fresh()->status);
 
         $this->post(route('admin.concert-tracker.deliveries.resend', $delivery))
-            ->assertRedirect()->assertSessionHas('status', 'Email queued again.');
+            ->assertRedirect()->assertSessionHasErrors('delivery');
+        $this->post(route('admin.concert-tracker.tasks.email.send', [$event, 'concert_week_email']), ['recipient_email' => 'alex@example.test'])->assertSessionHasNoErrors();
         $this->assertSame(2, ConcertTrackerEmailDelivery::count());
         $this->assertSame('queued', ConcertTrackerEmailDelivery::latest('id')->first()->status);
     }
@@ -419,7 +514,7 @@ class ConcertTrackerTest extends TestCase
             ->assertOk()
             ->assertSee('Review queue')
             ->assertSee('Booking confirmation')
-            ->assertSee('Final numbers &amp; technical information', false)
+            ->assertSee('Seats &amp; families email', false)
             ->assertSee($event->name);
 
         $route = route('admin.concert-tracker.automation.schedule', [$event, 'confirmation_information_email']);
@@ -449,7 +544,7 @@ class ConcertTrackerTest extends TestCase
 
         $alert = ConcertTrackerAlert::where('user_id', $staff->id)->where('type', 'follow_up_due')->firstOrFail();
         $this->assertSame(1, ConcertTrackerAlert::where('user_id', $staff->id)->where('dedupe_key', $alert->dedupe_key)->count());
-        $this->get(route('admin.concert-tracker.alerts.index'))->assertOk()->assertSee('Final numbers received');
+        $this->get(route('admin.concert-tracker.alerts.index'))->assertOk()->assertSee('Seats &amp; families numbers', false);
         $this->post(route('admin.concert-tracker.alerts.read', $alert))->assertRedirect();
         $this->assertNotNull($alert->fresh()->read_at);
     }
@@ -487,7 +582,7 @@ class ConcertTrackerTest extends TestCase
         $this->get(route('admin.concert-tracker.automation.settings'))->assertOk()->assertSee('Production targets')->assertSee('Email branding')->assertSee('Concert Coordinator');
         $this->assertDatabaseHas('staff_email_signatures', ['user_id' => $staff->id, 'display_name' => 'Morgan Vale', 'position' => 'Concert Coordinator']);
         $this->get(route('admin.concert-tracker.tasks.show', [$event, 'concert_edited']))
-            ->assertOk()->assertSee('Fri 30 Oct 2026');
+            ->assertOk()->assertSee('Tracker task controls')->assertSee('30 Oct 2026');
         $this->assertSame(1, app(ConcertTrackerAutomation::class)->scheduleAutomatic());
         $this->assertSame(0, app(ConcertTrackerAutomation::class)->scheduleAutomatic());
         $this->assertDatabaseHas('concert_tracker_email_deliveries', ['status' => 'scheduled']);
@@ -564,10 +659,340 @@ class ConcertTrackerTest extends TestCase
         $this->assertStringContainsString('PHOTOGRAPHY', $photoOnly['body']);
     }
 
-    private function fixture(): array
+    public function test_every_tracker_task_has_a_working_action_page(): void
+    {
+        [$staff, $event] = $this->fixture();
+        $this->actingAs($staff);
+        $row = app(ConcertTracker::class)->page('date', 2026, 'all')['rows']->first();
+        $this->assertCount(18, $row['tasks']);
+        foreach ($row['tasks'] as $task) {
+            $this->followingRedirects()->get($task['detailUrl'])->assertOk()
+                ->assertSee('Task navigation')->assertSee('Back to tracker')->assertSee('Back to event')
+                ->assertSee('Task instructions')->assertSee($task['definition']['description']);
+            if ($task['sourceUrl']) {
+                $this->followingRedirects()->get(strtok($task['sourceUrl'], '#'))->assertOk();
+            } elseif (in_array($task['definition']['key'], ['final_numbers_email', 'concert_week_email', 'post_concert_email', 'approval_link_email'], true)) {
+                $this->get($task['detailUrl'])->assertSee('Tracker task controls')->assertSee('Email action');
+            } elseif ($task['definition']['key'] === 'concert_edited') {
+                $this->get($task['detailUrl'])->assertSee('Tracker task controls')->assertSee('Mark editing complete');
+            } elseif (in_array($task['definition']['key'], ['director_corrections', 'final_release'], true)) {
+                $this->get($task['detailUrl'])->assertSee('Tracker task controls');
+            } else {
+                $this->get($task['detailUrl'])->assertSee('Save task');
+            }
+        }
+    }
+
+    public function test_only_booked_services_and_required_approvals_generate_work(): void
+    {
+        [, $event, , $booking] = $this->fixture();
+        $booking->update(['wants_concert_photography' => false]);
+        $tracker = app(ConcertTracker::class);
+        $tasks = $tracker->page('date', 2026, 'all')['rows']->first()['tasks'];
+        $this->assertSame('not_required', $tasks['photos_uploaded']['key']);
+        $this->assertSame('not_required', $tasks['photo_release']['key']);
+        $this->assertSame('not_started', $tasks['concert_edited']['key']);
+
+        $booking->update(['wants_concert_videography' => false, 'wants_concert_photography' => true]);
+        $tasks = $tracker->page('date', 2026, 'all')['rows']->first()['tasks'];
+        foreach (['concert_edited', 'quality_check', 'video_uploaded', 'slideshow_received', 'final_release'] as $key) {
+            $this->assertSame('not_required', $tasks[$key]['key']);
+            $this->assertNull($tasks[$key]['dueDate']);
+            $this->assertFalse($tasks[$key]['overdue']);
+        }
+        $this->assertSame('waiting', $tasks['photos_uploaded']['key']);
+        $booking->update(['wants_concert_videography' => true]);
+        Concert::factory()->create([
+            'studio_id' => $event->studio_id, 'concert_booking_item_id' => $event->concertBookingItem->id,
+            'requires_approval' => false,
+        ]);
+        $tasks = $tracker->page('date', 2026, 'all')['rows']->first()['tasks'];
+        foreach (['approval_link_email', 'director_corrections'] as $key) {
+            $this->assertSame('not_required', $tasks[$key]['key']);
+        }
+    }
+
+    public function test_attention_filter_rebuilds_shared_cells_and_overdue_dates_are_red(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-01'));
+        [$staff, $first, $second] = $this->fixture();
+        ConcertTrackerTask::create([
+            'scope_type' => 'event', 'scope_id' => $second->id, 'task_key' => 'concert_week_email',
+            'status' => 'waiting', 'due_date_override' => '2026-08-31',
+        ]);
+        $rows = app(ConcertTracker::class)->page('studio', 2026, 'booking', true)['rows'];
+        $this->assertCount(1, $rows);
+        $this->assertTrue($rows->first()['event']->is($second));
+        $this->assertFalse($rows->first()['tasks']['booking_received']['skip']);
+        $this->assertSame(1, $rows->first()['tasks']['booking_received']['rowspan']);
+        $this->actingAs($staff)->get(route('admin.concert-tracker.index', ['year' => 2026, 'phase' => 'booking', 'attention' => 1]))
+            ->assertOk()->assertSee('class="tracker-due-overdue">Due 31 Aug', false);
+    }
+
+    public function test_requesting_studio_video_does_not_complete_receipt(): void
+    {
+        Mail::fake();
+        Queue::fake();
+        [$staff, $event] = $this->fixture();
+        $this->actingAs($staff)->post(route('admin.concert-tracker.tasks.email.send', [$event, 'slideshow_received']), [
+            'recipient_name' => 'Alex Director', 'recipient_email' => 'alex@example.test',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $delivery = ConcertTrackerEmailDelivery::firstOrFail();
+        (new SendConcertTrackerEmail($delivery->id))->handle();
+        $this->assertSame('sent', $delivery->fresh()->status);
+        $this->assertNotSame('complete', $delivery->task->fresh()->status);
+        $task = app(ConcertTracker::class)->page('date', 2026, 'all')['rows']->first()['tasks']['slideshow_received'];
+        $this->assertSame(route('admin.concert-bookings.show', [$event->concertBookingItem->booking, 'tab' => 'studio-media', 'event' => $event->uuid]), $task['sourceUrl']);
+        $this->assertNotSame('complete', $task['key']);
+    }
+
+    public function test_photo_release_workspace_is_in_the_task_and_scoped_to_its_studio(): void
+    {
+        [$staff, $event, $related] = $this->fixture();
+        [, $other] = $this->fixture('OTHER');
+        foreach ([[$event, 'Current studio album'], [$related, 'Related concert album'], [$other, 'Other studio album']] as [$sourceEvent, $name]) {
+            $concert = Concert::factory()->create([
+                'studio_id' => $sourceEvent->studio_id,
+                'concert_booking_item_id' => $sourceEvent->concertBookingItem->id,
+            ]);
+            MediaCollection::factory()->create(['concert_id' => $concert->id, 'name' => $name]);
+        }
+        $this->actingAs($staff)->get(route('admin.concert-tracker.index', ['year' => 2026]))
+            ->assertOk()->assertDontSee('Parent album name')->assertDontSee('Current studio album');
+        $this->get(route('admin.concert-tracker.tasks.show', [$event, 'photo_release']))
+            ->assertOk()->assertSee('Parent album name')->assertSee('Current studio album')
+            ->assertSee('Related concert album')->assertDontSee('Other studio album');
+        $this->get(route('admin.concert-tracker.tasks.show', [$event, 'concert_edited']))
+            ->assertOk()->assertDontSee('Parent album name');
+    }
+
+    public function test_date_view_includes_pending_bookings_and_replaces_them_on_approval(): void
+    {
+        Queue::fake();
+        Notification::fake();
+        [$staff, $first, , $booking] = $this->fixture();
+        $pending = $booking->replicate(['uuid']);
+        $pending->fill(['status' => 'pending', 'studio_id' => $first->studio_id, 'studio_name' => 'Pending studio']);
+        $pending->save();
+        $item = $first->concertBookingItem->replicate(['uuid']);
+        $venue = Venue::create(['name' => 'Pending theatre', 'address_line_1' => '1 Example Road']);
+        $item->fill(['concert_booking_id' => $pending->id, 'scheduling_event_id' => null, 'venue_id' => $venue->id, 'title' => 'Pending opening night', 'event_date' => '2026-10-19']);
+        $item->save();
+        $tracker = app(ConcertTracker::class);
+        $before = SchedulingEvent::count();
+        $page = $tracker->page('date', 2026, 'all');
+        $this->assertSame(1, $page['pendingCount']);
+        $this->assertTrue($page['rows']->first()['pending']);
+        $this->assertTrue($page['rows']->first()['bookingItem']->is($item));
+        $this->assertCount(2, $tracker->page('studio', 2026, 'all')['rows']);
+        $this->actingAs($staff)->get(route('admin.concert-tracker.index', ['year' => 2026, 'view' => 'date']))
+            ->assertOk()->assertSee('Pending opening night')
+            ->assertSee('class="tracker-event-heading tracker-pending-heading"', false)
+            ->assertSee(route('admin.concert-bookings.show', $pending), false);
+        $this->assertSame($before, SchedulingEvent::count());
+
+        $event = app(ApproveConcertBooking::class)->approveItem($item, $staff);
+        $page = $tracker->page('date', 2026, 'all');
+        $this->assertSame(0, $page['pendingCount']);
+        $this->assertCount(3, $page['rows']);
+        $this->assertTrue($page['rows']->first()['event']->is($event));
+        $this->get(route('admin.concert-tracker.index', ['year' => 2026, 'view' => 'date']))
+            ->assertOk()->assertDontSee('class="tracker-event-heading tracker-pending-heading"', false)
+            ->assertSee(route('admin.scheduling-events.show', $event), false);
+    }
+
+    public function test_pending_tracker_rows_exclude_cancelled_declined_and_other_year_items(): void
+    {
+        [, $first, , $booking] = $this->fixture();
+        foreach ([
+            ['title' => 'Pending valid', 'event_date' => '2026-10-18'],
+            ['title' => 'Cancelled', 'event_date' => '2026-10-18', 'cancelled_at' => now()],
+            ['title' => 'Declined', 'event_date' => '2026-10-18', 'approval_status' => 'declined'],
+            ['title' => 'Other year', 'event_date' => '2027-10-18'],
+            ['title' => 'Portraits pending', 'event_date' => '2026-10-17', 'item_type' => 'dress_rehearsal'],
+        ] as $attributes) {
+            $item = $first->concertBookingItem->replicate(['uuid']);
+            $item->fill(['scheduling_event_id' => null, ...$attributes])->save();
+        }
+        $tracker = app(ConcertTracker::class);
+        $this->assertSame(['Portraits pending', 'Pending valid'], $tracker->page('date', 2026, 'all')['rows']->where('pending', true)->pluck('bookingItem.title')->all());
+        foreach (['declined', 'cancelled'] as $status) {
+            $booking->update(['status' => $status]);
+            $this->assertSame(0, $tracker->page('date', 2026, 'all')['pendingCount']);
+        }
+    }
+
+    public function test_tracker_task_numbers_stay_consistent_between_phase_tabs_and_detail(): void
+    {
+        [$staff, $event] = $this->fixture();
+        $catalog = app(ConcertTrackerTaskCatalog::class);
+        $this->assertSame('1.1 Booking & services', $catalog->find('booking_received')['numbered_label']);
+        $this->assertSame('2.1 Crew ready', $catalog->forPhase('preparation')->first()['numbered_label']);
+        $this->assertSame('4.3', $catalog->find('final_release')['number']);
+        $this->assertCount($catalog->all()->count(), $catalog->all()->pluck('number')->unique());
+        $this->actingAs($staff);
+        foreach (['all', 'preparation'] as $phase) {
+            $this->get(route('admin.concert-tracker.index', ['year' => 2026, 'phase' => $phase]))
+                ->assertOk()->assertSee('1. Booking')->assertSee('2. Preparation &amp; assembly', false)->assertSee('2.1 Crew ready');
+        }
+        $this->get(route('admin.concert-tracker.tasks.show', [$event, 'crew_ready']))->assertOk()->assertSee('2.1 Crew ready');
+    }
+
+    public function test_studio_availability_filter_and_isolated_crew_page_share_roster_status(): void
+    {
+        [$staff, $event, $second] = $this->fixture();
+        $otherStudio = Studio::factory()->create(['name' => 'Other studio']);
+        $other = SchedulingEvent::create(['studio_id' => $otherStudio->id, 'name' => 'Other concert', 'event_type' => 'concert', 'event_date' => '2026-10-22']);
+        foreach ([$event, $second, $other] as $item) {
+            $item->shifts()->create(['period' => 'morning', 'shift_date' => $item->event_date]);
+        }
+        $this->actingAs($staff)->get(route('admin.scheduling-events.index', ['studio' => $event->studio->uuid]))->assertOk()->assertViewHas('shifts', fn ($shifts) => $shifts->pluck('scheduling_event_id')->sort()->values()->all() === collect([$event->id, $second->id])->sort()->values()->all());
+        $page = route('admin.concert-tracker.tasks.show', [$event, 'crew_ready']);
+        $this->get($page.'?studio='.$otherStudio->uuid)->assertOk()->assertSee('Tracker task controls')->assertSee('Full event availability')->assertViewHas('shifts', fn ($shifts) => ! $shifts->contains('scheduling_event_id', $other->id));
+        foreach (['draft' => 'Draft', 'open' => 'Availability open', 'closed' => 'Rostering'] as $state => $label) {
+            $event->update(['availability_status' => $state]);
+            $detail = app(ConcertTracker::class)->detail($event->fresh(), 'crew_ready');
+            $this->assertSame($label, $detail['status']['label']);
+            $this->get(route('admin.scheduling-events.index', ['studio' => $event->studio->uuid]))->assertOk()->assertSee($label);
+        }
+        $role = CrewRole::where('code', 'concert-videographer')->firstOrFail();
+        $profile = CrewProfile::factory()->create(['preferred_name' => 'Alex']);
+        $event->roleRequirements()->create(['crew_role_id' => $role->id]);
+        $assignment = $event->shifts()->first()->assignments()->create(['crew_profile_id' => $profile->id, 'crew_role_id' => $role->id, 'status' => 'published', 'acknowledgement_status' => 'pending']);
+        $event->update(['roster_status' => 'published', 'roster_published_at' => now()]);
+        $this->assertSame('Assigned', app(ConcertTracker::class)->detail($event->fresh(), 'crew_ready')['status']['label']);
+        $assignment->update(['acknowledgement_status' => 'acknowledged']);
+        $status = app(ConcertTracker::class)->detail($event->fresh(), 'crew_ready')['status'];
+        $this->assertSame('READY', $status['label']);
+        $this->assertSame('complete', $status['tone']);
+        $this->assertSame(['V: Alex'], $status['crewSummary']->all());
+        $this->get(route('admin.concert-tracker.index', ['year' => 2026, 'phase' => 'preparation']))->assertOk()->assertSee('V: Alex');
+        $update = route('admin.concert-tracker.source-bar.update', [$event, 'crew_ready']);
+        $this->patchJson($update, ['panel' => 'follow_up', 'follow_up_status' => 'open', 'follow_up_date' => null, 'note' => 'Checked with crew.'])->assertOk();
+        $this->patchJson($update, ['panel' => 'status', 'status_override' => 'complete'])->assertUnprocessable();
+        $this->actingAs(User::factory()->customer()->create())->get($page)->assertForbidden();
+    }
+
+    public function test_programme_booking_tab_uses_attached_pdf_and_scopes_event_selection(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        config(['operations.filesystem_disk' => 'local']);
+        [$staff, $event, $second, $booking] = $this->fixture();
+        $pdf = UploadedFile::fake()->createWithContent('Studio programme.pdf', "%PDF-1.4\nProgramme from studio\n%%EOF");
+        app(StoreStudioEventFiles::class)->execute($event, $staff, 'programme', [$pdf]);
+        $url = route('admin.concert-bookings.show', [$booking, 'tab' => 'programme', 'event' => $event->uuid]);
+        $this->actingAs($staff)->get($url)->assertOk()->assertSee('2.2 Prepare programme')->assertSee('Tracker task controls')->assertSee('Use attached programme')->assertSee('Studio programme.pdf')->assertSee('Back to event availability');
+        $this->get(route('admin.programmes.show', $event))->assertRedirect($url);
+        $this->post(route('admin.programmes.start', $event))->assertSessionHasNoErrors();
+        $programme = Programme::where('scheduling_event_id', $event->id)->sole();
+        $originalSource = $programme->source;
+        $this->assertNotNull($originalSource);
+        $this->assertSame(Storage::disk('local')->get($event->fresh()->programme_path), Storage::disk('local')->get($originalSource->path));
+        $this->get($url)->assertOk()->assertSee('Source programme PDF')->assertSee('Use a replacement PDF');
+        $this->post(route('admin.programmes.use-attached', $event), ['version' => $programme->draft_version])->assertSessionHasNoErrors();
+        $this->assertNotSame($originalSource->id, $programme->fresh()->programme_source_id);
+        Storage::disk('local')->assertExists($originalSource->path);
+        $other = SchedulingEvent::create(['name' => 'Unrelated concert', 'event_type' => 'concert', 'event_date' => '2026-10-23']);
+        $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'programme', 'event' => $other->uuid]))->assertNotFound();
+        $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'programme', 'event' => $second->uuid]))->assertOk()->assertSee('Upload your programme')->assertDontSee('Studio programme.pdf');
+    }
+
+    public function test_reordered_tasks_and_studio_media_tab_share_uploads_reviews_and_status(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        config(['operations.filesystem_disk' => 'local']);
+        [$staff, $event, $second, $booking] = $this->fixture();
+        $event->concertBookingItem->update(['approval_status' => 'approved']);
+        $tracker = app(ConcertTracker::class);
+        $catalog = app(ConcertTrackerTaskCatalog::class);
+        $this->assertSame('3.1', $catalog->find('photos_uploaded')['number']);
+        $this->assertSame('3.2', $catalog->find('concert_edited')['number']);
+        $this->assertSame('3.5', $catalog->find('approval_link_email')['number']);
+        $this->assertSame('3.6', $catalog->find('director_corrections')['number']);
+        $this->assertSame('4.3', $catalog->find('final_release')['number']);
+        $this->assertSame('2.3', $catalog->find('video_titles')['number']);
+        $this->assertSame('2.4', $catalog->find('post_concert_email')['number']);
+        $this->assertSame('2.5', $catalog->find('slideshow_received')['number']);
+        $url = route('admin.concert-bookings.show', [$booking, 'tab' => 'studio-media', 'event' => $event->uuid]);
+        $bar = route('admin.concert-tracker.source-bar.update', [$event, 'slideshow_received']);
+        $this->assertSame($url, $tracker->detail($event, 'slideshow_received')['status']['detailUrl']);
+        $this->actingAs($staff)->get(route('admin.concert-tracker.tasks.show', [$event, 'slideshow_received']))->assertRedirect($url);
+        $this->get($url)->assertOk()->assertSee('2.5 Studio videos & slideshows')->assertSee('Tracker task controls')->assertSee('Upload studio files');
+        $this->patchJson($bar, ['panel' => 'status', 'status_override' => 'not_required'])->assertOk();
+        $this->assertSame('not_required', $tracker->detail($event->fresh(), 'slideshow_received')['status']['key']);
+        $this->patchJson($bar, ['panel' => 'status', 'status_override' => 'waiting'])->assertOk();
+        app(StoreStudioEventFiles::class)->execute($event, $staff, 'studio_video', [UploadedFile::fake()->create('Studio opening.mp4', 50, 'video/mp4')]);
+        $file = StudioEventFile::where('kind', 'studio_video')->sole();
+        $this->get($url)->assertOk()->assertSee('Studio opening.mp4')->assertSee('Save file review');
+        $activity = $tracker->detail($event->fresh(), 'slideshow_received')['status']['activity'];
+        $this->assertStringContainsString('Uploaded '.now()->format('j M Y'), $activity);
+        $this->assertStringContainsString($staff->name, $activity);
+        $this->patchJson($bar, ['panel' => 'status', 'status_override' => 'complete'])->assertUnprocessable();
+        $this->from($url)->patch(route('admin.concert-tracker.studio-event-files.review', $file), ['status' => 'approved'])->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->assertSame('complete', $tracker->detail($event->fresh(), 'slideshow_received')['status']['key']);
+        $this->assertStringContainsString('Reviewed '.now()->format('j M Y'), $tracker->detail($event->fresh(), 'slideshow_received')['status']['activity']);
+        $this->from($url)->post(route('admin.concert-booking-events.files', $event->concertBookingItem), [
+            'kind' => 'studio_video', 'replace_uuid' => $file->uuid,
+            'files' => [UploadedFile::fake()->create('Corrected opening.mp4', 50, 'video/mp4')],
+        ])->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->assertFalse($file->fresh()->is_current);
+        $this->assertSame('in_progress', $tracker->detail($event->fresh(), 'slideshow_received')['status']['key']);
+        $this->get($url)->assertOk()->assertSee('Corrected opening.mp4')->assertDontSee('Studio opening.mp4');
+        $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'studio-media', 'event' => $second->uuid]))->assertOk()->assertDontSee('Corrected opening.mp4');
+        $other = SchedulingEvent::create(['name' => 'Other booking', 'event_type' => 'concert', 'event_date' => '2026-10-23']);
+        $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'studio-media', 'event' => $other->uuid]))->assertNotFound();
+        $this->actingAs(User::factory()->customer()->create())->get($url)->assertForbidden();
+        $this->patchJson($bar, ['panel' => 'status', 'status_override' => 'complete'])->assertForbidden();
+    }
+
+    public function test_event_column_shows_studio_title_date_and_actual_gallery_login_in_both_views(): void
+    {
+        [$staff, $event] = $this->fixture('INTERNAL-ONLY');
+        $studio = $event->studio;
+        app(SaveStudioGalleryCode::class)->execute($studio, $staff, 'PHOTO-LOGIN', 0);
+        foreach (['date', 'studio'] as $view) {
+            $page = app(ConcertTracker::class)->page($view, 2026, 'booking');
+            $html = view('admin.tracking._event-column', ['row' => $page['rows']->first(), 'galleryLogins' => $page['galleryLogins']])->render();
+            $this->assertStringContainsString('<strong>Aurora Dance</strong>', $html);
+            $this->assertStringContainsString('class="tracker-event-title">Junior Concert', $html);
+            $this->assertStringContainsString('Tue 20 Oct 2026', $html);
+            $this->assertStringContainsString('PHOTO-LOGIN', $html);
+            $this->assertStringNotContainsString('INTERNAL-ONLY', $html);
+            $this->assertStringContainsString('aria-label="Communications for Junior Concert"', $html);
+            $this->assertStringContainsString(route('admin.concert-tracker.communications.show', $event), $html);
+        }
+        $this->actingAs(User::factory()->customer()->create())->get(route('admin.concert-tracker.index', ['year' => 2026]))->assertForbidden()->assertDontSee('PHOTO-LOGIN');
+    }
+
+    public function test_inactive_email_template_is_explained_before_sending(): void
+    {
+        [$staff, $event] = $this->fixture();
+        $detail = app(ConcertTracker::class)->detail($event, 'concert_week_email');
+        $detail['template']->update(['is_active' => false]);
+        $this->actingAs($staff)->get(route('admin.concert-tracker.tasks.show', [$event, 'concert_week_email']))
+            ->assertOk()->assertSee('Not ready to send')
+            ->assertSee('The email template is missing or inactive.')
+            ->assertDontSee('action="'.route('admin.concert-tracker.tasks.email.send', [$event, 'concert_week_email']).'"', false);
+    }
+
+    public function test_missing_booking_stays_on_an_explanatory_task_page(): void
+    {
+        [$staff] = $this->fixture();
+        $event = SchedulingEvent::create(['name' => 'Unlinked concert', 'event_type' => 'concert', 'event_date' => '2026-10-23']);
+        $this->actingAs($staff);
+        foreach (['invoice_sent', 'booking_received', 'final_numbers_received', 'slideshow_received'] as $key) {
+            $this->get(route('admin.concert-tracker.tasks.show', [$event, $key]))->assertOk()
+                ->assertSee('This task cannot be completed yet')->assertSee('Task navigation')
+                ->assertSee('Back to tracker')->assertSee('Back to event')->assertSee('Task instructions');
+        }
+    }
+
+    private function fixture(string $studioCode = 'AUR'): array
     {
         $staff = User::factory()->staff()->create(['name' => 'Morgan Vale']);
-        $studio = Studio::factory()->create(['name' => 'Aurora Dance', 'code' => 'AUR']);
+        $studio = Studio::factory()->create(['name' => 'Aurora Dance', 'code' => $studioCode]);
         $booking = ConcertBooking::create([
             'status' => 'approved', 'studio_name' => $studio->name, 'contact_name' => 'Alex Director',
             'contact_email' => 'alex@example.test', 'contact_phone' => '0400000000',

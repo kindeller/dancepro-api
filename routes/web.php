@@ -6,15 +6,21 @@ use App\Features\Admin\Controllers\AdminConcertController;
 use App\Features\Admin\Controllers\AdminDashboardController;
 use App\Features\Admin\Controllers\AdminDownloadLinkController;
 use App\Features\Admin\Controllers\AdminStudioController;
+use App\Features\Auth\Controllers\LocalAccountSwitchController;
 use App\Features\Auth\Controllers\PasswordResetController;
 use App\Features\Auth\Controllers\TwoFactorController;
 use App\Features\Auth\Controllers\WebAuthController;
+use App\Features\Bookings\Controllers\AdminBookingConfirmationController;
+use App\Features\Bookings\Controllers\AdminBookingEventMaterialsController;
 use App\Features\Bookings\Controllers\AdminConcertBookingController;
+use App\Features\Bookings\Controllers\BookingFamilyNumbersController;
+use App\Features\Bookings\Controllers\CustomerStudioBookingController;
 use App\Features\Bookings\Controllers\PublicConcertBookingController;
 use App\Features\Chat\Controllers\CrewChatController;
 use App\Features\Chat\Controllers\MessageReactionController;
 use App\Features\Competition\Controllers\AdminCompetitionObjectController;
 use App\Features\CompetitionContacts\Controllers\AdminCompetitionContactController;
+use App\Features\Concerts\Controllers\DirectorReviewController;
 use App\Features\Concerts\Controllers\PublicConcertController;
 use App\Features\Concerts\Controllers\PublicSlugRedirectController;
 use App\Features\Concerts\Controllers\PublicStudioController;
@@ -26,6 +32,7 @@ use App\Features\Crew\Controllers\AdminCrewRoleController;
 use App\Features\Crew\Controllers\CrewContractController;
 use App\Features\Crew\Controllers\CrewDirectoryController;
 use App\Features\Crew\Controllers\CrewProfileController;
+use App\Features\Customers\Controllers\AdminCustomerAccountController;
 use App\Features\Customers\Controllers\AdminCustomerSupportController;
 use App\Features\Customers\Controllers\CustomerAccountController;
 use App\Features\Customers\Controllers\CustomerCompetitionController;
@@ -53,6 +60,7 @@ use App\Features\Media\Controllers\AdminConcertPhotoGalleryController;
 use App\Features\Media\Controllers\AdminConcertPhotoReleaseController;
 use App\Features\Media\Controllers\AdminMediaCommerceController;
 use App\Features\Media\Controllers\AdminMediaWatermarkController;
+use App\Features\Media\Controllers\AdminTopPicsController;
 use App\Features\Media\Controllers\MediaAssetController;
 use App\Features\Media\Controllers\MediaCollectionController;
 use App\Features\Media\Controllers\MediaUploadController;
@@ -63,6 +71,7 @@ use App\Features\Operations\Controllers\AdminOperationsController;
 use App\Features\Operations\Controllers\CrewEventCommunicationController;
 use App\Features\Operations\Controllers\CrewOperationsController;
 use App\Features\Operations\Controllers\InternalDocumentController;
+use App\Features\Orders\Controllers\AdminOrderController;
 use App\Features\Payments\Controllers\CustomerCheckoutController;
 use App\Features\Payments\Controllers\CustomerPurchasedMediaDownloadController;
 use App\Features\Programmes\Controllers\AdminCompetitionVideoController;
@@ -70,8 +79,13 @@ use App\Features\Programmes\Controllers\AdminConcertTitleCardController;
 use App\Features\Programmes\Controllers\AdminPhotoUploadsController;
 use App\Features\Programmes\Controllers\CompetitionCustomerPreviewController;
 use App\Features\Programmes\Controllers\CompetitionGalleryController;
+use App\Features\Programmes\Controllers\ConcertTitlePackageController;
 use App\Features\Programmes\Controllers\ProgrammeChatUpdatesController;
 use App\Features\Programmes\Controllers\ProgrammeController;
+use App\Features\Publicity\Controllers\AdminGallerySharingController;
+use App\Features\Publicity\Controllers\AdminSlideshowController;
+use App\Features\Publicity\Controllers\PublicityJoinController;
+use App\Features\Publicity\Controllers\ScreenController;
 use App\Features\Reporting\Controllers\AdminMediaSalesController;
 use App\Features\Scheduling\Controllers\AdminEventTypeController;
 use App\Features\Scheduling\Controllers\AdminPaymentController;
@@ -80,17 +94,32 @@ use App\Features\Scheduling\Controllers\AdminTimeController;
 use App\Features\Scheduling\Controllers\CrewAvailabilityController;
 use App\Features\Scheduling\Controllers\CrewCoverRequestController;
 use App\Features\Scheduling\Controllers\CrewTimeController;
+use App\Features\StudioBilling\Controllers\AdminStudioInvoiceController;
+use App\Features\StudioBilling\Controllers\CustomerStudioInvoiceController;
+use App\Features\Studios\Controllers\StudioBookingChangeController;
 use App\Features\Studios\Controllers\StudioEventFileController;
+use App\Features\Studios\Controllers\StudioEventRequirementsController;
 use App\Features\Studios\Controllers\StudioEventSeatsController;
 use App\Features\Timesheets\Controllers\AdminTimesheetController;
 use App\Features\Timesheets\Controllers\CrewTimesheetController;
 use App\Features\Timesheets\Controllers\InvoiceStylePreferenceController;
+use App\Features\Tracking\Controllers\AdminBookingNumbersTrackerController;
+use App\Features\Tracking\Controllers\AdminBookingTrackerBarController;
 use App\Features\Tracking\Controllers\AdminConcertCommunicationController;
+use App\Features\Tracking\Controllers\AdminConcertQualityChecklistController;
 use App\Features\Tracking\Controllers\AdminConcertTrackerAlertController;
 use App\Features\Tracking\Controllers\AdminConcertTrackerAutomationController;
 use App\Features\Tracking\Controllers\AdminConcertTrackerController;
 use App\Features\Tracking\Controllers\AdminConcertTrackerTaskController;
+use App\Features\Tracking\Controllers\AdminConcertVideoInclusionsController;
+use App\Features\Tracking\Controllers\AdminSeatsFamiliesEmailTrackerController;
+use App\Features\Tracking\Controllers\AdminSourceTrackerBarController;
+use App\Features\Tracking\Controllers\ConcertEditingDownloadController;
 use App\Features\Tracking\Controllers\ConcertEmailOpenController;
+use App\Features\Tracking\Controllers\CrewConcertEditingController;
+use App\Features\Tracking\Controllers\DirectorCorrectionsController;
+use App\Features\Tracking\Controllers\PhotoReleaseEmailController;
+use App\Features\Tracking\Support\ConcertTrackerTaskCatalog;
 use App\Features\Training\Controllers\AdminTrainingController;
 use App\Features\Training\Controllers\CrewTrainingController;
 use App\Features\Venues\Controllers\AdminVenueController;
@@ -165,6 +194,12 @@ Route::post('logout', [WebAuthController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
+if (app()->environment(['local', 'testing'])) {
+    Route::post('local/switch-account', LocalAccountSwitchController::class)
+        ->middleware('auth')
+        ->name('local.account.switch');
+}
+
 Route::get('customer/email/verify/{id}/{hash}', [CustomerOnboardingController::class, 'verify'])
     ->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
 Route::middleware(['auth', 'two-factor.required'])->prefix('customer')->name('customer.')->group(function (): void {
@@ -192,6 +227,7 @@ Route::middleware('auth')->group(function (): void {
 Route::get('book-your-concert', [PublicConcertBookingController::class, 'create'])->name('concert-bookings.create');
 Route::post('book-your-concert', [PublicConcertBookingController::class, 'store'])->middleware('throttle:concert-booking')->name('concert-bookings.store');
 Route::get('book-your-concert/thanks', [PublicConcertBookingController::class, 'thanks'])->name('concert-bookings.thanks');
+Route::get('book-your-concert/submitted/{concertBooking}', [PublicConcertBookingController::class, 'submission'])->name('concert-bookings.submission');
 
 Route::middleware(['auth', 'two-factor.required'])->prefix('internal-documents')->name('internal-documents.')->group(function (): void {
     Route::get('resources/{resource}', [InternalDocumentController::class, 'resource'])->name('resources.show');
@@ -206,6 +242,16 @@ Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])->prefix
     Route::get('studios/{studio}/photos', [CustomerProfileController::class, 'studio'])->name('studio');
 });
 Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])
+    ->prefix('my/studios/{studio}/bookings')->name('customer.studio-bookings.')->group(function (): void {
+        Route::get('/', [CustomerStudioBookingController::class, 'index'])->name('index');
+        Route::get('{concertBooking}', [CustomerStudioBookingController::class, 'show'])->name('show');
+        Route::get('{concertBooking}/submission', [CustomerStudioBookingController::class, 'submission'])->name('submission');
+        Route::post('{concertBooking}/family-numbers', [BookingFamilyNumbersController::class, 'customer'])->middleware('throttle:10,1')->name('families');
+    });
+Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])
+    ->get('my/studio-hub', [CustomerStudioCommunicationController::class, 'hub'])
+    ->name('customer.studio-hub');
+Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])
     ->get('my/studios/{studio}/communications', CustomerStudioCommunicationController::class)
     ->name('customer.studio-communications.index');
 Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])
@@ -215,23 +261,36 @@ Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])
     ->post('my/studios/{studio}/events/{schedulingEvent}/seats', [StudioEventSeatsController::class, 'store'])
     ->middleware('throttle:10,1')->name('customer.studio-events.seats.store');
 Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])
+    ->post('my/studios/{studio}/events/{schedulingEvent}/requirements', [StudioEventRequirementsController::class, 'store'])
+    ->middleware('throttle:10,1')->name('customer.studio-events.requirements.store');
+Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])
     ->post('my/studios/{studio}/events/{schedulingEvent}/files', [StudioEventFileController::class, 'store'])
     ->middleware('throttle:10,1')->name('customer.studio-events.files.store');
+Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])
+    ->post('my/studios/{studio}/events/{schedulingEvent}/booking-changes', [StudioBookingChangeController::class, 'store'])
+    ->middleware('throttle:10,1')->name('customer.studio-events.booking-changes.store');
 Route::middleware(['auth', 'two-factor.required'])
     ->get('studio-event-files/{studioEventFile}', [StudioEventFileController::class, 'download'])
     ->name('studio-event-files.download');
+Route::middleware(['auth', 'two-factor.required'])
+    ->get('concert-editing/{schedulingEvent}/downloads/{kind}/{file?}', ConcertEditingDownloadController::class)
+    ->whereIn('kind', ['programme', 'titles', 'video'])->whereUuid('file')->name('concert-editing.download');
 Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])
     ->get('my/studios/{studio}/communications/attachments/{attachment}', [CustomerStudioCommunicationController::class, 'attachment'])
     ->name('customer.studio-communications.attachments.show');
 
 Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])->prefix('my/media')->name('customer.media.')->group(function (): void {
     Route::get('/', [CustomerMediaController::class, 'index'])->name('index');
+    Route::get('favourites', [CustomerMediaController::class, 'favourites'])->name('favourites');
+    Route::get('cart', [CustomerMediaController::class, 'cart'])->name('cart');
     Route::get('help', [CustomerMediaHelpController::class, 'index'])->name('help');
     Route::post('help', [CustomerMediaHelpController::class, 'store'])->middleware('throttle:5,1')->name('help.store');
     Route::post('help/articles/{article}/feedback', [CustomerMediaHelpController::class, 'feedback'])->middleware('throttle:20,1')->name('help.feedback');
     Route::get('orders', [CustomerOrderController::class, 'index'])->name('orders.index');
     Route::get('library/{kind}/{event}', [CustomerMediaLibraryController::class, 'show'])
         ->whereIn('kind', ['competition', 'concert'])->whereUuid('event')->name('library.show');
+    Route::get('library/{kind}/{event}/download-all', [CustomerMediaLibraryController::class, 'downloadAll'])
+        ->middleware('throttle:5,1')->whereIn('kind', ['competition', 'concert'])->whereUuid('event')->name('library.download-all');
     Route::get('library/{kind}/{event}/assets/{asset}/thumbnail', [CustomerMediaLibraryController::class, 'thumbnail'])
         ->whereIn('kind', ['competition', 'concert'])->whereUuid(['event', 'asset'])->name('library.thumbnail');
     Route::get('recommendations/{schedulingEvent}/{item}/{photo}/thumbnail', [CustomerMediaController::class, 'recommendationThumbnail'])->whereUuid(['item', 'photo'])->name('recommendations.thumbnail');
@@ -239,6 +298,7 @@ Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])->prefix
 });
 
 Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])->prefix('my/checkout')->name('customer.checkout.')->group(function (): void {
+    Route::post('account-cart', [CustomerCheckoutController::class, 'accountCart'])->name('account-cart');
     Route::get('{order}', [CustomerCheckoutController::class, 'show'])->name('show');
     Route::post('{order}/pay', [CustomerCheckoutController::class, 'pay'])->middleware('throttle:10,1')->name('pay');
 });
@@ -269,6 +329,16 @@ Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])->prefix
 Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])->get('my/studios/{studio}/photo-cart', [CustomerConcertPhotoSelectionController::class, 'cart'])->name('customer.concerts.photos.cart');
 Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])->post('my/studios/{studio}/photo-cart/checkout', [CustomerCheckoutController::class, 'concert'])->name('customer.concerts.photos.checkout');
 
+Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])
+    ->prefix('my/studios/{studio}/invoices')->name('customer.studio-invoices.')->group(function (): void {
+        Route::get('/', [CustomerStudioInvoiceController::class, 'index'])->name('index');
+        Route::get('{studioInvoice}', [CustomerStudioInvoiceController::class, 'show'])->name('show');
+        Route::get('{studioInvoice}/pdf', [CustomerStudioInvoiceController::class, 'pdf'])->name('pdf');
+        Route::get('{studioInvoice}/token', [CustomerStudioInvoiceController::class, 'token'])->middleware('throttle:10,1')->name('token');
+        Route::post('{studioInvoice}/pay', [CustomerStudioInvoiceController::class, 'pay'])->middleware('throttle:5,1')->name('pay');
+        Route::post('{studioInvoice}/check-payment', [CustomerStudioInvoiceController::class, 'reconcile'])->middleware('throttle:5,1')->name('reconcile');
+    });
+
 Route::middleware(['auth', 'admin.required', 'two-factor.required'])
     ->prefix('admin')
     ->name('admin.')
@@ -284,12 +354,16 @@ Route::middleware(['auth', 'admin.required', 'two-factor.required'])
         Route::get('concert-tracker/alerts', [AdminConcertTrackerAlertController::class, 'index'])->name('concert-tracker.alerts.index');
         Route::post('concert-tracker/alerts/read-all', [AdminConcertTrackerAlertController::class, 'readAll'])->name('concert-tracker.alerts.read-all');
         Route::post('concert-tracker/alerts/{alert}/read', [AdminConcertTrackerAlertController::class, 'read'])->name('concert-tracker.alerts.read');
+        Route::patch('concert-tracker/events/{schedulingEvent}/source/{taskKey}/tracker', AdminSourceTrackerBarController::class)->whereIn('taskKey', ['crew_ready', 'programme_prepared', 'slideshow_received', 'video_titles', 'photos_uploaded', 'concert_edited', 'quality_check', 'video_uploaded', 'director_corrections', 'photo_release', 'final_release', 'invoice_sent'])->name('concert-tracker.source-bar.update');
+        Route::patch('concert-tracker/events/{schedulingEvent}/video-inclusions', AdminConcertVideoInclusionsController::class)->name('concert-tracker.video-inclusions.update');
+        Route::patch('concert-tracker/events/{schedulingEvent}/quality-check', AdminConcertQualityChecklistController::class)->name('concert-tracker.quality.update');
         Route::get('concert-tracker/events/{schedulingEvent}/tasks/{taskKey}', [AdminConcertTrackerTaskController::class, 'show'])->name('concert-tracker.tasks.show');
         Route::patch('concert-tracker/events/{schedulingEvent}/tasks/{taskKey}', [AdminConcertTrackerTaskController::class, 'update'])->name('concert-tracker.tasks.update');
         Route::patch('concert-tracker/events/{schedulingEvent}/tasks/{taskKey}/template', [AdminConcertTrackerTaskController::class, 'updateTemplate'])->name('concert-tracker.tasks.template.update');
         Route::post('concert-tracker/events/{schedulingEvent}/tasks/{taskKey}/email', [AdminConcertTrackerTaskController::class, 'send'])->name('concert-tracker.tasks.email.send');
         Route::get('concert-tracker/events/{schedulingEvent}/communications', [AdminConcertCommunicationController::class, 'event'])->name('concert-tracker.communications.show');
         Route::patch('concert-tracker/studio-event-files/{studioEventFile}', [StudioEventFileController::class, 'review'])->name('concert-tracker.studio-event-files.review');
+        Route::patch('concert-tracker/booking-changes/{bookingChange}', [StudioBookingChangeController::class, 'review'])->name('concert-tracker.booking-changes.review');
         Route::get('concert-tracker/studio-communications', [AdminConcertCommunicationController::class, 'inbox'])->name('concert-tracker.studio-communications.index');
         Route::get('concert-tracker/studios/{studio}/communications', [AdminConcertCommunicationController::class, 'studio'])->name('concert-tracker.studio-communications.show');
         Route::post('concert-tracker/studios/{studio}/communications', [AdminConcertCommunicationController::class, 'reply'])->name('concert-tracker.studio-communications.reply');
@@ -307,6 +381,7 @@ Route::middleware(['auth', 'admin.required', 'two-factor.required'])
             Route::put('draft', 'save')->name('save');
             Route::post('confirm', 'confirm')->name('confirm');
             Route::post('source', 'upload')->name('upload');
+            Route::post('attached-source', 'useAttached')->name('use-attached');
             Route::get('sources/{source}', 'source')->name('source');
             Route::get('snapshot/{revision?}', 'snapshot')->name('snapshot');
         });
@@ -351,6 +426,27 @@ Route::middleware(['auth', 'admin.required', 'two-factor.required'])
         Route::resource('scheduling-events', AdminSchedulingEventController::class)->except('destroy');
         Route::get('media/competition-photos', [CompetitionGalleryController::class, 'index'])->name('competition-gallery.index');
         Route::get('media/competition-videos', [AdminCompetitionVideoController::class, 'events'])->name('competition-videos.events');
+        Route::get('media/publicity/sharing', [AdminGallerySharingController::class, 'index'])->name('publicity.sharing.index');
+        Route::get('media/publicity/sharing/events/{schedulingEvent}/qr', [AdminGallerySharingController::class, 'eventQr'])->name('publicity.sharing.event-qr');
+        Route::get('media/publicity/sharing/studios/{studio}/qr', [AdminGallerySharingController::class, 'studioQr'])->name('publicity.sharing.studio-qr');
+        Route::get('media/publicity/tv-slideshows', [AdminSlideshowController::class, 'index'])->name('publicity.tv-slideshows');
+        Route::post('media/publicity/slides', [AdminSlideshowController::class, 'storeSlide'])->name('publicity.slides.store');
+        Route::put('media/publicity/slides/{slide}', [AdminSlideshowController::class, 'updateSlide'])->name('publicity.slides.update');
+        Route::post('media/publicity/screens/{screen}/revoke', [AdminSlideshowController::class, 'revoke'])->name('publicity.screens.revoke');
+        Route::get('media/publicity/events/{schedulingEvent}', [AdminSlideshowController::class, 'show'])->name('publicity.show');
+        Route::put('media/publicity/events/{schedulingEvent}', [AdminSlideshowController::class, 'update'])->name('publicity.update');
+        Route::post('media/publicity/events/{schedulingEvent}/slides', [AdminSlideshowController::class, 'storeSlide'])->name('publicity.event-slides.store');
+        Route::post('media/publicity/events/{schedulingEvent}/pair', [AdminSlideshowController::class, 'pair'])->name('publicity.pair');
+        Route::get('media/publicity/events/{schedulingEvent}/preview', [AdminSlideshowController::class, 'preview'])->name('publicity.preview');
+        Route::get('media/publicity/events/{schedulingEvent}/manifest', [AdminSlideshowController::class, 'manifest'])->name('publicity.manifest');
+        Route::get('media/publicity/events/{schedulingEvent}/images/{key}', [AdminSlideshowController::class, 'image'])->name('publicity.image');
+        Route::get('media/publicity/events/{schedulingEvent}/videos/{key}', [AdminSlideshowController::class, 'video'])->name('publicity.video');
+        Route::get('media/top-pics', [AdminTopPicsController::class, 'index'])->name('top-pics.index');
+        Route::get('media/top-pics/{schedulingEvent}', [AdminTopPicsController::class, 'show'])->name('top-pics.show');
+        Route::get('media/top-pics/{schedulingEvent}/photos/{photo}/download', [AdminTopPicsController::class, 'download'])->name('top-pics.download');
+        Route::patch('concert-tracker/events/{schedulingEvent}/director-corrections', [DirectorCorrectionsController::class, 'update'])->name('concert-tracker.corrections.update');
+        Route::get('media/concert-photo-releases/{group}/email', [PhotoReleaseEmailController::class, 'show'])->name('concert-photo-releases.email');
+        Route::post('media/concert-photo-releases/{group}/email', [PhotoReleaseEmailController::class, 'send'])->name('concert-photo-releases.email.send');
         Route::get('media/concert-photo-releases', [AdminConcertPhotoReleaseController::class, 'index'])->name('concert-photo-releases.index');
         Route::post('media/concert-photo-releases', [AdminConcertPhotoReleaseController::class, 'store'])->name('concert-photo-releases.store');
         Route::post('media/concert-photo-releases/{group}/release', [AdminConcertPhotoReleaseController::class, 'release'])->name('concert-photo-releases.release');
@@ -360,8 +456,10 @@ Route::middleware(['auth', 'admin.required', 'two-factor.required'])
         Route::post('media/concert-photos/{schedulingEvent}/sync', [AdminConcertPhotoGalleryController::class, 'sync'])->name('concert-photo-gallery.sync');
         Route::post('media/concert-photos/{schedulingEvent}/albums/{collection}', [AdminConcertPhotoGalleryController::class, 'update'])->name('concert-photo-gallery.albums.update');
         Route::post('media/concert-photos/{schedulingEvent}/albums/{collection}/cover', [AdminConcertPhotoGalleryController::class, 'updateCover'])->name('concert-photo-gallery.albums.cover.update');
+        Route::get('media/concert-photos/{schedulingEvent}/assets/{asset}', [AdminConcertPhotoGalleryController::class, 'asset'])->name('concert-photo-gallery.asset');
         Route::get('media/concert-photos/{schedulingEvent}/photos/{photo}', [AdminConcertPhotoGalleryController::class, 'image'])->name('concert-photo-gallery.image');
         Route::get('scheduling-events/{schedulingEvent}/title-cards', [AdminConcertTitleCardController::class, 'show'])->name('concert-title-cards.show');
+        Route::post('scheduling-events/{schedulingEvent}/title-cards/publish', [ConcertTitlePackageController::class, 'publish'])->name('concert-title-cards.publish');
         Route::patch('scheduling-events/{schedulingEvent}/title-cards', [AdminConcertTitleCardController::class, 'update'])->name('concert-title-cards.update');
         Route::get('scheduling-events/{schedulingEvent}/competition-videos', [AdminCompetitionVideoController::class, 'index'])->name('competition-videos.index');
         Route::post('scheduling-events/{schedulingEvent}/competition-videos/files/{file}/assign', [AdminCompetitionVideoController::class, 'assign'])->name('competition-videos.assign');
@@ -383,8 +481,55 @@ Route::middleware(['auth', 'admin.required', 'two-factor.required'])
         Route::get('media/watermark', [AdminMediaCommerceController::class, 'watermark'])->name('media-settings.watermark');
         Route::get('media/sales', [AdminMediaSalesController::class, 'index'])->name('media-sales.index');
         Route::get('media/sales/export', [AdminMediaSalesController::class, 'export'])->name('media-sales.export');
+        Route::get('media/sales/studios/{studio}/activity', [AdminMediaSalesController::class, 'studioActivity'])
+            ->name('media-sales.studios.activity');
+        Route::get('media/sales/studios/{studio}/activity/export', [AdminMediaSalesController::class, 'exportStudioActivity'])
+            ->name('media-sales.studios.activity.export');
+        Route::get('media/sales/events/{kind}/{eventUuid}/activity', [AdminMediaSalesController::class, 'eventActivity'])
+            ->whereIn('kind', ['competition', 'concert'])->whereUuid('eventUuid')->name('media-sales.events.activity');
+        Route::get('media/sales/events/{kind}/{eventUuid}/activity/export', [AdminMediaSalesController::class, 'exportEventActivity'])
+            ->whereIn('kind', ['competition', 'concert'])->whereUuid('eventUuid')->name('media-sales.events.activity.export');
+
+        Route::get('studio-invoices', [AdminStudioInvoiceController::class, 'index'])->name('studio-invoices.index');
+        Route::get('studio-invoices/settings', [AdminStudioInvoiceController::class, 'settings'])->name('studio-invoices.settings');
+        Route::put('studio-invoices/settings', [AdminStudioInvoiceController::class, 'saveSettings'])->name('studio-invoices.settings.save');
+        Route::post('concert-bookings/{concertBooking}/invoices', [AdminStudioInvoiceController::class, 'store'])->name('studio-invoices.store');
+        Route::get('studio-invoices/{studioInvoice}', [AdminStudioInvoiceController::class, 'show'])->name('studio-invoices.show');
+        Route::get('studio-invoices/{studioInvoice}/email', [AdminStudioInvoiceController::class, 'email'])->name('studio-invoices.email');
+        Route::get('studio-invoices/{studioInvoice}/pdf', [AdminStudioInvoiceController::class, 'pdf'])->name('studio-invoices.pdf');
+        Route::patch('studio-invoices/{studioInvoice}', [AdminStudioInvoiceController::class, 'update'])->name('studio-invoices.update');
+        Route::post('studio-invoices/{studioInvoice}/refresh', [AdminStudioInvoiceController::class, 'refresh'])->name('studio-invoices.refresh');
+        Route::post('studio-invoices/{studioInvoice}/issue', [AdminStudioInvoiceController::class, 'issue'])->name('studio-invoices.issue');
+        Route::post('studio-invoices/{studioInvoice}/void', [AdminStudioInvoiceController::class, 'void'])->name('studio-invoices.void');
+        Route::post('studio-invoices/{studioInvoice}/payments', [AdminStudioInvoiceController::class, 'recordPayment'])->name('studio-invoices.record-payment');
+        Route::post('studio-invoices/{studioInvoice}/payments/{payment}/reverse', [AdminStudioInvoiceController::class, 'reverse'])->name('studio-invoices.reverse');
+        Route::post('studio-invoices/{studioInvoice}/check-payment', [AdminStudioInvoiceController::class, 'reconcile'])->middleware('throttle:10,1')->name('studio-invoices.reconcile');
+        Route::get('orders', [AdminOrderController::class, 'index'])->name('orders.index');
+        Route::get('orders/{order}', [AdminOrderController::class, 'show'])->name('orders.show');
+        Route::get('orders/{order}/items/{item}/thumbnail', [AdminOrderController::class, 'thumbnail'])->name('orders.items.thumbnail');
         Route::get('media/customer-support', [AdminCustomerSupportController::class, 'index'])->name('media-support.index');
         Route::patch('media/customer-support/{supportRequest}', [AdminCustomerSupportController::class, 'resolve'])->name('media-support.resolve');
+        Route::get('customers', [AdminCustomerAccountController::class, 'index'])->name('customers.index');
+        Route::get('customers/search/accounts', [AdminCustomerAccountController::class, 'search'])->name('customers.search');
+        Route::get('customers/follow-ups', [AdminCustomerAccountController::class, 'followUps'])->name('customers.follow-ups');
+        Route::get('customers/{customer}', [AdminCustomerAccountController::class, 'show'])->name('customers.show');
+        Route::get('customers/{customer}/media-assets/{asset}', [AdminCustomerAccountController::class, 'mediaAsset'])->name('customers.media-assets.show');
+        Route::post('customers/complimentary-media', [AdminCustomerAccountController::class, 'grant'])->name('customers.complimentary-media.store');
+        Route::post('customers/{customer}/orders/{order}/complimentary-media/revoke', [AdminCustomerAccountController::class, 'revokeComplimentaryMedia'])->name('customers.complimentary-media.revoke');
+        Route::patch('customers/{customer}/status', [AdminCustomerAccountController::class, 'updateStatus'])->name('customers.status.update');
+        Route::patch('customers/{customer}/contact', [AdminCustomerAccountController::class, 'updateContact'])->name('customers.contact.update');
+        Route::post('customers/{customer}/password-reset', [AdminCustomerAccountController::class, 'sendPasswordReset'])->name('customers.password-reset.store');
+        Route::post('customers/{customer}/emails', [AdminCustomerAccountController::class, 'sendEmail'])->name('customers.emails.store');
+        Route::post('customers/{customer}/events', [AdminCustomerAccountController::class, 'addEvent'])->name('customers.events.store');
+        Route::post('customers/{customer}/credits', [AdminCustomerAccountController::class, 'addCredit'])->name('customers.credits.store');
+        Route::post('customers/{customer}/orders/{order}/refunds', [AdminCustomerAccountController::class, 'refund'])->name('customers.refunds.store');
+        Route::patch('customers/{customer}/preferences', [AdminCustomerAccountController::class, 'preferences'])->name('customers.preferences.update');
+        Route::post('customers/{customer}/notes', [AdminCustomerAccountController::class, 'note'])->name('customers.notes.store');
+        Route::patch('customers/{customer}/notes/{note}/complete', [AdminCustomerAccountController::class, 'completeNote'])->name('customers.notes.complete');
+        Route::post('customers/{customer}/risk-events', [AdminCustomerAccountController::class, 'risk'])->name('customers.risk-events.store');
+        Route::patch('customers/{customer}/risk-events/{riskEvent}/resolve', [AdminCustomerAccountController::class, 'resolveRisk'])->name('customers.risk-events.resolve');
+        Route::post('customers/merge', [AdminCustomerAccountController::class, 'merge'])->name('customers.merge.store');
+        Route::post('customers/{customer}/privacy', [AdminCustomerAccountController::class, 'privacy'])->name('customers.privacy.store');
         Route::get('scheduling-events/{schedulingEvent}/competition-gallery', [CompetitionGalleryController::class, 'show'])->name('competition-gallery.show');
         Route::get('scheduling-events/{schedulingEvent}/competition-gallery/customer-preview', [CompetitionCustomerPreviewController::class, 'show'])->name('competition-gallery.customer-preview');
         Route::get('scheduling-events/{schedulingEvent}/competition-gallery/customer-preview/photos/{photo}', [CompetitionCustomerPreviewController::class, 'image'])->whereUuid('photo')->name('competition-gallery.customer-preview.image');
@@ -432,11 +577,19 @@ Route::middleware(['auth', 'admin.required', 'two-factor.required'])
         Route::put('venues/{venue}/map', [AdminOperationsController::class, 'updateVenueMap'])->name('venues.map.update');
         Route::get('concert-bookings', [AdminConcertBookingController::class, 'index'])->name('concert-bookings.index');
         Route::patch('concert-booking-events/bulk-status', [AdminConcertBookingController::class, 'bulkUpdate'])->name('concert-booking-events.bulk-status');
+        Route::get('concert-bookings/{concertBooking}/confirmation', AdminBookingConfirmationController::class)->name('concert-bookings.confirmation');
+        Route::post('concert-booking-events/{concertBookingItem}/seats', [AdminBookingEventMaterialsController::class, 'seats'])->name('concert-booking-events.seats');
+        Route::post('concert-booking-events/{concertBookingItem}/files', [AdminBookingEventMaterialsController::class, 'files'])->name('concert-booking-events.files');
         Route::post('concert-booking-events/{concertBookingItem}/programme', [AdminConcertBookingController::class, 'storeProgramme'])->name('concert-booking-events.programme.store');
         Route::get('concert-booking-events/{concertBookingItem}/programme', [AdminConcertBookingController::class, 'programme'])->name('concert-booking-events.programme.show');
         Route::post('concert-booking-events/{concertBookingItem}/cancel', [AdminConcertBookingController::class, 'cancelItem'])->name('concert-booking-events.cancel');
+        Route::patch('concert-tracker/{schedulingEvent}/seats-families-email/tracker', AdminSeatsFamiliesEmailTrackerController::class)->name('concert-tracker.seats-families-email.update');
+        Route::patch('concert-tracker/{schedulingEvent}/email/{taskKey}/tracker', AdminSeatsFamiliesEmailTrackerController::class)->whereIn('taskKey', ConcertTrackerTaskCatalog::GUARDED_EMAIL_TASKS)->name('concert-tracker.email-bar.update');
+        Route::patch('concert-bookings/{concertBooking}/numbers-tracker', AdminBookingNumbersTrackerController::class)->name('concert-bookings.numbers-tracker.update');
+        Route::patch('concert-bookings/{concertBooking}/tracker', AdminBookingTrackerBarController::class)->name('concert-bookings.tracker.update');
         Route::get('concert-bookings/{concertBooking}', [AdminConcertBookingController::class, 'show'])->name('concert-bookings.show');
         Route::put('concert-bookings/{concertBooking}', [AdminConcertBookingController::class, 'update'])->name('concert-bookings.update');
+        Route::post('concert-bookings/{concertBooking}/family-numbers', [BookingFamilyNumbersController::class, 'admin'])->name('concert-bookings.families');
         Route::post('concert-bookings/{concertBooking}/cancel', [AdminConcertBookingController::class, 'cancel'])->name('concert-bookings.cancel');
         Route::post('concert-bookings/{concertBooking}/create-studio', [AdminConcertBookingController::class, 'createStudio'])->name('concert-bookings.create-studio');
         Route::post('concert-bookings/{concertBooking}/reconcile-contact', [AdminConcertBookingController::class, 'reconcileContact'])->name('concert-bookings.reconcile-contact');
@@ -479,6 +632,9 @@ Route::middleware(['auth', 'admin.required', 'two-factor.required'])
     });
 
 Route::middleware(['auth', 'crew.required', 'two-factor.required', 'crew.onboarded'])->prefix('crew')->name('crew.')->group(function (): void {
+    Route::get('editing', [CrewConcertEditingController::class, 'index'])->name('editing.index');
+    Route::get('editing/{schedulingEvent}', [CrewConcertEditingController::class, 'show'])->name('editing.show');
+    Route::patch('editing/{schedulingEvent}', [CrewConcertEditingController::class, 'update'])->name('editing.update');
     Route::get('training', [CrewTrainingController::class, 'index'])->name('training.index');
     Route::get('training/{trainingCourse}', [CrewTrainingController::class, 'show'])->name('training.show');
     Route::post('training/{trainingCourse}/modules/{module}/complete', [CrewTrainingController::class, 'complete'])->name('training.modules.complete');
@@ -530,3 +686,21 @@ Route::middleware(['auth', 'crew.required', 'two-factor.required', 'crew.onboard
 Route::get('download/{token}', [PublicDownloadController::class, 'show'])
     ->middleware('throttle:public-download')
     ->name('downloads.public.show');
+
+Route::get('tv', [ScreenController::class, 'player'])->name('publicity.player');
+
+// Shared links and TV QR codes add gallery access after normal sign-in and onboarding.
+Route::get('publicity/join/{schedulingEvent}', [PublicityJoinController::class, 'scan'])
+    ->middleware(['signed:relative', 'throttle:30,1'])->name('publicity.join');
+Route::get('my/publicity/join', [PublicityJoinController::class, 'complete'])
+    ->middleware(['auth', 'two-factor.required', 'customer.onboarded', 'throttle:30,1'])->name('publicity.join.complete');
+
+Route::get('publicity/studios/{studio}/join', [PublicityJoinController::class, 'studio'])
+    ->middleware(['signed:relative', 'throttle:30,1'])->name('publicity.studio.join');
+
+Route::middleware(['auth', 'two-factor.required', 'customer.onboarded'])->prefix('my/concert-review/{schedulingEvent}')->name('customer.concert-review.')->group(function (): void {
+    Route::get('/', [DirectorReviewController::class, 'show'])->name('show');
+    Route::get('videos/{file}', [DirectorReviewController::class, 'video'])->whereUuid('file')->name('video');
+    Route::post('feedback', [DirectorReviewController::class, 'feedback'])->middleware('throttle:10,1')->name('feedback');
+    Route::post('release', [DirectorReviewController::class, 'release'])->middleware('throttle:10,1')->name('release');
+});

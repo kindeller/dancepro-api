@@ -127,7 +127,7 @@ class CustomerCreditTest extends TestCase
 
         $this->actingAs($staff)->get(route('admin.media-sales.index'))
             ->assertOk()
-            ->assertSee('Revenue')
+            ->assertSee('Cash collected')
             ->assertSee('$65.00')
             ->assertSee('Discounts: $10.00')
             ->assertSee('Account credit used: $25.00');

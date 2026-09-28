@@ -98,6 +98,14 @@ Fictional local accounts use `local-demo-password`. Useful review accounts are:
   studio, competition registration, completed orders, photos and video.
 - `granted.customer@dancepro.test` for saved concert access.
 
+After signing in to any active fictional account, the local account switcher is
+shown across the top of the customer, studio, crew and admin layouts. It lists
+active `.test` accounts by role and changes the authenticated session without a
+password or two-factor challenge. Customer accounts linked to an active studio
+access record appear in the Studio group and open the Studio Hub. The route and
+banner are registered only in local and test environments; non-`.test` accounts
+are excluded as an additional safeguard.
+
 The public gallery is available at `/galleries`. The released competition uses
 the gallery login code `SAPPHIRE26`, and the protected “Paper Wings” concert uses
 `paper-wings-demo`. All seeded email addresses use reserved `.test` domains. All

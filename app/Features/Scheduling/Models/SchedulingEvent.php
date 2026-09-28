@@ -10,6 +10,8 @@ use App\Features\Scheduling\Support\AvailabilityRoundStatus;
 use App\Features\Scheduling\Support\SchedulingEventType;
 use App\Features\Studios\Models\ConcertEventRoleSeats;
 use App\Features\Studios\Models\Studio;
+use App\Features\Studios\Models\StudioBookingChangeRequest;
+use App\Features\Studios\Models\StudioEventAcknowledgement;
 use App\Features\Studios\Models\StudioEventFile;
 use App\Features\Venues\Models\Venue;
 use App\Shared\Models\HasPublicUuid;
@@ -68,6 +70,16 @@ class SchedulingEvent extends Model
     public function studioFiles(): HasMany
     {
         return $this->hasMany(StudioEventFile::class)->orderByDesc('uploaded_at');
+    }
+
+    public function studioBookingChangeRequests(): HasMany
+    {
+        return $this->hasMany(StudioBookingChangeRequest::class)->latest();
+    }
+
+    public function studioEventAcknowledgements(): HasMany
+    {
+        return $this->hasMany(StudioEventAcknowledgement::class);
     }
 
     public function concertBookingItem(): HasOne

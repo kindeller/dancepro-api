@@ -34,6 +34,13 @@ public struct QueuedUploadPhoto: Sendable {
   public var signature: String? = nil
 }
 
+public struct TopPicChange: Sendable, Equatable {
+  public let photoID: String
+  public let fileUuid: String
+  public let changeUuid: String
+  public let isTopPic: Bool
+}
+
 public struct PhotoSplitResult: Sendable {
   public let manifest: PreparedEvent
   public let itemID: String
@@ -50,6 +57,8 @@ private struct PhotoRecord: Codable {
   var uploaded = false
   var uploadedSignature: String?
   var serverFileUuid: String?
+  var topPicRevision: String?
+  var syncedTopPicRevision: String?
 }
 private struct TrashRecord: Codable {
   let photoID: String
@@ -123,6 +132,19 @@ public actor PhotoLibrary {
     } else {
       state = ReviewState(
         eventID: manifest.programme.eventUuid, revisionID: manifest.programme.revisionUuid)
+    }
+    // Older upload receipts have no metadata acknowledgement. Reconcile their
+    // saved stars once, including edits made with earlier uploader versions.
+    var migrated = false
+    var upgraded = state
+    for id in Array(upgraded.records.keys) where upgraded.records[id]?.uploaded == true
+      && upgraded.records[id]?.serverFileUuid != nil && upgraded.records[id]?.topPicRevision == nil {
+      upgraded.records[id]?.topPicRevision = UUID().uuidString
+      migrated = true
+    }
+    if migrated {
+      try JSONEncoder().encode(upgraded).write(to: stateURL, options: .atomic)
+      state = upgraded
     }
   }
 
@@ -360,6 +382,9 @@ public actor PhotoLibrary {
     state.records[photo.photoUuid]?.uploaded = true
     state.records[photo.photoUuid]?.uploadedSignature = signature
     state.records[photo.photoUuid]?.serverFileUuid = serverFileUuid
+    // Always reconcile after verification: a retried reservation may already
+    // have been verified with a different star, or review changed during upload.
+    state.records[photo.photoUuid]?.topPicRevision = UUID().uuidString
     state.uploadedItems = Array(lockedItemIDs.union([photo.itemUuid])).sorted()
     state.queued?[photo.photoUuid] = nil
     do { try save() } catch {
@@ -567,11 +592,35 @@ public actor PhotoLibrary {
   public func setTopPic(_ id: String, selected: Bool) throws {
     _ = try currentURL(id)
     guard var record = state.records[id] else { return }
+    guard record.topPic != selected else { return }
     let original = record
     record.topPic = selected
+    record.topPicRevision = UUID().uuidString
     state.records[id] = record
     do { try save() } catch {
       state.records[id] = original
+      throw error
+    }
+  }
+
+  public func pendingTopPicChanges() -> [TopPicChange] {
+    state.records.values.compactMap { record in
+      guard record.uploaded, let file = record.serverFileUuid,
+        let revision = record.topPicRevision, revision != record.syncedTopPicRevision else { return nil }
+      return TopPicChange(photoID: record.id, fileUuid: file,
+        changeUuid: revision, isTopPic: record.topPic)
+    }.sorted { $0.photoID < $1.photoID }
+  }
+
+  public func acknowledgeTopPicChanges(_ changes: [TopPicChange]) throws {
+    let previous = state
+    for change in changes {
+      guard let record = state.records[change.photoID], record.serverFileUuid == change.fileUuid,
+        record.topPicRevision == change.changeUuid, record.topPic == change.isTopPic else { continue }
+      state.records[change.photoID]?.syncedTopPicRevision = change.changeUuid
+    }
+    do { try save() } catch {
+      state = previous
       throw error
     }
   }

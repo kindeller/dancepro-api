@@ -28,7 +28,7 @@ class AdminConcertPhotoReleaseController extends Controller
     {
         $releases->release($group, $request->user());
 
-        return back()->with('status', $group->name.' released to verified studio customers.');
+        return to_route('admin.concert-photo-releases.email', $group)->with('status', $group->name.' released. Review the registered-account announcement before sending.');
     }
 
     public function updateCover(UpdateConcertPhotoCoverRequest $request, ConcertPhotoReleaseGroup $group, ConcertPhotoReleases $releases): RedirectResponse

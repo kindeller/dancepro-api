@@ -42,8 +42,11 @@ class CustomerConcertGalleryTest extends TestCase
         $root = route('customer.concerts.photos.show', $concert);
         $album = route('customer.concerts.photos.show', ['concert' => $concert, 'folder' => $ready->uuid]);
         $preview = route('customer.concerts.photos.image', ['concert' => $concert, 'asset' => $asset->uuid]);
-        $this->actingAs($customer)->get($root)->assertOk()->assertSee('01 Dance')->assertDontSee('02 Unreleased');
-        $this->get($album)->assertOk()->assertSee($preview, false)->assertDontSee('photo.jpg');
+        $this->actingAs($customer)->get($root)->assertOk()->assertSee('01 Dance')->assertDontSee('02 Unreleased')
+            ->assertSee(route('customer.media.favourites', ['focus_kind' => 'concert', 'focus_event' => $concert->uuid]))
+            ->assertSee(route('customer.media.cart', ['focus_kind' => 'concert', 'focus_event' => $concert->uuid]));
+        $this->get($album)->assertOk()->assertSee($preview, false)->assertDontSee('photo.jpg')
+            ->assertSee('Bulk photo discounts')->assertSee('Spend $100')->assertSee('Save 5%');
         $response = $this->get($preview)->assertOk()->assertHeader('Content-Type', 'image/jpeg');
         $this->assertNotSame($original, $response->streamedContent());
         $this->actingAs(User::factory()->customer()->create())->get($preview)->assertForbidden();
@@ -51,10 +54,10 @@ class CustomerConcertGalleryTest extends TestCase
         $this->actingAs($customer)->get($preview)->assertNotFound();
     }
 
-    public function test_concert_photo_cart_combines_concerts_from_one_studio_and_rejects_other_studios(): void
+    public function test_concert_photo_cart_accepts_media_from_multiple_concerts_and_studios(): void
     {
-        $first = Concert::factory()->published()->create(['name' => 'Junior concert']);
-        $second = Concert::factory()->published()->create(['name' => 'Senior concert', 'studio_id' => $first->studio_id]);
+        $first = Concert::factory()->published()->create(['name' => 'Junior concert', 'event_date' => '2026-01-10']);
+        $second = Concert::factory()->published()->create(['name' => 'Senior concert', 'event_date' => '2026-09-10', 'studio_id' => $first->studio_id]);
         $foreign = Concert::factory()->published()->create(['name' => 'Other studio concert']);
         $customer = User::factory()->customer()->create();
         foreach ([$first, $foreign] as $concert) {
@@ -72,19 +75,27 @@ class CustomerConcertGalleryTest extends TestCase
         $foreignAsset = $createAsset($foreign);
         $this->actingAs($customer);
         $this->post(route('customer.concerts.photos.selections.store', $first), ['asset_uuid' => $firstAsset->uuid, 'action' => 'add'])->assertRedirect();
+        $this->post(route('customer.concerts.photos.selections.store', $first), ['asset_uuid' => $firstAsset->uuid, 'action' => 'favourite'])->assertRedirect();
         $this->post(route('customer.concerts.photos.selections.store', $second), ['asset_uuid' => $secondAsset->uuid, 'action' => 'add'])->assertRedirect();
-        $this->get(route('customer.concerts.photos.cart', $first->studio))->assertOk()
-            ->assertSee('Junior concert')->assertSee('Senior concert')->assertSee('$20.00');
+        $this->get(route('customer.media.favourites'))->assertOk()
+            ->assertSee('data-favourite-preview', false)
+            ->assertSee(route('customer.concerts.photos.image', ['concert' => $first, 'asset' => $firstAsset]), false);
+        $this->get(route('customer.media.cart', ['focus_kind' => 'concert', 'focus_event' => $first->uuid]))->assertOk()
+            ->assertSeeInOrder(['Junior concert', 'Senior concert'])->assertSee('$20.00');
+        $this->get(route('customer.media.cart'))->assertOk()
+            ->assertSeeInOrder(['Senior concert', 'Junior concert']);
+        $this->get(route('customer.concerts.photos.cart', $first->studio))
+            ->assertRedirect(route('customer.media.cart'));
         $this->post(route('customer.concerts.photos.selections.store', $foreign), ['asset_uuid' => $foreignAsset->uuid, 'action' => 'add'])
-            ->assertSessionHasErrors('cart');
+            ->assertRedirect()->assertSessionDoesntHaveErrors();
         $this->post(route('customer.concerts.photos.selections.store', $first), ['asset_uuid' => $foreignAsset->uuid, 'action' => 'add'])->assertNotFound();
-        foreach (range(1, 8) as $index) {
+        foreach (range(1, 9) as $index) {
             $asset = $createAsset($first);
             $this->post(route('customer.concerts.photos.selections.store', $first), ['asset_uuid' => $asset->uuid, 'action' => 'add'])->assertRedirect();
         }
-        $this->get(route('customer.concerts.photos.cart', $first->studio))->assertOk()
-            ->assertSee('Bulk discount (5%)')->assertSee('$95.00');
-        $this->assertDatabaseCount('customer_concert_photo_selections', 10);
+        $this->get(route('customer.media.cart', ['focus_kind' => 'concert', 'focus_event' => $first->uuid]))->assertOk()
+            ->assertSee('Event bulk discount (5%)')->assertSee('$95.00');
+        $this->assertDatabaseCount('customer_concert_photo_selections', 12);
     }
 
     public function test_authorised_studio_principal_photos_are_one_dollar_and_never_qualify_for_bulk_discount(): void
@@ -105,10 +116,8 @@ class CustomerConcertGalleryTest extends TestCase
             ])->assertRedirect();
         }
 
-        $this->get(route('customer.concerts.photos.cart', $concert->studio))->assertOk()
-            ->assertSee('Studio principal price')->assertSee('Bulk discount (0%)')
-            ->assertSee('Studio principal $1 photos do not count towards bulk discounts.')
-            ->assertSee('$12.00');
+        $this->get(route('customer.media.cart', ['focus_kind' => 'concert', 'focus_event' => $concert->uuid]))->assertOk()
+            ->assertDontSee('Event bulk discount')->assertSee('$12.00');
     }
 
     public function test_concert_cart_and_favourite_survive_an_album_price_list_change(): void

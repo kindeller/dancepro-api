@@ -13,6 +13,7 @@ use App\Features\Programmes\Policies\ProgrammePolicy;
 use App\Features\Programmes\Services\CompetitionProgrammeNodes;
 use App\Features\Programmes\Services\VerifyPhotoBytes;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Tracking\Services\ConcertTracker;
 use App\Models\User;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -94,6 +95,85 @@ class PhotoContributionsTest extends TestCase
     {
         return $this->call('PUT', "/api/staff/events/{$event->uuid}/programme/photo-files/$uuid/content", [], [], [],
             $this->transformHeadersToServerVars(['Content-Type' => 'image/jpeg', 'Accept' => 'application/json']), $bytes);
+    }
+
+    public function test_top_pic_changes_after_upload_update_both_event_types_without_reuploading(): void
+    {
+        Storage::fake('local');
+        foreach ([false, true] as $competition) {
+            $f = $this->fixture($competition);
+            $bytes = $this->jpegBytes();
+            $receipt = $this->reserveBytes($f, $bytes);
+            $this->sendBytes($f['event'], $receipt['uuid'], $bytes)->assertOk();
+            $file = ProgrammePhotoFile::where('uuid', $receipt['uuid'])->firstOrFail();
+            $original = $file->only(['storage_key', 'verified_at', 'sha256', 'uploaded_by_user_id']);
+            $this->postJson($this->finishUrl($f), $f['body'])->assertOk();
+            $url = "/api/staff/events/{$f['event']->uuid}/programme/top-pics";
+            foreach ([false, true, false] as $selected) {
+                $change = ['file_uuid' => $file->uuid, 'change_uuid' => (string) Str::uuid(), 'is_top_pic' => $selected];
+                $this->postJson($url, ['changes' => [$change]])->assertOk()
+                    ->assertJsonPath('data.event_uuid', $f['event']->uuid)->assertJsonPath('data.changes.0', $change);
+                $auditCount = DB::table('programme_upload_audits')->where('action', 'top_pic_changed')->count();
+                $this->postJson($url, ['changes' => [$change]])->assertOk();
+                $this->assertSame($auditCount, DB::table('programme_upload_audits')->where('action', 'top_pic_changed')->count());
+                $this->assertSame($selected, $file->refresh()->is_top_pic);
+            }
+            $this->assertEquals($original, $file->only(array_keys($original)));
+            $this->assertSame($bytes, Storage::disk('local')->get($file->storage_key));
+            $this->assertSame('complete', $file->contribution->status);
+        }
+    }
+
+    public function test_top_pic_sync_rejects_wrong_events_unverified_files_and_unauthorised_accounts(): void
+    {
+        Storage::fake('local');
+        $f = $this->fixture();
+        $bytes = $this->jpegBytes();
+        $receipt = $this->reserveBytes($f, $bytes);
+        $this->sendBytes($f['event'], $receipt['uuid'], $bytes)->assertOk();
+        $url = "/api/staff/events/{$f['event']->uuid}/programme/top-pics";
+        $change = ['file_uuid' => $receipt['uuid'], 'change_uuid' => (string) Str::uuid(), 'is_top_pic' => true];
+        $other = $this->fixture();
+        $this->postJson("/api/staff/events/{$other['event']->uuid}/programme/top-pics", ['changes' => [$change]])->assertNotFound();
+        $unverified = $this->reserveBytes($f, $this->jpegBytes(80));
+        $this->postJson($url, ['changes' => [$change, array_replace($change, ['file_uuid' => $unverified['uuid'], 'change_uuid' => (string) Str::uuid()])]])->assertNotFound();
+        $this->assertFalse(ProgrammePhotoFile::where('uuid', $receipt['uuid'])->firstOrFail()->is_top_pic);
+        $this->postJson($url, ['changes' => [array_replace($change, ['is_top_pic' => 'invalid'])]])->assertUnprocessable();
+        $this->actingAsApiUser(User::factory()->create(['type' => 'customer', 'is_admin' => false]), ['concert-media:upload']);
+        $this->postJson($url, ['changes' => [$change]])->assertForbidden();
+        $this->actingAsApiUser($f['user'], ['programmes:read']);
+        $this->postJson($url, ['changes' => [$change]])->assertForbidden();
+        $other['crew']->user->update(['type' => 'crew', 'is_admin' => false]);
+        $f['crew']->user->update(['type' => 'crew', 'is_admin' => false]);
+        $this->actingAsApiUser($other['crew']->user, ['concert-media:upload']);
+        $this->postJson($url, ['changes' => [$change]])->assertForbidden();
+        $this->actingAsApiUser($f['crew']->user, ['concert-media:upload']);
+        $this->postJson($url, ['changes' => [$change]])->assertOk();
+        $f['assignment']->update(['status' => 'draft']);
+        $this->postJson($url, ['changes' => [$change]])->assertForbidden();
+    }
+
+    public function test_top_pic_sync_updates_canonical_photo_for_replacement_laptop_receipt(): void
+    {
+        Storage::fake('local');
+        $f = $this->fixture();
+        $bytes = $this->jpegBytes();
+        $first = $this->reserveBytes($f, $bytes);
+        $this->sendBytes($f['event'], $first['uuid'], $bytes)->assertOk();
+        $copy = $this->reserveBytes($f, $bytes);
+        $this->sendBytes($f['event'], $copy['uuid'], $bytes)->assertOk();
+        $original = ProgrammePhotoFile::where('uuid', $first['uuid'])->firstOrFail();
+        $duplicate = ProgrammePhotoFile::where('uuid', $copy['uuid'])->firstOrFail();
+        $this->assertSame($original->id, $duplicate->duplicate_of_file_id);
+        $original->update(['is_top_pic' => true]);
+        $duplicate->update(['is_top_pic' => true]);
+        $this->postJson("/api/staff/events/{$f['event']->uuid}/programme/top-pics", ['changes' => [[
+            'file_uuid' => $copy['uuid'], 'change_uuid' => (string) Str::uuid(), 'is_top_pic' => false,
+        ]]])->assertOk();
+        $this->assertFalse($original->refresh()->is_top_pic);
+        $this->assertFalse($duplicate->refresh()->is_top_pic);
+        $this->assertSame($original->storage_key, $duplicate->storage_key);
+        $this->assertDatabaseCount('programme_photo_files', 2);
     }
 
     public function test_crew_uses_own_account_to_upload_for_another_event_role(): void
@@ -468,6 +548,83 @@ class PhotoContributionsTest extends TestCase
         $this->actingAsApiUser(User::factory()->customer()->create(), ['programmes:read']);
         $this->getJson($this->progressUrl($f))->assertForbidden();
         $this->assertDatabaseCount('programme_photo_contributions', 0);
+    }
+
+    public function test_admin_upload_page_shows_registered_counts_and_tracker_bar_before_completion(): void
+    {
+        Storage::fake('local');
+        config(['programme-media.uploads_enabled' => true]);
+        $f = $this->fixture();
+        $firstBytes = $this->jpegBytes(40);
+        $secondBytes = $this->jpegBytes(80);
+        $first = $this->reserveBytes($f, $firstBytes);
+        $second = $this->reserveBytes($f, $secondBytes);
+        $this->sendBytes($f['event'], $first['uuid'], $firstBytes)->assertOk();
+        $url = route('admin.photo-uploads.show', $f['event']);
+        $this->actingAs($f['user'], 'web')->get($url)->assertOk()
+            ->assertSee('3.1 Photo uploads')->assertSee('50% of registered photos verified')
+            ->assertSee('Awaiting files')->assertSee('Back to tracker')
+            ->assertViewHas('uploadSummary', fn ($summary) => $summary === [
+                'photographers' => 1, 'roles' => 1, 'verified' => 1, 'pending' => 1, 'registered' => 2, 'percent' => 50,
+            ]);
+        $this->get(route('admin.concert-tracker.tasks.show', [$f['event'], 'photos_uploaded']))->assertRedirect($url);
+        $barUrl = route('admin.concert-tracker.source-bar.update', [$f['event'], 'photos_uploaded']);
+        $this->patchJson($barUrl, ['panel' => 'due', 'due_date_override' => '2026-10-01'])->assertOk();
+        $this->patchJson($barUrl, ['panel' => 'status', 'status_override' => 'complete'])->assertUnprocessable();
+        $this->sendBytes($f['event'], $second['uuid'], $secondBytes)->assertOk();
+        $this->actingAs($f['user'], 'web')->get($url)->assertOk()->assertSee('100% of registered photos verified')->assertSee('Awaiting Upload Complete');
+        $this->postJson($this->finishUrl($f), $f['body'])->assertOk();
+        $this->actingAs($f['user'], 'web')->get($url)->assertOk()->assertSee('Upload complete');
+        $this->actingAs(User::factory()->customer()->create(), 'web')->get($url)->assertForbidden();
+    }
+
+    public function test_upload_page_shows_roster_without_a_plan_and_keeps_competitions_separate(): void
+    {
+        $user = User::factory()->staff()->create();
+        $event = SchedulingEvent::create(['name' => 'No uploads yet', 'event_type' => 'concert', 'event_date' => '2026-10-01']);
+        $this->actingAs($user)->get(route('admin.photo-uploads.show', $event))->assertOk()
+            ->assertSee('3.1 Photo uploads')->assertSee('No working programme')->assertDontSee('0% of registered');
+        $event->update(['event_type' => 'competition']);
+        $this->get(route('admin.photo-uploads.show', $event))->assertOk()->assertDontSee('3.1 Photo uploads');
+    }
+
+    public function test_tracker_photo_roles_wait_upload_and_complete_independently_without_yellow(): void
+    {
+        Storage::fake('local');
+        config(['programme-media.uploads_enabled' => true]);
+        $f = $this->fixture();
+        $p2 = CrewRole::where('code', 'concert-photographer-p2')->firstOrFail();
+        $f['shift']->assignments()->create(['crew_role_id' => $p2->id, 'crew_profile_id' => CrewProfile::factory()->create()->id, 'status' => 'published']);
+        $tracker = app(ConcertTracker::class);
+        $detail = $tracker->detail($f['event'], 'photos_uploaded');
+        $detail['task']->update(['due_date_override' => today()->addDay()]);
+        $status = $tracker->detail($f['event'], 'photos_uploaded')['status'];
+        $this->assertFalse($status['nearDue']);
+        $this->assertSame(['P1 Waiting', 'P2 Waiting'], array_column($status['photoRoles'], 'label'));
+        $this->assertSame(['ready', 'ready'], array_column($status['photoRoles'], 'tone'));
+        $detail['task']->update(['due_date_override' => today()->subDay()]);
+        $status = $tracker->detail($f['event'], 'photos_uploaded')['status'];
+        $this->assertSame(['overdue', 'overdue'], array_column($status['photoRoles'], 'tone'));
+        $bytes = $this->jpegBytes();
+        $file = $this->reserveBytes($f, $bytes);
+        $status = $tracker->detail($f['event'], 'photos_uploaded')['status'];
+        $this->assertSame(['P1 Uploading', 'P2 Waiting'], array_column($status['photoRoles'], 'label'));
+        $this->assertSame(['ready', 'overdue'], array_column($status['photoRoles'], 'tone'));
+        $this->sendBytes($f['event'], $file['uuid'], $bytes)->assertOk();
+        $this->postJson($this->finishUrl($f), $f['body'])->assertOk();
+        $status = $tracker->detail($f['event'], 'photos_uploaded')['status'];
+        $this->assertNotSame('complete', $status['key']);
+        $this->assertSame(['P1 Complete', 'P2 Waiting'], array_column($status['photoRoles'], 'label'));
+        $this->postJson($this->finishUrl($f), array_replace($f['body'], ['role_uuid' => $p2->uuid]))->assertOk();
+        $status = $tracker->detail($f['event'], 'photos_uploaded')['status'];
+        $this->assertSame('complete', $status['key']);
+        $this->assertSame(['complete', 'complete'], array_column($status['photoRoles'], 'tone'));
+        $this->reserveBytes($f, $this->jpegBytes(90));
+        $status = $tracker->detail($f['event'], 'photos_uploaded')['status'];
+        $this->assertSame('in_progress', $status['key']);
+        $this->assertSame(['P1 Uploading', 'P2 Complete'], array_column($status['photoRoles'], 'label'));
+        $this->actingAs($f['user'], 'web')->get(route('admin.concert-tracker.index', ['year' => 2026, 'phase' => 'editing']))
+            ->assertOk()->assertSee('P1 Uploading')->assertSee('P2 Complete');
     }
 
     private function finishUrl(array $f): string

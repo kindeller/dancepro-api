@@ -3,6 +3,7 @@
 namespace App\Features\Programmes\Services;
 
 use App\Features\Programmes\Models\Programme;
+use App\Features\Tracking\Models\ConcertTrackerTask;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
@@ -15,7 +16,9 @@ class ListProgrammeEvents
             ->join('scheduling_events', 'scheduling_events.id', '=', 'programmes.scheduling_event_id')
             ->whereNull('scheduling_events.cancelled_at')
             ->whereHas('revisions')
-            ->when($user && ! $user->canAccessAdmin(), fn ($query) => $query->whereHas('event.shifts.assignments', fn ($assignments) => $assignments->where('crew_profile_id', $user->crewProfile?->id)->where('status', 'published')))
+            ->when($user && ! $user->canAccessAdmin(), fn ($query) => $query->where(fn ($access) => $access
+                ->whereHas('event.shifts.assignments', fn ($assignments) => $assignments->where('crew_profile_id', $user->crewProfile?->id)->where('status', 'published'))
+                ->orWhereIn('scheduling_events.id', ConcertTrackerTask::where('scope_type', 'event')->where('task_key', 'concert_edited')->where('assignee_user_id', $user->id)->select('scope_id'))))
             ->when($search, fn ($query) => $query->where('scheduling_events.name', 'like', '%'.$search.'%'))
             ->when($from, fn ($query) => $query->whereDate('scheduling_events.event_date', '>=', $from))
             ->with(['event.studio', 'event.competitionContact', 'latestRevision'])

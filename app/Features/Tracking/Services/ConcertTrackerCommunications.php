@@ -44,6 +44,7 @@ class ConcertTrackerCommunications
     public function templatesPage(): array
     {
         $definitions = $this->catalog->all()->keyBy('templateKey');
+        $definitions->put('confirmation_information_email', $this->catalog->find('confirmation_information_email'));
         $templates = ConcertTrackerEmailTemplate::query()->orderBy('id')->get();
 
         return compact('templates', 'definitions');

@@ -3,18 +3,28 @@
 namespace App\Features\Customers\Services;
 
 use App\Features\Customers\Models\CustomerDancer;
+use App\Features\Customers\Support\CustomerDancerNameMatcher;
 use App\Features\Programmes\Services\CompetitionGallery;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Studios\Models\Studio;
 use App\Models\User;
+use Illuminate\Support\Collection;
 
 class CustomerDancerRoutines
 {
-    public function __construct(private readonly CompetitionGallery $gallery) {}
+    private ?Collection $studioNames = null;
+
+    public function __construct(
+        private readonly CompetitionGallery $gallery,
+        private readonly CustomerDancerNameMatcher $nameMatcher,
+    ) {}
 
     public function forEvent(User $user, SchedulingEvent $event): array
     {
         $data = $this->gallery->browse($event, null);
-        $dancers = CustomerDancer::where('user_id', $user->id)->orderBy('name')->get();
+        $dancers = CustomerDancer::where('user_id', $user->id)->orderBy('name')->get()
+            ->filter(fn (CustomerDancer $dancer): bool => ! $this->studioNames()->has($this->nameMatcher->canonical($dancer->name)))
+            ->values();
         $nodes = $data['nodes'];
         $ready = $data['sectionReadiness'];
         $routines = $nodes->where('kind', 'item')->filter(function (array $item) use ($ready, $dancers): bool {
@@ -33,15 +43,18 @@ class CustomerDancerRoutines
             'title' => $data['presentation']['title']];
     }
 
+    private function studioNames(): Collection
+    {
+        return $this->studioNames ??= Studio::where('status', 'active')->pluck('name')
+            ->map(fn (string $name): string => $this->nameMatcher->canonical($name))->flip();
+    }
+
     private function matches(string $title, CustomerDancer $dancer): bool
     {
-        $names = collect([$dancer->name, ...($dancer->programme_names ?? [])])->filter(fn ($name) => is_string($name) && trim($name) !== '');
+        $names = collect([$dancer->name, ...($dancer->programme_names ?? [])])
+            ->filter(fn ($name) => is_string($name) && trim($name) !== ''
+                && ! $this->studioNames()->has($this->nameMatcher->canonical($name)));
 
-        return $names->contains(function (string $name) use ($title): bool {
-            $parts = preg_split('/\s+/u', trim($name));
-            $phrase = implode('\\s+', array_map(fn ($part) => preg_quote($part, '/'), $parts));
-
-            return preg_match('/(?<![\pL\pN])'.$phrase.'(?![\pL\pN])/iu', $title) === 1;
-        });
+        return $names->contains(fn (string $name): bool => $this->nameMatcher->matches($title, $name));
     }
 }

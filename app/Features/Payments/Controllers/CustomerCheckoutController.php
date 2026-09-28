@@ -38,6 +38,16 @@ class CustomerCheckoutController extends Controller
         ));
     }
 
+    public function accountCart(PrepareCustomerCheckoutRequest $request, PrepareCustomerOrder $prepare): RedirectResponse
+    {
+        return redirect()->route('customer.checkout.show', $prepare->accountCart(
+            $request->user(),
+            $request->validated('cart_groups'),
+            $request->validated('discount_code'),
+            $request->boolean('use_account_credit'),
+        ));
+    }
+
     public function show(Request $request, Order $order): Response
     {
         abort_unless($order->user_id === $request->user()->id, 404);

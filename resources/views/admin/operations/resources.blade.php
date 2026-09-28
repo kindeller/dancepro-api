@@ -1,4 +1,4 @@
-@extends('layouts.admin', ['title' => 'Crew resources', 'heading' => 'Resources', 'subheading' => 'Reusable handbook files, role guides and crew support information.'])
+@extends('layouts.admin', ['title' => 'Crew resources', 'heading' => 'Crew resources', 'subheading' => 'Reusable handbook files, role guides and crew support information.'])
 
 @section('content')
 @include('admin.crew-management._tabs')

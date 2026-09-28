@@ -27,12 +27,29 @@ class StudioGalleryCodeTest extends TestCase
         $this->assertTrue(Hash::check('GALLERY-TEST', $studio->gallery_code_hash));
         $this->assertSame(1, $studio->gallery_code_version);
         $this->assertArrayNotHasKey('gallery_code_hash', $studio->toArray());
+        $this->assertArrayNotHasKey('gallery_code_encrypted', $studio->toArray());
+        $this->assertSame('GALLERY-TEST', $studio->gallery_code_encrypted);
+        $this->assertStringNotContainsString('GALLERY-TEST', $studio->getRawOriginal('gallery_code_encrypted'));
         $this->assertDatabaseHas('studio_gallery_code_changes', ['studio_id' => $studio->id, 'actor_user_id' => $admin->id, 'version' => 1]);
         $this->assertSame(1, DB::table('studio_gallery_code_changes')->count());
         $this->get(route('admin.studios.edit', $studio))->assertOk()->assertSee('A gallery code is set')->assertDontSee('gallery-test')->assertDontSee($studio->gallery_code_hash);
         $this->post($url, ['gallery_code' => 'new-gallery', 'version' => 0])->assertConflict();
         $this->post($url, ['gallery_code' => 'bad!', 'version' => 1])->assertSessionHasErrors('gallery_code')->assertSessionMissing('_old_input.gallery_code');
         $this->actingAs(User::factory()->customer()->create())->post($url, ['gallery_code' => 'another-test', 'version' => 1])->assertForbidden();
+    }
+
+    public function test_three_letter_gallery_code_can_be_saved_and_used_by_a_customer(): void
+    {
+        $studio = Studio::factory()->create();
+        $admin = User::factory()->staff()->create();
+        $url = route('admin.studios.gallery-code.update', $studio);
+        $this->actingAs($admin)->post($url, ['gallery_code' => 'abc', 'version' => 0])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('ABC', $studio->fresh()->gallery_code_encrypted);
+        $this->post($url, ['gallery_code' => 'AB', 'version' => 1])->assertSessionHasErrors('gallery_code');
+        $this->actingAs(User::factory()->customer()->create())->post(route('customer.profile.store'), [
+            'action' => 'studio', 'studio_uuid' => $studio->uuid, 'studio_gallery_code' => 'abc',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertNotNull(CustomerStudio::firstOrFail()->access_verified_at);
     }
 
     public function test_customer_must_verify_studio_code_before_profile_media_access(): void
@@ -63,7 +80,7 @@ class StudioGalleryCodeTest extends TestCase
         $studio->forceFill(['gallery_code_hash' => Hash::make('GALLERY-TEST')])->save();
         $user = User::factory()->customer()->create();
         CustomerStudio::create(['user_id' => $user->id, 'studio_id' => $studio->id]);
-        $this->actingAs($user)->get(route('customer.profile.edit'))->assertOk()->assertSee('Gallery code needed');
+        $this->actingAs($user)->get(route('customer.profile.edit', ['tab' => 'studios']))->assertOk()->assertSee('Gallery code needed');
         $this->get(route('customer.profile.studio', $studio))->assertForbidden();
         $this->get(route('customer.media.index'))->assertOk()->assertSee('Add your studio in My Profile');
         $this->post(route('customer.profile.store'), ['action' => 'studio', 'studio_uuid' => $studio->uuid, 'studio_gallery_code' => 'GALLERY-TEST'])->assertRedirect();

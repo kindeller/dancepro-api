@@ -28,16 +28,20 @@ use App\Features\Operations\Controllers\CrewMobileDocumentController;
 use App\Features\Operations\Controllers\CrewMobileHandbookController;
 use App\Features\Programmes\Controllers\CompetitionFoldersController;
 use App\Features\Programmes\Controllers\CompetitionVideoUploadController;
+use App\Features\Programmes\Controllers\ConcertTitlePackageController;
+use App\Features\Programmes\Controllers\ConcertVideoUploadController;
 use App\Features\Programmes\Controllers\PhotoCompletionController;
 use App\Features\Programmes\Controllers\PhotoContentController;
 use App\Features\Programmes\Controllers\PhotoContributionsController;
 use App\Features\Programmes\Controllers\PhotoFilesController;
+use App\Features\Programmes\Controllers\PhotoTopPicsController;
 use App\Features\Programmes\Controllers\PhotoUploadProgressController;
 use App\Features\Programmes\Controllers\ProgrammeController;
 use App\Features\Programmes\Controllers\ProgrammePhotographersController;
 use App\Features\Programmes\Controllers\ProgrammeSyncController;
 use App\Features\Programmes\Controllers\ProgrammeUploadRolesController;
 use App\Features\Programmes\Controllers\SharedConcertProgrammeController;
+use App\Features\Publicity\Controllers\ScreenController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentActionController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentController;
 use App\Features\Scheduling\Controllers\CrewMobileAssignmentFileController;
@@ -238,12 +242,20 @@ Route::middleware('auth:sanctum')->group(function (): void {
             ->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:120,1']);
         Route::post('events/{schedulingEvent}/programme/photo-files', PhotoFilesController::class)
             ->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:60,1']);
+        Route::post('events/{schedulingEvent}/programme/top-pics', PhotoTopPicsController::class)
+            ->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:60,1']);
         Route::post('events/{schedulingEvent}/programme/photo-completion', PhotoCompletionController::class)
             ->middleware(['token.ability:concert-media:upload', 'throttle:30,1']);
         Route::post('events/{schedulingEvent}/programme/photo-contributions', PhotoContributionsController::class)
             ->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:30,1']);
         Route::get('events/{schedulingEvent}/programme/competition-folders', [CompetitionFoldersController::class, 'show'])->middleware(['token.ability:programmes:read', 'throttle:60,1']);
         Route::post('events/{schedulingEvent}/programme/competition-folders', [CompetitionFoldersController::class, 'store'])->middleware(['token.ability:concert-media:upload', 'throttle:30,1']);
+        Route::middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:60,1'])->group(function (): void {
+            Route::post('events/{schedulingEvent}/concert-videos/batches', [ConcertVideoUploadController::class, 'begin']);
+            Route::post('events/{schedulingEvent}/concert-videos/batches/{batch}/files/{file}/address', [ConcertVideoUploadController::class, 'address']);
+            Route::post('events/{schedulingEvent}/concert-videos/batches/{batch}/files/{file}/verify', [ConcertVideoUploadController::class, 'verify']);
+            Route::post('events/{schedulingEvent}/concert-videos/batches/{batch}/complete', [ConcertVideoUploadController::class, 'complete']);
+        });
         Route::post('events/{schedulingEvent}/competition-videos/batches', [CompetitionVideoUploadController::class, 'begin'])->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:30,1']);
         Route::post('events/{schedulingEvent}/competition-videos/batches/{batch}/files', [CompetitionVideoUploadController::class, 'reserve'])->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:60,1']);
         Route::post('events/{schedulingEvent}/competition-videos/batches/{batch}/files/{file}/verify', [CompetitionVideoUploadController::class, 'verify'])->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:60,1']);
@@ -252,6 +264,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
             ->middleware(['token.ability:'.TokenAbility::ProgrammeRead->value, 'throttle:60,1']);
         Route::post('events/{schedulingEvent}/programme/sync', ProgrammeSyncController::class)
             ->middleware(['token.ability:'.TokenAbility::ConcertMediaUpload->value, 'throttle:30,1']);
+        Route::get('events/{schedulingEvent}/programme/title-cards', [ConcertTitlePackageController::class, 'show'])->middleware(['token.ability:'.TokenAbility::ProgrammeRead->value, 'throttle:60,1']);
+        Route::get('events/{schedulingEvent}/programme/title-cards/{package}', [ConcertTitlePackageController::class, 'download'])->name('staff.programmes.title-cards.download')->middleware(['token.ability:'.TokenAbility::ProgrammeRead->value, 'throttle:60,1']);
         Route::get('programme-events', [ProgrammeController::class, 'events'])
             ->middleware(['token.ability:'.TokenAbility::ProgrammeRead->value, 'throttle:60,1']);
         Route::get('events/{schedulingEvent}/programme/source/{revision?}', [ProgrammeController::class, 'confirmedSource'])->name('staff.programmes.source')
@@ -288,4 +302,13 @@ Route::middleware('auth:sanctum')->group(function (): void {
             Route::patch('media-assets/{asset}', [MediaAssetController::class, 'update']);
         });
     });
+});
+
+Route::prefix('publicity/screens')->group(function (): void {
+    Route::get('events', [ScreenController::class, 'events'])->middleware('throttle:120,1');
+    Route::post('event', [ScreenController::class, 'selectEvent'])->middleware('throttle:30,1');
+    Route::post('pair', [ScreenController::class, 'pair'])->middleware('throttle:6,1');
+    Route::get('manifest', [ScreenController::class, 'manifest'])->middleware('throttle:120,1');
+    Route::get('images/{key}', [ScreenController::class, 'image'])->middleware('throttle:600,1');
+    Route::get('videos/{key}', [ScreenController::class, 'video'])->middleware('throttle:600,1');
 });

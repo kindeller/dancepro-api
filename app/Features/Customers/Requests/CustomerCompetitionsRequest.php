@@ -3,6 +3,7 @@
 namespace App\Features\Customers\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CustomerCompetitionsRequest extends FormRequest
 {
@@ -13,6 +14,12 @@ class CustomerCompetitionsRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['page' => ['nullable', 'integer', 'min:1']];
+        return [
+            'page' => ['nullable', 'integer', 'min:1'],
+            'tab' => ['nullable', Rule::in(['overview', 'events', 'files', 'messages'])],
+            'focus_kind' => ['nullable', Rule::in(['competition', 'concert'])],
+            'focus_event' => ['nullable', 'uuid'],
+            'routine' => ['nullable', 'uuid'],
+        ];
     }
 }

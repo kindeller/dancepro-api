@@ -19,6 +19,14 @@ class CustomerMobileCatalogue
             ->orderByDesc('event_date')->get();
 
         return [
+            'notifications' => $user->notifications()->latest()->limit(20)->get()->map(fn ($notification): array => [
+                'id' => $notification->id,
+                'title' => $notification->data['title'] ?? 'DancePro update',
+                'body' => $notification->data['body'] ?? '',
+                'url' => $notification->data['url'] ?? null,
+                'read_at' => $notification->read_at?->toIso8601String(),
+                'created_at' => $notification->created_at?->toIso8601String(),
+            ])->all(),
             'dancers' => $data['dancers']->map(fn ($dancer) => ['uuid' => $dancer->uuid, 'name' => $dancer->name,
                 'programme_names' => $dancer->programme_names ?? []])->values()->all(),
             'studios' => $data['studios']->map(fn ($studio) => ['uuid' => $studio->uuid, 'name' => $studio->name])->values()->all(),

@@ -2,7 +2,9 @@
 
 namespace App\Features\Payments\Services;
 
+use App\Features\Customers\Services\CustomerEngagementTracker;
 use App\Features\Orders\Models\Order;
+use App\Features\Orders\Services\OrderFinancials;
 use App\Features\Orders\Support\OrderStatus;
 use App\Features\Payments\Contracts\PaymentGateway;
 use App\Features\Payments\Models\PaymentAttempt;
@@ -19,6 +21,7 @@ class ProcessTestPayment
         private readonly OrderDiscounts $orderDiscounts,
         private readonly CustomerCredits $customerCredits,
         private readonly CustomerMediaNotifications $mediaNotifications,
+        private readonly CustomerEngagementTracker $engagement,
     ) {}
 
     public function execute(User $user, Order $order, string $idempotencyKey, string $outcome): PaymentAttempt
@@ -62,6 +65,17 @@ class ProcessTestPayment
                 $this->customerCredits->redeem($order);
                 $this->activatePaidOrder->execute($order);
                 $this->mediaNotifications->receipt($order->fresh());
+                $order->load('items.mediaCollection.concert');
+                $financials = app(OrderFinancials::class);
+                $events = $order->items->groupBy(fn ($item) => json_encode($financials->event($order, $item)));
+                foreach ($events as $reference => $items) {
+                    $event = json_decode($reference, true);
+                    if ($event) {
+                        $this->engagement->record($user, $event[0], $event[1], 'purchased', metadata: [
+                            'order_uuid' => $order->uuid, 'amount' => $items->sum(fn ($item) => $financials->cash($item)),
+                        ]);
+                    }
+                }
             }
 
             return $attempt;

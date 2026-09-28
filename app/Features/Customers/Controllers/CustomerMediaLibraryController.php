@@ -4,8 +4,10 @@ namespace App\Features\Customers\Controllers;
 
 use App\Features\Customers\Requests\CustomerCompetitionsRequest;
 use App\Features\Customers\Services\CustomerCompetitionAccess;
+use App\Features\Customers\Services\CustomerMediaArchives;
 use App\Features\Customers\Services\CustomerMediaReviewExamples;
 use App\Features\Customers\Services\CustomerPurchasedMedia;
+use App\Features\Orders\Actions\RecordPurchasedMediaDownload;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
@@ -20,7 +22,7 @@ class CustomerMediaLibraryController extends Controller
             ->first(fn (array $entry) => $entry['kind'] === $kind && $entry['event']->uuid === $event);
         if ($card) {
             abort_unless($card['can_browse'], 403);
-            $album = $purchases->albumForUser($request->user(), $kind, $event);
+            $album = $purchases->albumForUser($request->user(), $kind, $event, $request->validated('routine'));
         } else {
             $review = $examples->forUser($request->user());
             $album = collect([...$review['photos'], ...$review['videos']])
@@ -45,5 +47,28 @@ class CustomerMediaLibraryController extends Controller
 
         return $disk->response($media->thumbnail_storage_key, null, ['Cache-Control' => 'private, no-store',
             'X-Content-Type-Options' => 'nosniff'], 'inline');
+    }
+
+    public function downloadAll(CustomerCompetitionsRequest $request, string $kind, string $event, CustomerPurchasedMedia $purchases, CustomerMediaArchives $archives, RecordPurchasedMediaDownload $record): StreamedResponse
+    {
+        $album = $purchases->albumForUser($request->user(), $kind, $event, $request->validated('routine'));
+        $assets = $album['assets'];
+        abort_if($assets->count() < 2, 404);
+        $archiveTitle = $album['selectedFolder']['title'] ?? $album['title'];
+        $archive = $archives->archive($request->user(), $kind, $event, $archiveTitle, $assets);
+        foreach ($assets as $asset) {
+            if ($entitlement = $album['entitlementByAsset']->get($asset->id)) {
+                $record->execute($request->user(), $entitlement, $asset, $request);
+            }
+        }
+        $archive->forceFill([
+            'download_count' => $archive->download_count + 1,
+            'last_download_at' => now(),
+            'expires_at' => now()->addDays($archive->scope === 'shared' ? 30 : 2),
+        ])->save();
+
+        return Storage::disk($archive->storage_disk)->download($archive->storage_key, $archive->filename, [
+            'Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 }

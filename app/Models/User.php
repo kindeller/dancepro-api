@@ -9,6 +9,7 @@ use App\Features\Customers\Models\CustomerProfile;
 use App\Features\Customers\Support\UserType;
 use App\Features\Orders\Models\Order;
 use App\Features\Payments\Models\CustomerCreditTransaction;
+use App\Features\Studios\Models\StudioAccountAccess;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -21,7 +22,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'is_active', 'is_admin', 'type', 'last_login_at', 'last_seen_at', 'invitation_sent_at', 'onboarding_completed_at'])]
+#[Fillable(['name', 'email', 'email_verified_at', 'password', 'is_active', 'is_admin', 'type', 'account_status', 'paused_at', 'cancelled_at', 'anonymized_at', 'account_status_reason', 'account_status_changed_by_user_id', 'merged_into_user_id', 'last_login_at', 'last_seen_at', 'invitation_sent_at', 'onboarding_completed_at'])]
 #[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -41,6 +42,18 @@ class User extends Authenticatable implements MustVerifyEmail
     public function canAccessCustomer(): bool
     {
         return $this->is_active && ($this->type === UserType::Customer->value || $this->canAccessAdmin());
+    }
+
+    public function canAccessStudioHub(): bool
+    {
+        if (! $this->canAccessCustomer()) {
+            return false;
+        }
+
+        return StudioAccountAccess::query()->where('status', 'active')
+            ->where(fn ($query) => $query->where('user_id', $this->id)
+                ->orWhereRaw('lower(email) = ?', [mb_strtolower($this->email)]))
+            ->exists();
     }
 
     public function canAccessCrew(): bool
@@ -92,6 +105,9 @@ class User extends Authenticatable implements MustVerifyEmail
             'invitation_sent_at' => 'datetime',
             'onboarding_completed_at' => 'datetime',
             'is_active' => 'boolean',
+            'paused_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'anonymized_at' => 'datetime',
             'is_admin' => 'boolean',
             'last_login_at' => 'datetime',
             'last_seen_at' => 'datetime',

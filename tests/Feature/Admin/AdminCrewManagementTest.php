@@ -311,7 +311,7 @@ class AdminCrewManagementTest extends TestCase
             ->get(route('admin.dashboard'))
             ->assertOk()
             ->assertSee(route('admin.crew.index'), false)
-            ->assertSee('Crew Management');
+            ->assertSee('Crew management');
 
         $this->actingAs($staff)
             ->get(route('admin.crew.index'))

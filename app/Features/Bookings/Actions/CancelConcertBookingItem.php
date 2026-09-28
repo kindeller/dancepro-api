@@ -2,10 +2,13 @@
 
 namespace App\Features\Bookings\Actions;
 
+use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Bookings\Models\ConcertBookingItem;
+use App\Features\Bookings\Services\BookingChangeSnapshot;
 use App\Features\Bookings\Support\ConcertBookingStatus;
 use App\Features\Scheduling\Models\CrewNotification;
 use App\Features\Scheduling\Support\AvailabilityRoundStatus;
+use App\Features\Tracking\Services\TrackerEmailContext;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -19,6 +22,17 @@ class CancelConcertBookingItem
         }
 
         return DB::transaction(function () use ($item, $user): ConcertBookingItem {
+            $booking = ConcertBooking::lockForUpdate()->findOrFail($item->concert_booking_id);
+            $item = ConcertBookingItem::lockForUpdate()->findOrFail($item->id);
+            if ($item->approval_status === 'cancelled') {
+                throw ValidationException::withMessages(['event' => 'This event has already been cancelled.']);
+            }
+            $snapshots = app(BookingChangeSnapshot::class);
+            $before = $snapshots->forBooking($booking);
+            if ($item->item_type->value === 'concert' && $booking->final_family_count !== null) {
+                $booking->update(['final_family_count' => null, 'family_count_confirmed_at' => null, 'family_count_confirmed_by' => null]);
+            }
+            $item->setRelation('booking', $booking);
             $item->update([
                 'approval_status' => 'cancelled',
                 'cancelled_by_user_id' => $user->id,
@@ -69,6 +83,7 @@ class CancelConcertBookingItem
                 });
 
             $booking = $item->booking;
+            app(TrackerEmailContext::class)->invalidate($booking, 'A booking event was cancelled. Review the remaining event details before scheduling a replacement.');
             if (! $booking->items()->where('approval_status', '!=', 'cancelled')->exists()) {
                 $booking->update([
                     'status' => ConcertBookingStatus::Cancelled,
@@ -82,6 +97,8 @@ class CancelConcertBookingItem
                     'reviewed_at' => now(),
                 ]);
             }
+
+            $booking->revisions()->create(['user_id' => $user->id, 'before' => $before, 'after' => $snapshots->forBooking($booking->refresh()), 'reason' => 'Booking event cancelled. Reconfirm final family numbers if concert videography remains booked.']);
 
             return $item->refresh();
         });

@@ -9,7 +9,7 @@ use Symfony\Component\Process\Process;
 
 class ProgrammePdfExtractor
 {
-    public function extract(ProgrammeSource $source, string $type, ?int $year = null): array
+    public function extract(ProgrammeSource $source, string $type, ?int $year = null, ?callable $progress = null): array
     {
         $directory = storage_path('app/private/programme-extraction');
         if (! is_dir($directory) && ! mkdir($directory, 0700, true) && ! is_dir($directory)) {
@@ -36,7 +36,23 @@ class ProgrammePdfExtractor
             $output = null;
             $process = new Process(['python3', app_path('Features/Programmes/Extraction/extract.py'), $path, $type, (string) $year]);
             $process->setTimeout(150);
-            $process->mustRun();
+            $buffer = '';
+            $process->mustRun(function (string $channel, string $chunk) use ($progress, &$buffer): void {
+                if ($channel !== Process::ERR || ! $progress) {
+                    return;
+                }
+                $buffer .= $chunk;
+                while (($end = strpos($buffer, "\n")) !== false) {
+                    $line = substr($buffer, 0, $end);
+                    $buffer = substr($buffer, $end + 1);
+                    if (str_starts_with($line, 'PROGRESS ')) {
+                        $data = json_decode(substr($line, 9), true);
+                        if (isset($data['page'], $data['total']) && is_int($data['page']) && is_int($data['total'])) {
+                            $progress($data['page'], $data['total'], (bool) ($data['ocr'] ?? false));
+                        }
+                    }
+                }
+            });
             $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
             if (! isset($result['nodes'], $result['issues']) || count($result['nodes']) > 10000) {
                 throw new RuntimeException('Invalid extraction result.');

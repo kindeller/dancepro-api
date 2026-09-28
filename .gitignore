@@ -23,6 +23,9 @@
 /storage/app/private/keys/
 /storage/pail
 /test-results
+/tmp/
+# Empty scratch output from local review commands.
+/uuid
 /vendor
 _ide_helper.php
 Homestead.json
@@ -36,3 +39,7 @@ __pycache__/
 /apps/mac-uploader/.build/
 /apps/mac-uploader/.swiftpm/
 /apps/mac-uploader/dist/
+
+# Full-resolution local review photos copied from a user-supplied shoot.
+/database/seeders/assets/realistic-media/photos/*.JPG
+/database/seeders/assets/realistic-media/photos/*.jpg

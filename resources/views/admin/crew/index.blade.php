@@ -10,8 +10,8 @@
         <form class="filters" method="GET" action="{{ route('admin.crew.index') }}">
             <label>Search<input name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Name or email"></label>
             <label>Status<select name="active"><option value="">Any status</option><option value="1" @selected(($filters['active'] ?? '') === '1')>Active</option><option value="0" @selected(($filters['active'] ?? '') === '0')>Inactive</option></select></label>
-            <button type="submit">Filter</button>
-            <a class="button secondary" href="{{ route('admin.crew.index') }}">Reset</a>
+            <button type="submit">Apply filters</button>
+            <a class="button secondary" href="{{ route('admin.crew.index') }}">Clear filters</a>
         </form>
         <a class="button" href="{{ route('admin.crew.create') }}">Invite crew member</a>
     </div>

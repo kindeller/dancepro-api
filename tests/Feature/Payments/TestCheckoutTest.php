@@ -153,6 +153,19 @@ class TestCheckoutTest extends TestCase
             'purpose' => 'customer_purchase',
         ]);
         $this->assertSame(1, $entitlement->fresh()->download_count);
+        $this->assertDatabaseHas('order_media_asset_downloads', [
+            'order_media_entitlement_id' => $entitlement->id,
+            'media_asset_id' => $asset->id,
+            'user_id' => $user->id,
+            'download_count' => 1,
+        ]);
+
+        $this->actingAs($user)->get(route('customer.purchases.download', [$entitlement, $asset]))->assertRedirectContains('/download/');
+        $this->assertDatabaseHas('order_media_asset_downloads', [
+            'order_media_entitlement_id' => $entitlement->id,
+            'media_asset_id' => $asset->id,
+            'download_count' => 2,
+        ]);
 
         $other = User::factory()->customer()->create();
         $this->actingAs($other)->get(route('customer.purchases.download', [$entitlement, $asset]))->assertNotFound();

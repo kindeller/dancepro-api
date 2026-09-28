@@ -7,15 +7,21 @@ use App\Features\Programmes\Requests\AdminPhotoUploadsRequest;
 use App\Features\Programmes\Requests\PhotoContributionExceptionRequest;
 use App\Features\Programmes\Services\AdminPhotoUploads;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Tracking\Services\BookingTrackerBar;
+use App\Features\Tracking\Services\ConcertTracker;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\View\View;
+use Illuminate\Http\Response;
 
 class AdminPhotoUploadsController extends Controller
 {
-    public function show(AdminPhotoUploadsRequest $request, SchedulingEvent $schedulingEvent, AdminPhotoUploads $uploads): View
+    public function show(AdminPhotoUploadsRequest $request, SchedulingEvent $schedulingEvent, AdminPhotoUploads $uploads, ConcertTracker $tracker, BookingTrackerBar $bar): Response
     {
-        return view('admin.programmes.photo-uploads', $uploads->forEvent($schedulingEvent, $request->validated('plan_uuid')));
+        $trackerBar = $schedulingEvent->event_type->value === 'concert'
+            ? $bar->sourcePage($tracker->detail($schedulingEvent, 'photos_uploaded'), $request->session()->get('concert_tracker_context', [])) : null;
+
+        return response()->view('admin.programmes.photo-uploads', $uploads->forEvent($schedulingEvent, $request->validated('plan_uuid')) + compact('trackerBar'))
+            ->header('Cache-Control', 'private, no-store');
     }
 
     public function update(PhotoContributionExceptionRequest $request, SchedulingEvent $schedulingEvent, ResolvePhotoContributionException $resolve): RedirectResponse

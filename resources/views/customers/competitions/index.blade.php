@@ -15,7 +15,7 @@
             </select>
         </label>
         @error('event_uuid')<p role="alert" style="color:#b42318">{{ $message }}</p>@enderror
-        <label for="login-code">Event login code<input id="login-code" type="password" name="login_code" required maxlength="64" autocomplete="off"></label>
+        <label for="login-code">Event media access code<input id="login-code" type="password" name="login_code" required maxlength="64" autocomplete="off"></label>
         @error('login_code')<p role="alert" style="color:#b42318">{{ $message }}</p>@enderror
         @if($availableEvents->isEmpty())<p>No events are available to add yet.</p>@endif
         <button class="button">Add competition</button>

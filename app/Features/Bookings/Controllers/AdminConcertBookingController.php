@@ -2,7 +2,7 @@
 
 namespace App\Features\Bookings\Controllers;
 
-use App\Features\Bookings\Actions\ApproveConcertBooking;
+use App\Features\Bookings\Actions\ApproveBookingForConfirmation;
 use App\Features\Bookings\Actions\BulkUpdateConcertBookingItems;
 use App\Features\Bookings\Actions\CancelConcertBooking;
 use App\Features\Bookings\Actions\CancelConcertBookingItem;
@@ -22,11 +22,18 @@ use App\Features\Bookings\Requests\ReviewConcertBookingRequest;
 use App\Features\Bookings\Requests\StoreConcertBookingProgrammeRequest;
 use App\Features\Bookings\Requests\UpdateConcertBookingRequest;
 use App\Features\Bookings\Services\BookingArtwork;
+use App\Features\Bookings\Services\BookingChangeReview;
+use App\Features\Bookings\Services\BookingProgrammeWorkspace;
+use App\Features\Bookings\Services\BookingSeatsAndFamilies;
+use App\Features\Bookings\Services\BookingStudioMediaWorkspace;
+use App\Features\Bookings\Services\BookingVideoTitlesWorkspace;
 use App\Features\Bookings\Services\ReviewBookingStudioContact;
 use App\Features\Operations\Services\OperationsFileStorage;
 use App\Features\Scheduling\Models\EventTypeDefinition;
+use App\Features\Studios\Actions\StoreStudioEventFiles;
 use App\Features\Studios\Models\Studio;
 use App\Features\Studios\Support\StudioStatus;
+use App\Features\Tracking\Services\BookingTrackerBar;
 use App\Features\Venues\Models\Venue;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -56,13 +63,25 @@ class AdminConcertBookingController extends Controller
         ]);
     }
 
-    public function show(Request $request, ConcertBooking $concertBooking, ReviewBookingStudioContact $reviewContact): View
+    public function show(Request $request, ConcertBooking $concertBooking, ReviewBookingStudioContact $reviewContact, BookingChangeReview $changes, BookingTrackerBar $trackerBar, BookingSeatsAndFamilies $seatsAndFamilies, BookingProgrammeWorkspace $programmeWorkspace, BookingStudioMediaWorkspace $studioMediaWorkspace, BookingVideoTitlesWorkspace $videoTitlesWorkspace): View
     {
         Gate::authorize('manageScheduling');
-        $concertBooking->load(['items.eventTypeDefinition', 'items.schedulingEvent', 'items.venue']);
+        $concertBooking->load(['items.eventTypeDefinition', 'items.schedulingEvent.shifts', 'items.schedulingEvent.roleRequirements.crewRole', 'items.schedulingEvent.roleSeats', 'items.schedulingEvent.studioFiles', 'items.venue']);
 
-        return view('admin.concert-bookings.show', [
+        $bookingTab = in_array($request->query('tab'), ['seats-families', 'programme', 'studio-media', 'video-titles'], true) ? $request->query('tab') : 'booking';
+        $programmePage = $bookingTab === 'programme' ? $programmeWorkspace->page($concertBooking, $request->string('event')->toString() ?: null, $request->session()->get('concert_tracker_context', [])) : [];
+
+        $mediaPage = $bookingTab === 'studio-media' ? $studioMediaWorkspace->page($concertBooking, $request->string('event')->toString() ?: null, $request->user(), $request->session()->get('concert_tracker_context', [])) : [];
+
+        $titlesPage = $bookingTab === 'video-titles' ? $videoTitlesWorkspace->page($concertBooking, $request->string('event')->toString() ?: null, $request->session()->get('concert_tracker_context', [])) : [];
+
+        return view('admin.concert-bookings.show', $titlesPage + $mediaPage + $programmePage + $changes->page($concertBooking, $request->string('change_request')->toString() ?: null) + [
             'booking' => $concertBooking,
+            'seatsAndFamilies' => $seatsAndFamilies,
+            'bookingTab' => $bookingTab,
+            'trackerBar' => $request->query('tab') === 'seats-families'
+                ? $trackerBar->numbersPage($concertBooking, $request->session()->get('concert_tracker_context', []))
+                : $trackerBar->page($concertBooking, $request->session()->get('concert_tracker_context', [])),
             'venues' => Venue::query()->orderBy('name')->get(),
             'studios' => Studio::query()->orderBy('name')->get(['uuid', 'name']),
             'studioStatuses' => StudioStatus::cases(),
@@ -117,16 +136,11 @@ class AdminConcertBookingController extends Controller
         return back()->with('status', "Venue resolved as {$venue->name}.");
     }
 
-    public function approve(ReviewConcertBookingRequest $request, ConcertBooking $concertBooking, ApproveConcertBooking $approveBooking): RedirectResponse
+    public function approve(ReviewConcertBookingRequest $request, ConcertBooking $concertBooking, ApproveBookingForConfirmation $approve): RedirectResponse
     {
-        /** @var User $staff */
-        $staff = $request->user();
-        $studio = $request->validated('studio_uuid')
-            ? Studio::query()->where('uuid', $request->validated('studio_uuid'))->firstOrFail()
-            : null;
-        $approveBooking->execute($concertBooking, $staff, $request->string('internal_review_note')->toString() ?: null, $studio);
+        $url = $approve->execute($concertBooking, $request->user(), $request->validated());
 
-        return back()->with('status', 'Booking approved and draft scheduling events created. Availability remains closed.');
+        return redirect()->to($url)->with('status', 'Booking approved. Review the confirmation template and send when ready.');
     }
 
     public function bulkUpdate(BulkUpdateConcertBookingItemsRequest $request, BulkUpdateConcertBookingItems $bulkUpdate): RedirectResponse
@@ -150,7 +164,7 @@ class AdminConcertBookingController extends Controller
 
     public function update(UpdateConcertBookingRequest $request, ConcertBooking $concertBooking, UpdateConcertBooking $update): RedirectResponse
     {
-        $update->execute($concertBooking, $request->validated());
+        $update->execute($concertBooking, $request->validated(), $request->user());
 
         return back()->with('status', 'Booking details updated.');
     }
@@ -171,9 +185,13 @@ class AdminConcertBookingController extends Controller
         return redirect()->route('admin.concert-bookings.show', $booking)->with('status', 'Booking event cancelled.');
     }
 
-    public function storeProgramme(StoreConcertBookingProgrammeRequest $request, ConcertBookingItem $concertBookingItem, StoreConcertBookingProgramme $store): RedirectResponse
+    public function storeProgramme(StoreConcertBookingProgrammeRequest $request, ConcertBookingItem $concertBookingItem, StoreConcertBookingProgramme $store, StoreStudioEventFiles $studioFiles): RedirectResponse
     {
-        $store->execute($concertBookingItem, $request->file('programme'));
+        if ($concertBookingItem->schedulingEvent) {
+            $studioFiles->execute($concertBookingItem->schedulingEvent, $request->user(), 'programme', [$request->file('programme')]);
+        } else {
+            $store->execute($concertBookingItem, $request->file('programme'));
+        }
 
         return back()->with('status', 'Event programme attached.');
     }
@@ -187,8 +205,8 @@ class AdminConcertBookingController extends Controller
         return $files->disk()->response(
             $concertBookingItem->programme_path,
             $concertBookingItem->programme_name ?: 'programme.pdf',
-            ['Cache-Control' => 'private, no-store'],
-            'inline',
+            ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff'],
+            $files->disk()->mimeType($concertBookingItem->programme_path) === 'application/pdf' ? 'inline' : 'attachment',
         );
     }
 }

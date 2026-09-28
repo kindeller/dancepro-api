@@ -21,6 +21,8 @@ class PrepareCustomerCheckoutRequest extends FormRequest
         return [
             'discount_code' => ['nullable', 'regex:/\A[A-Z0-9-]{4,32}\z/'],
             'use_account_credit' => ['sometimes', 'boolean'],
+            'cart_groups' => ['sometimes', 'array', 'min:1'],
+            'cart_groups.*' => ['required', 'string', 'regex:/\A(?:competition|concert):[0-9a-f-]{36}\z/i'],
         ];
     }
 }

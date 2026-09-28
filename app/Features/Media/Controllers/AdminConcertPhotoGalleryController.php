@@ -2,10 +2,12 @@
 
 namespace App\Features\Media\Controllers;
 
+use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Models\MediaCollection;
 use App\Features\Media\Requests\AdminConcertPhotoGalleryRequest;
 use App\Features\Media\Requests\UpdateConcertPhotoAlbumRequest;
 use App\Features\Media\Requests\UpdateConcertPhotoCoverRequest;
+use App\Features\Media\Services\AdminConcertPhotoPreview;
 use App\Features\Media\Services\ConcertPhotoGallerySetup;
 use App\Features\Media\Services\ConcertPhotoReleases;
 use App\Features\Programmes\Models\ProgrammePhotoFile;
@@ -63,5 +65,14 @@ class AdminConcertPhotoGalleryController extends Controller
 
         return Storage::disk('local')->response($preview->key($file, $request->validated('size', 'preview'), $schedulingEvent),
             $file->uuid.'.jpg', ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'private, no-store'], 'inline');
+    }
+
+    public function asset(
+        AdminConcertPhotoGalleryRequest $request,
+        SchedulingEvent $schedulingEvent,
+        MediaAsset $asset,
+        AdminConcertPhotoPreview $preview,
+    ): StreamedResponse {
+        return $preview->response($schedulingEvent, $asset, $request->validated('size', 'preview'));
     }
 }

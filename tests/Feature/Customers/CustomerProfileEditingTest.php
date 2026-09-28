@@ -15,6 +15,21 @@ class CustomerProfileEditingTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_profile_tabs_open_as_separate_focused_pages(): void
+    {
+        $user = User::factory()->customer()->create();
+        $this->actingAs($user)->get(route('customer.profile.edit'))
+            ->assertOk()->assertSee('My details')->assertSee('Account email')->assertDontSee('Add dancer')
+            ->assertDontSee('Media galleries')->assertDontSee('Studios &amp; concerts', false)->assertDontSee('Staff');
+        $this->get(route('customer.profile.edit', ['tab' => 'dancers']))
+            ->assertOk()->assertSee('Add dancer')->assertDontSee('Account email');
+        $this->get(route('customer.profile.edit', ['tab' => 'studios']))
+            ->assertOk()->assertSee('Add or verify studio')->assertDontSee('Save preferences');
+        $this->get(route('customer.profile.edit', ['tab' => 'preferences']))
+            ->assertOk()->assertSee('Save preferences')->assertDontSee('Add or verify studio');
+        $this->get(route('customer.profile.edit', ['tab' => 'wrong']))->assertSessionHasErrors('tab');
+    }
+
     public function test_details_update_only_owned_profile_and_safe_account_fields(): void
     {
         $user = User::factory()->customer()->create();
@@ -61,12 +76,28 @@ class CustomerProfileEditingTest extends TestCase
         $this->assertSame('Updated Name', $dancer->fresh()->name);
         $this->assertSame('self', $dancer->fresh()->relationship);
         $this->assertSame(['Stage Name', 'Another Name'], $dancer->fresh()->programme_names);
-        $this->get(route('customer.profile.edit'))->assertOk()->assertSee('Stage Name');
+        $this->get(route('customer.profile.edit', ['tab' => 'dancers']))->assertOk()->assertSee('Stage Name');
         $this->post(route('customer.profile.store'), array_replace($input, ['programme_names' => '']))->assertRedirect();
         $this->assertSame([], $dancer->fresh()->programme_names);
         CustomerDancer::create(['user_id' => $user->id, 'name' => 'Taken Name']);
         $this->post(route('customer.profile.store'), array_replace($input, ['name' => 'Taken Name']))->assertSessionHasErrors('name');
         $this->assertSame('Updated Name', $dancer->fresh()->name);
+    }
+
+    public function test_studio_names_cannot_be_saved_as_dancers_or_programme_aliases(): void
+    {
+        $user = User::factory()->customer()->create();
+        $studio = Studio::factory()->create(['name' => 'Harbour Dance Academy']);
+
+        $this->actingAs($user)->post(route('customer.profile.store'), [
+            'action' => 'dancer', 'name' => 'Harbour-Dance Academy',
+        ])->assertSessionHasErrors('name');
+        $this->assertDatabaseCount('customer_dancers', 0);
+
+        $this->post(route('customer.profile.store'), [
+            'action' => 'dancer', 'name' => 'Mia Hart', 'programme_names' => $studio->name,
+        ])->assertSessionHasErrors('name');
+        $this->assertDatabaseCount('customer_dancers', 0);
     }
 
     public function test_profile_removal_preserves_media_and_does_not_remove_another_accounts_links(): void
@@ -79,7 +110,7 @@ class CustomerProfileEditingTest extends TestCase
         $event = SchedulingEvent::create(['name' => 'Registered event', 'event_type' => 'competition', 'event_date' => '2026-09-04']);
         CustomerCompetitionRegistration::create(['user_id' => $user->id, 'scheduling_event_id' => $event->id, 'access_verified_at' => now()]);
         $this->actingAs($other)->post(route('customer.profile.store'), ['action' => 'studio_remove', 'studio_uuid' => $studio->uuid])->assertNotFound();
-        $this->actingAs($user)->get(route('customer.profile.edit'))->assertOk()->assertSee($studio->name)->assertSee('Currently unavailable');
+        $this->actingAs($user)->get(route('customer.profile.edit', ['tab' => 'studios']))->assertOk()->assertSee($studio->name)->assertSee('Currently unavailable');
         $this->post(route('customer.profile.store'), ['action' => 'studio_remove', 'studio_uuid' => $studio->uuid])->assertRedirect();
         $this->post(route('customer.profile.store'), ['action' => 'dancer_remove', 'dancer_uuid' => $dancer->uuid])->assertRedirect();
         $this->assertDatabaseCount('customer_studios', 0);

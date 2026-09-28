@@ -7,6 +7,7 @@ use App\Features\Customers\Requests\CustomerConcertGalleryRequest;
 use App\Features\Customers\Services\ConcertPhotoPreview;
 use App\Features\Customers\Services\CustomerConcertGallery;
 use App\Features\Customers\Services\CustomerConcertPhotoCart;
+use App\Features\Customers\Services\CustomerEngagementTracker;
 use App\Features\Customers\Services\StudioPrincipalPhotoPricing;
 use App\Features\Media\Services\MediaPriceLists;
 use App\Http\Controllers\Controller;
@@ -15,8 +16,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerConcertGalleryController extends Controller
 {
-    public function show(CustomerConcertGalleryRequest $request, Concert $concert, CustomerConcertGallery $gallery, CustomerConcertPhotoCart $cart, MediaPriceLists $priceLists, StudioPrincipalPhotoPricing $principalPricing): Response
+    public function show(CustomerConcertGalleryRequest $request, Concert $concert, CustomerConcertGallery $gallery, CustomerConcertPhotoCart $cart, MediaPriceLists $priceLists, StudioPrincipalPhotoPricing $principalPricing, CustomerEngagementTracker $engagement): Response
     {
+        $engagement->record($request->user(), 'concert', $concert->uuid, 'viewed', $request->validated('folder'));
         $galleryData = $gallery->browse($request->user(), $concert, $request->validated('folder'), $request->validated('group'));
         $shopping = $cart->forStudio($request->user(), $concert->studio);
         $shopping['photoPrice'] = $principalPricing->eligible($request->user(), $concert->studio)

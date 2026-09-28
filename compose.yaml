@@ -20,6 +20,7 @@ services:
         volumes:
             - '.:/var/www/html'
             - './docker/programmes/php.ini:/etc/php/8.5/cli/conf.d/99-sail.ini:ro'
+            - './docker/programmes/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf:ro'
         networks:
             - sail
         depends_on:

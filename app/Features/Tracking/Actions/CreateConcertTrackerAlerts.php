@@ -62,7 +62,7 @@ class CreateConcertTrackerAlerts
         if ($status['key'] === 'failed') {
             return 'email_failed';
         }
-        if ($status['override']?->follow_up_date?->lte(today()) && ! in_array($status['key'], ['complete', 'not_required'], true)) {
+        if ($status['override']?->follow_up_status !== 'resolved' && $status['override']?->follow_up_date?->lte(today()) && ! in_array($status['key'], ['complete', 'not_required'], true)) {
             return 'follow_up_due';
         }
 

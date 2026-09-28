@@ -4,7 +4,7 @@
 <div class="competition-programme card card-pad">
     <div><strong>Competition programme</strong><div class="muted">One programme is shared across every shift in this competition.</div></div>
     @if($event->programme_path)
-        <details class="programme-menu"><summary class="programme-icon attached" title="Programme attached" aria-label="Programme attached">▤</summary><div><a href="{{ $event->programmeUrl() }}" target="_blank">Open Programme</a><button type="button" data-programme-picker="competition-programme-upload">Replace Programme</button></div></details>
+        <details class="programme-menu"><summary class="programme-icon attached" title="Programme attached" aria-label="Programme attached">▤</summary><div><a href="{{ $event->programmeUrl() }}" target="_blank">Open programme</a><button type="button" data-programme-picker="competition-programme-upload">Replace programme</button></div></details>
     @else
         <button class="programme-icon" type="button" title="Attach Programme" aria-label="Attach Programme" data-programme-picker="competition-programme-upload"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 12.5 14.8 6.2a3 3 0 0 1 4.2 4.2l-8.1 8.1a5 5 0 0 1-7.1-7.1l8.5-8.5M7.1 14l8.2-8.2"/></svg></button>
     @endif

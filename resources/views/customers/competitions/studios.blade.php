@@ -1,4 +1,5 @@
 @extends('layouts.public', ['title' => 'My Studios’ Routines · '.$title, 'footerLabel' => 'Competition media'])
+@section('headerParentUrl', route(($competitionRoutes ?? ['show' => 'customer.competitions.show'])['show'], $event))
 @section('content')
 @php($competitionRoutes = $competitionRoutes ?? ['show' => 'customer.competitions.show'])
 <section class="hero"><div class="container"><div class="eyebrow">{{ $title }}</div><h1>My Studios’ Routines</h1><p class="lead">Ready routines assigned to studios in your profile.</p></div></section>
@@ -7,9 +8,9 @@
     @if($guestProfileRequired ?? false)
         <div class="empty"><h2>Create your profile to see your studio’s routines</h2><p>Your favourites and cart will transfer when you register or sign in.</p><a class="button" href="{{ route('customer.register') }}">Create account</a> <a href="{{ route('customer.login') }}">Sign in</a></div>
     @else
-    <p><a href="{{ route('customer.profile.edit') }}#studios">Edit studios in My Profile →</a></p>
+    <p><a href="{{ route('customer.profile.edit', ['tab' => 'studios']) }}">Edit studios in My Profile →</a></p>
     @if($studios->isEmpty())
-        <div class="empty"><h2>Add a studio to your profile</h2><p>Save your studio to find its assigned routines here.</p><a class="button" href="{{ route('customer.profile.edit') }}#studios">Add now</a></div>
+        <div class="empty"><h2>Add a studio to your profile</h2><p>Save your studio to find its assigned routines here.</p><a class="button" href="{{ route('customer.profile.edit', ['tab' => 'studios']) }}">Add now</a></div>
     @elseif(empty($routines))
         <div class="empty"><h2>No ready studio routines yet</h2><p>Check back as sections become ready, or browse the whole event.</p></div>
     @else

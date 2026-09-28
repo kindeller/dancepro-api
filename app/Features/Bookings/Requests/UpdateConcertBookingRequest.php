@@ -25,9 +25,11 @@ class UpdateConcertBookingRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'booking_change_uuid' => ['nullable', 'uuid'],
+            'resolution_note' => ['required_with:booking_change_uuid', 'nullable', 'string', 'max:5000'],
             'studio_name' => ['required', 'string', 'max:255'], 'contact_name' => ['required', 'string', 'max:255'],
             'contact_email' => ['required', 'email', 'max:255'], 'contact_phone' => ['required', 'string', 'max:50'],
-            'portrait_photography_interest' => ['required', Rule::in(['yes', 'no', 'unsure'])],
+            'portrait_photography_interest' => ['nullable', Rule::in(['yes', 'no', 'unsure'])],
             'wants_portrait_photography' => ['required', 'boolean'], 'wants_concert_photography' => ['required', 'boolean'], 'wants_concert_videography' => ['required', 'boolean'],
             'approximate_family_count' => ['nullable', 'integer', 'min:1', 'max:10000'], 'postal_address' => ['nullable', 'string', 'max:2000'],
             'previous_video_feedback' => ['nullable', 'string', 'max:5000'], 'concert_inclusions' => ['nullable', 'array'], 'concert_inclusions.*' => ['string', 'max:100'],
@@ -39,6 +41,7 @@ class UpdateConcertBookingRequest extends FormRequest
             'items.*.venue_name' => ['nullable', 'required_if:items.*.venue_uuid,other', 'string', 'max:255'],
             'items.*.venue_address' => ['nullable', 'required_if:items.*.venue_uuid,other', 'string', 'max:1000'],
             'items.*.event_date' => ['required', 'date'], 'items.*.starts_at' => ['required', 'date_format:H:i'],
+            'items.*.access_time' => ['nullable', 'date_format:H:i'],
             'items.*.finishes_at' => ['required', 'date_format:H:i'],
         ];
     }

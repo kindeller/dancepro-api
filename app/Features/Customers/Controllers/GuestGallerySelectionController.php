@@ -54,9 +54,13 @@ class GuestGallerySelectionController extends Controller
         return $this->competitionList($request, $schedulingEvent, $access, $cart, 'favourites');
     }
 
-    public function concert(GuestGallerySelectionRequest $request, Concert $concert, GuestGalleryAccessManager $access, GuestGallerySelections $selections): RedirectResponse
+    public function concert(GuestGallerySelectionRequest $request, Concert $concert, GuestGalleryAccessManager $access, GuestGallerySelections $selections): RedirectResponse|JsonResponse
     {
-        $selections->concert($access->concert($request, $concert), $concert, $request->validated());
+        $state = $selections->concert($access->concert($request, $concert), $concert, $request->validated());
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Guest favourites and cart updated.', 'data' => $state])
+                ->header('Cache-Control', 'private, no-store');
+        }
 
         return back()->with('status', 'Guest favourites and cart updated.');
     }

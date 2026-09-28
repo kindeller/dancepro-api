@@ -13,7 +13,10 @@ struct PhotoReviewView: View {
   let refreshSharedProgramme: () async -> Void
   let loadSharedProgramme: () async -> Void
   let shareProgramme: () async -> Void
+  let retryTopPics: () async -> Void
   let checkCompetitionFolders: () async -> Void
+  let downloadVideoTitles: () async -> Void
+  @State private var downloadingTitles = false
   @State private var showPhotographers = false
   @State private var fitRequest = UUID()
   @State private var expanded = false
@@ -39,6 +42,17 @@ struct PhotoReviewView: View {
       HStack {
         VStack(alignment: .leading, spacing: 3) {
           Label("Saved on this Mac", systemImage: "internaldrive")
+          HStack(spacing: 8) {
+            Label(model.topPicSyncStatus, systemImage: model.pendingTopPicCount > 0 ? "arrow.triangle.2.circlepath" : "checkmark.icloud")
+              .foregroundStyle(model.pendingTopPicCount > 0 ? Color.orange : Color.secondary)
+              .help(model.topPicSyncError ?? "Stars sync automatically after upload while this app is open. Unuploaded photos send their stars with the upload.")
+            if model.pendingTopPicCount > 0 && !model.syncingTopPics {
+              Button("Retry sync") { Task { await retryTopPics() } }.buttonStyle(.link)
+            }
+          }.font(.caption)
+          if let syncError = model.topPicSyncError {
+            Text(syncError).font(.caption).foregroundStyle(.orange).lineLimit(2).help(syncError)
+          }
           if !model.uploadStatus.isEmpty {
             Text(model.uploadStatus).font(.caption).foregroundStyle(.secondary).lineLimit(1)
               .help(model.uploadStatus)
@@ -116,6 +130,13 @@ struct PhotoReviewView: View {
       Spacer()
       Button("Open Folders", systemImage: "folder") { NSWorkspace.shared.open(model.local.url) }
       if model.local.manifest.programme.eventType == "concert" {
+        Button(downloadingTitles ? "Downloading…" : "Video Titles…", systemImage: "arrow.down.doc") {
+          Task {
+            downloadingTitles = true
+            await downloadVideoTitles()
+            downloadingTitles = false
+          }
+        }.disabled(model.busy || downloadingTitles)
         Button("Edit Items", systemImage: "pencil") { showConcertEditor = true }.disabled(
           model.busy || !model.lockedItemIDs.isEmpty)
       }

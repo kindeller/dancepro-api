@@ -6,16 +6,28 @@ import SwiftUI
 struct DanceProUploaderApp: App {
   @NSApplicationDelegateAdaptor(UploaderAppDelegate.self) private var appDelegate
   @StateObject private var model = AppModel()
+  @State private var showConcertVideos = false
   var body: some Scene {
     Window("DancePro Uploader", id: "main") {
       Group {
         if let review = model.review {
-          if review.local.manifest.programme.eventType == "competition",
+          if showConcertVideos && review.local.manifest.programme.eventType == "concert" {
+            ConcertVideoUploadView(eventUuid: review.local.manifest.programme.eventUuid,
+              eventName: review.local.manifest.programme.eventName, close: { showConcertVideos = false },
+              upload: { await model.uploadConcertVideos($0) }, finish: { await model.finishConcertVideos($0) })
+          } else if review.local.manifest.programme.eventType == "competition",
              review.photographerSelection?.selected?.isVideo == true {
             CompetitionVideoUploadView(review: review, close: { model.review = nil },
               refreshRoles: { await model.refreshPhotographers(review) },
               upload: { video, role in await model.uploadVideos(video, roleUuid: role) })
           } else {
+            VStack(spacing: 0) {
+            if review.local.manifest.programme.eventType == "concert" {
+              HStack {
+                Spacer()
+                Button("Upload Edited Concert Videos…", systemImage: "video.badge.plus") { showConcertVideos = true }
+              }.padding(.horizontal, 20).padding(.top, 10)
+            }
             PhotoReviewView(
             model: review, close: { model.review = nil },
             uploadPhotos: { model.uploadPhotos(review) },
@@ -25,7 +37,13 @@ struct DanceProUploaderApp: App {
             refreshSharedProgramme: { await model.refreshSharedProgramme(review) },
             loadSharedProgramme: { await model.loadSharedProgramme(review) },
             shareProgramme: { await model.shareProgramme(review) },
-            checkCompetitionFolders: { await model.checkCompetitionFolders(review) })
+            retryTopPics: { await model.retryTopPics(review) },
+            checkCompetitionFolders: { await model.checkCompetitionFolders(review) },
+            downloadVideoTitles: {
+              await model.downloadVideoTitles(review.local.manifest.programme)
+              review.error = model.error
+            })
+            }
           }
         } else {
           ContentView(model: model)
@@ -33,6 +51,12 @@ struct DanceProUploaderApp: App {
       }
       .frame(minWidth: 900, minHeight: 620)
       .task { if model.session != nil { await model.refresh() } }
+      .task {
+        while !Task.isCancelled {
+          await model.syncTopPics()
+          do { try await Task.sleep(for: .seconds(2)) } catch { return }
+        }
+      }
     }
     .defaultSize(width: 1080, height: 740)
   }
@@ -81,6 +105,11 @@ struct ContentView: View {
                 Text(
                   "Choose a destination, then the app creates the folders and saves the programme. Existing media is kept."
                 ).font(.caption).foregroundStyle(.secondary)
+                if programme.eventType == "concert" {
+                  Button("Download Video Titles…", systemImage: "arrow.down.doc") {
+                    Task { await model.downloadVideoTitles(programme) }
+                  }.disabled(model.busy || model.session == nil)
+                }
                 Divider()
                 ForEach(model.folders) { folder in
                   Text(folder.relativePath).textSelection(.enabled).font(
@@ -132,6 +161,11 @@ struct ContentView: View {
                   .buttonStyle(.borderedProminent)
                   Button("Open Folders", systemImage: "folder") {
                     NSWorkspace.shared.open(local.url)
+                  }
+                  if local.manifest.programme.eventType == "concert" {
+                    Button("Download Video Titles…", systemImage: "arrow.down.doc") {
+                      Task { await model.downloadVideoTitles(local.manifest.programme) }
+                    }.disabled(model.busy || model.session == nil)
                   }
                   if local.manifest.hasPdf {
                     Button("Open Programme", systemImage: "doc") {

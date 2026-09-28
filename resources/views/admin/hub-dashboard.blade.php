@@ -1,13 +1,13 @@
 @extends('layouts.admin', [
-    'title' => 'Hub Management Dashboard',
-    'heading' => 'Dashboard',
-    'subheading' => 'A quick read on upcoming events, crew coverage and work needing attention.',
+    'title' => 'Hub dashboard',
+    'heading' => 'Hub dashboard',
+    'subheading' => 'Upcoming events, crew coverage and work needing attention.',
 ])
 
 @section('content')
     <div class="toolbar dashboard-actions">
         <div></div>
-        <a class="button" href="{{ route('admin.scheduling-events.index', ['fullscreen' => 1]) }}">Event Availability</a>
+        <a class="button" href="{{ route('admin.scheduling-events.index', ['fullscreen' => 1]) }}">Event availability</a>
     </div>
     <section class="grid stats" aria-label="Hub management statistics">
         <a class="card metric dashboard-metric" href="{{ route('admin.scheduling-events.index') }}">
@@ -32,7 +32,7 @@
         <div class="card">
             <div class="card-pad dashboard-heading">
                 <div>
-                    <h2>Upcoming Events</h2>
+                    <h2>Upcoming events</h2>
                     <p class="muted">Today through the next 14 days.</p>
                 </div>
                 <a href="{{ route('admin.scheduling-events.index') }}">View all</a>
@@ -71,8 +71,8 @@
         <div class="card">
             <div class="card-pad dashboard-heading">
                 <div>
-                    <h2>Needs Attention</h2>
-                    <p class="muted">{{ $exceptionCount }} {{ str('exception')->plural($exceptionCount) }} across Hub Management.</p>
+                    <h2>Needs attention</h2>
+                    <p class="muted">{{ $exceptionCount }} {{ str('exception')->plural($exceptionCount) }} across Hub management.</p>
                 </div>
                 <a href="{{ route('admin.exceptions.index') }}">View all</a>
             </div>

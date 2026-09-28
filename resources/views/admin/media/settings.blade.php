@@ -398,8 +398,8 @@
                     @foreach($notificationHistory as $delivery)
                         <div class="notification-history-row">
                             <div><strong>{{ match($delivery->type) { 'receipt' => 'Order confirmation', 'media_ready' => 'Media ready', 'expiry_reminder' => 'Expiry reminder', default => 'Test email' } }}</strong><br><span class="muted">{{ ($delivery->sent_at ?? $delivery->queued_at)->format('j M Y, g:i a') }}</span></div>
-                            <div class="notification-history-recipient">{{ $delivery->recipient_email }}</div>
-                            <div class="notification-history-subject">{{ $delivery->subject }}@if($delivery->order)<br><span class="muted">Order {{ $delivery->order->uuid }}</span>@endif</div>
+                            <div class="notification-history-recipient">@if($delivery->user_id)<a href="{{ route('admin.customers.show', $delivery->user_id) }}">{{ $delivery->recipient_email }}</a>@else{{ $delivery->recipient_email }}@endif</div>
+                            <div class="notification-history-subject">{{ $delivery->subject }}@if($delivery->order)<br><span class="muted">Order {{ $delivery->order->displayNumber() }}</span>@endif</div>
                             <span class="notification-status {{ $delivery->status }}">{{ $delivery->status }}</span>
                         </div>
                     @endforeach
@@ -411,13 +411,13 @@
     <div class="settings-panel">
         <section class="card card-pad">
             <h2>Customer help</h2>
-            <p class="muted">Introductory text shown above the searchable Help Centre. The placeholder articles are intentionally provisional and will be reviewed after the product workflows settle.</p>
+            <p class="muted">Introductory text shown on the customer Help page. Keep it consistent with current ordering, access and download processes.</p>
             <form method="post" action="{{ route('admin.media-settings.update', ['tab' => 'help']) }}" class="grid">@csrf<input type="hidden" name="section" value="help">
                 <label>Help content<textarea name="help_content" rows="14" required>{{ old('help_content', $settings['help_content']) }}</textarea></label>
                 <div><button>Save help</button></div>
             </form>
         </section>
-        <section class="card card-pad"><h2>Help Centre insights</h2><div class="grid two-col"><div><h3>Searches with no answer</h3>@forelse($helpInsights['unanswered'] as $search)<p><strong>{{ $search->query }}</strong><br><span class="muted">{{ $search->searches }} {{ Str::plural('search', $search->searches) }} · last searched {{ \Carbon\Carbon::parse($search->last_searched_at)->format('j M Y') }}</span></p>@empty<p class="muted">No unanswered searches yet.</p>@endforelse</div><div><h3>Article feedback</h3>@foreach($helpInsights['articleFeedback'] as $article)<p><strong>{{ $article->title }}</strong><br><span class="muted">{{ $article->helpful_count }} helpful · {{ $article->unhelpful_count }} not helpful</span></p>@endforeach</div></div></section>
+        <section class="card card-pad"><h2>Help insights</h2><div class="grid two-col"><div><h3>Searches with no answer</h3>@forelse($helpInsights['unanswered'] as $search)<p><strong>{{ $search->query }}</strong><br><span class="muted">{{ $search->searches }} {{ Str::plural('search', $search->searches) }} · last searched {{ \Carbon\Carbon::parse($search->last_searched_at)->format('j M Y') }}</span></p>@empty<p class="muted">No unanswered searches yet.</p>@endforelse</div><div><h3>Article feedback</h3>@foreach($helpInsights['articleFeedback'] as $article)<p><strong>{{ $article->title }}</strong><br><span class="muted">{{ $article->helpful_count }} helpful · {{ $article->unhelpful_count }} not helpful</span></p>@endforeach</div></div></section>
     </div>
 @endif
 @endsection

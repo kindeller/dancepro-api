@@ -19,7 +19,7 @@ class ConcertTrackerAutomation
 {
     private const RULES = [
         'confirmation_information_email' => ['label' => 'Booking confirmation', 'basis' => 'approved'],
-        'final_numbers_email' => ['label' => 'Final numbers & technical information', 'basis' => 'booking_first'],
+        'final_numbers_email' => ['label' => 'Seats & families email', 'basis' => 'booking_first'],
         'concert_week_email' => ['label' => 'Concert Week requirements', 'basis' => 'event'],
         'post_concert_email' => ['label' => 'Post-concert information', 'basis' => 'event'],
     ];
@@ -96,7 +96,7 @@ class ConcertTrackerAutomation
     public function schedule(SchedulingEvent $event, string $taskKey, User $actor): ConcertTrackerEmailDelivery
     {
         $candidate = $this->forEvent($event)->firstWhere('task_key', $taskKey);
-        if (! $candidate || $candidate['existing']) {
+        if ($event->cancelled_at || ! $candidate || ($candidate['existing'] && ! $candidate['needs_review'])) {
             throw ValidationException::withMessages(['email' => 'This email is already scheduled or has been sent.']);
         }
         if (blank($candidate['recipient_email'])) {
@@ -129,12 +129,14 @@ class ConcertTrackerAutomation
             $booking = $event->concertBookingItem?->booking;
             $plannedAt = $this->plannedAt($event, $definitionRule, $rule);
             $existing = ConcertTrackerEmailDelivery::query()->where('concert_tracker_task_id', $task->id)
-                ->where('concert_tracker_email_template_id', $template->id)->where('status', '!=', 'cancelled')->latest()->first();
+                ->where('concert_tracker_email_template_id', $template->id)
+                ->where(fn ($query) => $query->where('status', '!=', 'cancelled')->orWhereNotNull('invalidated_at'))
+                ->latest('id')->first();
 
             return [
                 'event' => $event, 'task' => $task, 'task_key' => $taskKey, 'template' => $template,
                 'label' => $definitionRule['label'], 'planned_at' => $plannedAt, 'existing' => $existing,
-                'mode' => $rule->mode,
+                'mode' => $rule->mode, 'needs_review' => $existing?->invalidated_at !== null,
                 'recipient_name' => $booking?->contact_name ?? $event->organiser_name ?? $event->studio?->contact_name,
                 'recipient_email' => $booking?->contact_email ?? $event->organiser_email ?? $event->studio?->contact_email,
             ];
@@ -148,7 +150,7 @@ class ConcertTrackerAutomation
             $date = $approved ? Carbon::parse($approved) : now();
         } else {
             $date = $definition['basis'] === 'booking_first'
-                ? Carbon::parse($event->concertBookingItem?->booking?->items->pluck('event_date')->filter()->sort()->first())
+                ? Carbon::parse($event->concertBookingItem?->booking?->items->whereNull('cancelled_at')->pluck('event_date')->filter()->sort()->first())
                 : Carbon::parse($event->event_date);
         }
         [$hour, $minute] = array_map('intval', explode(':', $rule->send_time));

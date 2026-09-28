@@ -1,5 +1,17 @@
 @extends('layouts.public', ['title' => $title, 'footerLabel' => 'Competition media'])
 
+@php
+    $headerCompetitionRoutes = $competitionRoutes ?? ['show' => 'customer.competitions.show'];
+    $headerCompetitionHomeUrl = $competitionHomeUrl ?? route('customer.media.index');
+    $headerParentCrumb = $selected ? collect($breadcrumbs)->slice(0, -1)->last() : null;
+    $headerParentUrl = $selected
+        ? ($headerParentCrumb
+            ? route($headerCompetitionRoutes['show'], ['schedulingEvent' => $event, 'folder' => $headerParentCrumb['uuid']]).'#gallery-content'
+            : route($headerCompetitionRoutes['show'], $event).'#gallery-content')
+        : $headerCompetitionHomeUrl;
+@endphp
+@section('headerParentUrl', $headerParentUrl)
+
 @push('styles')
 <style>
     .gallery-intro { padding: 34px 0; }
@@ -8,12 +20,15 @@
     .gallery-intro h1 { font-size: clamp(32px, 5vw, 54px); margin-bottom: 0; }
     .gallery-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-bottom: 24px; }
     .gallery-crumbs a { text-underline-offset: 3px; }
-    .gallery-folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
-    .gallery-folder { display: flex; align-items: center; gap: 11px; min-height: 66px; padding: 12px; text-decoration: none; }
-    .gallery-folder:hover, .gallery-folder:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
-    .gallery-folder-icon { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px; border-radius: 8px; background: #e6f6fd; color: #07648a; font-size: 18px; }
-    .gallery-folder-title { font-size: 15px; font-weight: 800; line-height: 1.3; }
-    .gallery-folder-kind { display: block; color: var(--muted); font-size: 12px; font-weight: 650; margin-top: 2px; }
+    .gallery-folders { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,240px)); gap:16px; align-items:stretch; }
+    .gallery-folder { display:flex; min-width:0; overflow:hidden; flex-direction:column; padding:0; text-decoration:none; }
+    .gallery-folder:hover,.gallery-folder:focus-visible { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent); }
+    .gallery-folder-cover { display:block; width:100%; aspect-ratio:4/3; object-fit:cover; background:#10202c; }
+    .gallery-folder-placeholder { display:grid; width:100%; aspect-ratio:4/3; place-items:center; background:#10202c; color:#8ddcff; font-size:38px; }
+    .gallery-folder-copy { display:flex; min-height:132px; flex:1; flex-direction:column; padding:16px 18px; }
+    .gallery-folder-title { font-size:18px; font-weight:850; line-height:1.3; }
+    .gallery-folder-kind { display:block; margin-top:7px; color:var(--muted); font-size:14px; font-weight:700; }
+    .gallery-folder-action { display:block; margin-top:auto; padding-top:16px; color:#0879a7; font-weight:850; }
     .gallery-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-items: start; }
     .gallery-photo { display: block; overflow: hidden; padding: 0; cursor: zoom-in; }
     .gallery-photo img { display: block; width: 100%; height: auto; }
@@ -27,9 +42,11 @@
     .gallery-product-note { min-height:21px; margin:0 0 12px; color:var(--muted); font-size:12px; }
     .gallery-product-actions { display:flex; gap:10px; margin-top:auto; }
     .gallery-product-actions form { margin:0; }
+    .gallery-product-actions form[data-selection-kind="favourite"],.gallery-product-actions [data-start-selection="favourite"] { order:1; }
+    .gallery-product-actions form[data-selection-kind="cart"],.gallery-product-actions [data-start-selection="add"] { order:2; }
     .gallery-icon-button { display:inline-grid; width:43px; height:39px; place-items:center; border:1px solid #c9dbe4; border-radius:9px; background:#fff; color:#285068; cursor:pointer; }
     .gallery-icon-button:hover, .gallery-icon-button:focus-visible { border-color:#0589c2; background:#e8f7fd; color:#006b98; }
-    .gallery-icon-button.is-selected { border-color:#0a8fc7; background:#e7f7fe; color:#057eb2; }
+    .gallery-icon-button.is-selected { border-color:#078bc4; background:#078bc4; color:#fff; }
     .gallery-icon-button.is-favourite { border-color:#a8bde7; background:#edf2ff; color:#335fc7; }
     .gallery-icon-button svg { width:21px; height:21px; fill:none; stroke:currentColor; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round; }
     .gallery-icon-button.is-favourite svg { fill:currentColor; }
@@ -47,8 +64,11 @@
     .gallery-photo-tile:hover .gallery-photo-actions, .gallery-photo-tile:focus-within .gallery-photo-actions { opacity:1; }
     .gallery-photos.is-selecting .gallery-photo-actions { display:none; }
     .gallery-photo-actions form { margin:0; }
+    .gallery-photo-actions form[data-selection-kind="favourite"] { order:1; }
+    .gallery-photo-actions form[data-selection-kind="cart"] { order:2; }
     .gallery-photo-actions .gallery-icon-button { width:37px; height:34px; border-color:#ffffff9c; border-radius:7px; background:#102a3bd9; color:#fff; backdrop-filter:blur(4px); }
     .gallery-photo-actions .gallery-icon-button:hover, .gallery-photo-actions .gallery-icon-button:focus-visible { border-color:#fff; background:#087eae; color:#fff; }
+    .gallery-photo-actions .gallery-icon-button.is-selected { border-color:#79d4f6; background:#078bc4; color:#fff; }
     .gallery-photo-actions .gallery-icon-button.is-favourite { background:#385fbedf; color:#fff; }
     .gallery-photo-actions .gallery-icon-button svg { width:18px; height:18px; }
     .gallery-icon-button { position:relative; }
@@ -73,7 +93,7 @@
     .gallery-viewer-photo-frame:hover .gallery-viewer-actions, .gallery-viewer-photo-frame:focus-within .gallery-viewer-actions { opacity:1; }
     .gallery-viewer-actions form { margin:0; }
     .gallery-viewer-actions .gallery-icon-button { background:#24323a; border-color:#52636c; color:#fff; }
-    .gallery-viewer-actions .gallery-icon-button.is-selected { background:#087eae; }
+    .gallery-viewer-actions .gallery-icon-button.is-selected { border-color:#79d4f6; background:#078bc4; color:#fff; }
     .gallery-viewer-actions .gallery-icon-button.is-favourite { background:#385fbe; }
     .gallery-viewer-close { border: 1px solid #52636c; border-radius: 7px; background: #24323a; color: #fff; cursor: pointer; font: inherit; font-weight: 750; padding: 8px 12px; }
     .gallery-viewer-image { display: block; max-width: 100%; max-height: calc(100vh - 150px); width: auto; height: auto; object-fit: contain; }
@@ -86,6 +106,10 @@
 @endpush
 
 @section('content')
+@if($adminPreview ?? false)
+<div style="background:#e6f6fd;border-bottom:1px solid #b2dcec;padding:12px 0"><div class="container" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap"><span><strong>Customer preview</strong> · This is the live customer gallery layout. Shopping controls are shown but disabled.</span><a class="button secondary" href="{{ route('admin.competition-gallery.show', $event) }}">Back to management</a></div></div>
+<style>.gallery-product-actions,.gallery-photo-actions,.competition-tabs .competition-tab:not([aria-current="page"]){pointer-events:none}.gallery-product-actions,.gallery-photo-actions{opacity:.42!important}</style>
+@endif
 @php
     $competitionRoutes = $competitionRoutes ?? [
         'home' => 'customer.media.index', 'show' => 'customer.competitions.show',
@@ -98,30 +122,29 @@
     $photoPrice = $mediaPricing->competitionPrice($event, 'competition_photo', $pricingItemUuid);
     $photoPriceText = '$'.number_format($photoPrice / 100, 2);
 @endphp
-<div class="container" style="padding-top:18px"><a href="{{ $competitionHomeUrl }}">← My Media</a></div>
 <section class="hero gallery-intro"><div class="container gallery-intro-inner">
     @if($coverUrl)<img class="gallery-cover" src="{{ $coverUrl }}" alt="{{ $title }} cover">@endif
     <div><div class="eyebrow">{{ $eventCode }}</div><h1>{{ $title }}</h1></div>
 </div></section>
-<section class="section"><div class="container">
+<section class="section" id="gallery-content"><div class="container">
     @include('customers.competitions.partials.tabs')
     @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
     @if($errors->any())<p class="error" role="alert">{{ $errors->first() }}</p>@endif
     <nav class="gallery-crumbs" aria-label="Gallery folders">
-        <a href="{{ route($competitionRoutes['show'], $event) }}" @if(!$selected)aria-current="page"@endif>Whole Event</a>
+        <a href="{{ route($competitionRoutes['show'], $event).'#gallery-content' }}" @if(!$selected)aria-current="page"@endif>Whole Event</a>
         @foreach($breadcrumbs as $crumb)
             <span aria-hidden="true">/</span>
             @if($loop->last)<strong aria-current="page">{{ $crumb['label'] }}</strong>
-            @else<a href="{{ route($competitionRoutes['show'], ['schedulingEvent' => $event, 'folder' => $crumb['uuid']]) }}">{{ $crumb['label'] }}</a>@endif
+            @else<a href="{{ route($competitionRoutes['show'], ['schedulingEvent' => $event, 'folder' => $crumb['uuid']]).'#gallery-content' }}">{{ $crumb['label'] }}</a>@endif
         @endforeach
     </nav>
     @if(!$selected)<h2>Browse the event</h2>@elseif($selected['kind'] !== 'item')<h2>{{ $selected['label'] }}</h2>@endif
     @if($children)
         <div class="gallery-folders">
             @foreach($children as $child)
-                <a class="card gallery-folder" href="{{ route($competitionRoutes['show'], ['schedulingEvent' => $event, 'folder' => $child['uuid']]) }}">
-                    <span class="gallery-folder-icon" aria-hidden="true">{{ $child['kind'] === 'item' ? '▣' : '▱' }}</span>
-                    <span><span class="gallery-folder-title">{{ $child['label'] }}</span><span class="gallery-folder-kind">{{ $child['kind'] === 'item' ? 'Routine' : ($child['kind'] === 'day' ? 'Day' : 'Section') }}</span></span>
+                <a class="card gallery-folder" href="{{ route($competitionRoutes['show'], ['schedulingEvent' => $event, 'folder' => $child['uuid']]).'#gallery-content' }}">
+                    @if($child['cover_uuid'] ?? null)<img class="gallery-folder-cover" src="{{ route($competitionRoutes['image'], ['schedulingEvent' => $event, 'photo' => $child['cover_uuid'], 'size' => 'thumbnail']) }}" alt="">@else<span class="gallery-folder-placeholder" aria-hidden="true">{{ $child['kind'] === 'item' ? '▣' : '▱' }}</span>@endif
+                    <span class="gallery-folder-copy"><span class="gallery-folder-title">{{ $child['label'] }}</span><span class="gallery-folder-kind">{{ $child['kind'] === 'item' ? 'Routine' : ($child['kind'] === 'day' ? 'Day' : 'Section') }}</span><span class="gallery-folder-action">View {{ $child['kind'] === 'item' ? 'routine' : strtolower($child['kind']) }} →</span></span>
                 </a>
             @endforeach
         </div>

@@ -13,6 +13,7 @@ use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Studios\Models\Studio;
 use App\Features\Venues\Models\Venue;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -118,9 +119,9 @@ class ConcertBookingWorkflowTest extends TestCase
     public function test_public_booking_collects_repeatable_concert_details(): void
     {
         $this->get(route('concert-bookings.create'))
-            ->assertOk()->assertSee('Studio/company name')->assertSee('dress rehearsal portrait photography')
+            ->assertOk()->assertSee('Studio/company name')->assertDontSee('Would you like dress rehearsal portrait photography?')
             ->assertSee('Concert videography')->assertSee('Event details')->assertSee('Add another event')
-            ->assertSee('DR Portrait')->assertSee('Concert title (optional)')
+            ->assertSee('DR Portrait')->assertSee('Event title')->assertDontSee('<label>Event type', false)
             ->assertSee('Other venue')->assertSee('General booking confirmation')
             ->assertSee('id="video-delivery"', false)
             ->assertDontSee('Our concerts include');
@@ -177,7 +178,7 @@ class ConcertBookingWorkflowTest extends TestCase
         unset($data['postal_address'], $data['previous_video_feedback']);
 
         $this->post(route('concert-bookings.store'), $data)
-            ->assertSessionHasErrors(['postal_address', 'previous_video_feedback'])
+            ->assertSessionHasErrors('postal_address')->assertSessionDoesntHaveErrors('previous_video_feedback')
             ->assertSessionDoesntHaveErrors('items.1.title');
 
         $data['postal_address'] = '1 Example Road, Perth WA 6000';
@@ -406,15 +407,16 @@ class ConcertBookingWorkflowTest extends TestCase
             ->assertOk()
             ->assertHeader('content-disposition', 'inline; filename=first-programme.pdf');
         $this->actingAs($staff)->get(route('admin.concert-bookings.index'))
-            ->assertOk()->assertSee('Open Programme')->assertSee('Replace Programme');
+            ->assertOk()->assertSee('Open programme')->assertSee('Replace programme');
         $this->actingAs($staff)->get(route('admin.concert-bookings.show', $item->booking))
-            ->assertOk()->assertSee('Open Programme')->assertSee('Replace Programme');
+            ->assertOk()->assertSee('Open programme')->assertSee('Replace programme');
 
         $this->actingAs($staff)->post(route('admin.concert-booking-events.programme.store', $item), [
             'programme' => UploadedFile::fake()->create('replacement.pdf', 50, 'application/pdf'),
         ])->assertRedirect();
 
-        Storage::disk('local')->assertMissing($firstPath);
+        // Approved event programmes now use the retained Studio Hub file workflow.
+        Storage::disk('local')->assertExists($firstPath);
         Storage::disk('local')->assertExists($item->refresh()->programme_path);
         $this->assertSame('replacement.pdf', $item->programme_name);
         $this->assertSame($item->programme_path, $item->schedulingEvent->programme_path);
@@ -592,7 +594,7 @@ class ConcertBookingWorkflowTest extends TestCase
         $this->actingAs($staff)->get(route('admin.scheduling-events.create'))
             ->assertOk()->assertSee('DR Portrait');
         $this->get(route('concert-bookings.create', ['event_type' => $eventType->uuid]))
-            ->assertOk()->assertSee('value="'.$eventType->id.'" selected', false);
+            ->assertOk()->assertSee('name="items[0][event_type_definition_id]" value="'.$eventType->id.'"', false);
 
         $data = $this->bookingData();
         $data['items'] = [
@@ -646,6 +648,95 @@ class ConcertBookingWorkflowTest extends TestCase
         $this->assertNotNull($item->refresh()->venue_id);
     }
 
+    public function test_dr_portrait_events_require_portrait_agreements_even_when_the_removed_interest_field_says_no(): void
+    {
+        $data = $this->bookingData();
+        $data['portrait_photography_interest'] = 'no';
+        $data['accepted_requirements'] = array_values(array_diff($data['accepted_requirements'], ['portrait_space', 'no_personal_backdrop_photos']));
+        $this->post(route('concert-bookings.store'), $data)->assertSessionHasErrors('accepted_requirements');
+        $this->assertDatabaseCount('concert_bookings', 0);
+
+        $data['accepted_requirements'] = [...$data['accepted_requirements'], 'portrait_space', 'no_personal_backdrop_photos'];
+        $this->post(route('concert-bookings.store'), $data)->assertRedirect(route('concert-bookings.thanks'));
+        $this->assertTrue(ConcertBooking::query()->firstOrFail()->wants_portrait_photography);
+    }
+
+    public function test_photo_only_booking_keeps_postal_address_and_general_feedback_without_portrait_requirements(): void
+    {
+        $data = $this->bookingData();
+        $data['items'] = [$data['items'][1]];
+        $data['wants_concert_videography'] = '0';
+        $data['previous_video_feedback'] = 'Please simplify the photo ordering instructions this year.';
+        $data['accepted_requirements'] = ['accurate', 'minimum_spend', 'photographer_seat', 'no_audience_recording', 'promote_gallery', 'credit_images'];
+        unset($data['approximate_family_count']);
+        $this->post(route('concert-bookings.store'), $data)->assertRedirect(route('concert-bookings.thanks'));
+        $booking = ConcertBooking::query()->firstOrFail();
+        $this->assertFalse($booking->wants_portrait_photography);
+        $this->assertFalse($booking->wants_concert_videography);
+        $this->assertSame($data['postal_address'], $booking->postal_address);
+        $this->assertSame($data['previous_video_feedback'], $booking->previous_video_feedback);
+    }
+
+    public function test_portrait_only_booking_is_allowed_without_concert_services_and_feedback_is_optional(): void
+    {
+        $data = $this->bookingData();
+        $data['items'] = [$data['items'][0]];
+        $data['wants_concert_photography'] = '0';
+        $data['wants_concert_videography'] = '0';
+        $data['accepted_requirements'] = ['accurate', 'portrait_space', 'no_personal_backdrop_photos'];
+        unset($data['previous_video_feedback'], $data['approximate_family_count']);
+        $this->post(route('concert-bookings.store'), $data)->assertRedirect(route('concert-bookings.thanks'));
+        $this->assertTrue(ConcertBooking::query()->firstOrFail()->wants_portrait_photography);
+    }
+
+    public function test_submission_shows_personalised_quote_and_timeline_and_preserves_the_original_form(): void
+    {
+        $data = $this->bookingData();
+        $this->post(route('concert-bookings.store'), $data)->assertRedirect(route('concert-bookings.thanks'));
+        $booking = ConcertBooking::query()->firstOrFail();
+        $snapshot = $booking->submission_snapshot;
+        $this->assertSame(140000, $snapshot['quote']['photo_minimum_cents']);
+        $this->assertSame(180000, $snapshot['quote']['video_quote_cents']);
+        $timeline = collect($snapshot['timeline']);
+        $lastFinish = CarbonImmutable::parse($data['items'][1]['event_date'].' 21:00');
+        $this->assertSame($lastFinish->addHours(48)->toIso8601String(), $timeline->firstWhere('title', 'Estimated photo gallery release')['due_at']);
+        $this->assertSame($lastFinish->addWeeks(2)->toIso8601String(), $timeline->firstWhere('title', 'Estimated video ready for approval')['due_at']);
+        $this->assertStringContainsString('16:00:00', $timeline->firstWhere('title', 'Crew arrival & setup · A Night of Dance')['due_at']);
+        $this->assertStringContainsString('16:00:00', $timeline->firstWhere('title', 'Crew arrival & setup · DR Portrait 1')['due_at']);
+        $this->get(route('concert-bookings.thanks'))->assertOk()->assertHeader('Cache-Control', 'no-store, private')
+            ->assertSee('Fictional Dance Academy')->assertSee('$1,400.00')->assertSee('$1,800.00')
+            ->assertSee('Event timeline')->assertSee('include GST')
+            ->assertSee(route('concert-bookings.submission', $booking), false);
+
+        $booking->update(['studio_name' => 'Changed by staff', 'previous_video_feedback' => 'Changed feedback', 'internal_review_note' => 'Private staff note']);
+        $booking->items()->update(['title' => 'Changed event title']);
+        $this->get(route('concert-bookings.submission', $booking))->assertOk()->assertHeader('Cache-Control', 'no-store, private')
+            ->assertSee('Fictional Dance Academy')->assertSee('A Night of Dance')
+            ->assertSee('Clear chapter navigation worked well.')->assertDontSee('Changed by staff')
+            ->assertDontSee('Changed feedback')->assertDontSee('Private staff note')->assertDontSee('Changed event title');
+    }
+
+    public function test_booking_receipt_cannot_be_opened_from_another_session(): void
+    {
+        $this->post(route('concert-bookings.store'), $this->bookingData())->assertRedirect();
+        $booking = ConcertBooking::query()->firstOrFail();
+        $this->flushSession();
+        $this->get(route('concert-bookings.submission', $booking))->assertForbidden();
+        $this->get(route('concert-bookings.thanks'))->assertOk()->assertDontSee('Fictional Dance Academy');
+    }
+
+    public function test_photo_only_timeline_has_one_hour_setup_and_no_video_milestones(): void
+    {
+        $data = $this->bookingData();
+        $data['items'] = [$data['items'][1]];
+        $data['wants_concert_videography'] = '0';
+        $this->post(route('concert-bookings.store'), $data)->assertRedirect();
+        $timeline = collect(ConcertBooking::query()->firstOrFail()->submission_snapshot['timeline']);
+        $this->assertStringContainsString('17:00:00', $timeline->firstWhere('title', 'Crew arrival & setup · A Night of Dance')['due_at']);
+        $this->assertNull($timeline->firstWhere('title', 'Estimated video ready for approval'));
+        $this->assertNull($timeline->firstWhere('title', 'Video invoice due'));
+    }
+
     private function bookingData(): array
     {
         $hall = Venue::query()->firstOrCreate(['name' => 'Example Hall'], ['address_line_1' => '1 Example Road']);
@@ -654,7 +745,7 @@ class ConcertBookingWorkflowTest extends TestCase
         return [
             'studio_name' => 'Fictional Dance Academy', 'contact_name' => 'Morgan Example',
             'contact_email' => 'studio@example.test', 'contact_phone' => '0400 000 100',
-            'portrait_photography_interest' => 'yes', 'wants_concert_photography' => '1',
+            'wants_concert_photography' => '1',
             'wants_concert_videography' => '1', 'approximate_family_count' => 120,
             'postal_address' => '1 Example Road, Perth WA 6000',
             'previous_video_feedback' => 'Clear chapter navigation worked well.',

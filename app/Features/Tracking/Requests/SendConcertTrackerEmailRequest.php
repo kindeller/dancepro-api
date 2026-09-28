@@ -14,6 +14,9 @@ class SendConcertTrackerEmailRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'studio_invoice_uuid' => [$this->route('taskKey') === 'invoice_sent' ? 'required' : 'nullable', 'uuid'],
+            'confirm_resend' => ['sometimes', 'accepted'],
+            'previous_delivery_id' => ['nullable', 'integer'],
             'recipient_name' => ['nullable', 'string', 'max:255'],
             'recipient_email' => ['required', 'email:rfc', 'max:255'],
             'scheduled_at' => ['nullable', 'date', 'after:now'],

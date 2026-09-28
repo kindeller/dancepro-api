@@ -52,6 +52,28 @@ class LayoutExtractionTest(unittest.TestCase):
         self.assertEqual('Teen Ballet',items[1]['class_name'])
         self.assertEqual('break',items[2]['item_kind'])
 
+    def test_unnumbered_scanned_columns_do_not_require_a_readable_act_heading(self):
+        page = []
+        for i, (title, classes) in enumerate([('Opening Dance','Opening'),('Candy Shop','Tiny Tot Jazz'),('Autumn Leaves','Petite Lyrical'),('Queen','Adult Tap')]):
+            page += [(x,y,right,y+24,value) for x,y,right,bottom,value in words(30, 40+i*40, title)]
+            page += words(350, 50+i*40, classes)
+        page += words(250, 220, 'Interval')
+        result = self.parse([(1,600,800,page,True)],False)
+        items = [n for n in result['nodes'] if n['kind']=='item']
+        self.assertEqual(['Opening Dance','Candy Shop','Autumn Leaves','Queen','Interval'],[n['title'] for n in items])
+        self.assertEqual([None]*5,[n['number'] for n in items])
+        self.assertEqual('Tiny Tot Jazz',items[1]['class_name'])
+        self.assertTrue(any('unnumbered title/class list' in i for i in result['issues']))
+
+    def test_wide_title_spacing_is_not_mistaken_for_the_class_column(self):
+        row = words(30,40,'Do You Wanna Build') + words(250,40,'A Snowman') + words(340,40,'Mini Lyrical')
+        self.assertEqual(('Do You Wanna Build A Snowman','Mini Lyrical'),extract.concert_pair(row,600))
+
+    def test_isolated_class_mentions_on_credits_pages_are_not_imported(self):
+        page = words(30,30,'Special thanks')+words(350,30,'Junior Jazz')
+        page += words(30,70,'Our cast and sponsors made this show possible')
+        self.assertEqual([],self.parse([(1,600,800,page,False)],False)['nodes'])
+
     def test_compact_concert_rows_split_trailing_class_names(self):
         page=words(30,20,'1. OPENING NUMBER')
         page+=words(30,50,"2. LET'S GET CRAZY PETITE ACRO 1 (FRI)")

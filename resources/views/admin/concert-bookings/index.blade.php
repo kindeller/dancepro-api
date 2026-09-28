@@ -55,7 +55,7 @@
                                 @if($item->programme_path)
                                     <details class="programme-menu">
                                         <summary class="programme-icon attached" title="Programme attached" aria-label="Programme attached">▤</summary>
-                                        <div><a href="{{ route('admin.concert-booking-events.programme.show', $item) }}" target="_blank">Open Programme</a><button type="button" data-programme-picker="programme-{{ $item->uuid }}">Replace Programme</button></div>
+                                        <div><a href="{{ route('admin.concert-booking-events.programme.show', $item) }}" target="_blank">Open programme</a><button type="button" data-programme-picker="programme-{{ $item->uuid }}">Replace programme</button></div>
                                     </details>
                                 @else
                                     <button class="programme-icon" type="button" title="Attach Programme" aria-label="Attach Programme" data-programme-picker="programme-{{ $item->uuid }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 12.5 14.8 6.2a3 3 0 0 1 4.2 4.2l-8.1 8.1a5 5 0 0 1-7.1-7.1l8.5-8.5M7.1 14l8.2-8.2"/></svg></button>

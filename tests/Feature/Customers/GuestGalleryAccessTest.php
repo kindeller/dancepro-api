@@ -80,6 +80,26 @@ class GuestGalleryAccessTest extends TestCase
         $this->get(route('guest-galleries.concerts.show', $fixture['concert']))->assertForbidden();
     }
 
+    public function test_signed_in_customer_registers_with_one_button_and_receives_account_notification(): void
+    {
+        Notification::fake();
+        $fixture = $this->concert(false);
+        $event = $fixture['event'];
+        $customer = User::factory()->customer()->create(['email' => 'signed-in@example.test']);
+        $this->actingAs($customer)->get(route('guest-galleries.index', ['type' => 'concert']))
+            ->assertRedirect(route('customer.media.index'));
+        $this->post(route('guest-galleries.notifications.store', $event), [])->assertRedirect()
+            ->assertSessionHas('status', 'We’ll notify you here and by email when this gallery is ready.');
+        $this->assertDatabaseHas('guest_gallery_registrations', [
+            'scheduling_event_id' => $event->id, 'user_id' => $customer->id,
+            'email_hash' => hash('sha256', 'signed-in@example.test'),
+        ]);
+
+        $fixture['collection']->update(['status' => 'published', 'visibility' => 'customer', 'published_at' => now()]);
+        $this->assertSame(1, app(SendGuestGalleryReleaseNotifications::class)->execute());
+        Notification::assertSentTo($customer, GuestGalleryReleased::class, fn ($notification, $channels): bool => $channels === ['mail', 'database']);
+    }
+
     private ?Concert $concertRecord = null;
 
     public function test_guest_can_unlock_and_browse_released_concert_photos_with_email_and_studio_code(): void
@@ -104,9 +124,11 @@ class GuestGalleryAccessTest extends TestCase
         $this->post($selection, ['asset_uuid' => $fixture['asset']->uuid, 'action' => 'add'])->assertRedirect();
         $this->assertDatabaseHas('guest_gallery_selections', ['media_asset_id' => $fixture['asset']->id,
             'is_favourite' => true, 'in_cart' => true]);
-        $this->get($album)->assertOk()->assertSee('Favourites &amp; photo cart (1)', false)->assertSee('♥ Saved')->assertSee('✓ In cart');
+        $this->get($album)->assertOk()->assertSee('Favourites')->assertSee('Cart')->assertSee('Remove from favourites')->assertSee('Remove from cart');
         $this->get(route('guest-galleries.concerts.cart', $fixture['concert']))->assertOk()
-            ->assertSee('Saved favourites')->assertSee('Your cart')->assertSee('Create an account to continue to checkout');
+            ->assertSee('Your cart')->assertSee('Create an account to continue to checkout');
+        $this->get(route('guest-galleries.concerts.cart', ['concert' => $fixture['concert'], 'tab' => 'favourites']))
+            ->assertOk()->assertSee('Saved favourites')->assertSee('Album One')->assertSee('Remove from favourites');
         $this->get(route('guest-galleries.concerts.checkout', ['concert' => $fixture['concert'], 'account' => 'login']))
             ->assertRedirect(route('customer.login'));
         $this->assertSame(route('customer.concerts.photos.cart', $fixture['studio']), session('url.intended'));
@@ -120,7 +142,7 @@ class GuestGalleryAccessTest extends TestCase
         ])->assertRedirect();
         $this->assertDatabaseCount('guest_gallery_accesses', 1);
         $this->assertSame($accessUuid, DB::table('guest_gallery_accesses')->value('uuid'));
-        $this->get($album)->assertOk()->assertSee('Favourites &amp; photo cart (1)', false)->assertSee('♥ Saved')->assertSee('✓ In cart');
+        $this->get($album)->assertOk()->assertSee('Favourites')->assertSee('Cart')->assertSee('Remove from favourites')->assertSee('Remove from cart');
 
         Notification::fake();
         $this->post(route('customer.register.store'), [

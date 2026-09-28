@@ -12,7 +12,7 @@
         <label>Search crew<input type="search" name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Name or email"></label>
         <label>Course<select name="course_id"><option value="">All courses</option>@foreach($allCourses as $filterCourse)<option value="{{ $filterCourse->id }}" @selected(($filters['course_id'] ?? null) == $filterCourse->id)>{{ $filterCourse->title }}</option>@endforeach</select></label>
         <label>Status<select name="status"><option value="">All statuses</option>@foreach(['not_assigned'=>'Not assigned','assigned'=>'Assigned','in_progress'=>'In progress','overdue'=>'Overdue','completed'=>'Completed'] as $value=>$label)<option value="{{ $value }}" @selected(($filters['status'] ?? null) === $value)>{{ $label }}</option>@endforeach</select></label>
-        <div class="toolbar" style="align-self:end;justify-content:flex-start"><button>Filter</button><a class="button secondary" href="{{ route('admin.training-courses.overview') }}">Clear</a></div>
+        <div class="toolbar" style="align-self:end;justify-content:flex-start"><button>Apply filters</button><a class="button secondary" href="{{ route('admin.training-courses.overview') }}">Clear filters</a></div>
     </form>
 
     <div class="card" style="overflow-x:auto">

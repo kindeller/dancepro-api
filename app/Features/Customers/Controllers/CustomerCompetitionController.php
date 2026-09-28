@@ -10,6 +10,7 @@ use App\Features\Customers\Services\CustomerCompetitionAccess;
 use App\Features\Customers\Services\CustomerCompetitionCart;
 use App\Features\Customers\Services\CustomerCompetitionTabs;
 use App\Features\Customers\Services\CustomerDancerRoutines;
+use App\Features\Customers\Services\CustomerEngagementTracker;
 use App\Features\Customers\Services\CustomerImprovisationRoutines;
 use App\Features\Customers\Services\CustomerStudioRoutines;
 use App\Features\Programmes\Services\CompetitionCustomerPreview;
@@ -33,8 +34,9 @@ class CustomerCompetitionController extends Controller
         return to_route('customer.competitions.show', $event);
     }
 
-    public function show(CustomerCompetitionGalleryRequest $request, SchedulingEvent $schedulingEvent, CompetitionCustomerPreview $gallery, CustomerCompetitionCart $cart, CustomerCompetitionTabs $tabs): Response
+    public function show(CustomerCompetitionGalleryRequest $request, SchedulingEvent $schedulingEvent, CompetitionCustomerPreview $gallery, CustomerCompetitionCart $cart, CustomerCompetitionTabs $tabs, CustomerEngagementTracker $engagement): Response
     {
+        $engagement->record($request->user(), 'competition', $schedulingEvent->uuid, 'viewed', $request->validated('folder'));
         $galleryData = $gallery->browse($schedulingEvent, $request->validated('folder'), 'customer.competitions.image');
         $itemUuid = ($galleryData['selected']['kind'] ?? null) === 'item' ? $galleryData['selected']['uuid'] : null;
 

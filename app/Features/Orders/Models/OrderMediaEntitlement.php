@@ -6,6 +6,7 @@ use App\Features\Media\Models\MediaAsset;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class OrderMediaEntitlement extends Model
 {
@@ -21,9 +22,15 @@ class OrderMediaEntitlement extends Model
         return $this->belongsToMany(MediaAsset::class, 'order_media_entitlement_assets');
     }
 
+    public function assetDownloads(): HasMany
+    {
+        return $this->hasMany(OrderMediaAssetDownload::class);
+    }
+
     protected function casts(): array
     {
         return ['ready_at' => 'datetime', 'expires_at' => 'datetime',
+            'revoked_at' => 'datetime',
             'first_download_at' => 'datetime', 'last_download_at' => 'datetime',
             'download_count' => 'integer'];
     }

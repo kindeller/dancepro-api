@@ -20,13 +20,24 @@ class GuestGallerySelections
         private readonly CustomerConcertGallery $gallery,
     ) {}
 
-    public function concert(GuestGalleryAccess $access, Concert $concert, array $input): void
+    public function concert(GuestGalleryAccess $access, Concert $concert, array $input): array
     {
         $asset = $this->gallery->assetForReleasedConcert($concert, $input['asset_uuid'] ?? '');
         $this->save($access, [
             'concert_id' => $asset->collection->concert_id, 'media_asset_id' => $asset->id,
             'selection_key' => 'concert_photo:'.$asset->uuid, 'product' => 'photo',
         ], $input['action']);
+
+        $selection = GuestGallerySelection::where('guest_gallery_access_id', $access->id)
+            ->where('selection_key', 'concert_photo:'.$asset->uuid)->first();
+        $base = GuestGallerySelection::query()->whereHas('access', fn ($query) => $query
+            ->where('gallery_type', 'concert')->where('email_hash', $access->email_hash)
+            ->whereHas('concert', fn ($concerts) => $concerts->where('studio_id', $concert->studio_id)));
+
+        return ['asset_uuid' => $asset->uuid, 'in_cart' => (bool) $selection?->in_cart,
+            'is_favourite' => (bool) $selection?->is_favourite,
+            'cart_count' => (clone $base)->where('in_cart', true)->count(),
+            'favourite_count' => (clone $base)->where('is_favourite', true)->count()];
     }
 
     public function forAccess(GuestGalleryAccess $access): Collection

@@ -17,7 +17,7 @@ class SendGuestGalleryReleaseNotifications
     {
         $registrations = GuestGalleryRegistration::query()->whereNull('notified_at')->whereNull('unsubscribed_at')
             ->when($onlyEvent, fn ($query) => $query->where('scheduling_event_id', $onlyEvent->id))
-            ->with('event.concertBookingItem.concert.bookingItem')->limit(250)->get();
+            ->with(['event.concertBookingItem.concert.bookingItem', 'user'])->limit(250)->get();
         $sent = 0;
         foreach ($registrations as $registration) {
             if (! $this->catalogue->eventIsReleased($registration->event)) {
@@ -28,8 +28,10 @@ class SendGuestGalleryReleaseNotifications
                 if ($locked->notified_at || $locked->unsubscribed_at) {
                     return;
                 }
-                Notification::route('mail', $locked->email)
-                    ->notify((new GuestGalleryReleased($locked->load('event')))->afterCommit());
+                $notification = (new GuestGalleryReleased($locked->load('event')))->afterCommit();
+                $locked->user
+                    ? $locked->user->notify($notification)
+                    : Notification::route('mail', $locked->email)->notify($notification);
                 $locked->update(['notified_at' => now()]);
                 $sent++;
             });

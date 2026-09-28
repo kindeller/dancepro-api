@@ -1,4 +1,5 @@
 @extends('layouts.public', ['title' => 'My orders · DancePro', 'footerLabel' => 'DancePro Media'])
+@section('headerParentUrl', route('customer.media.index'))
 
 @push('styles')
 <style>
@@ -11,14 +12,13 @@
 @endpush
 
 @section('content')
-<div class="container" style="padding-top:18px"><a href="{{ route('customer.media.index') }}">← My Media</a></div>
-<section class="hero" style="padding:38px 0"><div class="container"><h1>My orders</h1><p class="lead">Your purchases and media delivery status.</p></div></section>
+<section class="hero" style="padding:38px 0"><div class="container"><h1>My orders</h1><p class="lead">Your orders, complimentary media and download availability.</p></div></section>
 <section class="section"><div class="container">
     @if($orders->count() === 0)<div class="empty"><p>You have no orders yet.</p></div>
     @else<div class="order-list">
         @foreach($orders as $order)
             <article class="card order-card">
-                <div class="order-heading"><div><h2 style="font-size:24px;margin-bottom:4px">Order {{ $order->uuid }}</h2>
+                <div class="order-heading"><div><h2 style="font-size:24px;margin-bottom:4px">Order {{ $order->displayNumber() }}</h2>
                     <p class="meta">{{ $order->placed_at?->format('j M Y') ?? $order->created_at->format('j M Y') }} · {{ ucfirst($order->status->value) }}</p></div>
                     <div style="text-align:right"><strong>${{ number_format($order->total_amount / 100, 2) }} AUD</strong>@if(($order->metadata['account_credit_amount'] ?? 0) > 0)<div class="meta">After ${{ number_format($order->metadata['account_credit_amount'] / 100, 2) }} account credit</div>@endif</div></div>
                 <ul class="order-items">

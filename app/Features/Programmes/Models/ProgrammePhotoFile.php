@@ -5,12 +5,18 @@ namespace App\Features\Programmes\Models;
 use App\Shared\Models\HasPublicUuid;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProgrammePhotoFile extends Model
 {
     use HasPublicUuid;
 
     protected $guarded = ['id'];
+
+    public function contribution(): BelongsTo
+    {
+        return $this->belongsTo(ProgrammePhotoContribution::class, 'programme_photo_contribution_id');
+    }
 
     public function scopeInGallery(Builder $query, ProgrammePhotoGallery $gallery): Builder
     {

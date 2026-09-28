@@ -45,7 +45,12 @@ class CustomerCompetitionAccessTest extends TestCase
         }
         $this->assertDatabaseCount('customer_competition_registrations', 1);
         $this->assertNotNull(CustomerCompetitionRegistration::first()->access_verified_at);
-        $this->get(route('customer.competitions.show', $event))->assertOk()->assertSee('Photos are being prepared')->assertDontSee('Customer Preview');
+        $this->get(route('customer.competitions.show', $event))->assertOk()->assertSee('Photos are being prepared')->assertDontSee('Customer preview')
+            ->assertSee(route('customer.media.favourites', ['focus_kind' => 'competition', 'focus_event' => $event->uuid]))
+            ->assertSee(route('customer.media.cart', ['focus_kind' => 'competition', 'focus_event' => $event->uuid]));
+        $this->get(route('customer.competitions.favourites', $event))->assertRedirect(
+            route('customer.media.favourites', ['focus_kind' => 'competition', 'focus_event' => $event->uuid])
+        );
         $event->update(['event_date' => '2026-10-01']);
         CompetitionGallerySetting::where('scheduling_event_id', $event->id)->update(['login_code_hash' => Hash::make('CHANGED-TEST')]);
         $this->get(route('customer.competitions.show', $event))->assertOk();

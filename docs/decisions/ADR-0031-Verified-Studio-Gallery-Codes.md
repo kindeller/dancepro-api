@@ -43,3 +43,11 @@ Migration 000013 adds hash/version fields, verification timestamps and code-chan
 audit records. Rollback drops only these fields/history and does not delete studios,
 profiles, media or grants. Rollback also loses verification evidence, so it must not
 be used to create a legacy membership bypass.
+
+## Studio Hub display amendment (27 September 2026)
+
+ADR-0057 supersedes the no-display rule for authorised Studio Hub management views
+at the owner's request. Newly saved codes retain an encrypted display copy alongside
+the hash. Admin input fields, serialization and audit history still do not disclose
+codes; verification and existing access rules are unchanged. Hash-only legacy codes
+must be re-entered once before they can be displayed.

@@ -1,4 +1,4 @@
-@extends('layouts.admin', ['title'=>'Crew Payments · Timesheets','heading'=>'Crew Payments','subheading'=>'Trust-based time monitoring. Only discrepancies require attention.'])
+@extends('layouts.admin', ['title'=>'Crew payments · Timesheets','heading'=>'Crew payments','subheading'=>'Trust-based time monitoring. Only discrepancies require attention.'])
 @section('content')
 @include('admin.timesheets._tabs')
 <div class="card"><table><thead><tr><th>Crew / event</th><th>Recorded time</th><th>Payment preview</th><th>Internal flags</th><th>Status</th></tr></thead><tbody>

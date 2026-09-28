@@ -10,8 +10,8 @@
         <form class="filters" method="GET" action="{{ route('admin.studios.index') }}">
             <label>Search<input name="search" value="{{ $filters['search'] ?? '' }}" placeholder="Studio name, code or email"></label>
             <label>Status<select name="status"><option value="">Any status</option>@foreach($statuses as $status)<option value="{{ $status->value }}" @selected(($filters['status'] ?? '') === $status->value)>{{ ucfirst($status->value) }}</option>@endforeach</select></label>
-            <button type="submit">Filter</button>
-            <a class="button secondary" href="{{ route('admin.studios.index') }}">Reset</a>
+            <button type="submit">Apply filters</button>
+            <a class="button secondary" href="{{ route('admin.studios.index') }}">Clear filters</a>
         </form>
         <a class="button" href="{{ route('admin.studios.create') }}">Add studio</a>
     </div>

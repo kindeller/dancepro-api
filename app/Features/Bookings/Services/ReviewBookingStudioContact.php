@@ -10,6 +10,10 @@ class ReviewBookingStudioContact
 {
     public function findStudio(ConcertBooking $booking, ?string $studioUuid = null): ?Studio
     {
+        if ($booking->studio_id) {
+            return $booking->studio?->load('contacts');
+        }
+
         return Studio::query()
             ->with('contacts')
             ->when(

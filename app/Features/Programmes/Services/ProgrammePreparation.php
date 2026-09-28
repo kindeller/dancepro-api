@@ -3,7 +3,6 @@
 namespace App\Features\Programmes\Services;
 
 use App\Features\Programmes\Models\Programme;
-use App\Features\Programmes\Models\ProgrammeExtraction;
 use App\Features\Programmes\Models\ProgrammeRevision;
 use App\Features\Programmes\Models\ProgrammeSource;
 use App\Features\Scheduling\Models\SchedulingEvent;
@@ -22,7 +21,7 @@ class ProgrammePreparation
         return [
             'event' => $event, 'programme' => $programme, 'nodes' => $programme?->draftNodes() ?? [],
             'source' => $programme?->source,
-            'extraction' => $programme ? ProgrammeExtraction::where('programme_id', $programme->id)->where('programme_source_id', $programme->programme_source_id)->first() : null,
+            'extraction' => app(ProgrammeExtractionProgress::class)->forProgramme($programme),
             'revisions' => $programme?->revisions()->with(['confirmedBy', 'source'])->orderByDesc('version')->get() ?? collect(),
         ];
     }

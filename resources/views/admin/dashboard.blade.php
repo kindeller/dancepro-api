@@ -1,7 +1,7 @@
 @extends('layouts.admin', [
-    'title' => 'DancePro Admin',
-    'heading' => 'Dashboard',
-    'subheading' => 'A quick read on generated download links and access activity.',
+    'title' => 'Media dashboard',
+    'heading' => 'Media dashboard',
+    'subheading' => 'Download links and recent access activity.',
 ])
 
 @section('content')
@@ -27,7 +27,7 @@
     <section class="grid two-col" style="margin-top: 18px;">
         <div class="card">
             <div class="card-pad">
-                <h2>Recent Download Links</h2>
+                <h2>Recent download links</h2>
             </div>
             <table>
                 <thead>
@@ -59,7 +59,7 @@
 
         <div class="card">
             <div class="card-pad">
-                <h2>Recent Access</h2>
+                <h2>Recent access</h2>
             </div>
             <table>
                 <thead>

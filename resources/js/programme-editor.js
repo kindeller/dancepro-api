@@ -229,22 +229,21 @@ function initialiseProgramme(config) {
     fields.disabled = config.cancelled || config.extracting;
     const progress = document.getElementById('extraction-progress');
     if (config.extracting && progress) {
-        const started = Date.now();
         const poll = async () => {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000);
+            let delay = 2000;
             try {
-                const response = await fetch(progress.dataset.url, { headers: { Accept: 'application/json' } });
+                const response = await fetch(progress.dataset.url, { headers: { Accept: 'application/json' }, signal: controller.signal });
                 if (!response.ok) throw new Error('Progress unavailable');
                 const result = await response.json();
                 if (!['queued', 'processing'].includes(result.data.status)) { window.location.reload(); return; }
-                if (Date.now() - started > 240000) {
-                    progress.querySelector('[role="status"]').textContent = 'Reading is taking longer than expected. You can leave this page and return later; your PDF is saved.';
-                    return;
-                }
+                progress.querySelector('[role="status"]').textContent = result.data.message || 'Reading your programme…';
             } catch (_) {
-                progress.querySelector('[role="status"]').textContent = 'Unable to check progress. Refresh this page to try again; your PDF is saved.';
-                return;
-            }
-            setTimeout(poll, 2000);
+                progress.querySelector('[role="status"]').textContent = 'Unable to check progress just now. Retrying automatically; your PDF is saved.';
+                delay = 5000;
+            } finally { clearTimeout(timeout); }
+            setTimeout(poll, delay);
         };
         setTimeout(poll, 2000);
     }

@@ -61,6 +61,7 @@ def pages(path):
             words = [(float(w.attrib['xMin']), float(w.attrib['yMin']), float(w.attrib['xMax']),
                       float(w.attrib['yMax']), w.text or '') for w in page.findall('.//' + NS + 'word')]
             ocr = len(''.join(w[4] for w in words)) < 40
+            print('PROGRESS '+json.dumps({'page': index, 'total': count, 'ocr': ocr}), file=sys.stderr, flush=True)
             if ocr:
                 prefix = os.path.join(temp, 'page')
                 run(['pdftoppm', '-f', str(index), '-l', str(index), '-scale-to', '2400',
@@ -81,8 +82,14 @@ def pages(path):
 def rows(words):
     result = []
     for word in sorted(words, key=lambda w: (w[1], w[0])):
-        # Baseline-adjacent words remain in a row; superscript ordinals stay attached.
-        match = next((r for r in reversed(result[-3:]) if abs(r[0][1] - word[1]) <= 4), None)
+        # Coordinate units vary with PDF page size. Different font sizes in
+        # paired columns can have different tops but overlap on the same line.
+        # Compare vertical overlap, keeping the existing superscript tolerance.
+        def aligned(other):
+            overlap = min(other[3], word[3]) - max(other[1], word[1])
+            shorter = min(other[3]-other[1], word[3]-word[1])
+            return abs(other[1] - word[1]) <= 4 or (shorter > 0 and overlap >= shorter*.6)
+        match = next((r for r in reversed(result[-3:]) if aligned(r[0])), None)
         if match is None:
             result.append([word])
         else:
@@ -144,6 +151,21 @@ def split_concert_class(title):
     if not match or not title[:match.start()].strip():
         return title, None
     return title[:match.start()].strip(), match.group(1).strip()
+
+
+def concert_pair(row, width):
+    """Only infer a heading-free list when repeated right columns are dance classes."""
+    gaps = sorted([(a,b) for a,b in zip(row,row[1:])
+                   if b[0]-a[2] > width*.02 and b[0] > width*.32],
+                  key=lambda pair:pair[1][0]-pair[0][2], reverse=True)
+    for _, right in gaps:
+        title = text([w for w in row if w[0] < right[0]])
+        classes = text([w for w in row if w[0] >= right[0]])
+        style = r'(?:jazz|ballet|tap|lyrical|contemporary|acro|hip\s*hop|musical\s+theatre|opening|finale|everyone)'
+        qualifier = r'(?:tiny\s+tots?|petite|mini|junior|teen|intermediate|inter|senior|adult|advanced|open|pre[- ]junior|level|grade)'
+        if title and re.match(rf'^(?:{qualifier}|{style})\b', classes, re.I) and re.search(rf'\b{style}\b', classes, re.I):
+            return title, classes
+    return None
 
 
 def extract(path, competition, year=None):
@@ -211,18 +233,31 @@ def extract(path, competition, year=None):
                                   match.group(1), class_name=(classes or '')[:500] or None, item_kind=item_kind(title)))
             if not any(match is not None for _,match,_ in numbered):
                 nodes = [n for n in nodes if not (n['kind']=='item' and n['source_page']==page)]
-                # Unnumbered paired-column lists: only accept rows beneath an explicit
-                # act/part heading. Cast/narrative pages are left for manual review.
-                active = False
+                # Unnumbered lists need an explicit act heading or repeated class
+                # columns. Cast/narrative pages remain for manual review.
+                pairs = [concert_pair(row, width) for row in lines]
+                # Repeated title/class pairs are strong evidence even when an Act
+                # label is decorative artwork that OCR cannot read. Do not infer
+                # isolated names/cast/credits or narrative paragraphs.
+                inferred = sum(pair is not None for pair in pairs) >= 4 and sum(pair is not None for pair in pairs) >= len(lines)*.6
+                active = inferred
+                if inferred:
+                    issues.append(f'PDF page {page}: unnumbered title/class list detected. Check the running order; no printed item numbers were invented.')
                 for row in lines:
                     value = text(row)
                     if re.match(r'^(ACT|PART)\s+(\d+|ONE|TWO)\b', value, re.I):
                         active = True
                         group = next((n for n in reversed(nodes) if n['kind'] == 'group' and n['title'] == value), None)
                         continue
-                    if active and re.match(r'^(INTERVAL|INTERMISSION|PRESENTATIONS)\b', value, re.I):
+                    if active and re.match(r'^(INTERVAL|INTERMISSION|PRESENTATIONS|FINALE)\b', value, re.I):
                         nodes.append(node('item',value,page,group['uuid'] if group else None,item_kind=item_kind(value)))
                         active = False
+                        continue
+                    if inferred and active:
+                        pair = concert_pair(row, width)
+                        if pair:
+                            title, classes = pair
+                            nodes.append(node('item', title, page, group['uuid'] if group else None, class_name=classes[:500], item_kind=item_kind(title)))
                         continue
                     if not active or re.search(r'choreograph|thank|sponsor|cast|performers', value, re.I):
                         continue

@@ -1,0 +1,4 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><shape><solid android:color="#041B3E" /><size android:width="320dp" android:height="180dp" /></shape></item>
+    <item><inset android:drawable="@drawable/tv_brand" android:insetLeft="21.875%" android:insetRight="21.875%" /></item>
+</layer-list>

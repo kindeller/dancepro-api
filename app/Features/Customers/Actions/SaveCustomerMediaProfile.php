@@ -4,6 +4,8 @@ namespace App\Features\Customers\Actions;
 
 use App\Features\Customers\Models\CustomerDancer;
 use App\Features\Customers\Models\CustomerStudio;
+use App\Features\Customers\Services\CustomerCommunicationPreferences;
+use App\Features\Customers\Support\CustomerDancerNameMatcher;
 use App\Features\Studios\Models\Studio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class SaveCustomerMediaProfile
 {
+    public function __construct(private readonly CustomerDancerNameMatcher $nameMatcher) {}
+
     public function execute(User $user, array $input): void
     {
         abort_unless($user->canAccessCustomer(), 403);
@@ -39,17 +43,20 @@ class SaveCustomerMediaProfile
 
     private function preferences(User $user, array $input): void
     {
-        $profile = $user->customerProfile()->firstOrNew();
-        $profile->preferences = array_merge($profile->preferences ?? [], [
-            'media_ready_email' => (bool) $input['media_ready_email'],
-            'expiry_reminders_email' => (bool) $input['expiry_reminders_email'],
-        ]);
-        $profile->marketing_consent_at = $input['marketing_email'] ? ($profile->marketing_consent_at ?? now()) : null;
-        $profile->save();
+        app(CustomerCommunicationPreferences::class)->save($user, $input);
     }
 
     private function dancer(User $user, array $input): void
     {
+        $studioNames = Studio::where('status', 'active')->pluck('name')
+            ->map(fn (string $name): string => $this->nameMatcher->canonical($name))->flip();
+        $submittedNames = collect([$input['name'], ...($input['programme_names'] ?? [])]);
+        if ($submittedNames->contains(fn (string $name): bool => $studioNames->has($this->nameMatcher->canonical($name)))) {
+            throw ValidationException::withMessages([
+                'name' => 'Enter an individual dancer name here. Add a dance studio under My studios instead.',
+            ]);
+        }
+
         $dancer = $input['action'] === 'dancer_update'
             ? CustomerDancer::where('user_id', $user->id)->where('uuid', $input['dancer_uuid'])->firstOrFail()
             : CustomerDancer::firstOrNew(['user_id' => $user->id, 'name' => $input['name']]);

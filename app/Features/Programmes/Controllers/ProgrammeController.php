@@ -6,6 +6,7 @@ use App\Features\Programmes\Actions\ConfirmProgramme;
 use App\Features\Programmes\Actions\PrepareProgramme;
 use App\Features\Programmes\Actions\ReplaceProgrammeSource;
 use App\Features\Programmes\Actions\SaveProgrammeDraft;
+use App\Features\Programmes\Models\Programme;
 use App\Features\Programmes\Models\ProgrammeRevision;
 use App\Features\Programmes\Models\ProgrammeSource;
 use App\Features\Programmes\Requests\ListProgrammeEventsRequest;
@@ -14,9 +15,12 @@ use App\Features\Programmes\Requests\SaveProgrammeDraftRequest;
 use App\Features\Programmes\Requests\StartProgrammeRequest;
 use App\Features\Programmes\Requests\UploadProgrammeSourceRequest;
 use App\Features\Programmes\Services\ListProgrammeEvents;
+use App\Features\Programmes\Services\ProgrammeExtractionProgress;
 use App\Features\Programmes\Services\ProgrammePreparation;
 use App\Features\Programmes\Services\ProgrammeSourceStorage;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Tracking\Services\BookingTrackerBar;
+use App\Features\Tracking\Services\ConcertTracker;
 use App\Http\Controllers\Controller;
 use App\Shared\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -38,11 +42,16 @@ class ProgrammeController extends Controller
         ])->header('Cache-Control', 'private, no-store');
     }
 
-    public function show(SchedulingEvent $schedulingEvent): View
+    public function show(SchedulingEvent $schedulingEvent): View|RedirectResponse
     {
         Gate::authorize('viewProgramme', $schedulingEvent);
 
-        return view('admin.programmes.show', $this->preparation->editor($schedulingEvent));
+        if (Gate::allows('manageScheduling') && $schedulingEvent->event_type->value === 'concert' && $schedulingEvent->concertBookingItem?->booking) {
+            return to_route('admin.concert-bookings.show', [$schedulingEvent->concertBookingItem->booking, 'tab' => 'programme', 'event' => $schedulingEvent->uuid]);
+        }
+        $bar = Gate::allows('manageScheduling') && $schedulingEvent->event_type->value === 'concert' ? app(BookingTrackerBar::class)->sourcePage(app(ConcertTracker::class)->detail($schedulingEvent, 'programme_prepared'), session('concert_tracker_context', [])) : null;
+
+        return view('admin.programmes.show', $this->preparation->editor($schedulingEvent) + ['trackerBar' => $bar]);
     }
 
     public function start(StartProgrammeRequest $request, SchedulingEvent $schedulingEvent, PrepareProgramme $prepare): RedirectResponse
@@ -53,14 +62,14 @@ class ProgrammeController extends Controller
         return to_route('admin.programmes.show', $schedulingEvent);
     }
 
-    public function extraction(SchedulingEvent $schedulingEvent): JsonResponse
+    public function extraction(SchedulingEvent $schedulingEvent, ProgrammeExtractionProgress $progress): JsonResponse
     {
         Gate::authorize('viewProgramme', $schedulingEvent);
-        $editor = $this->preparation->editor($schedulingEvent);
+        $extraction = $progress->forProgramme(Programme::where('scheduling_event_id', $schedulingEvent->id)->first());
 
         return ApiResponse::success('', [
-            'status' => $editor['extraction']?->status,
-            'message' => $editor['extraction']?->message,
+            'status' => $extraction?->status,
+            'message' => $extraction?->message,
         ])->header('Cache-Control', 'private, no-store');
     }
 
@@ -83,6 +92,13 @@ class ProgrammeController extends Controller
         $replace->execute($this->preparation->forEvent($schedulingEvent), $request->user(), $request->integer('version'), $request->file('programme'));
 
         return to_route('admin.programmes.show', $schedulingEvent)->with('status', 'Source PDF saved. Review the draft before confirming.');
+    }
+
+    public function useAttached(ProgrammeVersionRequest $request, SchedulingEvent $schedulingEvent, ReplaceProgrammeSource $replace): RedirectResponse
+    {
+        $replace->execute($this->preparation->forEvent($schedulingEvent), $request->user(), $request->integer('version'));
+
+        return to_route('admin.programmes.show', $schedulingEvent)->with('status', 'Attached programme loaded. Review the draft before confirming.');
     }
 
     public function source(SchedulingEvent $schedulingEvent, ProgrammeSource $source, ProgrammeSourceStorage $storage): StreamedResponse

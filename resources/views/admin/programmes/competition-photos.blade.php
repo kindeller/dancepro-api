@@ -1,12 +1,13 @@
-@extends('layouts.admin', ['title' => 'Competition Photos', 'heading' => 'Competition Photos', 'subheading' => 'Choose a competition to browse its photo gallery.'])
+@extends('layouts.admin', ['title' => 'Competition photos', 'heading' => 'Competition photos', 'subheading' => 'Choose a competition to browse its photo gallery.'])
 
 @section('content')
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px">
+@include('admin.media._backend-gallery-styles')
+<div class="backend-gallery-grid">
     @forelse($events as $event)
-        <a class="card card-pad" style="display:block" href="{{ route('admin.competition-gallery.show', $event) }}">
-            <div style="margin-bottom:14px"><x-event-artwork :url="$presentation[$event->uuid]['cover_url']" :name="$presentation[$event->uuid]['title']" size="large" /></div>
-            <strong>{{ $presentation[$event->uuid]['title'] }}</strong>
-            <div class="muted">{{ $event->eventCode() }} · {{ $event->event_date?->format('j M Y') }}</div>
+        <a class="card backend-gallery-card" href="{{ route('admin.competition-gallery.show', $event) }}">
+            <div class="backend-gallery-card-media"><x-event-artwork :url="$event->crewLogoUrl()" :name="$presentation[$event->uuid]['title']" size="large" /></div>
+            <div class="backend-gallery-card-body"><strong class="backend-gallery-card-title">{{ $presentation[$event->uuid]['title'] }}</strong>
+            <div class="backend-gallery-card-meta">{{ $event->eventCode() }} · {{ $event->event_date?->format('j M Y') }}</div></div>
         </a>
     @empty
         <p class="card card-pad">No competitions yet.</p>

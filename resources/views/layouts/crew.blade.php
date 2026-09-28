@@ -257,7 +257,7 @@
             .detail-grid > div:last-child { grid-column:1/-1; }
             .shift-action { align-items:stretch; flex-direction:column; }
             .header-inner { flex-wrap:wrap; }
-            .crew-nav { order:3; width:100%; margin:8px 0 0; }
+            .crew-nav { order:3; width:100%; margin:8px 0 0; flex-wrap:wrap; }
             .crew-nav a { flex:1; text-align:center; }
             .profile-grid,.vehicle-row { grid-template-columns:1fr 1fr; }
             .invoice-overview { grid-template-columns:1fr; }
@@ -281,6 +281,7 @@
     @stack('styles')
 </head>
 <body>
+    @include('layouts.partials.local-account-switcher')
     <header>
         <div class="header-inner">
             <a class="brand" href="{{ route('crew.availability.index') }}" aria-label="DancePro Crew home"><img src="{{ asset('images/brand/dancepro-logo-inverse-landscape.png') }}" alt="DancePro Photography & Video"></a>
@@ -291,6 +292,7 @@
                     @endif
                     My Shifts
                 </a>
+                <a class="{{ request()->routeIs('crew.editing.*') ? 'active' : '' }}" href="{{ route('crew.editing.index') }}">My editing</a>
                 <a class="{{ request()->routeIs('crew.timesheets.*') ? 'active' : '' }}" href="{{ route('crew.timesheets.index') }}">
                     @if($crewNavigationIndicators['timesheets'])
                         <span class="nav-indicator timesheets" title="{{ $crewNavigationIndicators['timesheets'] }} pending timesheets or invoices" aria-label="{{ $crewNavigationIndicators['timesheets'] }} pending timesheets or invoices"></span>
@@ -307,7 +309,7 @@
                 <a class="{{ request()->routeIs('crew.training.*') ? 'active' : '' }}" href="{{ route('crew.training.index') }}">My Training</a>
                 <a class="{{ request()->routeIs('crew.help.*') ? 'active' : '' }}" href="{{ route('crew.help.index') }}">My Handbook</a>
                 @if(config('security.two_factor.enabled'))
-                    <a href="{{ route('account.security') }}">Security</a>
+                    <a href="{{ route('account.security') }}">Account security</a>
                 @endif
             </nav>
             <div class="user-menu">

@@ -4,9 +4,9 @@ namespace App\Features\Bookings\Actions;
 
 use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Bookings\Models\ConcertBookingItem;
+use App\Features\Bookings\Services\BookingCrewRequirements;
 use App\Features\Bookings\Support\ConcertBookingItemType;
 use App\Features\Bookings\Support\ConcertBookingStatus;
-use App\Features\Crew\Models\CrewRole;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Scheduling\Support\AvailabilityRoundStatus;
 use App\Features\Scheduling\Support\SchedulingEventType;
@@ -18,6 +18,8 @@ use Illuminate\Validation\ValidationException;
 
 class ApproveConcertBooking
 {
+    public function __construct(private readonly PrepareBookingConcert $media, private readonly BookingCrewRequirements $crew) {}
+
     public function execute(ConcertBooking $booking, User $reviewedBy, ?string $note, ?Studio $studio = null): ConcertBooking
     {
         return DB::transaction(function () use ($booking, $reviewedBy, $note, $studio): ConcertBooking {
@@ -38,7 +40,18 @@ class ApproveConcertBooking
         }
 
         return DB::transaction(function () use ($item, $reviewedBy, $studio): SchedulingEvent {
-            $booking = $item->booking;
+            $booking = ConcertBooking::query()->lockForUpdate()->findOrFail($item->concert_booking_id);
+            $item = ConcertBookingItem::query()->lockForUpdate()->findOrFail($item->id);
+            if ($item->approval_status !== 'pending') {
+                throw ValidationException::withMessages(['events' => 'This event has already been reviewed. Reload the booking.']);
+            }
+            if ($studio && $booking->studio_id && $studio->id !== $booking->studio_id) {
+                throw ValidationException::withMessages(['studio_uuid' => 'This booking is linked to another studio. Resolve the studio association before approving it.']);
+            }
+            $studio ??= $booking->studio;
+            if ($studio && ! $booking->studio_id) {
+                $booking->update(['studio_id' => $studio->id]);
+            }
             $venue = $item->venue;
             if (! $venue) {
                 $itemLabel = $item->title ?: str_replace('_', ' ', $item->item_type->value);
@@ -59,6 +72,9 @@ class ApproveConcertBooking
             ]);
             $startsAt = Carbon::parse($item->event_date->toDateString().' '.$item->starts_at);
             $finishesAt = Carbon::parse($item->event_date->toDateString().' '.$item->finishes_at);
+            if ($finishesAt->lte($startsAt)) {
+                $finishesAt->addDay();
+            }
             $isVideo = $item->item_type === ConcertBookingItemType::Concert && $booking->wants_concert_videography;
             $event->shifts()->create([
                 'period' => null,
@@ -69,7 +85,7 @@ class ApproveConcertBooking
                 'starts_at' => $startsAt,
                 'estimated_finish_at' => $finishesAt->copy()->addMinutes(20),
             ]);
-            foreach ($this->requiredRoles($booking, $item->item_type) as $role) {
+            foreach ($this->crew->roles($booking, $item->item_type) as $role) {
                 $event->roleRequirements()->create(['crew_role_id' => $role->id, 'quantity' => 1]);
             }
             $item->update([
@@ -78,6 +94,8 @@ class ApproveConcertBooking
                 'approved_at' => now(),
                 'scheduling_event_id' => $event->id,
             ]);
+
+            $this->media->execute($item->fresh(['schedulingEvent', 'booking', 'concert']), $reviewedBy);
 
             if (! $booking->items()->where('approval_status', 'pending')->exists()) {
                 $booking->update([
@@ -89,22 +107,5 @@ class ApproveConcertBooking
 
             return $event;
         });
-    }
-
-    private function requiredRoles(ConcertBooking $booking, ConcertBookingItemType $itemType): array
-    {
-        $roles = [];
-        if ($itemType === ConcertBookingItemType::DressRehearsal && $booking->wants_portrait_photography) {
-            $roles[] = CrewRole::query()->firstOrCreate(['code' => 'photographer-p'], ['name' => 'Dress Rehearsal Photographer P', 'event_type' => 'concert', 'is_active' => true]);
-            $roles[] = CrewRole::query()->firstOrCreate(['code' => 'concert-dr-portrait-assistant'], ['name' => 'Concert DR Portrait Assistant A', 'event_type' => 'concert', 'is_active' => true]);
-        }
-        if ($itemType === ConcertBookingItemType::Concert && $booking->wants_concert_photography) {
-            $roles[] = CrewRole::query()->firstOrCreate(['code' => 'concert-photographer-p1'], ['name' => 'Concert Photographer P1', 'event_type' => 'concert', 'is_active' => true]);
-        }
-        if ($itemType === ConcertBookingItemType::Concert && $booking->wants_concert_videography) {
-            $roles[] = CrewRole::query()->firstOrCreate(['code' => 'concert-videographer'], ['name' => 'Concert Videographer V', 'event_type' => 'concert', 'is_active' => true]);
-        }
-
-        return $roles;
     }
 }

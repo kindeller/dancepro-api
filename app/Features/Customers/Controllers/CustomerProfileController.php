@@ -4,6 +4,7 @@ namespace App\Features\Customers\Controllers;
 
 use App\Features\Customers\Actions\SaveCustomerMediaProfile;
 use App\Features\Customers\Requests\CustomerCompetitionsRequest;
+use App\Features\Customers\Requests\CustomerProfilePageRequest;
 use App\Features\Customers\Requests\SaveCustomerMediaProfileRequest;
 use App\Features\Customers\Services\CustomerMediaProfile;
 use App\Features\Studios\Models\Studio;
@@ -13,9 +14,11 @@ use Illuminate\Http\Response;
 
 class CustomerProfileController extends Controller
 {
-    public function edit(CustomerCompetitionsRequest $request, CustomerMediaProfile $profile): Response
+    public function edit(CustomerProfilePageRequest $request, CustomerMediaProfile $profile): Response
     {
-        return response()->view('customers.profile.edit', $profile->editor($request->user()))->header('Cache-Control', 'private, no-store');
+        return response()->view('customers.profile.edit', $profile->editor($request->user()) + [
+            'profileTab' => $request->validated('tab') ?? 'details',
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     public function studio(CustomerCompetitionsRequest $request, Studio $studio, CustomerMediaProfile $profile): Response
@@ -37,6 +40,13 @@ class CustomerProfileController extends Controller
             default => 'Studio added. Return to My Media to access its photos and videos.',
         };
 
-        return to_route('customer.profile.edit')->with('status', $message);
+        $tab = match ($request->validated('action')) {
+            'preferences' => 'preferences',
+            'dancer', 'dancer_update', 'dancer_remove' => 'dancers',
+            'studio', 'studio_remove' => 'studios',
+            default => 'details',
+        };
+
+        return to_route('customer.profile.edit', ['tab' => $tab])->with('status', $message);
     }
 }

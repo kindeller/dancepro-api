@@ -33,7 +33,7 @@
 @endif
 <div class="utility-grid">
     @if($assets->isNotEmpty() && $canStream)<article class="card utility"><h3>Download manager</h3><p class="muted" id="download-status">Ready to download {{ $assets->count() }} originals. Your browser may ask permission for multiple files.</p><div class="actions"><button class="button secondary" id="download-all" type="button">Start</button><button class="button secondary" id="download-pause" type="button" disabled>Pause</button><button class="button secondary" id="download-reset" type="button">Reset</button></div></article>@endif
-    <article class="card utility"><h3>Concert program</h3>@if($concert->programForDisplay())<p class="muted">View the program supplied for this concert.</p><a class="button secondary" href="{{ $concert->programForDisplay() }}" target="_blank" rel="noopener">Open program</a>@else<p class="muted">No program is available for this concert.</p>@endif</article>
+    <article class="card utility"><h3>Concert programme</h3>@if($concert->programForDisplay())<p class="muted">View the program supplied for this concert.</p><a class="button secondary" href="{{ $concert->programForDisplay() }}" target="_blank" rel="noopener">Open program</a>@else<p class="muted">No program is available for this concert.</p>@endif</article>
     <article class="card utility"><h3>Photo gallery</h3>@if($concert->galleryForDisplay())<p class="muted">Continue to the studio's external gallery.</p><a class="button secondary" href="{{ $concert->galleryForDisplay() }}" target="_blank" rel="noopener">Open gallery</a>@else<p class="muted">No external gallery is available.</p>@endif</article>
 </div>
 </div></section>

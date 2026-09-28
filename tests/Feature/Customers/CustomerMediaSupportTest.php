@@ -55,6 +55,7 @@ class CustomerMediaSupportTest extends TestCase
         $request = CustomerSupportRequest::query()->firstOrFail();
         $this->assertSame($customer->id, $request->user_id);
         $this->assertSame($order->uuid, $request->context['order_uuid']);
+        $this->assertSame($order->displayNumber(), $request->context['order_number']);
         $this->assertSame('photo', $request->context['media_type']);
         $this->assertDatabaseHas('customer_support_requests', ['status' => 'pending', 'order_media_entitlement_id' => $entitlement->id]);
 

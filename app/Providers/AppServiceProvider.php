@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Features\Auth\Services\LocalAccountSwitcher;
 use App\Features\Crew\Services\CrewNavigationIndicators;
 use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Downloads\Policies\DownloadLinkPolicy;
@@ -194,6 +195,12 @@ class AppServiceProvider extends ServiceProvider
                 ? app(CrewNavigationIndicators::class)->for($user)
                 : ['shifts' => 0, 'timesheets' => 0, 'chat' => 0]);
         });
+
+        if ($this->app->environment(['local', 'testing'])) {
+            View::composer(['layouts.public', 'layouts.admin', 'layouts.crew'], function (ViewContract $view): void {
+                $view->with('localSwitchAccounts', app(LocalAccountSwitcher::class)->accounts());
+            });
+        }
 
         View::composer('layouts.admin', function (ViewContract $view): void {
             $user = auth()->user();

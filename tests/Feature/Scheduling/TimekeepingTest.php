@@ -129,7 +129,7 @@ class TimekeepingTest extends TestCase
             ->assertOk()
             ->assertSee('Next shift')
             ->assertSee('>Clock in</button>', false)
-            ->assertSee('Pre-Start Checks')
+            ->assertSee('Pre-start checks')
             ->assertSee('Shift starts soon')
             ->assertSee('data-shift-start', false)
             ->assertDontSee('>Clock out</button>', false);

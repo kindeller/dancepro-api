@@ -698,6 +698,7 @@
     @stack('styles')
 </head>
 <body>
+    @include('layouts.partials.local-account-switcher')
     <div class="shell">
         <aside class="sidebar">
             <a class="brand" href="https://www.dancepro.com.au/">
@@ -715,48 +716,59 @@
                 @endif
                 @php($hubManagementActive = request()->routeIs('admin.hub.*', 'admin.exceptions.*', 'admin.studios.*', 'admin.competition-contacts.*', 'admin.crew.*', 'admin.crew-roles.*', 'admin.crew-contracts.*', 'admin.crew-management.*', 'admin.scheduling-events.*', 'admin.event-management.*', 'admin.event-types.*', 'admin.venues.*', 'admin.operations.*', 'admin.payments.*', 'admin.timesheets.*', 'admin.concert-bookings.*', 'admin.concert-booking-events.*'))
                 <details class="nav-group {{ $hubManagementActive ? 'active' : '' }}" @if($hubManagementActive) open @endif>
-                    <summary>Hub Management</summary>
+                    <summary>Hub management</summary>
                     <div class="nav-submenu">
                         @can('manageScheduling')
-                            <a href="{{ route('admin.hub.dashboard') }}" @if(request()->routeIs('admin.hub.*')) aria-current="page" @endif>Dashboard</a>
+                            <a href="{{ route('admin.hub.dashboard') }}" @if(request()->routeIs('admin.hub.*')) aria-current="page" @endif>Hub dashboard</a>
                         @endcan
                         @can('manageStudios')
                             <a href="{{ route('admin.studios.index') }}" @if(request()->routeIs('admin.studios.*', 'admin.competition-contacts.*')) aria-current="page" @endif>Contacts</a>
                         @endcan
                         @can('manageCrew')
-                            <a href="{{ route('admin.crew.index') }}" @if(request()->routeIs('admin.crew.*', 'admin.crew-roles.*', 'admin.crew-contracts.*', 'admin.crew-management.*')) aria-current="page" @endif>Crew Management</a>
+                            <a href="{{ route('admin.crew.index') }}" @if(request()->routeIs('admin.crew.*', 'admin.crew-roles.*', 'admin.crew-contracts.*', 'admin.crew-management.*')) aria-current="page" @endif>Crew management</a>
                         @endcan
                         @can('manageScheduling')
                             <a href="{{ route('admin.exceptions.index') }}" @if(request()->routeIs('admin.exceptions.*')) aria-current="page" @endif>@if($adminExceptionCount)<span class="nav-notification">{{ $adminExceptionCount }}</span>@endif Exceptions</a>
-                            <a href="{{ route('admin.concert-bookings.index') }}" @if(request()->routeIs('admin.scheduling-events.*', 'admin.event-management.*', 'admin.event-types.*', 'admin.concert-bookings.*', 'admin.concert-booking-events.*')) aria-current="page" @endif>Event Management</a>
-                            <a href="{{ route('admin.venues.index') }}" @if(request()->routeIs('admin.venues.*')) aria-current="page" @endif>Venue Management</a>
-                            <a href="{{ route('admin.timesheets.index') }}" @if(request()->routeIs('admin.timesheets.*', 'admin.payments.*')) aria-current="page" @endif>Crew Payments</a>
+                            <a href="{{ route('admin.concert-bookings.index') }}" @if(request()->routeIs('admin.scheduling-events.*', 'admin.event-management.*', 'admin.event-types.*', 'admin.concert-bookings.*', 'admin.concert-booking-events.*')) aria-current="page" @endif>Event management</a>
+                            <a href="{{ route('admin.venues.index') }}" @if(request()->routeIs('admin.venues.*')) aria-current="page" @endif>Venue management</a>
+                            <a href="{{ route('admin.timesheets.index') }}" @if(request()->routeIs('admin.timesheets.*', 'admin.payments.*')) aria-current="page" @endif>Crew payments</a>
                         @endcan
                     </div>
                 </details>
                 @can('manageScheduling')
-                    <a href="{{ route('admin.concert-tracker.index') }}" @if(request()->routeIs('admin.concert-tracker.*')) aria-current="page" @endif>@if($concertTrackerAlertCount)<span class="nav-notification">{{ $concertTrackerAlertCount }}</span>@endif Tracker</a>
-                    <a href="{{ route('admin.concert-tracker.studio-communications.index') }}" @if(request()->routeIs('admin.concert-tracker.studio-communications.*')) aria-current="page" @endif>@if($studioMessageUnreadCount)<span class="nav-notification">{{ $studioMessageUnreadCount }}</span>@endif Studio Messages</a>
+                    <a href="{{ route('admin.concert-tracker.index') }}" @if(request()->routeIs('admin.concert-tracker.*')) aria-current="page" @endif>@if($concertTrackerAlertCount)<span class="nav-notification">{{ $concertTrackerAlertCount }}</span>@endif Concert tracker</a>
+                    <a href="{{ route('admin.concert-tracker.studio-communications.index') }}" @if(request()->routeIs('admin.concert-tracker.studio-communications.*')) aria-current="page" @endif>@if($studioMessageUnreadCount)<span class="nav-notification">{{ $studioMessageUnreadCount }}</span>@endif Studio messages</a>
                 @endcan
                 @php($competitionPhotosActive = request()->routeIs('admin.competition-gallery.*') || (request()->routeIs('admin.photo-uploads.*') && request()->route('schedulingEvent')?->event_type->value === 'competition'))
-                @php($mediaActive = request()->routeIs('admin.dashboard', 'admin.concerts.*', 'admin.concert-photo-gallery.*', 'admin.competition.objects.*', 'admin.competition-gallery.*', 'admin.competition-videos.*', 'admin.download-links.*', 'admin.media-settings.*', 'admin.media-sales.*', 'admin.media-support.*') || $competitionPhotosActive)
+                @php($mediaActive = request()->routeIs('admin.dashboard', 'admin.publicity.*', 'admin.top-pics.*', 'admin.concerts.*', 'admin.concert-photo-gallery.*', 'admin.competition.objects.*', 'admin.competition-gallery.*', 'admin.competition-videos.*', 'admin.download-links.*', 'admin.media-settings.*') || $competitionPhotosActive)
                 <details class="nav-group {{ $mediaActive ? 'active' : '' }}" @if($mediaActive) open @endif>
                     <summary>Media</summary>
                     <div class="nav-submenu">
-                        <a href="{{ route('admin.dashboard') }}" @if(request()->routeIs('admin.dashboard')) aria-current="page" @endif>Media Dashboard</a>
+                        <a href="{{ route('admin.dashboard') }}" @if(request()->routeIs('admin.dashboard')) aria-current="page" @endif>Media dashboard</a>
                         @can('manageConcerts')
-                            <a href="{{ route('admin.concerts.index') }}" @if(request()->routeIs('admin.concerts.*')) aria-current="page" @endif>Concert Media</a>
-                            <a href="{{ route('admin.concert-photo-gallery.events') }}" @if(request()->routeIs('admin.concert-photo-gallery.*')) aria-current="page" @endif>Concert Photos</a>
+                            <a href="{{ route('admin.concerts.index') }}" @if(request()->routeIs('admin.concerts.*')) aria-current="page" @endif>Concert media</a>
+                            <a href="{{ route('admin.concert-photo-gallery.events') }}" @if(request()->routeIs('admin.concert-photo-gallery.*')) aria-current="page" @endif>Concert photos</a>
                         @endcan
-                        <a href="{{ route('admin.competition-gallery.index') }}" @if($competitionPhotosActive) aria-current="page" @endif>Competition Photos</a>
-                        <a href="{{ route('admin.competition.objects.index') }}" @if(request()->routeIs('admin.competition.objects.*', 'admin.competition-videos.*')) aria-current="page" @endif>Competition Media</a>
-                        <a href="{{ route('admin.download-links.index') }}" @if(request()->routeIs('admin.download-links.index', 'admin.download-links.show')) aria-current="page" @endif>Download Links</a>
-                        <a href="{{ route('admin.download-links.create') }}" @if(request()->routeIs('admin.download-links.create')) aria-current="page" @endif>Create Link</a>
-                        <a href="{{ route('admin.media-settings.index') }}" @if(request()->routeIs('admin.media-settings.*')) aria-current="page" @endif>Gallery Settings</a>
-                        <a href="{{ route('admin.media-sales.index') }}" @if(request()->routeIs('admin.media-sales.*')) aria-current="page" @endif>Sales</a>
-                        <a href="{{ route('admin.media-support.index') }}" @if(request()->routeIs('admin.media-support.*')) aria-current="page" @endif>Customer Support</a>
+                        <a href="{{ route('admin.top-pics.index') }}" @if(request()->routeIs('admin.top-pics.*', 'admin.publicity.*')) aria-current="page" @endif>Publicity</a>
+                        <a href="{{ route('admin.competition-gallery.index') }}" @if($competitionPhotosActive) aria-current="page" @endif>Competition photos</a>
+                        <a href="{{ route('admin.competition.objects.index') }}" @if(request()->routeIs('admin.competition.objects.*', 'admin.competition-videos.*')) aria-current="page" @endif>Competition media</a>
+                        <a href="{{ route('admin.download-links.index') }}" @if(request()->routeIs('admin.download-links.index', 'admin.download-links.show')) aria-current="page" @endif>Download links</a>
+                        <a href="{{ route('admin.download-links.create') }}" @if(request()->routeIs('admin.download-links.create')) aria-current="page" @endif>Create download links</a>
+                        <a href="{{ route('admin.media-settings.index') }}" @if(request()->routeIs('admin.media-settings.*')) aria-current="page" @endif>Gallery settings</a>
                     </div>
                 </details>
+                @php($salesActive = request()->routeIs('admin.orders.*', 'admin.media-sales.*', 'admin.studio-invoices.*'))
+                <details class="nav-group {{ $salesActive ? 'active' : '' }}" @if($salesActive) open @endif><summary>Sales &amp; reports</summary><div class="nav-submenu">
+                    <a href="{{ route('admin.orders.index') }}" @if(request()->routeIs('admin.orders.*')) aria-current="page" @endif>Orders &amp; refunds</a>
+                    <a href="{{ route('admin.studio-invoices.index') }}" @if(request()->routeIs('admin.studio-invoices.*')) aria-current="page" @endif>Studio invoices</a>
+                    <a href="{{ route('admin.media-sales.index') }}" @if(request()->routeIs('admin.media-sales.*')) aria-current="page" @endif>Sales reports</a>
+                </div></details>
+                @php($customersActive = request()->routeIs('admin.customers.*', 'admin.media-support.*'))
+                <details class="nav-group {{ $customersActive ? 'active' : '' }}" @if($customersActive) open @endif><summary>Customers</summary><div class="nav-submenu">
+                    <a href="{{ route('admin.customers.index') }}" @if(request()->routeIs('admin.customers.*') && !request()->routeIs('admin.customers.follow-ups')) aria-current="page" @endif>Customer accounts</a>
+                    <a href="{{ route('admin.customers.follow-ups') }}" @if(request()->routeIs('admin.customers.follow-ups')) aria-current="page" @endif>Customer follow-ups</a>
+                    <a href="{{ route('admin.media-support.index') }}" @if(request()->routeIs('admin.media-support.*')) aria-current="page" @endif>Customer support</a>
+                </div></details>
                 @if(config('security.two_factor.enabled'))<a href="{{ route('account.security') }}">Account security</a>@endif
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf

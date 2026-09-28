@@ -17,7 +17,7 @@ class CustomerOnboardingController extends Controller
     {
         abort_unless($request->user()?->canAccessCustomer(), 403);
 
-        return $request->user()->hasVerifiedEmail() ? to_route('customer.media.index')
+        return $request->user()->hasVerifiedEmail() ? to_route($request->session()->has('publicity_join') ? 'publicity.join.complete' : 'customer.media.index')
             : view('customers.account.verify-email');
     }
 
@@ -44,7 +44,7 @@ class CustomerOnboardingController extends Controller
         }
 
         return $request->user()?->is($user)
-            ? to_route('customer.media.index')->with('status', 'Email verified.')
+            ? to_route($request->session()->has('publicity_join') ? 'publicity.join.complete' : 'customer.media.index')->with('status', 'Email verified.')
             : to_route('customer.login')->with('status', 'Email verified. Sign in to continue.');
     }
 
@@ -62,6 +62,6 @@ class CustomerOnboardingController extends Controller
     {
         $accept->execute($request->user());
 
-        return to_route('customer.media.index');
+        return to_route($request->session()->has('publicity_join') ? 'publicity.join.complete' : 'customer.media.index');
     }
 }

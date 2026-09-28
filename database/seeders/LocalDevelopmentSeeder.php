@@ -57,6 +57,7 @@ class LocalDevelopmentSeeder extends Seeder
             PaymentPlaceholderSeeder::class,
             TimesheetInvoiceDemoSeeder::class,
             ConcertTrackerDemoSeeder::class,
+            RealisticMediaDemoSeeder::class,
         ]);
 
         $this->command?->info('Local DancePro development data seeded.');

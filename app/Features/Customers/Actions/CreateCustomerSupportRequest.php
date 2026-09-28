@@ -29,6 +29,9 @@ class CreateCustomerSupportRequest
             throw ValidationException::withMessages(['order_media_entitlement_id' => 'Choose media from one of your own orders.']);
         }
         if ($input['type'] === 'download_reactivation') {
+            if ($entitlement?->revoked_at) {
+                throw ValidationException::withMessages(['order_media_entitlement_id' => 'Revoked media access cannot be reactivated.']);
+            }
             if (! $entitlement?->ready_at || ! $entitlement->expires_at?->isPast()) {
                 throw ValidationException::withMessages(['order_media_entitlement_id' => 'Reactivation is available after a ready download period has ended.']);
             }
@@ -52,6 +55,7 @@ class CreateCustomerSupportRequest
             'context' => array_filter([
                 'customer_email' => $user->email,
                 'order_uuid' => $order?->uuid,
+                'order_number' => $order?->displayNumber(),
                 'order_status' => $order?->status?->value,
                 'item_name' => $entitlement?->orderItem?->snapshot_display_name,
                 'media_type' => $entitlement?->media_type,

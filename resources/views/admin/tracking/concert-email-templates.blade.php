@@ -69,7 +69,7 @@
 
 @section('content')
 <div class="email-template-shell">
-    <div class="toolbar" style="margin-bottom:18px"><a class="button secondary" href="{{ route('admin.concert-tracker.index') }}">← Concert Tracker</a></div>
+    <div class="toolbar" style="margin-bottom:18px"><a class="button secondary" href="{{ route('admin.concert-tracker.index') }}">← Concert tracker</a></div>
     @if(session('status'))<p class="card card-pad" role="status">{{ session('status') }}</p>@endif
     @if($errors->any())<p class="card card-pad" role="alert" style="color:#a62232">{{ $errors->first() }}</p>@endif
     <section class="card template-intro"><div><h2>Studio communication library</h2><p>Select a template to edit its wording and see the finished email beside it.</p></div><span class="template-count">{{ $templates->count() }}</span></section>
@@ -93,7 +93,7 @@
                         <label>Template name<input name="name" value="{{ $template->name }}" required></label>
                         <label>Email subject<input name="subject" value="{{ $template->subject }}" required data-live-subject></label>
                         <x-email-composer :value="$template->body" :rows="10" />
-                        <div class="template-tokens"><p><strong>Personalisation fields</strong> · filled from the selected studio and event.</p><div class="template-token-list">@foreach(['studio_name','contact_name','event_name','event_details','services','family_count','venue','start_time','finish_time','arrival_time','crew_names','gallery_access'] as $token)<span class="template-token">&#123;&#123; {{ $token }} &#125;&#125;</span>@endforeach</div></div>
+                        <div class="template-tokens"><p><strong>Personalisation fields</strong> · filled from the selected studio and event.</p><div class="template-token-list">@foreach(['studio_name','contact_name','event_name','event_details','services','family_count','venue','start_time','finish_time','arrival_time','crew_names','gallery_access','review_url','gallery_url'] as $token)<span class="template-token">&#123;&#123; {{ $token }} &#125;&#125;</span>@endforeach</div></div>
                         <div class="template-side-actions"><label class="template-active"><input type="checkbox" name="is_active" value="1" @checked($template->is_active)> Available for Tracker emails</label><button>Save template</button></div>
                     </div>
                     <div class="email-preview-stage">

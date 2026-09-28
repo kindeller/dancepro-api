@@ -16,7 +16,7 @@ class ConcertCodeGroup extends Model
 
     protected $guarded = ['id'];
 
-    protected $hidden = ['code_hash'];
+    protected $hidden = ['code_hash', 'code_encrypted'];
 
     public function studio(): BelongsTo
     {
@@ -50,6 +50,6 @@ class ConcertCodeGroup extends Model
 
     protected function casts(): array
     {
-        return ['year' => 'integer', 'version' => 'integer', 'released_at' => 'datetime'];
+        return ['year' => 'integer', 'version' => 'integer', 'code_encrypted' => 'encrypted', 'released_at' => 'datetime'];
     }
 }

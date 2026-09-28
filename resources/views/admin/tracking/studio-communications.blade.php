@@ -1,6 +1,6 @@
 @extends('layouts.admin', ['title' => 'Studio communications', 'heading' => $studio->name, 'subheading' => 'Studio communication thread'])
 @section('content')
-<div class="toolbar"><a class="button secondary" href="{{ route('admin.concert-tracker.index') }}">← Concert Tracker</a></div>
+<div class="toolbar"><a class="button secondary" href="{{ route('admin.concert-tracker.index') }}">← Concert tracker</a></div>
 @if(session('status'))<p class="card card-pad" role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<p class="card card-pad" role="alert" style="color:#a62232">{{ $errors->first() }}</p>@endif
 <section class="card card-pad" style="margin-bottom:18px"><form method="post" action="{{ route('admin.concert-tracker.studio-communications.assign', $studio) }}" style="display:flex;gap:10px;align-items:end;margin-bottom:20px">@csrf @method('PATCH')<label style="flex:1">Assigned staff member<select name="assigned_user_id"><option value="">Unassigned</option>@foreach($staff as $member)<option value="{{ $member->id }}" @selected($thread->assigned_user_id === $member->id)>{{ $member->name }}</option>@endforeach</select></label><button>Save owner</button></form><h2>Reply to studio</h2><form method="post" action="{{ route('admin.concert-tracker.studio-communications.reply', $studio) }}" class="grid" enctype="multipart/form-data">@csrf

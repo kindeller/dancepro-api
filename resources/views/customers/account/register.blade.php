@@ -2,6 +2,7 @@
 @section('content')
 <section class="section"><div class="container" style="max-width:520px">
     <h1>Create your account</h1><p>One DancePro account for competition media, concert photos and concert videos.</p>
+    @if(session('publicity_join.name'))<p class="card card-body">{{ session('publicity_join.name') }} will be added to My Media after you sign in or create and verify your account. You won't need to enter a gallery code.</p>@endif
     <form method="POST" action="{{ route('customer.register.store') }}" class="card card-body" style="display:grid;gap:16px">
         @csrf
         <label>Name<input name="name" value="{{ old('name') }}" maxlength="255" autocomplete="name" required></label>

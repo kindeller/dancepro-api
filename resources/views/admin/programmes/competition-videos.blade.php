@@ -1,7 +1,7 @@
 @extends('layouts.admin', ['title' => 'Competition videos', 'heading' => 'Competition videos', 'subheading' => $schedulingEvent->name])
 
 @section('content')
-<div class="toolbar" style="margin-bottom:20px"><a class="button secondary" href="{{ route('admin.competition.objects.index', ['prefix' => $schedulingEvent->event_date?->format('Y').'/'.$schedulingEvent->eventCode()]) }}">← Competition Media</a><a class="button secondary" href="{{ route('admin.competition-gallery.show', $schedulingEvent) }}">Competition photos</a></div>
+<div class="toolbar" style="margin-bottom:20px"><a class="button secondary" href="{{ route('admin.competition.objects.index', ['prefix' => $schedulingEvent->event_date?->format('Y').'/'.$schedulingEvent->eventCode()]) }}">← Competition media</a><a class="button secondary" href="{{ route('admin.competition-gallery.show', $schedulingEvent) }}">Competition photos</a></div>
 @if(session('status'))<p class="card card-pad" role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<p class="card card-pad" role="alert" style="color:#a62232">{{ $errors->first() }}</p>@endif
 <p class="muted">The Mac uploader sends video files privately. A routine becomes available to customers only after every file in its batch is verified, unmatched files are assigned, and the batch is completed. HOLD blocks video access without affecting photos.</p>

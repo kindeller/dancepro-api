@@ -31,15 +31,18 @@ class ConcertTrackerDemoSeeder extends Seeder
             throw new RuntimeException('Seed a local administrator before loading Tracker review data.');
         }
 
+        $logoPath = 'logos/studios/aurora-tracker-demo.svg';
+        Storage::disk(config('uploads.public_disk'))->put($logoPath, $this->studioLogo());
         $studio = Studio::withTrashed()->updateOrCreate(['uuid' => '71000000-0000-4000-8000-000000000001'], [
             'name' => 'Aurora Dance Academy - TRACKER DEMO', 'slug' => 'aurora-tracker-demo', 'status' => 'active',
             'code' => 'AUR', 'contact_name' => 'Alex Director', 'contact_email' => 'aurora-director@example.test',
-            'description' => 'Fictional local review data for the Concert Tracker.', 'deleted_at' => null,
+            'description' => 'Fictional local review data for the Concert Tracker.', 'logo_path' => $logoPath, 'deleted_at' => null,
         ]);
         $booking = ConcertBooking::updateOrCreate(['uuid' => '72000000-0000-4000-8000-000000000001'], [
-            'status' => 'approved', 'studio_name' => $studio->name, 'contact_name' => 'Alex Director',
+            'status' => 'approved', 'studio_id' => $studio->id, 'studio_name' => $studio->name, 'contact_name' => 'Alex Director',
             'contact_email' => 'aurora-director@example.test', 'contact_phone' => '0400 000 777',
             'wants_concert_photography' => true, 'wants_concert_videography' => true,
+            'wants_portrait_photography' => true, 'portrait_photography_interest' => 'yes',
             'approximate_family_count' => 86, 'reviewed_by_user_id' => $actor->id, 'reviewed_at' => now()->subMonths(2),
         ]);
 
@@ -47,10 +50,17 @@ class ConcertTrackerDemoSeeder extends Seeder
         $future = $this->event($studio, '73000000-0000-4000-8000-000000000002', 'Aurora Senior Showcase - TRACKER DEMO', now()->addDays(24)->toDateString());
         $recent = $this->event($studio, '73000000-0000-4000-8000-000000000003', 'Aurora Matinee - TRACKER DEMO', now()->subDays(3)->toDateString());
         $near = $this->event($studio, '73000000-0000-4000-8000-000000000004', 'Aurora Spring Gala - TRACKER DEMO', now()->addDays(4)->toDateString());
+        $dressRehearsal = $this->event($studio, '73000000-0000-4000-8000-000000000005', 'Aurora Dress Rehearsal Portraits - TRACKER DEMO', now()->addDays(22)->toDateString());
         $pastItem = $this->item($booking, $past, '74000000-0000-4000-8000-000000000001', 'Aurora Junior Showcase');
         $futureItem = $this->item($booking, $future, '74000000-0000-4000-8000-000000000002', 'Aurora Senior Showcase');
         $recentItem = $this->item($booking, $recent, '74000000-0000-4000-8000-000000000003', 'Aurora Matinee');
         $nearItem = $this->item($booking, $near, '74000000-0000-4000-8000-000000000004', 'Aurora Spring Gala');
+        ConcertBookingItem::updateOrCreate(['uuid' => '74000000-0000-4000-8000-000000000005'], [
+            'concert_booking_id' => $booking->id, 'item_type' => 'dress_rehearsal', 'title' => 'Dress Rehearsal Portraits',
+            'venue_name' => 'Demo Arts Theatre', 'venue_address' => '1 Example Street',
+            'event_date' => $dressRehearsal->event_date, 'starts_at' => '16:00', 'finishes_at' => '20:00',
+            'approval_status' => 'approved', 'scheduling_event_id' => $dressRehearsal->id,
+        ]);
         $pastConcert = $this->concert($studio, $pastItem, $actor, '75000000-0000-4000-8000-000000000001', 'Aurora Junior Showcase', true);
         $this->concert($studio, $futureItem, $actor, '75000000-0000-4000-8000-000000000002', 'Aurora Senior Showcase', false);
         $this->concert($studio, $recentItem, $actor, '75000000-0000-4000-8000-000000000003', 'Aurora Matinee', false);
@@ -235,5 +245,19 @@ class ConcertTrackerDemoSeeder extends Seeder
         imagedestroy($image);
 
         return $bytes;
+    }
+
+    private function studioLogo(): string
+    {
+        return <<<'SVG'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-labelledby="title">
+  <title id="title">Aurora Dance Academy demo logo</title>
+  <defs><linearGradient id="aurora" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#68e0cf"/><stop offset=".52" stop-color="#4b9fe6"/><stop offset="1" stop-color="#9f6be8"/></linearGradient></defs>
+  <rect width="640" height="360" rx="36" fill="#0f1c2b"/>
+  <path d="M154 248c35-112 83-170 145-174-44 43-58 91-42 145 17-72 62-123 137-153-39 54-48 111-27 172 31-44 69-73 115-87-39 91-107 137-204 137-49 0-90-13-124-40Z" fill="url(#aurora)" opacity=".95"/>
+  <text x="320" y="282" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="38" font-weight="700" letter-spacing="7">AURORA</text>
+  <text x="320" y="320" text-anchor="middle" fill="#b9d5e6" font-family="Arial,sans-serif" font-size="18" letter-spacing="5">DANCE ACADEMY</text>
+</svg>
+SVG;
     }
 }

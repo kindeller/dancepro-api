@@ -1,4 +1,5 @@
 @extends('layouts.public', ['title' => 'Checkout · DancePro', 'footerLabel' => 'DancePro Media'])
+@section('headerParentUrl', $order->status->value === 'draft' ? route('customer.media.cart') : route('customer.media.orders'))
 
 @push('styles')
 <style>
@@ -16,8 +17,7 @@
 @endpush
 
 @section('content')
-<div class="container" style="padding-top:18px"><a href="{{ route('customer.media.index') }}">← My Media</a></div>
-<section class="hero" style="padding:38px 0"><div class="container"><h1>{{ $order->status->value === 'draft' ? 'Review your order' : 'Order complete' }}</h1><p class="lead">Order {{ $order->uuid }}</p></div></section>
+<section class="hero" style="padding:38px 0"><div class="container"><h1>{{ $order->status->value === 'draft' ? 'Review your order' : 'Order complete' }}</h1><p class="lead">Order {{ $order->displayNumber() }}</p></div></section>
 <section class="section"><div class="container">
     @if(session('status'))<p class="test-banner" role="status">{{ session('status') }}</p>@endif
     @if($errors->any())<div class="card checkout-card" role="alert"><strong>Payment was not completed.</strong><p>{{ $errors->first() }}</p></div>@endif

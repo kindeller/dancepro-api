@@ -124,7 +124,7 @@ class CrewFoundationTest extends TestCase
             ->assertSee('My Profile')
             ->assertSee('Change password')
             ->assertSee('password-dialog', false)
-            ->assertSee('Log out')
+            ->assertSee('Sign out')
             ->assertSee('Current Crew Agreement')
             ->assertSee('Working With Children Check')
             ->assertDontSee('Private administrator note.')

@@ -15,9 +15,11 @@ class GuestGalleryRegistrationController extends Controller
 {
     public function store(GuestGalleryRegistrationRequest $request, SchedulingEvent $schedulingEvent, GuestGalleryRegistrations $registrations): RedirectResponse
     {
-        $registrations->register($schedulingEvent, $request->validated('email'));
+        $registrations->register($schedulingEvent, $request->user()?->email ?? $request->validated('email'), $request->user());
 
-        return back()->with('status', 'You’re registered. We’ll email you when this gallery is ready.');
+        return back()->with('status', $request->user()
+            ? 'We’ll notify you here and by email when this gallery is ready.'
+            : 'You’re registered. We’ll email you when this gallery is ready.');
     }
 
     public function open(Request $request, GuestGalleryRegistration $registration): RedirectResponse

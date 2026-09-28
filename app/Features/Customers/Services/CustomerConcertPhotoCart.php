@@ -4,6 +4,7 @@ namespace App\Features\Customers\Services;
 
 use App\Features\Concerts\Models\Concert;
 use App\Features\Customers\Models\CustomerConcertPhotoSelection;
+use App\Features\Customers\Models\CustomerMediaSelection;
 use App\Features\Customers\Models\CustomerStudio;
 use App\Features\Media\Services\MediaCommerceSettings;
 use App\Features\Media\Services\MediaPriceLists;
@@ -32,10 +33,6 @@ class CustomerConcertPhotoCart
         }
 
         DB::transaction(function () use ($user, $concert, $asset, $assetConcert, $action): void {
-            if ($action === 'add' && CustomerConcertPhotoSelection::where('user_id', $user->id)
-                ->where('studio_id', '!=', $concert->studio_id)->where('in_cart', true)->exists()) {
-                throw ValidationException::withMessages(['cart' => 'Finish or clear your current studio cart before starting another studio.']);
-            }
             $selection = CustomerConcertPhotoSelection::firstOrCreate([
                 'user_id' => $user->id, 'media_asset_id' => $asset->id,
             ], ['studio_id' => $concert->studio_id, 'concert_id' => $assetConcert->id]);
@@ -46,6 +43,22 @@ class CustomerConcertPhotoCart
                 $selection->delete();
             }
         });
+    }
+
+    public function state(User $user, Studio $studio, string $assetUuid): array
+    {
+        $selection = CustomerConcertPhotoSelection::query()->where('user_id', $user->id)
+            ->whereHas('asset', fn ($query) => $query->where('uuid', $assetUuid))->first();
+        $base = CustomerConcertPhotoSelection::query()->where('user_id', $user->id);
+
+        return [
+            'in_cart' => (bool) $selection?->in_cart,
+            'is_favourite' => (bool) $selection?->is_favourite,
+            'cart_count' => (clone $base)->where('in_cart', true)->count()
+                + CustomerMediaSelection::query()->where('user_id', $user->id)->where('in_cart', true)->count(),
+            'favourite_count' => (clone $base)->where('is_favourite', true)->count()
+                + CustomerMediaSelection::query()->where('user_id', $user->id)->where('is_favourite', true)->count(),
+        ];
     }
 
     public function forStudio(User $user, Studio $studio): array
@@ -76,9 +89,13 @@ class CustomerConcertPhotoCart
         $discount = intdiv($bulkEligibleSubtotal * $percent, 100);
 
         $ownedAssetIds = $this->ownedAssetIds($user);
+        $cartCount = CustomerConcertPhotoSelection::query()->where('user_id', $user->id)->where('in_cart', true)->count()
+            + CustomerMediaSelection::query()->where('user_id', $user->id)->where('in_cart', true)->count();
+        $favouriteCount = CustomerConcertPhotoSelection::query()->where('user_id', $user->id)->where('is_favourite', true)->count()
+            + CustomerMediaSelection::query()->where('user_id', $user->id)->where('is_favourite', true)->count();
 
         return compact('studio', 'selections', 'cart', 'subtotal', 'percent', 'discount', 'ownedAssetIds',
-            'photoPrice', 'principalPrice', 'lineAmounts')
+            'photoPrice', 'principalPrice', 'lineAmounts', 'cartCount', 'favouriteCount')
             + ['bulk_eligible_subtotal' => $bulkEligibleSubtotal, 'total' => $subtotal - $discount];
     }
 

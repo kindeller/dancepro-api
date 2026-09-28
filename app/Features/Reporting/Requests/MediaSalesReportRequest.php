@@ -15,7 +15,7 @@ class MediaSalesReportRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tab' => ['nullable', Rule::in(['overview', 'customers', 'products', 'events', 'discounts', 'loyalty', 'orders'])],
+            'tab' => ['nullable', Rule::in(['overview', 'customers', 'products', 'events', 'discounts', 'downloads', 'loyalty', 'orders'])],
             'date_from' => ['nullable', 'date_format:Y-m-d'],
             'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from'],
             'kind' => ['nullable', Rule::in(['competition', 'concert'])],

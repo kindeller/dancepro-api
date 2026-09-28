@@ -17,11 +17,24 @@ class ProgrammePhotoPreview
     public function key(ProgrammePhotoFile $file, string $size, ?SchedulingEvent $event = null): string
     {
         $edge = $size === 'thumbnail' ? 480 : 1600;
+        $watermark = $this->watermarks->competition($event);
+
+        $version = hash('sha256', 'v2:'.$file->sha256.':'.$watermark['fingerprint'].':'.$edge.':88');
+
+        return $this->derivative($file, $edge, $watermark, 'programme-previews', $version);
+    }
+
+    /** Only private publicity endpoints may expose this derivative, never customer galleries. */
+    public function publicityKey(ProgrammePhotoFile $file): string
+    {
+        return $this->derivative($file, 1920, null, 'publicity/photos', hash('sha256', 'unwatermarked-v1:'.$file->sha256.':1920:88'));
+    }
+
+    private function derivative(ProgrammePhotoFile $file, int $edge, ?array $watermark, string $prefix, string $version): string
+    {
         $disk = Storage::disk('local');
         abort_unless($file->storage_disk === 'local' && $disk->exists($file->storage_key), 404);
-        $watermark = $this->watermarks->competition($event);
-        $version = hash('sha256', 'v2:'.$file->sha256.':'.$watermark['fingerprint'].':'.$edge.':88');
-        $key = 'programme-previews/'.$file->uuid.'/'.$version.'.jpg';
+        $key = $prefix.'/'.$file->uuid.'/'.$version.'.jpg';
         if ($disk->exists($key)) {
             return $key;
         }
@@ -42,7 +55,7 @@ class ProgrammePhotoPreview
         return $key;
     }
 
-    private function render(string $source, array $watermark, string $destination, int $edge, string $sha256): void
+    private function render(string $source, ?array $watermark, string $destination, int $edge, string $sha256): void
     {
         $info = @getimagesize($source);
         abort_unless($info && $info[2] === IMAGETYPE_JPEG && $info[0] > 0 && $info[1] > 0
@@ -63,7 +76,9 @@ class ProgrammePhotoPreview
         $preview = $this->orient($preview, (int) ($exif['Orientation'] ?? 1));
         $width = imagesx($preview);
         $height = imagesy($preview);
-        $this->renderer->apply($preview, $watermark);
+        if ($watermark !== null) {
+            $this->renderer->apply($preview, $watermark);
+        }
         // Publish only the finished JPEG, so simultaneous requests cannot read a partial file.
         $temp = tempnam(dirname($destination), '.preview-');
         abort_unless($temp !== false, 503, 'Unable to save photo preview.');

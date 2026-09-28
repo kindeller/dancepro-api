@@ -15,7 +15,8 @@ class SaveConcertEventSeatsRequest extends FormRequest
     {
         return [
             'roles' => ['required', 'array'],
-            'roles.*' => ['array', 'max:6'],
+            'roles.*' => ['array'],
+            'roles.*.seating' => ['nullable', 'string', 'max:500'],
             'roles.*.*.row' => ['nullable', 'string', 'max:30'],
             'roles.*.*.seat' => ['nullable', 'string', 'max:30'],
         ];

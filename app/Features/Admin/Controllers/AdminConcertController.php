@@ -84,7 +84,7 @@ class AdminConcertController extends Controller
     {
         $bookingItems = ConcertBookingItem::query()
             ->with('booking')
-            ->where('item_type', ConcertBookingItemType::Concert->value)
+            ->whereIn('item_type', [ConcertBookingItemType::Concert->value, ConcertBookingItemType::DressRehearsal->value])
             ->whereNull('cancelled_at')
             ->whereDoesntHave('concert')
             ->orderByDesc('event_date')

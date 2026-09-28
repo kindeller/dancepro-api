@@ -1,4 +1,5 @@
 @extends('layouts.public', ['title' => 'Improvisation · '.$title, 'footerLabel' => 'Competition media'])
+@section('headerParentUrl', route(($competitionRoutes ?? ['show' => 'customer.competitions.show'])['show'], $event))
 
 @section('content')
 @php($competitionRoutes = $competitionRoutes ?? ['show' => 'customer.competitions.show'])

@@ -661,6 +661,97 @@ final class PhotoReviewTests: XCTestCase {
     XCTAssertFalse(reopened.canRemoveSelected)
   }
 
+  func testTopPicQueueSurvivesRestartAndDoesNotLoseEditsDuringAcknowledgement() async throws {
+    let (root, manifest) = try fixture()
+    try jpeg(root.appendingPathComponent("01 Ballet/Stars.jpg"))
+    let library = try PhotoLibrary(root: root, manifest: manifest, quietInterval: 0)
+    _ = try await library.scan()
+    try await library.markReady(itemIDs: [manifest.folders[0].itemUuid])
+    let queued = try await library.queuedUploadPhotos()
+    let photo = try XCTUnwrap(queued.first)
+    try await library.setTopPic(photo.photoUuid, selected: true)
+    let beforeUpload = await library.pendingTopPicChanges()
+    XCTAssertTrue(beforeUpload.isEmpty)
+    try await library.acknowledgeUpload(photo, serverFileUuid: UUID().uuidString)
+    let first = await library.pendingTopPicChanges()
+    XCTAssertEqual(first.count, 1)
+    XCTAssertTrue(first[0].isTopPic)
+    try await library.setTopPic(photo.photoUuid, selected: false)
+    try await library.acknowledgeTopPicChanges(first)
+    let newer = await library.pendingTopPicChanges()
+    XCTAssertEqual(newer.count, 1)
+    XCTAssertFalse(newer[0].isTopPic)
+    XCTAssertNotEqual(newer[0].changeUuid, first[0].changeUuid)
+    let reopened = try PhotoLibrary(root: root, manifest: manifest, quietInterval: 0)
+    let persisted = await reopened.pendingTopPicChanges()
+    XCTAssertEqual(persisted, newer)
+    try await reopened.acknowledgeTopPicChanges(newer)
+    let clean = try PhotoLibrary(root: root, manifest: manifest, quietInterval: 0)
+    let remaining = await clean.pendingTopPicChanges()
+    XCTAssertTrue(remaining.isEmpty)
+
+    // Sidecars from the previous app version are reconciled once on reopening.
+    let url = root.appendingPathComponent("photo-review.json")
+    var json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+    var records = try XCTUnwrap(json["records"] as? [String: [String: Any]])
+    records[photo.photoUuid]?.removeValue(forKey: "topPicRevision")
+    records[photo.photoUuid]?.removeValue(forKey: "syncedTopPicRevision")
+    json["records"] = records
+    try JSONSerialization.data(withJSONObject: json).write(to: url)
+    let legacy = try PhotoLibrary(root: root, manifest: manifest, quietInterval: 0)
+    let migrated = await legacy.pendingTopPicChanges()
+    XCTAssertEqual(migrated.count, 1)
+    XCTAssertFalse(migrated[0].isTopPic)
+    let again = try PhotoLibrary(root: root, manifest: manifest, quietInterval: 0)
+    let stable = await again.pendingTopPicChanges()
+    XCTAssertEqual(stable, migrated)
+  }
+
+  @MainActor
+  func testTopPicSyncRetriesAndOnlyAcknowledgesMatchingServerReceipts() async throws {
+    let (model, client, responses) = try await uploadFixture()
+    PhotoUploadProtocol.state.configure(responses)
+    model.startUploads(client: client)
+    try await awaitUpload { !model.isUploading }
+    await model.toggleTopPic()
+    await model.syncTopPics(client: nil)
+    XCTAssertEqual(model.pendingTopPicCount, 1)
+    XCTAssertTrue(model.topPicSyncError?.contains("Sign in") == true)
+    let now = Date()
+    PhotoUploadProtocol.state.configure([:], offline: true)
+    await model.syncTopPics(client: client, now: now)
+    XCTAssertEqual(model.pendingTopPicCount, 1)
+    XCTAssertNotNil(model.topPicSyncError)
+    let count = PhotoUploadProtocol.state.paths().count
+    await model.syncTopPics(client: client, now: now.addingTimeInterval(1))
+    XCTAssertEqual(PhotoUploadProtocol.state.paths().count, count)
+
+    let saved = try PhotoLibrary(root: model.local.url, manifest: model.local.manifest)
+    let changes = await saved.pendingTopPicChanges()
+    let path = "/api/staff/events/\(model.local.manifest.programme.eventUuid)/programme/top-pics"
+    func response(event: String) throws -> Data {
+      try JSONSerialization.data(withJSONObject: ["data": [
+        "event_uuid": event,
+        "changes": changes.map { ["file_uuid": $0.fileUuid.lowercased(),
+          "change_uuid": $0.changeUuid.lowercased(), "is_top_pic": $0.isTopPic] as [String: Any] }
+      ]])
+    }
+    PhotoUploadProtocol.state.configure([path: try response(event: UUID().uuidString)])
+    await model.syncTopPics(client: client, now: now.addingTimeInterval(6))
+    XCTAssertEqual(model.pendingTopPicCount, 1)
+    XCTAssertTrue(model.topPicSyncError?.contains("did not match") == true)
+    PhotoUploadProtocol.state.configure([path: try response(event: model.local.manifest.programme.eventUuid)])
+    await model.syncTopPics(client: client, now: now.addingTimeInterval(20))
+    XCTAssertEqual(model.pendingTopPicCount, 0)
+    XCTAssertNil(model.topPicSyncError)
+    let reopened = try PhotoLibrary(root: model.local.url, manifest: model.local.manifest)
+    let remaining = await reopened.pendingTopPicChanges()
+    XCTAssertTrue(remaining.isEmpty)
+    XCTAssertEqual(PhotoUploadProtocol.state.paths(), [path]) // No image transfer.
+    await model.toggleTopPic()
+    XCTAssertEqual(model.pendingTopPicCount, 1) // Unstarring queues a fresh update.
+  }
+
   @MainActor
   func testFinishRequiresVerifiedPhotosAndPersistsUntilNewWorkArrives() async throws {
     let (model, client, responses) = try await uploadFixture()

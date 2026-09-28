@@ -897,6 +897,44 @@ The advertised $15–$25 is an effective per-family guide, not pricing tiers.
 
 The booking form collects an estimated family total.
 
+Public booking form refinements (27 September 2026): photography and videography
+are both selected initially. Adding a DR Portrait event activates portrait
+requirements and the portrait service; there is no separate portrait-interest
+question. The managed event-type selector is hidden on the public form and
+retained in the backend. Event title is optional. Postal address is in Studio
+details for every service selection (required for video bookings). Optional
+feedback on previous media/processes and requests for this year belongs in
+Booking requirements.
+
+The post-submission page shows a personalised timeline and a read-only original
+submission. New bookings store a snapshot of submitted details, requirements,
+quote and initial timeline so later staff edits do not rewrite the submission.
+The public guest receipt is restricted to the submitting browser session. Studio
+Hub has an **Event timeline** button and matching page heading, listing saved
+submissions with timeline and original-form links. Studio Hub bookings store a
+server-authorised studio association and remain accessible to current authorised
+studio managers across sessions, including while awaiting approval. Legacy saved
+submissions use real event/studio links; names/emails alone never grant access.
+All receipt responses are private/no-store. The guest receipt and original-form
+view retain the initial snapshot. The authenticated Event timeline recalculates
+current estimates and adds shared tracker production status; actual finance and
+release follow-up milestones are still pending implementation.
+
+Owner-confirmed calculations (27 September 2026), all AUD inclusive of GST:
+
+- Video estimate: greater of $1,500 per booked concert or $15 per estimated
+  performing family across the booking, continuing the same rule for 3+ concerts.
+- Count each family once, including performing siblings and parents across one
+  or more concerts. DR Portrait rows do not count as video concerts.
+- Crew setup/arrival: one hour before photo-only concerts and DR Portraits;
+  1.5–2 hours before concerts with videography.
+- Estimated photo release: 48 hours after the final booked event ends.
+- Estimated video ready for approval: two weeks after the final event ends.
+- Programme, supplied studio-media and video-invoice dates reuse the tracker
+  catalogue offsets. Seats/technical arrangements and final-number deadlines
+  are shown as to be confirmed because no authoritative receipt deadlines are
+  currently configured. Submission does not create an invoice or charge.
+
 In the Tracker:
 
 - Show only the number.
@@ -923,7 +961,7 @@ When enabled, create the relevant:
 - One final invoice for the whole booking.
 - Do not automatically split invoices for concerts far apart.
 - Prepare/send as soon as the necessary final information is available.
-- Due seven days after the last concert.
+- Prepare/send seven days before the final event, once final family numbers are confirmed. Payment is due fourteen days after the first successful invoice email (owner update, 27 September 2026).
 - Earlier concerts may be sent for approval before payment.
 - The final concert’s approval access is blocked until payment.
 
@@ -933,14 +971,21 @@ The accounting integration and payment-reconciliation mechanism still need to be
 
 ### Photography minimum spend
 
-Existing materials describe:
+Owner-confirmed policy (27 September 2026), replacing earlier legacy figures:
 
-- $600 for the first event.
-- $400 for each additional event.
-- Review around 30 days after gallery release.
-- Follow-up before any shortfall invoice.
+- $800 AUD including GST for the first photography event in the booking.
+- $600 AUD including GST for each subsequent photography event.
+- Count both DR Portrait sessions and concerts booked for photography.
+- Examples: one concert $800; two concerts $1,400; one DR Portrait and one
+  concert $1,400; one DR Portrait and two concerts $2,000.
+- If sales do not meet the minimum 30 days after the actual gallery release,
+  contact the studio and explore ways to resolve the shortfall.
+- Only after all options are exhausted, invoice the difference between actual
+  spend and the minimum spend.
 
-Verify the current policy and exact grouping before automating a charge. Do not silently create shortfall invoices from legacy wording.
+The submission summary calculates the minimum and an indicative review date;
+it does not automatically invoice a shortfall. The actual release date controls
+that later review, not the estimated release shown at booking.
 
 ---
 
@@ -1264,6 +1309,13 @@ Click opens the relevant source page or task.
 
 Waiting does not automatically remove overdue status.
 
+The task sheet centres its text, highlights past open-task deadlines in red, and
+supports full-screen expansion with fixed column headings and a fixed event
+column. Service-specific checkpoints show Not required when the linked booking
+does not include that service for the event type. Current supplied studio videos
+show approved/total progress with a file-review action; sending a request email
+never counts as receiving those files.
+
 ### Due dates
 
 Support offsets from:
@@ -1332,7 +1384,7 @@ one column per old-system action:
 - Photographer contributions and verified files are progressive states of
   **Photo uploads**.
 - Album preparation, parent grouping and release are progressive states of
-  **Photo gallery**.
+  **Photo release**.
 - Invoice preparation and sending are one **Invoice** task.
 - Group chat creation is not tracked because the unified event chat is automatic.
 - The optional video deposit is hidden until a production deposit record exists;
@@ -1947,7 +1999,7 @@ set. Reusable competition, concert and proof watermarks now have a library,
 previews, event-type defaults and gallery/release overrides. Existing settings
 remain as fallbacks. Parent album grouping, covers and live payment remain pending.
 
-The release workspace now lives in the top-level Concert Tracker rather than a
+The release workspace now lives in the Concert Tracker Photo release task rather than a
 separate Media navigation item. Date and studio views derive programme, crew,
 verified-photo and photo-release status from their source records. Creating a
 release group, selecting its Top Pic cover and releasing its albums therefore
@@ -2012,3 +2064,217 @@ uploader Top Pics and routine albums default to their first photo; staff can cha
 either cover after release. Public gallery cards show a watermarked parent cover,
 and customer/guest carts preserve the actual concert for photos reached through a
 multi-concert parent. Existing media files and storage identities are unchanged.
+
+### Admin Top Pics browsing implementation (26 September 2026)
+
+Media > Publicity > Top Pics provides a private competition/concert switch and event albums.
+The same event album is linked from each backend photo gallery. It reads verified
+uploader selection flags without creating new originals, shows routine context,
+and supports preview, audited original download and complimentary account grants
+(using synced customer assets for concerts). It is not a customer-facing gallery.
+Post-upload tag synchronisation is implemented below; kiosk exports remain separate work.
+
+Publicity now has separate Top Pics and TV Slideshows pages with shared tabs.
+The TV page is an explicit placeholder; playback and screen pairing are not
+implemented. TV should reuse the existing Top Pics event/photo catalogue, with
+advertising and event information added to its playlist.
+
+### Automatic post-upload Top Pics sync (26 September 2026)
+
+The Mac uploader now persists star edits and acknowledgements in its local review
+sidecar. A background worker syncs verified-photo changes in batches of up to 100,
+including when the event list is shown. Offline failures retain changes and retry
+with backoff; restarting the app resumes the queue. Only matching acknowledgements
+clear pending revisions, so edits during upload or sync are not lost. Older local
+reviews receive a one-time reconciliation of their saved stars.
+
+The upload-authorised event endpoint changes existing photo flags and records the
+actor. Cross-event/unverified files are rejected atomically, and replacement-laptop
+receipts resolve to the canonical photo. Bytes, gallery visibility, order references
+and upload-completion state are unchanged. Publicity reads the same flags on the
+next page load. TV playback remains unimplemented and will consume this catalogue.
+
+### Publicity TV local pilot (26 September 2026)
+
+The TV Slideshows placeholder is replaced with event settings, global advertising,
+event information and admin-approved screen pairing. Both a browser player and
+native Fire OS app consume a feed derived from the existing Top Pics catalogue.
+Only display derivatives are cached; originals and star identities are unchanged.
+Playback refreshes every minute, with a 500 MB cache and a 24-hour offline window.
+Admin pairs each crew screen once; the native homepage lists TV-enabled events
+newest first. Crew select the event locally. Events without Top Pics still play
+general and event adverts. TV photos use separate unwatermarked derivatives,
+while customer galleries remain watermarked. Physical Fire OS testing and
+production storage/hosting remain pending. See the
+[TV milestone](../milestones/Publicity-TV-Slideshows.md) and
+[ADR-0053](../decisions/ADR-0053-Publicity-TV-Playback.md) for the precise boundary.
+
+TV controls now separate Back/Escape (event menu) from Menu/M (playback controls).
+Photo/general/event defaults are 2/5/8 seconds. A generated event advert includes
+current event branding and a scan-to-add QR when gallery access is configured;
+customer sign-in and onboarding still apply. Concert QR admission follows existing
+studio photo access, without paid video or media entitlements. Both corner logos
+are cached for offline playback. Custom uploaded adverts remain supported; a
+multi-template design editor is not yet included.
+
+
+### Gallery sharing independent of TV (26 September 2026)
+
+Publicity → QR codes & links lists competitions and studios separately, with search,
+copyable signed access links and downloadable PNG QR codes. Competition links are
+identical to those in the TV advert. Studio links add the studio’s photo-gallery
+access without requiring a slideshow or a specific concert. Signup, verification,
+onboarding and existing-account sign-in preserve the pending selection. Access is
+idempotent and audited; purchased media and concert videos are not granted. A
+configured gallery code is required; changing it invalidates old links. TV enablement
+is independent of sharing. The crew TV catalogue now lists competitions only.
+
+
+### Standard advertising categories (26 September 2026)
+
+The TV Slideshows page’s Standard advertising panel has separate Competition and
+Concert categories. Each has independent slides, ordering, visibility and duration.
+Existing standard adverts belong to Competitions. Playlist construction and image
+requests use the event’s type to select only matching standard adverts, alongside
+that event’s own slides. Concert adverts may be prepared without enabling concert
+TV playback. The default remains 5 seconds per standard advert.
+
+
+### Competition advertising templates (26 September 2026)
+
+Six supplied competition designs are included automatically in each eligible TV
+playlist. Each uses the event’s current shareable admission QR, plays for 8 seconds,
+and leaves logos to the existing corner overlays. Left/right QR placements are
+recorded per template. Ads play even without Top Pics; a generic event message is
+used until gallery access is configured. Admin event slideshow pages show the six
+rendered previews. Cached PNGs refresh on artwork or access-link changes, using the
+existing player update/offline flow without an APK rebuild.
+
+
+### TV image fill (26 September 2026)
+
+Photos and advertising fill the screen proportionally with a centred crop where
+aspect ratios differ. This replaces the initial contain/letterbox behaviour.
+Image advert titles alone are management labels, not playback captions; explicit
+advert body text overlays the image. Corner logos remain separate overlays.
+
+
+### TV video advertising (26 September 2026)
+
+Standard and event adverts accept validated H.264/AAC MP4 video, up to 1080p,
+60 fps, 120 seconds and 100 MB. Video adverts are spaced evenly across the Top Pics, independently of the
+five-photo image/QR advert interval, and play to completion. Silent is the default, with optional
+audio per advert. Native 0.4.0 and the browser preview cache complete verified clips
+before playback. Offline access remains 24 hours; media cache capacity is 500 MB.
+Playback has no visible transport controls unless deliberately opened by crew.
+Routine/customer video playback is outside this advertising-only change.
+
+
+### TV general advert retention — 26 September 2026
+
+General photo/video adverts are shared on each paired device across event changes
+and restarts. Content versions, rather than titles/timing/audio settings, control
+redownloads. Disabled playback retains the current general library; removed or
+replaced adverts are reconciled at the next successful update. Pairing reset or
+revocation clears all media. The 500 MB limit and 24-hour offline access lease
+still apply. Native version 0.4.1 and browser shell v7 implement this behaviour.
+
+### Booking delivery progress — 27 September 2026
+
+The authenticated Studio Hub Event timeline now uses current booking items for estimates and the Concert Tracker for production status; the original form continues to use the immutable submission snapshot. Cancelled items are excluded from current estimates. Approval preserves the saved studio and prepares a private disabled customer-media record for each concert or DR portrait session. This does not publish galleries or grant family access.
+
+Local tracker-email rehearsal uses Mailpit and simulated delivery labels. See [rehearsal handbook](../handbook/Booking-Delivery-Rehearsal.md). Live finance/review/release milestones and the complete delivery rehearsal remain outstanding.
+
+### Booking workflow update — 27 September 2026
+
+Reviewed booking amendments now synchronise linked scheduling/media details and retain revision history without changing the original submission. Pending tracker emails are invalidated after material changes, and replacement reminders require review. Authenticated studios and authorised staff can confirm final unique-family counts; quotes and the final-number tracker task use that record. Booking-level invoicing/payment reconciliation and director review/release remain subsequent work. Operational details are in `docs/handbook/Booking-Delivery-Rehearsal.md`.
+
+### Studio invoices and Hub payments — 27 September 2026
+
+Approved studio bookings support a single active invoice with multiple GST-inclusive service lines, sequential invoice numbers, private drafts, issuance, partial received payments, immutable issued details and audit history. Studio Hub invoices include event details, payment status and downloadable PDFs based on the supplied DancePro invoice example, including bank details and an authenticated invoice link/QR. Photography minimum-spend shortfalls remain a reviewed manual decision.
+
+The Concert Tracker and current Event timeline use the invoice ledger for financial state. A separate Braintree Hosted Fields/3DS2 integration reserves durable payment attempts and reconciles settlement; local simulation is available for rehearsal invoices. Live card activation still needs merchant configuration and sandbox verification. Director review and its final-concert payment gate remain subsequent work. See [Studio invoices](../handbook/Studio-Invoices.md).
+
+### Tracker pending-booking visibility — 27 September 2026
+
+Date view includes unconfirmed booking items with red studio headings and explicit Pending booking labels. Review opens the booking; approval replaces that preview with the scheduled event and its production tasks. Cancelled and declined requests are excluded. Tracker phases and tasks have stable hierarchical display numbers (1. Booking, 1.1 Booking & services), independent of filtering; internal task identifiers remain unchanged.
+
+### Shared tracker controls on canonical pages — 27 September 2026
+
+Task 1.1 Booking & services now opens the existing booking review/edit page. It always includes a shared sticky tracker bar, including direct entry from Event management. Booking-scoped task state persists from pending through approval. Status overrides are separate from actual approval, deadlines and assignments save independently, and follow-up dialogs retain dated notes. Other task destinations will be migrated individually as agreed with the owner; see ADR-0055.
+
+
+### Booking approval and confirmation combined — 27 September 2026
+
+Task 1.1 now includes booking review, approval and the immediate confirmation-email step; the former separate confirmation column is removed. Both approval controls use the same action and then open the personalised template for explicit sending. Historical confirmation records and automation remain compatible. The booking information page also exposes per-event reserved seats, programmes and slideshow files shared with the Studio Hub, including staff uploads and retained replacement history. Final family numbers remain unconfirmed until explicitly submitted, regardless of due date.
+
+### Concert booking task tabs (27 September 2026)
+
+The admin booking detail is the canonical workspace for tracker 1.1 Booking & services and 1.3 Seats & families numbers, with separate page tabs and task bars. The latter records one final unique-family count and reserved seats for each concert; it completes only after all required details are confirmed and remains not required for DR portraits. Tracker 1.2 Seats & families email shows its template below its shared task bar, supports manual Approved without sending, and becomes Completed on successful delivery. Existing task keys and history remain intact.
+
+Tracker 1.3 now presents families and seats independently: an explicit final-family confirmation or correction updates the green family count immediately, while outstanding seats retain the current pending/warning colour. Successfully sending 1.2 sets a seven-calendar-day response deadline for 1.3. Queueing or manually approving 1.2 does not start the deadline; the global three-day yellow warning and past-date red rules apply.
+
+Tracker email tasks 1.2 and 1.4 share the same tracker bar and email workflow. Successful sends show recipient, sender and time; pending deliveries block duplicates and subsequent copies require explicit resend confirmation. Test captures are labelled separately from live sends.
+
+Tasks 2.1 and 2.2 reuse operational workspaces: 2.1 displays the studio-filtered live availability sheet, with shared readiness labels and assigned-crew summaries; 2.2 is a booking tab containing the existing per-event programme editor. Studio-supplied programmes and admin PDF uploads use the same preparation and revision workflow. Existing preparation URLs resolve to the canonical booking tab for administrators.
+
+Concert tracker follow-up (27 September 2026): Photo uploads is 3.1, ahead of the existing editing tasks. Post-concert email is 2.3 and uses the shared email workflow with deliberate resend protection. Studio video/slideshow is 2.4 and opens an event-scoped tab in the canonical booking workspace, reusing studio submissions and admin upload/review controls. Task keys and historical records are retained when display numbers change.
+
+Tracker 2.4 now includes dated uploader/reviewer attribution. Programme reading exposes
+page-level progress and recoverable failures, with lightweight polling and improved
+scanned concert title/class alignment. Dedicated worker availability is required;
+extraction remains an editable proposal that staff must review and approve.
+
+Video Titles follow-up (27 September 2026): Preparation inserts **2.3 Video Titles**;
+Post-concert email and Studio video/slideshow are now **2.4** and **2.5**. The new
+booking tab embeds the existing title editor and its tracker bar. **Video titles
+ready** publishes the browser-rendered, approved-programme JPEG ZIP privately and
+records task completion with staff/date. The Mac uploader downloads this exact
+package after checking access, revision and integrity. Programme/template/title/logo
+changes withdraw stale packages until reviewed and published again. No title
+package is exposed through customer routes. See ADR-0056.
+
+Studio Hub progress follow-up (27 September 2026): Authorised studio managers see
+available photo-gallery and concert-video login codes in compact right-hand
+“Access Code:” badges in their respective release rows. Video codes remain hidden
+until studio-owner approval is recorded on the concert; removing approval hides
+the badge again. Missing codes produce no extra text row. Newly saved studio/group codes retain encrypted display copies alongside
+existing hashes; legacy hash-only codes require re-entry once. Existing individual
+concert encrypted passwords are reused. This does not change publication, account
+verification, media entitlement or code-group access periods. See ADR-0057.
+
+Concert Tracker event-column follow-up (27 September 2026): studio heading, event
+subtitle, separate event date, then a communications envelope and the studio's
+actual gallery login on one wrapping row. This applies to date/studio views,
+including red pending studio headings. Existing navigation and task status rules
+are retained; unavailable codes are labelled rather than replaced by internal IDs.
+
+Studio photo-gallery logins support three-letter codes at the owner's request;
+tracker and Studio Hub continue reading the same stored code. Concert-video codes
+remain separate.
+
+Concert Tracker 3.1 uses the canonical Photo uploads workspace with the shared
+tracker bar and registered-file progress. Cells show each photo role as Waiting
+(blue, red only when overdue), Uploading (blue), or Complete (green), with no yellow
+state. All required roles must explicitly finish against the current programme;
+verified percentage alone and waived contributions do not complete the task.
+
+Concert Tracker 3.2 follow-up (27 September 2026): concert editing is an
+event-scoped assignment and manual sign-off. The task opens one shared editing
+view with the tracker bar above it. Admin assigns an editor and manages deadlines;
+the assigned crew editor can access it through Crew Hub > My editing, update
+progress/follow-up notes and mark the edit complete. Completion records actor and
+time and turns the tracker cell green; reopening clears the current completion
+stamp while retaining change history. Completion does not advance quality checks,
+studio approval or release. Photo-only/DR events remain Not required.
+
+
+Concert Tracker follow-up (27 September 2026): 3.2 exposes authorized source-file
+and title-package downloads. 3.3 saves the owner's 20 quality checks individually
+as they change, with reviewer/time records and conflict protection. Only actual
+admin accounts have Complete all; staff cannot bulk-complete checks. 3.4 consumes
+the laptop's complete concert-video manifest and verified-file counts, requires
+an explicit Finished Uploading signal, and records which final exports include
+studio videos/slideshows. Readiness also requires editing and quality completion.
+This is a private review workflow; sending and publication remain separate. See
+Concert-Tracker.md for the current MP4 upload size limits and verification.

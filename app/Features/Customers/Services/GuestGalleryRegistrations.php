@@ -4,6 +4,7 @@ namespace App\Features\Customers\Services;
 
 use App\Features\Customers\Models\GuestGalleryRegistration;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -11,17 +12,17 @@ class GuestGalleryRegistrations
 {
     public function __construct(private readonly GuestGalleryCatalogue $catalogue) {}
 
-    public function register(SchedulingEvent $event, string $email): GuestGalleryRegistration
+    public function register(SchedulingEvent $event, string $email, ?User $user = null): GuestGalleryRegistration
     {
         if (! $this->catalogue->acceptsRegistration($event)) {
             throw ValidationException::withMessages(['email' => 'Release notifications are not available for this event.']);
         }
         $email = mb_strtolower(trim($email));
 
-        return DB::transaction(function () use ($event, $email): GuestGalleryRegistration {
+        return DB::transaction(function () use ($event, $email, $user): GuestGalleryRegistration {
             return GuestGalleryRegistration::updateOrCreate(
                 ['scheduling_event_id' => $event->id, 'email_hash' => hash('sha256', $email)],
-                ['email' => $email, 'consent_at' => now(), 'notified_at' => null, 'unsubscribed_at' => null],
+                ['user_id' => $user?->id, 'email' => $email, 'consent_at' => now(), 'notified_at' => null, 'unsubscribed_at' => null],
             );
         });
     }

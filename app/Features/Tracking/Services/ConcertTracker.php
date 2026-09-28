@@ -2,15 +2,27 @@
 
 namespace App\Features\Tracking\Services;
 
+use App\Features\Bookings\Models\ConcertBooking;
+use App\Features\Bookings\Models\ConcertBookingItem;
+use App\Features\Bookings\Services\BookingSeatsAndFamilies;
 use App\Features\Bookings\Support\ConcertBookingItemType;
+use App\Features\Bookings\Support\ConcertBookingStatus;
+use App\Features\Concerts\Models\ConcertDirectorReview;
+use App\Features\Concerts\Services\ConcertDirectorReviews;
+use App\Features\Customers\Services\StudioHubLoginCodes;
 use App\Features\Media\Models\ConcertPhotoReleaseGroup;
 use App\Features\Media\Models\MediaCollection;
 use App\Features\Media\Models\MediaWatermark;
+use App\Features\Media\Services\ConcertPhotoReleases;
+use App\Features\Programmes\Models\ConcertTitleCardPackage;
+use App\Features\Programmes\Models\ConcertTitleCardTemplate;
+use App\Features\Programmes\Models\ConcertVideoBatch;
 use App\Features\Programmes\Models\Programme;
-use App\Features\Programmes\Models\ProgrammePhotoContribution;
-use App\Features\Programmes\Models\ProgrammePhotoFile;
-use App\Features\Programmes\Models\ProgrammePhotoGallery;
+use App\Features\Programmes\Services\ConcertTitlePackages;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Scheduling\Services\EventRosterStatus;
+use App\Features\StudioBilling\Models\StudioInvoice;
+use App\Features\StudioBilling\Services\InvoiceTrackerWorkflow;
 use App\Features\Tracking\Actions\UpdateConcertTrackerTask;
 use App\Features\Tracking\Models\ConcertTrackerEmailTemplate;
 use App\Features\Tracking\Models\ConcertTrackerSetting;
@@ -26,6 +38,8 @@ class ConcertTracker
     public function __construct(
         private readonly ConcertTrackerTaskCatalog $catalog,
         private readonly UpdateConcertTrackerTask $tasks,
+        private readonly BookingTrackerBar $bookingBar,
+        private readonly BookingSeatsAndFamilies $seatsAndFamilies,
     ) {}
 
     public function page(string $view, int $year, string $phase, bool $attention = false): array
@@ -36,13 +50,19 @@ class ConcertTracker
         $overrides = $this->overrides($events);
         $rows = $events->map(fn (SchedulingEvent $event): array => $this->row($event, $definitions, $sources, $overrides));
 
+        if ($view === 'date') {
+            $rows = $rows->concat($this->pendingRows($year))->sortBy([
+                ['event_date', 'asc'], ['name', 'asc'],
+            ])->values();
+        }
+        $pendingCount = $rows->where('pending', true)->count();
+
         if ($view === 'studio') {
             $rows = $rows->sort(function (array $left, array $right): int {
                 $studioOrder = strcasecmp($left['event']->studio?->name ?? 'zzzz', $right['event']->studio?->name ?? 'zzzz');
 
                 return $studioOrder !== 0 ? $studioOrder : ($left['event']->event_date <=> $right['event']->event_date);
             })->values();
-            $this->mergeSharedBookingCells($rows, $definitions);
         }
 
         $summary = $this->summary($rows);
@@ -50,20 +70,30 @@ class ConcertTracker
             $rows = $rows->filter(fn (array $row): bool => $row['tasks']->contains(fn (array $task): bool => $this->needsAttention($task)))->values();
         }
 
-        $albums = MediaCollection::query()->where('media_type', 'photo')->where('status', 'draft')
-            ->where('visibility', 'private')->whereNull('published_at')->whereDoesntHave('concertPhotoReleaseGroups')
-            ->whereHas('concert.bookingItem.schedulingEvent', fn ($query) => $query->whereYear('event_date', $year))
-            ->with('concert.studio')->orderByDesc('id')->get();
-        $groups = ConcertPhotoReleaseGroup::with([
-            'studio', 'watermark', 'coverAsset', 'collections.concert.bookingItem.schedulingEvent',
-            'collections.assets' => fn ($query) => $query->where('media_type', 'photo')->where('status', 'available')
-                ->where('is_visible', true)->where('metadata->is_top_pic', true)->orderBy('sort_order')->orderBy('id'),
-        ])->whereHas('collections.concert.bookingItem.schedulingEvent', fn ($query) => $query->whereYear('event_date', $year))
-            ->latest()->get();
-        $watermarks = MediaWatermark::where('gallery_type', 'concert')->where('is_active', true)->orderBy('name')->get();
+        if ($view === 'studio') {
+            $this->mergeSharedBookingCells($rows, $definitions);
+        }
+
+        $codes = app(StudioHubLoginCodes::class);
+        $galleryLogins = $rows->map(fn (array $row) => $row['pending'] ? $row['bookingItem']->booking->studio : $row['event']->studio)
+            ->filter()->unique('id')->mapWithKeys(fn ($studio): array => [$studio->id => $codes->photo($studio)]);
+
         $phases = ConcertTrackerTaskCatalog::PHASES;
 
-        return compact('view', 'year', 'phase', 'attention', 'phases', 'definitions', 'rows', 'summary', 'albums', 'groups', 'watermarks');
+        return compact('view', 'year', 'phase', 'attention', 'phases', 'definitions', 'rows', 'summary', 'pendingCount', 'galleryLogins');
+    }
+
+    public function statusesForEvents(Collection $events): Collection
+    {
+        (new \Illuminate\Database\Eloquent\Collection($events->all()))->loadMissing($this->relations());
+        $sources = $this->sources($events);
+        $overrides = $this->overrides($events);
+
+        return $events->mapWithKeys(fn (SchedulingEvent $event): array => [
+            $event->id => $this->catalog->all()->mapWithKeys(fn (array $definition): array => [
+                $definition['key'] => $this->taskStatus($event, $definition, $sources, $overrides),
+            ]),
+        ]);
     }
 
     public function detail(SchedulingEvent $event, string $taskKey): array
@@ -74,14 +104,41 @@ class ConcertTracker
         $sources = $this->sources(collect([$event]));
         $overrides = $this->overrides(collect([$event]));
         $status = $this->taskStatus($event, $definition, $sources, $overrides);
-        $task = $this->tasks->task($event, $definition)->load(['assignee', 'completedBy', 'notes.user', 'deliveries.template']);
+        $task = $this->tasks->task($event, $definition)->load(['assignee', 'completedBy', 'notes.user', 'deliveries.template', 'deliveries.createdBy']);
         $template = $definition['templateKey'] ? ConcertTrackerEmailTemplate::where('task_key', $definition['templateKey'])->first() : null;
 
         return compact('event', 'definition', 'status', 'task', 'template') + [
+            'releaseWorkspace' => $taskKey === 'photo_release' ? $this->photoReleaseWorkspace($event) : null,
             'staff' => User::query()->where('is_admin', true)->where('is_active', true)->orderBy('name')->get(),
             'recipient' => $this->recipient($event),
             'renderedTemplate' => $template ? $this->renderTemplate($template->subject, $template->body, $event) : null,
         ];
+    }
+
+    private function photoReleaseWorkspace(SchedulingEvent $event): array
+    {
+        // Unassigned events must not expose unrelated studios' release work.
+        if (! $event->studio_id) {
+            return ['albums' => collect(), 'groups' => collect(), 'watermarks' => collect()];
+        }
+        $year = $event->event_date?->year;
+        $albums = MediaCollection::query()->where('media_type', 'photo')->where('status', 'draft')
+            ->where('visibility', 'private')->whereNull('published_at')->whereDoesntHave('concertPhotoReleaseGroups')
+            ->whereHas('concert', fn ($query) => $query->where('studio_id', $event->studio_id))
+            ->whereHas('concert.bookingItem.schedulingEvent', fn ($query) => $query->whereYear('event_date', $year))
+            ->with('concert.studio')->orderByDesc('id')->get();
+        $groups = ConcertPhotoReleaseGroup::with([
+            'studio', 'watermark', 'coverAsset', 'collections.concert.bookingItem.schedulingEvent',
+            'collections.assets' => fn ($query) => $query->where('media_type', 'photo')->where('status', 'available')
+                ->where('is_visible', true)->where('metadata->is_top_pic', true)->orderBy('sort_order')->orderBy('id'),
+        ])->where('studio_id', $event->studio_id)
+            ->whereHas('collections.concert.bookingItem.schedulingEvent', fn ($query) => $query->whereYear('event_date', $year))
+            ->latest()->get();
+        $watermarks = MediaWatermark::where('gallery_type', 'concert')->where('is_active', true)->orderBy('name')->get();
+
+        $releaseBlockers = $groups->mapWithKeys(fn ($group) => [$group->id => $group->released_at ? [] : app(ConcertPhotoReleases::class)->releaseBlockers($group)]);
+
+        return compact('albums', 'groups', 'watermarks', 'releaseBlockers');
     }
 
     public function renderTemplate(string $subject, string $body, SchedulingEvent $event): array
@@ -121,7 +178,7 @@ class ConcertTracker
         };
         $body = $renderConditions($body);
         $subject = $renderConditions($subject);
-        $eventDetails = $booking?->items->sortBy('event_date')->map(function ($bookingItem) use ($photo, $video, $portraits): string {
+        $eventDetails = $booking?->items->whereNull('cancelled_at')->sortBy('event_date')->map(function ($bookingItem) use ($photo, $video, $portraits): string {
             $dressRehearsal = $bookingItem->item_type === ConcertBookingItemType::DressRehearsal;
             $roleCodes = $bookingItem->schedulingEvent?->roleRequirements->pluck('crewRole.code') ?? collect();
             $services = $roleCodes->isNotEmpty()
@@ -168,6 +225,7 @@ class ConcertTracker
         })->implode("\n\n---\n\n") ?: '**'.$event->name."**\n\n- **Date:** ".($event->event_date?->format('l j F Y') ?? 'To be confirmed');
         $crewNames = $event->shifts->flatMap->assignments->map(fn ($assignment): ?string => $assignment->crewProfile?->preferred_name ?? $assignment->crewProfile?->user?->name)->filter()->unique()->implode(', ');
         $arrival = $event->shifts->pluck('posted_arrival_at')->filter()->sort()->first();
+        $invoice = $booking ? StudioInvoice::where('active_booking_id', $booking->id)->first() : null;
         $values = [
             '{{ studio_name }}' => $event->studio?->name ?? $booking?->studio_name ?? 'Your studio',
             '{{ event_name }}' => $event->name,
@@ -176,12 +234,15 @@ class ConcertTracker
             '{{ contact_name }}' => $booking?->contact_name ?? $event->organiser_name ?? $event->studio?->contact_name ?? 'there',
             '{{ event_details }}' => $eventDetails,
             '{{ services }}' => ucfirst(collect([$photo ? 'photography' : null, $video ? 'videography' : null, $portraits ? 'portrait photography' : null])->filter()->join(', ', ' and ')),
-            '{{ family_count }}' => (string) ($booking?->approximate_family_count ?? 'to be confirmed'),
+            '{{ family_count }}' => (string) ($booking?->final_family_count ?? $booking?->approximate_family_count ?? 'to be confirmed'),
             '{{ venue }}' => $item?->venue_name ?? $event->venue?->name ?? 'to be confirmed',
             '{{ start_time }}' => $item?->starts_at ? Carbon::parse($item->starts_at)->format('g:i a') : 'to be confirmed',
             '{{ finish_time }}' => $item?->finishes_at ? Carbon::parse($item->finishes_at)->format('g:i a') : 'to be confirmed',
             '{{ arrival_time }}' => $arrival?->format('g:i a') ?? 'to be confirmed',
             '{{ crew_names }}' => $crewNames ?: 'your DancePro team',
+            '{{ review_url }}' => route('customer.concert-review.show', $event),
+            '{{ invoice_url }}' => $invoice ? route('customer.studio-invoices.show', [$invoice->studio, $invoice]) : ($event->studio ? route('customer.studio-invoices.index', $event->studio) : route('customer.media.index')),
+            '{{ gallery_url }}' => $event->studio ? route('customer.profile.studio', $event->studio) : route('customer.media.index'),
             '{{ gallery_access }}' => $event->studio?->gallery_code_hash ? 'Your studio gallery access is configured. Use the secure studio gallery instructions supplied by DancePro.' : 'Gallery access still needs to be configured for your studio.',
         ];
 
@@ -194,11 +255,38 @@ class ConcertTracker
             ->whereYear('event_date', $year)->with($this->relations())->orderBy('event_date')->orderBy('name')->get();
     }
 
+    private function pendingRows(int $year): Collection
+    {
+        $items = ConcertBookingItem::query()
+            ->where('approval_status', 'pending')
+            ->whereNull('scheduling_event_id')
+            ->whereNull('cancelled_at')
+            ->whereYear('event_date', $year)
+            ->whereHas('booking', fn ($query) => $query->whereIn('status', [ConcertBookingStatus::Pending, ConcertBookingStatus::Approved]))
+            ->with('booking.studio')
+            ->get();
+        $tasks = ConcertTrackerTask::query()->with('assignee')->where('scope_type', 'booking')
+            ->where('task_key', 'booking_received')->whereIn('scope_id', $items->pluck('concert_booking_id'))->get()->keyBy('scope_id');
+
+        return $items->map(fn (ConcertBookingItem $item): array => [
+            'event' => null,
+            'pending' => true,
+            'bookingItem' => $item,
+            'bookingTask' => $tasks->get($item->concert_booking_id),
+            'bookingStatus' => $this->bookingBar->source($item->booking, $tasks->get($item->concert_booking_id)),
+            'event_date' => $item->event_date,
+            'name' => $item->booking->studio?->name ?? $item->booking->studio_name,
+            'tasks' => collect(),
+        ]);
+    }
+
     private function relations(): array
     {
         return [
-            'studio', 'roleRequirements', 'shifts.assignments',
-            'concertBookingItem.booking.items',
+            'studio', 'roleRequirements', 'shifts.assignments.role', 'shifts.assignments.crewProfile.user', 'studioFiles.uploadedBy', 'studioFiles.reviewedBy',
+            'concertBookingItem.booking.items.schedulingEvent.roleRequirements.crewRole',
+            'concertBookingItem.booking.items.schedulingEvent.roleSeats.crewRole',
+            'concertBookingItem.booking.items.schedulingEvent.roleSeats.submittedBy', 'concertBookingItem.booking.familyCountConfirmedBy',
             'concertBookingItem.concert.mediaCollections' => fn ($query) => $query->withCount([
                 'assets' => fn ($assets) => $assets->where('status', 'available')->where('is_visible', true),
             ]),
@@ -210,14 +298,13 @@ class ConcertTracker
     {
         $programmes = Programme::query()->with(['latestRevision.confirmedBy', 'source.createdBy'])
             ->whereIn('scheduling_event_id', $events->pluck('id'))->get()->keyBy('scheduling_event_id');
-        $galleries = ProgrammePhotoGallery::query()->whereIn('scheduling_event_id', $events->pluck('id'))->get()->keyBy('scheduling_event_id');
-        $plans = $galleries->pluck('programme_upload_plan_id')->filter();
-        $contributions = ProgrammePhotoContribution::query()->whereIn('programme_upload_plan_id', $plans)->get()->groupBy('programme_upload_plan_id');
-        $files = ProgrammePhotoFile::query()->whereIn('programme_photo_gallery_id', $galleries->pluck('id'))
-            ->where('status', 'verified')->whereNotNull('verified_at')->whereNotNull('storage_key')
-            ->whereNull('duplicate_of_file_id')->get()->groupBy('programme_photo_gallery_id');
+        $invoices = StudioInvoice::with('payments', 'sentBy')
+            ->whereIn('active_booking_id', $events->pluck('concertBookingItem.concert_booking_id')->filter())->get()->keyBy('active_booking_id');
 
-        return compact('programmes', 'galleries', 'contributions', 'files');
+        $titlePackages = ConcertTitleCardPackage::whereIn('id', fn ($query) => $query->from('concert_title_card_packages')->selectRaw('MAX(id)')->whereIn('scheduling_event_id', $events->pluck('id'))->groupBy('scheduling_event_id'))->get()->keyBy('scheduling_event_id');
+        $titleTemplates = ConcertTitleCardTemplate::whereIn('scheduling_event_id', $events->pluck('id'))->get()->keyBy('scheduling_event_id');
+
+        return compact('programmes', 'invoices', 'titlePackages', 'titleTemplates');
     }
 
     private function overrides(Collection $events): Collection
@@ -239,7 +326,11 @@ class ConcertTracker
             $definition['key'] => $this->taskStatus($event, $definition, $sources, $overrides),
         ]);
 
-        return compact('event', 'tasks');
+        return compact('event', 'tasks') + [
+            'pending' => false,
+            'event_date' => $event->event_date,
+            'name' => $event->name,
+        ];
     }
 
     private function taskStatus(SchedulingEvent $event, array $definition, array $sources, Collection $overrides): array
@@ -248,27 +339,136 @@ class ConcertTracker
         $scopeKey = $scopeType.':'.$scopeId;
         $override = $overrides->get($scopeKey.':'.$definition['key']);
         $dueDate = $override?->due_date_override ?? $this->calculatedDueDate($event, $definition);
+        if ($definition['key'] === 'invoice_sent') {
+            $invoice = $sources['invoices']->get($event->concertBookingItem?->concert_booking_id);
+            $dueDate = $invoice?->sent_at ? $invoice->due_date : ($event->concertBookingItem?->booking?->family_count_confirmed_at ? $dueDate : null);
+        }
         $source = $definition['kind'] === 'source'
             ? $this->sourceStatus($event, $definition['key'], $sources)
             : $this->manualStatus($definition, $override);
+        if ($definition['key'] === 'quality_check') {
+            $quality = app(ConcertQualityChecklist::class)->summary($override);
+            $source = $this->status($quality['complete'] ? 'complete' : ($quality['checked'] ? 'in_progress' : 'not_started'),
+                $quality['checked'].' / '.$quality['total'].' checked', 'Review every quality check before sending the concert to the studio.',
+                route('admin.concert-tracker.tasks.show', [$event, 'quality_check']), $quality['complete'] ? $override?->completed_at : null);
+        }
+        if ($definition['key'] === 'booking_received' && $event->concertBookingItem?->booking) {
+            $source = $this->bookingBar->source($event->concertBookingItem->booking, $override);
+        }
+        if ($definition['key'] === 'video_titles' && $source['key'] === 'complete'
+            && ! app(ConcertTitlePackages::class)->matches($event, $sources['titlePackages']->get($event->id), $sources['programmes']->get($event->id), $sources['titleTemplates']->get($event->id))) {
+            $source = $this->status('in_progress', 'Titles need updating', 'The programme or template changed. Publish the video titles again.', null);
+        }
+        if ($definition['key'] === 'slideshow_received') {
+            $source['sourceUrl'] = route('admin.scheduling-events.show', $event).'#studio-submissions';
+            $studioVideos = $event->studioFiles->where('is_current', true)->where('kind', 'studio_video');
+            if ($studioVideos->isNotEmpty()) {
+                $approved = $studioVideos->where('status', 'approved')->count();
+                $source = $this->status(
+                    $approved === $studioVideos->count() ? 'complete' : 'in_progress',
+                    $approved === $studioVideos->count() ? 'Approved' : 'Review files',
+                    $approved.' of '.$studioVideos->count().' studio videos approved.',
+                    $source['sourceUrl'],
+                    $approved === $studioVideos->count() ? $studioVideos->max('reviewed_at') : null,
+                    $this->studioMediaActivity($studioVideos),
+                );
+            }
+        }
+        $notRequired = $this->notRequiredReason($event, $definition);
+        if ($notRequired) {
+            $source = $this->status('not_required', 'Not required', $notRequired, route('admin.scheduling-events.show', $event));
+        }
+        $sourceDriven = $definition['kind'] === 'source' || $definition['key'] === 'quality_check' || $notRequired !== null
+            || ($definition['key'] === 'slideshow_received' && $studioVideos->isNotEmpty());
         $isOpen = ! in_array($source['key'], ['complete', 'not_required'], true);
         if (! $isOpen || ($definition['key'] === 'programme_prepared' && $source['key'] === 'in_progress')) {
             $dueDate = null;
         }
-        $overdue = $isOpen && $dueDate?->isBefore(today());
-        $nearDue = $isOpen && ! $overdue && $dueDate?->lte(today()->addDays(7));
-        $tone = $overdue ? 'overdue' : ($nearDue ? 'near-due' : $source['key']);
-        $detailUrl = $definition['key'] === 'programme_prepared' && $source['sourceUrl']
+        $overdue = $isOpen && ($definition['key'] === 'photo_release' ? $dueDate?->isPast() : $dueDate?->isBefore(today()));
+        $nearDue = $isOpen && ! $overdue && $dueDate?->lte(today()->addDays(3));
+        $baseTone = $definition['key'] === 'final_numbers_received' && $source['key'] === 'waiting' ? 'in_progress' : $source['key'];
+        if ($definition['key'] === 'video_uploaded' && $isOpen) {
+            $baseTone = 'ready';
+        }
+        if ($definition['key'] === 'invoice_sent' && $source['label'] === 'Pending') {
+            $baseTone = 'ready';
+        }
+        $tone = $overdue ? 'overdue' : ($nearDue ? 'near-due' : $baseTone);
+        if ($definition['key'] === 'director_corrections') {
+            $tone = match ($source['label']) {
+                'Pending' => 'ready', 'Corrections' => 'overdue', default => $baseTone,
+            };
+        }
+        if ($definition['key'] === 'invoice_sent' && $source['label'] === 'Not paid') {
+            $tone = $overdue ? 'overdue' : 'near-due';
+        }
+        if ($definition['key'] === 'photo_release' && $source['label'] === 'Ready to release') {
+            $tone = 'overdue';
+        }
+        if ($definition['key'] === 'crew_ready') {
+            $tone = $source['key'] === 'complete' ? 'complete' : ($source['key'] === 'not_required' ? 'not_required' : 'roster');
+        }
+        if ($definition['key'] === 'photos_uploaded' && $source['key'] !== 'not_required') {
+            $nearDue = false;
+            $tone = $source['key'] === 'complete' ? 'complete' : ($overdue && $source['key'] === 'waiting' ? 'overdue' : 'ready');
+            foreach ($source['photoRoles'] as &$role) {
+                $role['tone'] = $role['state'] === 'complete' ? 'complete' : ($role['state'] === 'waiting' && $overdue ? 'overdue' : 'ready');
+            }
+            unset($role);
+        }
+        $detailUrl = in_array($definition['key'], ['programme_prepared', 'booking_received', 'final_numbers_received', 'photos_uploaded'], true) && $source['sourceUrl']
             ? $source['sourceUrl']
             : route('admin.concert-tracker.tasks.show', ['schedulingEvent' => $event, 'taskKey' => $definition['key']]);
 
-        return $source + compact('scopeKey', 'override', 'dueDate', 'overdue', 'nearDue', 'tone', 'detailUrl') + [
+        if ($definition['key'] === 'video_titles') {
+            $detailUrl = $event->concertBookingItem?->booking
+                ? route('admin.concert-bookings.show', [$event->concertBookingItem->booking, 'tab' => 'video-titles', 'event' => $event->uuid])
+                : route('admin.concert-title-cards.show', $event);
+            $source['sourceUrl'] = $detailUrl;
+        }
+        if ($definition['key'] === 'programme_prepared' && $event->concertBookingItem?->booking) {
+            $detailUrl = route('admin.concert-bookings.show', [$event->concertBookingItem->booking, 'tab' => 'programme', 'event' => $event->uuid]);
+        }
+        if ($definition['key'] === 'slideshow_received' && $event->concertBookingItem?->booking) {
+            $detailUrl = route('admin.concert-bookings.show', [$event->concertBookingItem->booking, 'tab' => 'studio-media', 'event' => $event->uuid]);
+            $source['sourceUrl'] = $detailUrl;
+        }
+        if ($definition['key'] === 'final_numbers_received') {
+            $scopeKey .= ':event:'.$event->id;
+        }
+
+        return $source + compact('scopeKey', 'override', 'dueDate', 'overdue', 'nearDue', 'tone', 'detailUrl', 'sourceDriven') + [
             'definition' => $definition,
             'assignee' => $override?->assignee,
             'note_count' => $override?->notes->count() ?? 0,
             'rowspan' => 1,
             'skip' => false,
         ];
+    }
+
+    private function notRequiredReason(SchedulingEvent $event, array $definition): ?string
+    {
+        $item = $event->concertBookingItem;
+        $booking = $item?->booking;
+        if ($booking && in_array($definition['key'], ['invoice_sent', 'payment_received'], true) && ! $booking->wants_concert_videography
+            && ! StudioInvoice::where('active_booking_id', $booking->id)->exists()) {
+            return 'No studio invoice is required unless reviewed custom charges are added.';
+        }
+        if ($booking && $definition['service']) {
+            $portraits = $item->item_type === ConcertBookingItemType::DressRehearsal;
+            $booked = $definition['service'] === 'video'
+                ? (! $portraits && $booking->wants_concert_videography)
+                : ($portraits ? $booking->wants_portrait_photography : $booking->wants_concert_photography);
+            if (! $booked) {
+                return ucfirst($definition['service']).' service is not booked for this event. Review the booking if this changes.';
+            }
+        }
+        if (in_array($definition['key'], ['approval_link_email', 'director_corrections', 'director_approval'], true)
+            && $item?->concert && ! $item->concert->requires_approval) {
+            return 'Director approval is disabled for this concert.';
+        }
+
+        return null;
     }
 
     private function sourceStatus(SchedulingEvent $event, string $key, array $sources): array
@@ -280,17 +480,14 @@ class ConcertTracker
         $videoCollections = $collections->filter(fn (MediaCollection $collection): bool => $collection->media_type->value === 'video');
         $groups = $photoAlbums->flatMap->concertPhotoReleaseGroups->unique('id')->values();
         $programme = $sources['programmes']->get($event->id);
-        $gallery = $sources['galleries']->get($event->id);
-        $contributions = $gallery ? ($sources['contributions']->get($gallery->programme_upload_plan_id) ?? collect()) : collect();
-        $files = $gallery ? ($sources['files']->get($gallery->id) ?? collect()) : collect();
 
         return match ($key) {
+            'invoice_sent', 'payment_received' => $this->invoiceStatus($booking, $sources['invoices']->get($booking?->id), $key),
             'booking_received' => $booking
-                ? $this->status($booking->status->value === 'approved' ? 'complete' : 'in_progress', $booking->status->value === 'approved' ? 'Approved' : 'Pending', 'Booking and selected services are held in the unified booking record.', route('admin.concert-bookings.show', $booking), $booking->reviewed_at)
+                ? $this->bookingBar->source($booking, null)
                 : $this->status('not_started', 'Not received', 'No concert booking is linked.', route('admin.concert-bookings.index')),
-            'crew_ready' => $event->rosterIsReady()
-                ? $this->status('complete', 'Ready', 'Required crew are published and acknowledged.', route('admin.scheduling-events.show', $event), $event->roster_published_at)
-                : $this->status('not_started', 'Needs attention', 'Required crew or acknowledgements are incomplete.', route('admin.scheduling-events.show', $event)),
+            'final_numbers_received' => $this->seatsAndFamilies->status($event),
+            'crew_ready' => $this->crewStatus($event),
             'programme_prepared' => $programme?->latestRevision?->confirmed_at
                 ? $this->status('complete', 'Confirmed', 'The working programme is confirmed.', route('admin.programmes.show', $event), $programme->latestRevision->confirmed_at,
                     'Confirmed '.$programme->latestRevision->confirmed_at->format('j M Y, g:i a').' by '.($programme->latestRevision->confirmedBy?->name ?? 'former staff member'))
@@ -298,50 +495,91 @@ class ConcertTracker
                     ? $this->status('in_progress', 'Confirm', 'The programme is attached and still needs confirmation.', route('admin.programmes.show', $event), $programme?->source?->created_at,
                         $programme?->source ? 'Uploaded '.$programme->source->created_at->format('j M Y, g:i a').' by '.($programme->source->createdBy?->name ?? 'former staff member') : 'Attached to the event booking')
                     : $this->status('not_started', 'Not received', 'No programme source is attached.', route('admin.programmes.show', $event))),
-            'video_uploaded' => $videoCollections->sum('assets_count') > 0
-                ? $this->status('complete', $videoCollections->sum('assets_count').' uploaded', 'Available concert video media is attached.', route('admin.concerts.edit', $concert), $videoCollections->max('updated_at'))
-                : $this->status('not_started', 'Not uploaded', 'No available concert video is attached.', $concert ? route('admin.concerts.edit', $concert) : route('admin.concerts.index')),
+            'video_uploaded' => app(ConcertVideoReadiness::class)->status($event),
+            'director_corrections' => $this->correctionsStatus($event),
             'director_approval' => ! $concert
                 ? $this->status('not_started', 'Not started', 'No customer concert is linked.', route('admin.concerts.index'))
                 : ($concert->approved_at
                     ? $this->status('complete', 'Approved', 'Director approval is recorded.', route('admin.concerts.edit', $concert), $concert->approved_at)
                     : $this->status('waiting', 'Waiting', 'Director approval has not been recorded.', route('admin.concerts.edit', $concert))),
-            'photos_uploaded' => ! $gallery
-                ? $this->status('not_started', 'Not started', 'No uploader gallery exists yet.', route('admin.concert-photo-gallery.show', $event))
-                : (($contributions->isNotEmpty() && ! $contributions->every(fn ($item): bool => $item->status === 'complete' || $item->waived_at !== null))
-                    ? $this->status('waiting', 'Contributions open', $files->count().' verified photo(s); one or more photographer contributions remain open.', route('admin.concert-photo-gallery.show', $event))
-                    : ($files->isNotEmpty()
-                        ? $this->status('complete', $files->count().' verified', 'Required contributions and verified uploads are complete.', route('admin.concert-photo-gallery.show', $event), $files->max('verified_at'))
-                        : $this->status('waiting', 'Waiting for files', 'The uploader gallery exists but has no verified photos.', route('admin.concert-photo-gallery.show', $event)))),
+            'photos_uploaded' => app(ConcertPhotoUploadStatus::class)->forEvent($event),
             'photo_release' => $this->photoReleaseStatus($event, $concert, $photoAlbums, $groups),
-            'final_release' => $concert?->status->value === 'published' && $concert->published_at
-                ? $this->status('complete', 'Released', 'The concert video record is published.', route('admin.concerts.edit', $concert), $concert->published_at)
-                : $this->status('not_started', 'Not released', 'The final concert video is not published.', $concert ? route('admin.concerts.edit', $concert) : route('admin.concerts.index')),
+            'final_release' => $this->videoReleased($event, $concert)
+                ? $this->status('complete', 'Released', 'The concert video has been approved and released. Families need the studio video access code.', route('admin.concerts.edit', $concert), $concert->published_at)
+                : $this->status('not_started', 'Not released', 'Waiting for the studio director to review and release the concert video.', $concert ? route('admin.concerts.edit', $concert) : route('admin.concerts.index')),
             default => $this->status('not_started', 'Not started', 'Open the task to update it.', route('admin.scheduling-events.show', $event)),
         };
     }
 
+    private function videoReleased(SchedulingEvent $event, mixed $concert): bool
+    {
+        if (! $concert?->isPubliclyAvailable() || ! $concert->published_at) {
+            return false;
+        }
+        $review = ConcertDirectorReview::where('scheduling_event_id', $event->id)->first();
+
+        return ! $review || ($review->released_at && $review->released_batch_id === ConcertVideoBatch::where('scheduling_event_id', $event->id)->latest('id')->value('id'));
+    }
+
+    private function correctionsStatus(SchedulingEvent $event): array
+    {
+        $data = app(ConcertDirectorReviews::class)->page($event);
+        if (! $data['review']->revision) {
+            return $data['released']
+                ? $this->status('not_required', 'No corrections', 'The studio released the video without requesting corrections.', null)
+                : $this->status('waiting', 'Pending', 'Awaiting studio review. No corrections have been submitted.', null);
+        }
+        $complete = $data['checksReady'] && $data['currentMail'];
+
+        return $this->status($complete ? 'complete' : 'in_progress', $complete ? 'Completed' : 'Corrections',
+            $complete ? 'Corrections email sent to the studio director.' : 'Review feedback, complete and upload corrections, then send the email.', null,
+            $complete ? $data['currentMail']->sent_at : null);
+    }
+
     private function photoReleaseStatus(SchedulingEvent $event, mixed $concert, Collection $albums, Collection $groups): array
     {
-        if (! $concert) {
-            return $this->status('not_started', 'Link concert', 'Link the customer concert record.', route('admin.concerts.index'));
+        $url = route('admin.concert-tracker.tasks.show', [$event, 'photo_release']);
+        if ($albums->isNotEmpty() && $albums->every(fn (MediaCollection $album): bool => $album->published_at !== null && $album->status->value === 'published')) {
+            return $this->status('complete', 'Released', 'All photo albums are released.', $url, $groups->max('released_at'));
         }
-        if ($albums->isEmpty()) {
-            return $this->status('not_started', 'Not started', 'No customer photo albums exist.', route('admin.concert-photo-gallery.show', $event));
-        }
-        if ($albums->every(fn (MediaCollection $album): bool => $album->published_at !== null)) {
-            return $this->status('complete', 'Released', 'All photo albums are released.', route('admin.concert-tracker.index', ['year' => $event->event_date?->year, 'phase' => 'completion']).'#release-groups', $groups->max('released_at'));
-        }
-        if ($groups->contains(fn (ConcertPhotoReleaseGroup $group): bool => $group->released_at === null)) {
-            return $this->status('in_progress', 'Ready to release', 'The parent album is ready for release.', route('admin.concert-tracker.index', ['year' => $event->event_date?->year, 'phase' => 'completion']).'#release-groups');
+        if (app(ConcertPhotoUploadStatus::class)->forEvent($event)['key'] === 'complete') {
+            return $this->status('in_progress', 'Ready to release', 'All required photographers have finished uploading. Prepare and release the gallery.', $url);
         }
 
-        return $this->status('not_started', 'Create group', 'Create the parent release group.', route('admin.concert-tracker.index', ['year' => $event->event_date?->year, 'phase' => 'completion']).'#prepare-release');
+        return $this->status('waiting', 'Pending', 'Waiting for all required photographers to finish uploading.', $url);
+    }
+
+    private function studioMediaActivity(Collection $files): string
+    {
+        $uploaded = $files->sortByDesc('uploaded_at')->first();
+        $reviewed = $files->whereNotNull('reviewed_at')->sortByDesc('reviewed_at')->first();
+        $activity = 'Uploaded '.$uploaded->uploaded_at?->format('j M Y, g:i a').' · '.($uploaded->uploadedBy?->name ?? 'Former account');
+        if ($reviewed) {
+            $activity .= ' | Reviewed '.$reviewed->reviewed_at->format('j M Y, g:i a').' · '.($reviewed->reviewedBy?->name ?? 'Former staff member');
+        }
+
+        return $activity;
+    }
+
+    private function crewStatus(SchedulingEvent $event): array
+    {
+        $roster = app(EventRosterStatus::class)->forEvent($event);
+
+        return $this->status($event->cancelled_at ? 'not_required' : ($roster['ready'] ? 'complete' : 'in_progress'), $roster['label'],
+            $roster['ready'] ? 'Required crew are published and acknowledged.' : 'Review availability, assignments and acknowledgements.',
+            route('admin.concert-tracker.tasks.show', [$event, 'crew_ready']), $roster['ready'] ? $event->roster_published_at : null)
+            + ['crewSummary' => $roster['crew']];
     }
 
     private function manualStatus(array $definition, ?ConcertTrackerTask $override): array
     {
         $delivery = $override?->deliveries->first();
+        if (in_array($definition['key'], ConcertTrackerTaskCatalog::GUARDED_EMAIL_TASKS, true) && $override?->status === 'complete') {
+            $manual = $override->status_override === 'complete';
+            $activity = ($manual ? 'Approved ' : 'Sent ').$override->completed_at?->format('j M Y, g:i a').($override->completedBy ? ' · '.$override->completedBy->name : ' · Automation');
+
+            return $this->status('complete', $manual ? 'Approved' : 'Completed', $manual ? 'Email not required; approved manually.' : $definition['label'].' sent.', null, $override->completed_at, $activity);
+        }
         if ($override?->status !== 'complete' && $delivery) {
             $deliveryStatus = match ($delivery->status) {
                 'scheduled' => ['in_progress', 'Scheduled', 'Scheduled for '.$delivery->scheduled_at?->format('j M Y g:i a').'.'],
@@ -368,9 +606,15 @@ class ConcertTracker
 
     private function calculatedDueDate(SchedulingEvent $event, array $definition): ?CarbonInterface
     {
-        if (in_array($definition['key'], ['concert_edited', 'quality_check', 'director_approval'], true)) {
+        if ($definition['key'] === 'photo_release') {
+            $last = $event->concertBookingItem?->booking?->items->whereNull('cancelled_at')->sortBy(fn ($item) => $item->event_date?->format('Y-m-d').' '.($item->finishes_at ?? '00:00'))->last();
+            $date = $last?->event_date ?? $event->event_date;
+
+            return $date ? Carbon::parse($date->format('Y-m-d').' '.($last?->finishes_at ?? '00:00'))->addHours(48) : null;
+        }
+        if (in_array($definition['key'], ['concert_edited', 'quality_check', 'final_release'], true)) {
             $settings = ConcertTrackerSetting::query()->first();
-            $days = $definition['key'] === 'director_approval'
+            $days = $definition['key'] === 'final_release'
                 ? ($settings?->approval_target_days ?? 14)
                 : ($settings?->editing_target_days ?? 14);
 
@@ -379,7 +623,7 @@ class ConcertTracker
         if ($definition['dueBasis'] === null || $definition['dueOffsetDays'] === null) {
             return null;
         }
-        $bookingDates = $event->concertBookingItem?->booking?->items->pluck('event_date')->filter()->sort();
+        $bookingDates = $event->concertBookingItem?->booking?->items->whereNull('cancelled_at')->pluck('event_date')->filter()->sort();
         $base = match ($definition['dueBasis']) {
             'booking_first' => $bookingDates?->first(),
             'booking_last' => $bookingDates?->last(),
@@ -387,6 +631,11 @@ class ConcertTracker
         };
 
         return $base?->copy()->addDays($definition['dueOffsetDays']);
+    }
+
+    private function invoiceStatus(?ConcertBooking $booking, ?StudioInvoice $invoice, string $key): array
+    {
+        return app(InvoiceTrackerWorkflow::class)->status($booking, $invoice);
     }
 
     private function status(string $key, string $label, string $detail, ?string $sourceUrl, ?CarbonInterface $completedAt = null, ?string $activity = null): array
@@ -438,7 +687,7 @@ class ConcertTracker
     private function needsAttention(array $task): bool
     {
         return $task['overdue'] || $task['key'] === 'failed'
-            || ($task['override']?->follow_up_date?->lte(today()) && ! in_array($task['key'], ['complete', 'not_required'], true));
+            || ($task['override']?->follow_up_status !== 'resolved' && $task['override']?->follow_up_date?->lte(today()) && ! in_array($task['key'], ['complete', 'not_required'], true));
     }
 
     private function recipient(SchedulingEvent $event): array

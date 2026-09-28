@@ -9,6 +9,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class ResolveDownloadLink
@@ -18,7 +20,7 @@ class ResolveDownloadLink
         private readonly RecordDownloadAccess $recordDownloadAccess,
     ) {}
 
-    public function handle(string $token, Request $request): RedirectResponse|Response
+    public function handle(string $token, Request $request): RedirectResponse|Response|StreamedResponse
     {
         $downloadLink = DownloadLink::query()
             ->where('token_hash', hash('sha256', $token))
@@ -60,7 +62,9 @@ class ResolveDownloadLink
         }
 
         try {
-            $signedUrl = $this->downloadUrlSigner->signedUrl($downloadLink);
+            $delivery = app()->environment('local')
+                ? $this->localDownload($downloadLink)
+                : $this->downloadUrlSigner->signedUrl($downloadLink);
         } catch (Throwable) {
             $this->recordDownloadAccess->handle($downloadLink, $request, false, 'signing_failed');
 
@@ -84,7 +88,24 @@ class ResolveDownloadLink
             $this->recordDownloadAccess->handle($downloadLink, $request, true);
         });
 
-        return redirect()->away($signedUrl);
+        return $delivery instanceof StreamedResponse
+            ? $delivery
+            : redirect()->away($delivery);
+    }
+
+    private function localDownload(DownloadLink $downloadLink): StreamedResponse
+    {
+        $disk = Storage::disk($downloadLink->storage_disk);
+        abort_unless($disk->exists($downloadLink->storage_key), 404);
+
+        return $disk->download(
+            $downloadLink->storage_key,
+            $downloadLink->original_filename ?: basename($downloadLink->storage_key),
+            [
+                'Cache-Control' => 'private, no-store',
+                'X-Content-Type-Options' => 'nosniff',
+            ],
+        );
     }
 
     private function unavailable(

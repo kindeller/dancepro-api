@@ -34,6 +34,7 @@ class ConcertPhotoGallerySetupTest extends TestCase
             'studio_id' => $studio->id, 'name' => 'Spring concert', 'event_type' => 'concert',
             'event_date' => '2026-09-22',
         ]);
+        $shift = $event->shifts()->create(['shift_date' => '2026-09-22']);
         $booking = ConcertBooking::create([
             'studio_name' => $studio->name, 'contact_name' => 'Director', 'contact_email' => 'director@example.test',
             'contact_phone' => '0400000000', 'status' => 'pending',
@@ -63,7 +64,7 @@ class ConcertPhotoGallerySetupTest extends TestCase
         $role = CrewRole::where('code', 'concert-photographer-p1')->firstOrFail();
         $contribution = ProgrammePhotoContribution::create([
             'programme_upload_plan_id' => $plan->id, 'item_uuid' => $itemUuid,
-            'crew_role_id' => $role->id, 'assignment_uuids' => [], 'status' => 'complete', 'completed_at' => now(),
+            'crew_role_id' => $role->id, 'assignment_uuids' => [$shift->uuid], 'status' => 'complete', 'completed_at' => now(),
         ]);
         $image = imagecreatetruecolor(320, 240);
         imagefill($image, 0, 0, imagecolorallocate($image, 40, 80, 120));
@@ -105,6 +106,10 @@ class ConcertPhotoGallerySetupTest extends TestCase
         $this->assertTrue($album->assets->first()->metadata['is_top_pic']);
         $this->assertSame($album->assets->first()->id, $album->cover_media_asset_id);
 
+        $this->get(route('admin.concert-photo-gallery.asset', [
+            'schedulingEvent' => $f['event'], 'asset' => $album->assets->first(), 'size' => 'thumbnail',
+        ]))->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+
         $this->post(route('admin.concert-photo-gallery.albums.update', [$f['event'], $album]), [
             'name' => 'Opening Number', 'sort_order' => 4,
         ])->assertRedirect();
@@ -143,7 +148,7 @@ class ConcertPhotoGallerySetupTest extends TestCase
 
         $this->actingAs($staff)->get(route('admin.concert-tracker.index', ['view' => 'date', 'year' => 2026, 'phase' => 'completion']))
             ->assertOk()->assertSeeInOrder(['Early concert', 'Later concert'])
-            ->assertSee('Not started')->assertSee('Link concert');
+            ->assertSee('Pending')->assertDontSee('Not invoiced')->assertSee('Not released');
         $this->get(route('admin.concert-tracker.index', ['view' => 'studio', 'year' => 2026, 'phase' => 'completion']))
             ->assertOk()->assertSeeInOrder(['Alpha Dance', 'Later concert', 'Zulu Dance', 'Early concert']);
         $this->actingAs(User::factory()->customer()->create())
@@ -172,7 +177,8 @@ class ConcertPhotoGallerySetupTest extends TestCase
         $this->get(route('admin.concert-photo-releases.index'))
             ->assertRedirect(route('admin.concert-tracker.index', ['year' => now()->year]));
         $this->get(route('admin.concert-tracker.index', ['year' => 2026, 'phase' => 'completion']))->assertOk()
-            ->assertSee('Concert Tracker')
+            ->assertSee('Photo release')->assertDontSee('Choose parent album cover');
+        $this->get(route('admin.concert-tracker.tasks.show', [$f['event'], 'photo_release']))->assertOk()
             ->assertSee('Photo release')
             ->assertSee('Choose parent album cover')->assertSee('Top Pic');
 
@@ -183,7 +189,9 @@ class ConcertPhotoGallerySetupTest extends TestCase
         $this->assertNotNull($album->published_at);
         $this->assertDatabaseHas('concert_photo_release_group_changes', ['action' => 'released']);
         $this->get(route('admin.concert-tracker.index', ['view' => 'studio', 'year' => 2026, 'phase' => 'completion']))
-            ->assertOk()->assertSee('Studio view')->assertSee('Released')->assertSee('Spring concert photos');
+            ->assertOk()->assertSee('Studio view')->assertSee('Released');
+        $this->get(route('admin.concert-tracker.tasks.show', [$f['event'], 'photo_release']))
+            ->assertOk()->assertSee('Spring concert photos')->assertSee('Released');
         $this->actingAs($customer)->get(route('customer.concerts.photos.show', $f['concert']))
             ->assertOk()->assertSee('Spring concert photos')->assertDontSee('01 Opening Dance');
         $this->actingAs($customer)->get(route('customer.concerts.photos.show', [
@@ -195,6 +203,7 @@ class ConcertPhotoGallerySetupTest extends TestCase
         $this->get(route('guest-galleries.concerts.cover', [
             'concert' => $f['concert'], 'group' => $group,
         ]))->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+        $this->post(route('logout'))->assertRedirect();
         $this->get(route('guest-galleries.index', ['type' => 'concert']))->assertOk()
             ->assertSee('Spring concert photos')
             ->assertSee(route('guest-galleries.concerts.cover', ['concert' => $f['concert'], 'group' => $group]), false);

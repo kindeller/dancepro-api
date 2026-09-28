@@ -22,9 +22,10 @@ class CustomerMediaProfileTest extends TestCase
         $studio->forceFill(['gallery_code_hash' => Hash::make('GALLERY-TEST')])->save();
         $this->actingAs($user)->get(route('customer.media.index'))->assertOk()
             ->assertSee('Add media')->assertSee('Add a dancer in My Profile')->assertSee('Add your studio in My Profile')
-            ->assertSee(route('customer.profile.edit').'#dancers', false)->assertSee(route('customer.profile.edit').'#studios', false)
-            ->assertDontSee('name="concert_code"', false)->assertDontSee('name="event_uuid"', false);
-        $this->get(route('customer.profile.edit'))->assertOk()->assertSee($studio->name);
+            ->assertSee(route('customer.profile.edit', ['tab' => 'dancers']), false)
+            ->assertSee(route('customer.profile.edit', ['tab' => 'studios']), false)
+            ->assertDontSee('name="concert_code"', false)->assertDontSee('<select name="event_uuid"', false);
+        $this->get(route('customer.profile.edit', ['tab' => 'studios']))->assertOk()->assertSee($studio->name);
         foreach ([['action' => 'dancer', 'name' => 'Jessica Smith'], ['action' => 'studio', 'studio_uuid' => $studio->uuid, 'studio_gallery_code' => 'GALLERY-TEST']] as $input) {
             $this->post(route('customer.profile.store'), $input + ['user_id' => 999])->assertRedirect();
             $this->post(route('customer.profile.store'), $input)->assertRedirect();
@@ -32,13 +33,13 @@ class CustomerMediaProfileTest extends TestCase
         $this->assertDatabaseCount('customer_dancers', 1);
         $this->assertDatabaseCount('customer_studios', 1);
         $this->assertDatabaseHas('customer_dancers', ['user_id' => $user->id, 'name' => 'Jessica Smith']);
-        $this->get(route('customer.media.index'))->assertOk()->assertSee('name="event_uuid"', false)
-            ->assertSee('Event login code')->assertSee('name="year"', false)->assertSee('Video login code')
+        $this->get(route('customer.media.index'))->assertOk()->assertSee('<select name="event_uuid"', false)
+            ->assertSee('Event media access code')->assertSee('name="year"', false)->assertSee('Video access code')
             ->assertSee(route('customer.profile.studio', $studio), false)->assertDontSee('Add now');
         $this->get(route('customer.profile.studio', $studio))->assertOk()->assertSee('not available yet');
         Concert::factory()->published()->create(['studio_id' => $studio->id, 'external_gallery_url' => 'https://photos.example.test/studio-gallery']);
         $this->get(route('customer.profile.studio', $studio))->assertOk()->assertSee('View/order photos')->assertSee('https://photos.example.test/studio-gallery', false);
-        $this->actingAs(User::factory()->customer()->create())->get(route('customer.profile.edit'))->assertOk()->assertDontSee('Jessica Smith');
+        $this->actingAs(User::factory()->customer()->create())->get(route('customer.profile.edit', ['tab' => 'dancers']))->assertOk()->assertDontSee('Jessica Smith');
         $this->get(route('customer.profile.studio', $studio))->assertForbidden();
     }
 

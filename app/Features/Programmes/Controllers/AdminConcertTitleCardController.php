@@ -3,10 +3,12 @@
 namespace App\Features\Programmes\Controllers;
 
 use App\Features\Programmes\Models\ConcertTitleCardTemplate;
-use App\Features\Programmes\Models\Programme;
 use App\Features\Programmes\Requests\SaveConcertTitleCardTemplateRequest;
+use App\Features\Programmes\Services\ConcertTitleCards;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Scheduling\Support\SchedulingEventType;
+use App\Features\Tracking\Services\BookingTrackerBar;
+use App\Features\Tracking\Services\ConcertTracker;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,31 +16,15 @@ use Illuminate\View\View;
 
 class AdminConcertTitleCardController extends Controller
 {
-    public function show(Request $request, SchedulingEvent $schedulingEvent): View
+    public function show(Request $request, SchedulingEvent $schedulingEvent, ConcertTitleCards $titles, BookingTrackerBar $bar, ConcertTracker $tracker): View|RedirectResponse
     {
         abort_unless($schedulingEvent->event_type === SchedulingEventType::Concert, 404);
-        $schedulingEvent->load(['studio', 'concertBookingItem']);
-        $programme = Programme::query()->where('scheduling_event_id', $schedulingEvent->id)->with('latestRevision')->first();
-        $nodes = collect($programme?->latestRevision?->snapshot['nodes'] ?? $programme?->draftNodes() ?? [])
-            ->filter(fn (array $node): bool => ($node['kind'] ?? null) === 'item' && ($node['merged_into_uuid'] ?? null) === null)
-            ->values();
-        $template = ConcertTitleCardTemplate::firstOrNew(['scheduling_event_id' => $schedulingEvent->id], [
-            'logo_source' => $schedulingEvent->logo_path ? 'event' : 'studio',
-            'background_color' => '#000000',
-            'logo_band_color' => $schedulingEvent->studio?->brand_color ?: '#0B438C',
-            'text_color' => '#FFFFFF',
-            'separator_start_color' => '#000000',
-            'separator_end_color' => '#FFFFFF',
-            'font_family' => 'Atlanta',
-        ]);
+        if ($schedulingEvent->concertBookingItem?->booking) {
+            return to_route('admin.concert-bookings.show', [$schedulingEvent->concertBookingItem->booking, 'tab' => 'video-titles', 'event' => $schedulingEvent->uuid]);
+        }
 
-        return view('admin.programmes.title-cards', [
-            'event' => $schedulingEvent,
-            'concertTitle' => $schedulingEvent->concertBookingItem?->title ?: $schedulingEvent->name,
-            'template' => $template,
-            'items' => $nodes,
-            'eventLogoUrl' => $schedulingEvent->logoUrl(),
-            'studioLogoUrl' => $schedulingEvent->studio?->logoUrl(),
+        return view('admin.programmes.title-cards', $titles->page($schedulingEvent) + [
+            'trackerBar' => $bar->videoTitlesPage($tracker->detail($schedulingEvent, 'video_titles'), $request->session()->get('concert_tracker_context', [])),
         ]);
     }
 

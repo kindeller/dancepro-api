@@ -15,7 +15,7 @@ class SaveStudioGalleryCodeRequest extends FormRequest
     {
         return [
             'version' => ['required', 'integer', 'min:0'],
-            'gallery_code' => ['required', 'string', 'regex:/\A[A-Za-z0-9-]{6,64}\z/'],
+            'gallery_code' => ['required', 'string', 'regex:/\A[A-Za-z0-9-]{3,64}\z/'],
         ];
     }
 }

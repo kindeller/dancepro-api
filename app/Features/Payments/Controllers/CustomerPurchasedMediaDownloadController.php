@@ -4,6 +4,7 @@ namespace App\Features\Payments\Controllers;
 
 use App\Features\Downloads\Services\IssuePurchasedMediaDownload;
 use App\Features\Media\Models\MediaAsset;
+use App\Features\Orders\Actions\RecordPurchasedMediaDownload;
 use App\Features\Orders\Models\OrderMediaEntitlement;
 use App\Features\Orders\Services\AuthorizePurchasedMediaDownload;
 use App\Http\Controllers\Controller;
@@ -19,6 +20,7 @@ class CustomerPurchasedMediaDownloadController extends Controller
         MediaAsset $asset,
         AuthorizePurchasedMediaDownload $authorize,
         IssuePurchasedMediaDownload $issue,
+        RecordPurchasedMediaDownload $record,
     ): RedirectResponse {
         try {
             $asset = $authorize->execute($request->user(), $entitlement, $asset);
@@ -36,6 +38,7 @@ class CustomerPurchasedMediaDownloadController extends Controller
             ])->with('status', 'This download period has ended. You can request reactivation below.');
         }
         $handoff = $issue->execute($request->user(), $entitlement, $asset);
+        $record->execute($request->user(), $entitlement, $asset, $request);
 
         $entitlement->forceFill([
             'first_download_at' => $entitlement->first_download_at ?? now(),

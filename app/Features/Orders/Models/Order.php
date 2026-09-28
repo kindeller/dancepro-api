@@ -3,6 +3,8 @@
 namespace App\Features\Orders\Models;
 
 use App\Features\Orders\Support\OrderStatus;
+use App\Features\Payments\Models\CustomerMediaNotification;
+use App\Features\Payments\Models\PaymentAttempt;
 use App\Models\User;
 use App\Shared\Models\HasPublicUuid;
 use Database\Factories\OrderFactory;
@@ -16,6 +18,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable(['uuid', 'user_id', 'customer_email', 'customer_name', 'status', 'currency', 'subtotal_amount', 'total_amount', 'tax_amount', 'placed_at', 'paid_at', 'fulfilled_at', 'cancelled_at', 'metadata'])]
 class Order extends Model
 {
+    public const DISPLAY_NUMBER_OFFSET = 100000;
+
     /** @use HasFactory<OrderFactory> */
     use HasFactory, HasPublicUuid, SoftDeletes;
 
@@ -29,9 +33,40 @@ class Order extends Model
         return $this->hasMany(OrderItem::class)->orderBy('id');
     }
 
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(OrderRefund::class)->latest('requested_at');
+    }
+
+    public function paymentAttempts(): HasMany
+    {
+        return $this->hasMany(PaymentAttempt::class)->latest('processed_at');
+    }
+
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(CustomerMediaNotification::class)->latest('queued_at');
+    }
+
     public function paymentAmount(): int
     {
         return (int) ($this->metadata['payment_amount'] ?? $this->total_amount);
+    }
+
+    public function displayNumber(): string
+    {
+        return (string) (self::DISPLAY_NUMBER_OFFSET + (int) $this->getKey());
+    }
+
+    public static function idFromDisplayNumber(string $value): ?int
+    {
+        if (! preg_match('/^(?:order\s*)?#?\s*(\d+)$/i', trim($value), $matches)) {
+            return null;
+        }
+
+        $id = (int) $matches[1] - self::DISPLAY_NUMBER_OFFSET;
+
+        return $id > 0 ? $id : null;
     }
 
     protected function casts(): array

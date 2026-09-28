@@ -23,6 +23,16 @@ notarization and target architectures remain release work.
 
 ## Behaviour and boundaries
 
+- Top Pic stars and removals sync automatically after upload while the app is open
+  and signed in. The app checks its durable metadata queue every two seconds,
+  including on the event list; failed requests retry with a delay up to one minute.
+  Offline changes survive quitting and resume when the app reopens. The footer
+  shows pending/syncing/synced status and an optional **Retry sync** action.
+  Unuploaded photos send their stars with the normal upload. Only flags are sent
+  for verified photos; no second copy of the image is uploaded. Opening older local
+  reviews reconciles previously saved post-upload stars once. A server with the
+  new `/api/staff/events/{event}/programme/top-pics` endpoint is required.
+
 - Login uses the existing staff API; only administrators with `programmes:read`
   can download. Ordinary crew accounts are not yet enabled for this workflow.
 - The bearer token is stored only in this app's macOS Keychain item. Passwords,
@@ -249,3 +259,24 @@ routines in the web Competition Videos page. Files changed in the last two minut
 are skipped. The app verifies each upload and resumes an interrupted open batch.
 Unmatched filenames upload privately and must be assigned in the web view before
 the batch can complete. Direct uploads are currently limited to 5 GiB per file.
+
+
+## Edited concert video uploads
+
+Open a prepared concert and choose **Upload Edited Concert Videos…**. Admin/staff
+or the assigned concert editor can select the folder of final MP4 exports. Include
+opening videos and studio slideshows, either as separate exports or within the
+concert edit. Files must have stopped changing for two minutes; filenames must
+be unique within the queue. This path accepts up to 500 files, each up to 5 GiB.
+Larger individual exports need the multipart upload UI (not implemented here).
+
+**Upload / Resume** hashes files, registers the entire queue, transfers missing
+files to private storage and verifies size/checksum. Queues persist across app
+restarts. After all files verify, **Finished Uploading** explicitly records the
+uploader and time. New/changed exports require uploading the current queue first.
+The tracker shows verified-file percentage, not partial-byte transfer percentage.
+
+Tracker 3.4 separately checks editing, all quality checks and approved studio file
+inclusions before showing Ready for studio. Uploading never sends an email or
+publishes media. Playback uses the existing progressive MP4 fallback; this upload
+path does not generate streaming renditions.

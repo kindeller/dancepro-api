@@ -2,6 +2,7 @@
 
 namespace App\Features\Payments\Services;
 
+use App\Features\Customers\Services\CustomerCommunicationPreferences;
 use App\Features\Media\Services\MediaCommerceSettings;
 use App\Features\Orders\Models\Order;
 use App\Features\Orders\Models\OrderMediaEntitlement;
@@ -21,7 +22,7 @@ class CustomerMediaNotifications
         if (! $order->user) {
             return null;
         }
-        $body = $this->settings->get('receipt_email_body')."\n\nOrder {$order->uuid}\n"
+        $body = $this->settings->get('receipt_email_body')."\n\nOrder ".$order->displayNumber()."\n"
             .'Total: $'.number_format($order->total_amount / 100, 2).' AUD (including $'
             .number_format($order->tax_amount / 100, 2).' GST).';
 
@@ -38,9 +39,9 @@ class CustomerMediaNotifications
             return null;
         }
         $label = ucfirst($entitlement->media_type);
-        $body = $this->settings->get('ready_email_body')."\n\n{$label} media from order {$order->uuid} is ready.";
+        $body = $this->settings->get('ready_email_body')."\n\n{$label} media from order ".$order->displayNumber().' is ready.';
 
-        return $this->dispatch($user, 'media_ready', "ready:{$order->id}:{$entitlement->media_type}",
+        return $this->dispatch($user, 'media_ready', "ready-entitlement:{$entitlement->id}",
             $this->settings->get('ready_email_subject'), $body, 'View my media', route('customer.checkout.show', $order),
             $order, $entitlement);
     }
@@ -63,7 +64,7 @@ class CustomerMediaNotifications
             }
             $date = $entitlement->expires_at->format('j M Y');
             $types = $entitlements->pluck('media_type')->unique()->map(fn (string $type): string => ucfirst($type))->join(' and ');
-            $body = $this->settings->get('expiry_email_body')."\n\n{$types} media from order {$order->uuid} expires on {$date}.";
+            $body = $this->settings->get('expiry_email_body')."\n\n{$types} media from order ".$order->displayNumber()." expires on {$date}.";
             $delivery = $this->dispatch($user, 'expiry_reminder', "expiry:{$order->id}:{$entitlement->expires_at->toDateString()}",
                 $this->settings->get('expiry_email_subject'), $body, 'Download my media', route('customer.checkout.show', $order),
                 $order, $entitlement, ['entitlement_ids' => $entitlements->pluck('id')->all()]);
@@ -81,7 +82,7 @@ class CustomerMediaNotifications
             default => 'expiry',
         };
         $subject = $this->settings->get($prefix.'_email_subject');
-        $body = $this->settings->get($prefix.'_email_body')."\n\nThis is a test using sample order DP-TEST-1001.";
+        $body = $this->settings->get($prefix.'_email_body')."\n\nThis is a test using sample order 100001.";
         $delivery = CustomerMediaNotification::create([
             'user_id' => $actor->id, 'type' => 'test_'.$template, 'deduplication_key' => 'test:'.Str::uuid(),
             'recipient_email' => $email, 'subject' => $subject, 'status' => 'queued', 'queued_at' => now(),
@@ -121,6 +122,6 @@ class CustomerMediaNotifications
 
     private function preference(User $user, string $key): bool
     {
-        return (bool) data_get($user->customerProfile?->preferences, $key, true);
+        return CustomerCommunicationPreferences::enabled($user, $key);
     }
 }

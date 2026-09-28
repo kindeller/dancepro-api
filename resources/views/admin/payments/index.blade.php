@@ -1,4 +1,4 @@
-@extends('layouts.admin', ['title' => 'Crew Payments · Payment Settings', 'heading' => 'Crew Payments', 'subheading' => 'Crew-specific rates in one compact table.'])
+@extends('layouts.admin', ['title' => 'Crew payments · Payment settings', 'heading' => 'Crew payments', 'subheading' => 'Crew-specific rates in one compact table.'])
 
 @section('content')
 @include('admin.timesheets._tabs')

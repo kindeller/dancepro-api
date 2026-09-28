@@ -58,7 +58,7 @@ class PublicConcertController extends Controller
         abort_unless($concert->isPubliclyAvailable(), 404);
 
         if (! $unlock->execute($concert, $request, $request->string('student_name')->toString(), $request->string('password')->toString())) {
-            return back()->withErrors(['password' => 'The concert password was not recognised.'])->onlyInput('student_name');
+            return back()->withErrors(['password' => 'The concert access code was not recognised.'])->onlyInput('student_name');
         }
 
         return redirect()->route('concerts.show', $concert);

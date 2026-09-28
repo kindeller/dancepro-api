@@ -3,7 +3,10 @@
 namespace App\Features\Bookings\Requests;
 
 use App\Features\Bookings\Support\ConcertBookingItemType;
+use App\Features\Bookings\Support\ConcertBookingRequirements;
+use App\Features\Customers\Services\StudioCommunicationHistory;
 use App\Features\Scheduling\Models\EventTypeDefinition;
+use App\Features\Studios\Models\Studio;
 use App\Features\Venues\Models\Venue;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -11,9 +14,24 @@ use Illuminate\Validation\Validator;
 
 class StoreConcertBookingRequest extends FormRequest
 {
+    private ?Studio $bookingStudio = null;
+
     public function authorize(): bool
     {
-        return true;
+        if (! $this->filled('studio')) {
+            return true;
+        }
+        if (! $this->user() || ! is_string($this->input('studio'))) {
+            return false;
+        }
+        $this->bookingStudio = Studio::query()->where('uuid', $this->input('studio'))->first();
+
+        return $this->bookingStudio && app(StudioCommunicationHistory::class)->canView($this->user(), $this->bookingStudio);
+    }
+
+    public function bookingStudio(): ?Studio
+    {
+        return $this->bookingStudio;
     }
 
     protected function prepareForValidation(): void
@@ -27,8 +45,10 @@ class StoreConcertBookingRequest extends FormRequest
                 return $item;
             })
             ->values()->all();
+        $hasPortrait = collect($items)->contains('item_type', ConcertBookingItemType::DressRehearsal->value);
         $this->merge([
-            'wants_portrait_photography' => $this->input('portrait_photography_interest') === 'yes',
+            'wants_portrait_photography' => $hasPortrait,
+            'portrait_photography_interest' => $hasPortrait ? 'yes' : 'no',
             'wants_concert_photography' => $this->boolean('wants_concert_photography'),
             'wants_concert_videography' => $this->boolean('wants_concert_videography'),
             'items' => $items,
@@ -41,6 +61,7 @@ class StoreConcertBookingRequest extends FormRequest
 
         return [
             'website' => ['nullable', 'prohibited'],
+            'studio' => ['nullable', 'uuid'],
             'studio_name' => ['required', 'string', 'max:255'],
             'contact_name' => ['required', 'string', 'max:255'],
             'contact_email' => ['required', 'email', 'max:255'],
@@ -51,7 +72,7 @@ class StoreConcertBookingRequest extends FormRequest
             'wants_concert_videography' => ['required', 'boolean'],
             'approximate_family_count' => [...$videoFieldPresence, 'integer', 'min:1', 'max:10000'],
             'postal_address' => [...$videoFieldPresence, 'string', 'max:2000'],
-            'previous_video_feedback' => [...$videoFieldPresence, 'string', 'max:5000'],
+            'previous_video_feedback' => ['nullable', 'string', 'max:5000'],
             'accepted_requirements' => ['required', 'array', 'min:1'],
             'accepted_requirements.*' => ['string', 'max:100'],
             'items' => ['required', 'array', 'min:1', 'max:20'],
@@ -72,13 +93,13 @@ class StoreConcertBookingRequest extends FormRequest
         return [function (Validator $validator): void {
             $required = ['accurate'];
             if ($this->input('portrait_photography_interest') === 'yes') {
-                $required = [...$required, 'portrait_space', 'no_personal_backdrop_photos'];
+                $required = [...$required, ...array_keys(ConcertBookingRequirements::PORTRAIT)];
             }
             if ($this->boolean('wants_concert_photography')) {
-                $required = [...$required, 'minimum_spend', 'photographer_seat', 'no_audience_recording', 'promote_gallery', 'credit_images'];
+                $required = [...$required, ...array_keys(ConcertBookingRequirements::PHOTO)];
             }
             if ($this->boolean('wants_concert_videography')) {
-                $required = [...$required, 'video_access', 'video_space_audio', 'programme_invoice'];
+                $required = [...$required, ...array_keys(ConcertBookingRequirements::VIDEO)];
             }
 
             $accepted = $this->input('accepted_requirements', []);
@@ -87,7 +108,7 @@ class StoreConcertBookingRequest extends FormRequest
             }
 
             if (! $this->boolean('wants_concert_photography') && ! $this->boolean('wants_concert_videography') && $this->input('portrait_photography_interest') === 'no') {
-                $validator->errors()->add('services', 'Please select at least one service or request portrait information.');
+                $validator->errors()->add('services', 'Please select photography or videography, or add a DR Portrait event.');
             }
 
             foreach ($this->input('items', []) as $index => $item) {

@@ -152,6 +152,34 @@ production reconciliation and refunds before live charges are enabled.
 Guest gallery access and the shared product, favourites and cart experience are
 implemented. Live payment remains outstanding.
 
+Administrators can now search customer accounts by name, email address or numeric
+account ID and open one account record containing its current favourites, carts,
+orders, complimentary grants, media emails and help requests. Admin competition
+and concert galleries expose an Add to account control on individual photos and
+routine/album folders. Competition routine grants may include the released video.
+The same grant action is available beside media in a customer's current favourites
+and cart. Complimentary grants create audited zero-value fulfilment records and
+normal protected entitlements, do not enter sales reporting, and skip files the
+customer already owns.
+
+The account record is now a tabbed customer service workspace containing customer
+details, dancers and studios, order and item-level refund records, event access,
+emails and help messages, notification history, per-asset download history, credit
+history and an administrative activity trail. Staff can send a recorded email, add
+credit, grant competition or concert access and pause or cancel sign-in. Refunds
+remain `pending_provider`: no money moves and no entitlement is removed until a
+payment provider confirms the result. See
+[ADR-0052](../decisions/ADR-0052-Customer-Service-Account-Workspace.md).
+
+Customer intelligence tabs add duplicate detection and confirmed account merging,
+contact-preference and consent history, login/device review, lifetime and average
+order value, repeat-purchase and event conversion reporting, refund/support outcome
+visibility, chargeback and payment-risk cases, internal notes/tags/follow-ups, JSON
+privacy export, contact correction and confirmed anonymisation. Gallery views,
+favourite/cart actions and purchases are recorded from this release forward; the
+software does not invent historical funnel activity. Retention anonymisation remains
+a deliberate staff action until a production retention policy is approved.
+
 Guest Gallery Access now provides a public gallery index with Competition and
 Concert tabs. Released events remain code-gated after email entry. An event is
 listed from seven days before it starts with a Coming soon — register now banner;
@@ -216,3 +244,213 @@ retain the photo's actual concert. Public gallery cards use a dedicated watermar
 parent-cover thumbnail. Next review the complete web journey before beginning the
 shared mobile clients; live payments remain last. See
 [ADR-0048](../decisions/ADR-0048-Concert-Parent-Albums-and-Covers.md).
+
+## Admin order detail
+
+The media sales order list and customer workspace link to one dedicated order detail page. It preserves the information needed to reconcile a sale: customer and event source, snapshotted filenames and product names, quantities, discounts, account credit, included GST, amount collected, provider transaction attempts, refunds, download activity and order-email delivery. Digital delivery is shown explicitly; print-lab shipping fields are not presented unless physical products are introduced.
+
+## Customer and sales workflow audit — 26 September 2026
+
+Completed a read-only review of customer accounts, sales/reporting, order processing,
+support, navigation and layout. Findings and proposed grouping are recorded in the
+[workflow audit](../handbook/Customer-Sales-Workflow-Audit-2026-09-26.md).
+No application fixes were made during this review. The existing Sail suite passed:
+723 tests and 6,639 assertions. Browser review reproduced a studio visitor-filter
+404 and identified navigation/layout gaps; code review found disconnected admin
+email preferences, mixed-order reporting inconsistencies and incomplete privacy
+handling. Recommended next step: fix those correctness gaps, add regression coverage,
+then consolidate the customer, sales and reports navigation. Live payment integration
+remains deferred as previously agreed.
+
+## Audit implementation pass — 26 September 2026
+
+The first implementation pass follows the audit's correctness-first sequence:
+
+- Studio visitor filters use the studio route, while visitor favourites/cart links
+  retain an event filter for individual events.
+- Shared communication preferences govern customer and administrator changes;
+  unchecked options revoke consent and ready notices deduplicate per entitlement.
+- Mixed orders report their item-level event allocations, preserving event-specific
+  discount totals. Sales overview and CSV distinguish cash, completed refunds and
+  net receipts; complimentary grants do not inflate customer purchase metrics.
+- Customer accounts use six primary page groups and contextual secondary tabs.
+  Editing and account actions moved off Overview. Histories paginate instead of
+  silently stopping at fixed limits, and only the selected account page loads its data.
+- Orders & refunds has a canonical all-order list, source/status/search filters,
+  refund history and unpaid payment-issue views. Refund and complimentary-access
+  actions now live on the individual order page, with contextual return links.
+- Sales & reports and Customers are separate navigation groups from Media. Dated
+  customer notes have a Due now / Upcoming / Completed follow-up queue.
+- Support can renew expired or revoked concert grants. Account merge handling
+  retains dancer aliases and verification, moves additional account histories, and
+  handles profile collisions. Privacy export covers more account records and
+  anonymisation redacts the stored soft-deleted profile and related contact data.
+
+Live payments and provider refund execution remain deferred. The audit is not
+fully closed: merge preview, unified email delivery history, fine-grained staff
+permissions, cash/credit refund completion, per-request download analytics,
+large-data report aggregation, background ZIP preparation and retention workflow
+still need separate implementation and validation. See the audit's implementation
+status for the exact boundaries of this pass.
+
+Verification: the final Sail suite passed **733 tests / 6,695 assertions**. Admin
+route registration, scoped Pint and whitespace checks passed. Browser checks covered
+the reorganised account/order/report pages and the corrected studio activity filter.
+No migration or commit was created by this pass.
+
+## Admin Top Pics workspace (26 September 2026)
+
+- Media now has a private Top Pics gallery with a Competition/Concert segmented
+  switch and one album per event that has verified uploader Top Pics.
+- Both backend photo galleries link to an event's Top Pics through the same
+  All photos / Top Pics navigation. Customer galleries and menus are unchanged.
+- Albums show section/competitor or concert/item context, in-place large previews,
+  previous/next controls, original download links and the shared translucent
+  Add to account control. Concert grants become available after verified photos
+  are synced into customer album records; unsynced photos remain previewable and
+  downloadable in this admin workspace.
+- Pages and original downloads require active admin permission. Selections use
+  existing ProgrammePhotoFile flags, current gallery plans and storage keys;
+  unverified and duplicate records are excluded. No extra originals are copied.
+  Downloads record the actor and source photo in the upload audit.
+- This workspace reads Top Pic flags already received by the backend. It does
+  not add post-upload uploader metadata synchronisation or kiosk export tooling.
+
+Verification: five focused feature tests passed (46 assertions), including
+customer/crew denial, event filters, original bytes, download auditing, obsolete
+plan exclusion and concert grants after sync. Browser review covered competition
+and concert album lists plus competition large previews and navigation. The full suite ran 738 tests: 737 passed and the existing
+`LocalDevelopmentSeederTest::test_seeder_creates_repeatable_linked_local_data`
+failed because a repeat seed added 8 collections and 40 assets. An isolated
+rerun of that test file passed (2 tests / 57 assertions), so the full-suite
+seeder failure remains intermittent and is not claimed as fixed. Scoped Pint,
+route registration and whitespace checks passed. No migrations or commits were
+created.
+
+### Duplicate demo Top Pics tidy-up (26 September 2026)
+
+The PDC realistic demo contained 46 selected file records pointing to 35 storage
+files. Eleven pairs had the same contribution, storage path, checksum and size.
+The local-only `TidyDemoTopPics` action retains the earliest photo identity as the
+selected Top Pic and clears the redundant selection flags. It keeps all photo
+records and files so favourites, carts, entitlements and existing downloads retain
+their targets; it does not hide reused sample images belonging to different items.
+The realistic demo seeder updates the earliest matching record and runs this tidy
+step to prevent repeated selections returning on reseed.
+
+Applied locally: 11 flags cleared; PDC now has 35 Top Pics and zero repeated
+selections within a routine. Prior selected identities are recorded privately in
+`maintenance/top-pics-before-2026-09-26.json` on the local storage disk. Seven
+focused tests passed (55 assertions), including idempotence, preservation of
+records and separate routines, and refusal outside the local environment.
+
+Final cleanup verification: full Sail suite passed **740 tests / 6,753 assertions**;
+scoped Pint and whitespace checks passed. Browser confirmed 35 Top Pics for PDC.
+
+### Publicity navigation (26 September 2026)
+
+Renamed the admin Media menu entry to Publicity and added shared Top Pics and
+TV Slideshows tabs on separate pages. Existing Top Pics links and its
+Competition/Concert switch remain available. The new TV page clearly states
+that playback and screen pairing are not connected yet.
+
+TV will reuse the Top Pics event/photo catalogue rather than create separate
+selections. Inspection confirmed that changing a star after upload currently
+saves only to the uploader's local library; verified uploads do not receive a
+metadata update. That sync remains required for both the backend gallery and
+future TV updates. No uploader sync or TV playback was implemented in this change.
+
+Browser review confirmed both pages and tab navigation. Route registration,
+scoped Pint and whitespace checks passed. Feature coverage includes tab links,
+event-type preservation and denial for guests, customers and non-admin crew.
+Full Sail suite passed **741 tests / 6,764 assertions**.
+
+### Post-upload Top Pics sync connected (26 September 2026)
+
+The missing uploader metadata path is now implemented: automatic durable star and
+unstar syncing, offline retries, restart recovery and pending/synced status. The
+shared Publicity catalogue reads updated flags on page load; no photo bytes are
+copied. See the Mac uploader milestone for scope and verification. All 744 Laravel
+and 89 Swift tests passed. TV playback and pairing remain the next separate task.
+
+### Orders page navigation layout (26 September 2026)
+
+All orders, Refunds and Payment issues now use the same page-tab presentation as
+Media sales, sharing one stylesheet partial. Sales reports is a separate button
+above the tabs. Existing page URLs, filtering and payment/refund behaviour remain
+unchanged. Browser review covered all three pages and the Media sales comparison;
+scoped Pint and whitespace checks passed.
+
+Orders navigation verification: full Sail suite passed **744 tests / 6,834 assertions**.
+
+### Interface wording audit — 26 September 2026
+
+- Audited navigation, headings, buttons and descriptions across admin, customer, studio and crew web templates. Canonical naming, changes and remaining content-review boundaries are recorded in `docs/handbook/Interface-Wording-Audit-2026-09-26.md`.
+- Aligned sales/orders/customer headings with navigation; standardised administrative labels, filter actions, download links, programme spelling and access-code terminology.
+- Corrected stale library/profile/crew-help copy and clarified that download history measures requests rather than confirmed saves.
+- Added a guarded update for three original default Help articles covering media access and global carts, preserving customised content and existing slugs; rollback follows the same guard.
+- Verification: the final complete Sail regression suite passed **746 tests / 6,843 assertions**. Scoped Pint and `git diff --check` passed. The Help migration ran successfully locally; dedicated tests verified guarded rollback and preservation of custom articles. Browser spot checks covered Orders & refunds (including Refunds), Sales reports and Customer performance, Customer accounts, Create download links, My Handbook and customer Help. No routes, permissions or financial calculations changed.
+- Next: use the audit glossary for future UI work; review staff-customised Help and email content before launch, preserving the existing notices for unfinished integrations.
+
+### Consistent Add to account placement — 26 September 2026
+
+- Audited all six grant-button call sites across competition routines/photos,
+  concert albums/photos, Top Pics and the shared customer favourites/cart view.
+- Standardised one shared translucent circular control: 39 px, bottom-right,
+  10 px inset. Removed corner and small-size variants. Anchors now surround only
+  the thumbnail; competition folder navigation remains separate from granting.
+- Recorded the component usage rule in the interface audit handbook.
+- Browser checks confirmed competition folders/photos, concert albums/photos,
+  Top Pics and customer favourites/cart placement. Grant dialogs opened and
+  cancelled correctly; no grants were submitted. Scoped Sail Pint and
+  `git diff --check` passed.
+- Full `sail artisan test --compact`: 745 of 746 tests passed (6,843 assertions).
+  The demo-seeder repeatability test reported 8 additional collections and 40
+  assets on a second seed. Isolated rerun with
+  `sail artisan test --compact --filter=LocalDevelopmentSeederTest` passed
+  both tests (57 assertions), indicating an intermittent fixture issue.
+  No seeder or grant business logic was changed for this placement task.
+
+### Publicity TV pilot — 26 September 2026
+
+TV Slideshows now has event settings, shared/event slides, scoped screen pairing,
+a live browser preview and an initial native Fire OS player. This work is tracked
+in [Publicity TV slideshows](Publicity-TV-Slideshows.md). The owner confirmed Fire
+OS; hardware testing awaits the delivered stick. Customer galleries and media
+access remain separate from TV pairing. Verification and remaining rollout work
+are recorded in that milestone.
+
+TV pilot verification: all **751 Laravel tests / 6,913 assertions** and four
+offline browser tests passed. Fire OS debug APK compiled and linted; physical
+stick installation and endurance testing remain outstanding.
+
+### Studio Hub media login codes — 27 September 2026
+
+- Photo gallery released shows the studio's photo gallery login code when available.
+  Video released to dancers shows the applicable grouped or individual concert video
+  login code after studio-owner video approval is recorded. Available codes appear
+  as compact right-hand “Access Code:” badges beside the progress status; code text
+  can be selected for copying. Long codes wrap within the badge on narrow screens.
+- Existing Studio Hub management authorisation and private/no-store caching remain.
+  Ordinary verified studio customers and revoked managers cannot view these codes.
+  DR portrait events have no video-code row. Codes do not alter release status.
+- Photo and grouped video codes now retain hidden encrypted display copies on save.
+  Current hashes remain authoritative. Legacy hash-only codes have no badge and
+  can be re-entered once by staff. This presentation change does not reset codes.
+- Migration applied locally. Down removes only new encrypted display columns;
+  hashes, grants and verification history remain. See ADR-0057.
+- Next action: re-enter any known legacy code that needs to appear in Studio Hub;
+  no code changes were made during implementation or visual verification.
+- Verification: all 863 Laravel tests passed (8,353 assertions), including current
+  code selection, group rotation/encryption, missing/legacy/stale-code handling,
+  ordinary-customer denial and revoked-manager denial. Scoped Pint and whitespace
+  checks passed. Desktop (1440px) and mobile (390px) browser checks passed using
+  temporary demonstration codes; all preview database changes were rolled back.
+
+Badge/approval follow-up verification: full Laravel suite passed (865 tests,
+8,377 assertions); after the approval requirement was added during that run,
+`BookingDeliveryConnectionsTest` was rerun against the final code and passed.
+The checks cover hidden unapproved individual/group codes, approval revealing
+only the applicable concert code, and withdrawal hiding it again. Scoped Pint,
+whitespace checks, and desktop/mobile browser layout checks passed. Preview-only
+demonstration codes and approvals were rolled back; no live values were changed.

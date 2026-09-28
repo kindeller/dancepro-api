@@ -9,4 +9,5 @@ enum ConcertAccessGrantSource: string
     case StaffAssignment = 'staff_assignment';
     case Order = 'order';
     case LegacyImport = 'legacy_import';
+    case AdminSupport = 'admin_support';
 }

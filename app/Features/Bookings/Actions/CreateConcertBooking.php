@@ -3,17 +3,21 @@
 namespace App\Features\Bookings\Actions;
 
 use App\Features\Bookings\Models\ConcertBooking;
+use App\Features\Bookings\Services\ConcertBookingSummary;
+use App\Features\Studios\Models\Studio;
 use App\Features\Venues\Models\Venue;
 use Illuminate\Support\Facades\DB;
 
 class CreateConcertBooking
 {
-    public function execute(array $data): ConcertBooking
-    {
-        $data = collect($data)->except('website')->all();
-        $fingerprint = $this->fingerprint($data);
+    public function __construct(private readonly ConcertBookingSummary $summary) {}
 
-        return DB::transaction(function () use ($data, $fingerprint): ConcertBooking {
+    public function execute(array $data, ?Studio $studio = null): ConcertBooking
+    {
+        $data = collect($data)->except(['website', 'studio'])->all();
+        $fingerprint = $this->fingerprint([...$data, 'studio_uuid' => $studio?->uuid]);
+
+        return DB::transaction(function () use ($data, $fingerprint, $studio): ConcertBooking {
             $duplicate = ConcertBooking::query()
                 ->where('submission_fingerprint', $fingerprint)
                 ->where('created_at', '>=', now()->subMinutes((int) config('concerts.booking_duplicate_window_minutes')))
@@ -27,6 +31,7 @@ class CreateConcertBooking
             $booking = ConcertBooking::query()->create([
                 ...collect($data)->except('items')->all(),
                 'submission_fingerprint' => $fingerprint,
+                'studio_id' => $studio?->id,
             ]);
             $items = collect($data['items'])->map(function (array $item): array {
                 $venueUuid = $item['venue_uuid'];
@@ -50,6 +55,7 @@ class CreateConcertBooking
                 return $item;
             })->all();
             $booking->items()->createMany($items);
+            $booking->forceFill(['submission_snapshot' => $this->summary->snapshot($booking, $data)])->save();
 
             return $booking;
         });
