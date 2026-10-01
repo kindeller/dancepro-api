@@ -40,7 +40,7 @@ class CompetitionCustomerPreview
                 ->where('programme_photo_files.uuid', $data['presentation']['cover_uuid'])->addSelect('contributions.item_uuid')->first()?->item_uuid : null;
             if ($item && isset($allowed[$item])) {
                 $coverUrl = route($imageRoute, ['schedulingEvent' => $event,
-                    'photo' => $data['presentation']['cover_uuid'], 'size' => 'thumbnail']);
+                    'photo' => $data['presentation']['cover_uuid'], 'size' => 'cover']);
             }
         }
 

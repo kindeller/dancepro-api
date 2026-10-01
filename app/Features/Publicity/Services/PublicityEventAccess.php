@@ -21,7 +21,7 @@ class PublicityEventAccess
         }
         $code = match ($event->event_type->value) {
             'competition' => CompetitionGallerySetting::where('scheduling_event_id', $event->id)->value('login_code_hash'),
-            'concert' => $event->studio?->status->value === 'active' ? $event->studio->gallery_code_hash : null,
+            'concert' => $event->studio?->status->value === 'active' ? $event->studio->photoAccessFingerprint() : null,
             default => null,
         };
 
@@ -43,8 +43,8 @@ class PublicityEventAccess
 
     public function studioVersion(Studio $studio): ?string
     {
-        return $studio->status->value === 'active' && $studio->gallery_code_hash
-            ? hash('sha256', $studio->uuid.':'.$studio->gallery_code_hash) : null;
+        return $studio->status->value === 'active' && $studio->photoAccessFingerprint()
+            ? hash('sha256', $studio->uuid.':'.$studio->photoAccessFingerprint()) : null;
     }
 
     public function studioLink(Studio $studio): ?string

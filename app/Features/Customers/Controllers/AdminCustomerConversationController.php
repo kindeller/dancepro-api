@@ -13,14 +13,14 @@ class AdminCustomerConversationController extends Controller
 {
     public function show(Request $request, CustomerSupportRequest $conversation, CustomerConversations $conversations)
     {
-        return response()->view('admin.customers.conversation', $conversations->page($conversation, $request->user(), true))->header('Cache-Control', 'private, no-store');
+        return redirect()->route('admin.messages.index', ['channel' => data_get($conversation->context, 'message_audience', 'customer'), 'thread' => $conversation->uuid]);
     }
 
     public function reply(ReplyCustomerConversationRequest $request, CustomerSupportRequest $conversation, CustomerConversations $conversations)
     {
         $conversations->reply($conversation, $request->user(), $request->validated(), true);
 
-        return back()->with('status', 'Reply added to the customer conversation and queued for email.');
+        return back()->with('status', 'Reply added to the conversation and queued for email.');
     }
 
     public function attachment(Request $request, CustomerSupportMessage $message, CustomerConversations $conversations)

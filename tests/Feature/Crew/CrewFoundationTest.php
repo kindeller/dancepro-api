@@ -42,6 +42,40 @@ class CrewFoundationTest extends TestCase
 
         $this->assertNull($profile->monthsOfService());
         $this->assertNull($profile->completedYearsOfService());
+        $this->assertNull($profile->biographyDueDate());
+    }
+
+    public function test_biography_deadline_follows_start_date_and_only_unfinished_biographies_become_overdue(): void
+    {
+        $this->travelTo(Carbon::parse('2026-09-28 12:00:00'));
+        $user = User::factory()->crew()->create();
+        $profile = CrewProfile::factory()->for($user)->create([
+            'commencement_date' => '2026-08-31',
+            'biography' => null,
+        ]);
+
+        $this->assertSame('2026-09-28', $profile->biographyDueDate()->toDateString());
+        $this->assertSame('2026-08-31', $profile->commencement_date->toDateString());
+        $this->actingAs($user)->get(route('crew.profile.edit'))->assertOk()
+            ->assertSee('Due 28 Sep 2026')->assertDontSee('biography-status is-overdue');
+
+        $this->travelTo(Carbon::parse('2026-09-29 00:01:00'));
+        $this->get(route('crew.profile.edit'))->assertOk()
+            ->assertSee('Overdue 28 Sep 2026')->assertSee('biography-status is-overdue');
+
+        $profile->update(['biography' => 'I enjoy capturing performances.']);
+        $user->unsetRelation('crewProfile');
+        $this->get(route('crew.profile.edit'))->assertOk()
+            ->assertSee('Biography complete')->assertDontSee('biography-status is-overdue');
+
+        $profile->update(['biography' => null, 'commencement_date' => '2026-09-15']);
+        $user->unsetRelation('crewProfile');
+        $this->get(route('crew.profile.edit'))->assertOk()->assertSee('Due 13 Oct 2026');
+
+        $profile->update(['commencement_date' => null]);
+        $user->unsetRelation('crewProfile');
+        $this->get(route('crew.profile.edit'))->assertOk()->assertSee('Due date awaiting your start date.');
+        $this->travelBack();
     }
 
     public function test_crew_roles_have_an_explicit_qualification_status(): void
@@ -126,6 +160,9 @@ class CrewFoundationTest extends TestCase
             ->assertSee('password-dialog', false)
             ->assertSee('Sign out')
             ->assertSee('Current Crew Agreement')
+            ->assertSeeInOrder(['Contact and clothing', 'Biography', 'Personal and emergency details'])
+            ->assertSee('When did you join DancePro?')
+            ->assertSee('dancepro-crew-hub-outline.png')
             ->assertSee('Working With Children Check')
             ->assertDontSee('Private administrator note.')
             ->assertDontSee('Admin-managed camera list.')
@@ -134,6 +171,7 @@ class CrewFoundationTest extends TestCase
 
         $this->actingAs($user)->put(route('crew.profile.update'), [
             'preferred_name' => 'Alex Updated',
+            'biography' => 'I joined DancePro in 2026. I love capturing live performances.',
             'legal_name' => 'Alex Example',
             'email' => 'alex.updated@dancepro.test',
             'phone' => '0412 345 678',
@@ -155,6 +193,8 @@ class CrewFoundationTest extends TestCase
 
         $profile->refresh();
         $this->assertSame('Alex Updated', $profile->preferred_name);
+        $this->assertSame('I joined DancePro in 2026. I love capturing live performances.', $profile->biography);
+        $this->get(route('crew.profile.edit'))->assertOk()->assertSee($profile->biography);
         $this->assertSame('alex.updated@dancepro.test', $user->refresh()->email);
         $this->assertSame('WWC123456', $profile->working_with_children_number);
         $this->assertSame('Private administrator note.', $profile->internal_notes);
@@ -173,8 +213,9 @@ class CrewFoundationTest extends TestCase
 
         $this->actingAs($user)->put(route('crew.profile.update'), [
             'preferred_name' => 'Alex',
+            'biography' => str_repeat('x', 5001),
             'email' => $user->email,
-        ])->assertSessionHasErrors(['phone', 'address_line_1', 'suburb', 'state', 'postcode', 'working_with_children_number', 'working_with_children_expiry']);
+        ])->assertSessionHasErrors(['biography', 'phone', 'address_line_1', 'suburb', 'state', 'postcode', 'working_with_children_number', 'working_with_children_expiry']);
 
         $this->assertNull($user->refresh()->onboarding_completed_at);
     }

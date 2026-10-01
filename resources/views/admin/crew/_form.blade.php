@@ -5,6 +5,8 @@
 
 <div class="grid two-col">
     <div class="grid">
+        <label>First name<input name="first_name" value="{{ old('first_name', $crewProfile?->user?->first_name) }}" required maxlength="255" autocomplete="given-name"></label>
+        <label>Last name<input name="last_name" value="{{ old('last_name', $crewProfile?->user?->last_name) }}" maxlength="255" autocomplete="family-name"></label>
         <label>Preferred name<input name="preferred_name" value="{{ old('preferred_name', $crewProfile?->preferred_name) }}" required maxlength="255"></label>
         <label>Legal name<input name="legal_name" value="{{ old('legal_name', $crewProfile?->legal_name) }}" maxlength="255"></label>
         <label>Email<input type="email" name="email" value="{{ old('email', $crewProfile?->user?->email) }}" required maxlength="255"></label>

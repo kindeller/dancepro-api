@@ -2,6 +2,7 @@
 
 namespace App\Features\Customers\Services;
 
+use App\Features\Programmes\Services\CompetitionFolderCovers;
 use App\Features\Programmes\Services\CompetitionGallery;
 use App\Features\Scheduling\Models\SchedulingEvent;
 
@@ -26,6 +27,8 @@ class CustomerImprovisationRoutines
             return ['uuid' => $item['uuid'], 'label' => $item['label'],
                 'section' => $section['label'] ?? null, 'day' => $day['label'] ?? null];
         })->values()->all();
+
+        $routines = app(CompetitionFolderCovers::class)->apply(array_map(fn (array $routine) => $routine + ['kind' => 'item'], $routines), $nodes, $event);
 
         return ['event' => $event, 'routines' => $routines, 'title' => $data['presentation']['title']];
     }

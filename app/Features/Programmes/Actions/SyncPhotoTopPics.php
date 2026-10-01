@@ -2,6 +2,7 @@
 
 namespace App\Features\Programmes\Actions;
 
+use App\Features\Media\Services\ConcertPhotoGallerySetup;
 use App\Features\Programmes\Models\ProgrammePhotoFile;
 use App\Features\Programmes\Models\ProgrammePhotoGallery;
 use App\Features\Programmes\Policies\ProgrammePolicy;
@@ -40,6 +41,7 @@ class SyncPhotoTopPics
                 if ($target->id !== $file->id && $file->is_top_pic !== $selected) {
                     $file->update(['is_top_pic' => $selected]);
                 }
+                app(ConcertPhotoGallerySetup::class)->syncVerifiedPhoto($event, $target);
                 $receipts[] = ['file_uuid' => $file->uuid, 'change_uuid' => strtolower($change['change_uuid']), 'is_top_pic' => $selected];
             }
 

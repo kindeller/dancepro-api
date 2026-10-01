@@ -2,10 +2,12 @@
 
 namespace App\Features\Customers\Services;
 
+use App\Features\Bookings\Models\ConcertBookingItem;
 use App\Features\Concerts\Services\ConcertDirectorReviews;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Customers\Models\CustomerStudio;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\StudioBilling\Models\StudioInvoice;
 use App\Features\Studios\Models\Studio;
 use App\Features\Studios\Models\StudioAccountAccess;
 use App\Features\Tracking\Mail\StudioConversationReply;
@@ -28,7 +30,7 @@ class StudioCommunicationHistory
     public function inbox(): array
     {
         $studioIds = StudioConversationMessage::query()->pluck('studio_id')
-            ->merge(ConcertTrackerEmailDelivery::query()->whereNotNull('scheduling_event_id')->with('event:id,studio_id')->get()->pluck('event.studio_id'))
+            ->merge(ConcertTrackerEmailDelivery::query()->whereNull('photo_release_group_id')->whereNotNull('scheduling_event_id')->with('event:id,studio_id')->get()->pluck('event.studio_id'))
             ->filter()->unique();
         $studios = Studio::query()->whereIn('id', $studioIds)->with(['contacts', 'concerts'])->orderBy('name')->get();
         $latest = StudioConversationMessage::query()->with('event')->latest('sent_at')->get()->unique('studio_id')->keyBy('studio_id');
@@ -39,16 +41,11 @@ class StudioCommunicationHistory
         return compact('studios', 'latest', 'unread', 'threads');
     }
 
-    public function forUser(User $user, Studio $studio, bool $markMessagesRead = true): array
+    public function forUser(User $user, Studio $studio): array
     {
         abort_unless($this->canView($user, $studio), 403);
 
-        if ($markMessagesRead) {
-            StudioConversationMessage::query()->where('studio_id', $studio->id)
-                ->where('direction', 'from_dancepro')->whereNull('studio_read_at')->update(['studio_read_at' => now()]);
-        }
-
-        $deliveries = ConcertTrackerEmailDelivery::query()
+        $deliveries = ConcertTrackerEmailDelivery::query()->whereNull('photo_release_group_id')
             ->with('event')
             ->whereHas('event', fn ($events) => $events->where('studio_id', $studio->id))
             ->where('status', 'sent')
@@ -61,21 +58,26 @@ class StudioCommunicationHistory
 
         $webMessages = StudioConversationMessage::query()->with(['event', 'attachments'])->where('studio_id', $studio->id)->get();
         $communications = $deliveries->map(fn ($delivery): array => [
+            'source' => 'email', 'uuid' => $delivery->uuid, 'read_at' => $delivery->studio_read_at,
             'direction' => 'from_dancepro', 'subject' => $delivery->subject, 'body' => $delivery->body,
             'contact' => $delivery->recipient_email, 'event' => $delivery->event?->name,
             'event_uuid' => $delivery->event?->uuid,
             'occurred_at' => $delivery->sent_at ?? $delivery->scheduled_at ?? $delivery->created_at,
             'status' => ($delivery->is_simulated ? 'Test · ' : '').$delivery->status, 'attachments' => collect(),
         ])->concat($inbound->map(fn ($message): array => [
+            'source' => 'inbound', 'uuid' => $message->uuid, 'read_at' => null,
             'direction' => 'to_dancepro', 'subject' => $message->subject, 'body' => $message->body,
             'contact' => $message->sender_email, 'event' => $message->event?->name,
             'event_uuid' => $message->event?->uuid,
             'occurred_at' => $message->received_at, 'status' => 'received', 'attachments' => collect(),
         ]))->concat($webMessages->map(fn ($message): array => [
+            'source' => 'message', 'uuid' => $message->uuid, 'read_at' => $message->studio_read_at,
             'direction' => $message->direction, 'subject' => $message->subject, 'body' => $message->body,
             'contact' => $message->sender_email ?: $message->recipient_email, 'event' => $message->event?->name,
             'event_uuid' => $message->event?->uuid,
-            'occurred_at' => $message->sent_at, 'status' => 'sent in DancePro', 'attachments' => $message->attachments,
+            'occurred_at' => $message->sent_at ?? $message->created_at, 'status' => match ($message->channel) {
+                'booking_receipt' => 'Booking notification', 'payment_receipt' => 'Payment received', default => 'sent in DancePro'
+            }, 'attachments' => $message->attachments,
         ]))->sortByDesc('occurred_at')->values();
 
         $events = $this->studioEvents($studio);
@@ -160,7 +162,7 @@ class StudioCommunicationHistory
         return $this->contactEmails($studio)->contains($email);
     }
 
-    private function contactEmails(Studio $studio): Collection
+    public function contactEmails(Studio $studio): Collection
     {
         $studio->loadMissing(['contacts', 'accountAccesses']);
 
@@ -176,18 +178,17 @@ class StudioCommunicationHistory
             return null;
         }
 
-        return $studio->concerts()->whereHas('bookingItem.schedulingEvent', fn ($events) => $events->where('uuid', $uuid))
-            ->with('bookingItem.schedulingEvent')->firstOrFail()->bookingItem->schedulingEvent;
+        return SchedulingEvent::where('studio_id', $studio->id)->where('uuid', $uuid)->firstOrFail();
     }
 
     private function forUserData(Studio $studio): array
     {
-        $deliveries = ConcertTrackerEmailDelivery::with('event')->whereHas('event', fn ($events) => $events->where('studio_id', $studio->id))->whereIn('status', ['queued', 'scheduled', 'sent'])->get();
+        $deliveries = ConcertTrackerEmailDelivery::with('event')->whereNull('photo_release_group_id')->whereHas('event', fn ($events) => $events->where('studio_id', $studio->id))->whereIn('status', ['queued', 'scheduled', 'sent'])->get();
         $inbound = ConcertTrackerInboundEmail::with('event')->whereHas('event', fn ($events) => $events->where('studio_id', $studio->id))->get();
         $web = StudioConversationMessage::with(['event', 'attachments'])->where('studio_id', $studio->id)->get();
         $communications = $deliveries->map(fn ($m) => ['direction' => 'from_dancepro', 'subject' => $m->subject, 'body' => $m->body, 'contact' => $m->recipient_email, 'event' => $m->event?->name, 'event_uuid' => $m->event?->uuid, 'occurred_at' => $m->sent_at ?? $m->created_at, 'status' => $m->status, 'attachments' => collect()])
             ->concat($inbound->map(fn ($m) => ['direction' => 'to_dancepro', 'subject' => $m->subject, 'body' => $m->body, 'contact' => $m->sender_email, 'event' => $m->event?->name, 'event_uuid' => $m->event?->uuid, 'occurred_at' => $m->received_at, 'status' => 'received', 'attachments' => collect()]))
-            ->concat($web->map(fn ($m) => ['direction' => $m->direction, 'subject' => $m->subject, 'body' => $m->body, 'contact' => $m->sender_email ?: $m->recipient_email, 'event' => $m->event?->name, 'event_uuid' => $m->event?->uuid, 'occurred_at' => $m->sent_at, 'status' => 'sent in DancePro', 'attachments' => $m->attachments]))
+            ->concat($web->map(fn ($m) => ['direction' => $m->direction, 'subject' => $m->subject, 'body' => $m->body, 'contact' => $m->sender_email ?: $m->recipient_email, 'event' => $m->event?->name, 'event_uuid' => $m->event?->uuid, 'occurred_at' => $m->sent_at, 'status' => $m->channel === 'booking_receipt' ? 'Booking notification' : 'sent in DancePro', 'attachments' => $m->attachments]))
             ->sortByDesc('occurred_at')->values();
         $events = $this->studioEvents($studio);
 
@@ -211,11 +212,11 @@ class StudioCommunicationHistory
     {
         return SchedulingEvent::query()->where('studio_id', $studio->id)
             ->with([
-                'concertBookingItem.booking', 'concertBookingItem.concert.codeGroup', 'venue', 'shifts.assignments.crewProfile.user', 'shifts.assignments.role',
+                'concertBookingItem.booking.items', 'concertBookingItem.concert.codeGroup', 'venue', 'shifts.assignments.crewProfile.user', 'shifts.assignments.role',
                 'roleRequirements.crewRole', 'roleSeats', 'studioFiles.uploadedBy', 'studioEventAcknowledgements',
                 'studioBookingChangeRequests.requestedBy',
             ])
-            ->orderByDesc('event_date')->get();
+            ->orderBy('event_date')->orderBy('id')->get();
     }
 
     private function hub(Collection $events, Collection $communications, Studio $studio, User $user): array
@@ -279,22 +280,28 @@ class StudioCommunicationHistory
                 [
                     'label' => 'Booking confirmed',
                     'status' => $bookingItem?->approval_status === 'approved' ? 'complete' : 'waiting',
-                    'detail' => 'DancePro',
+                    'detail' => $bookingItem?->approval_status === 'approved'
+                        ? 'Your booking and selected services are confirmed.'
+                        : 'DancePro will review your booking and confirm the selected services.',
                     'url' => null,
                 ],
                 [
                     'label' => 'Crew assigned',
                     'status' => $sourceState('crew_ready'),
-                    'detail' => $crew->isNotEmpty() && $crew->every('published')
-                        ? $crew->pluck('name')->map(fn (string $name): string => str($name)->before(' ')->toString())->unique()->join(', ')
-                        : 'DancePro',
+                    'detail' => match (true) {
+                        $crew->isNotEmpty() && $crew->every('published') => 'Your assigned crew: '.$crew->pluck('name')->map(fn (string $name): string => str($name)->before(' ')->toString())->unique()->join(', ').'.',
+                        $sourceState('crew_ready') === 'complete' => 'Crew arrangements are confirmed for your event.',
+                        default => 'DancePro is arranging crew for the services in your booking.',
+                    },
                     'url' => null,
                 ],
                 (($isConcert && $booking?->wants_concert_photography) || $portraitRequired) ? [
                     'label' => 'Photo gallery released',
                     'loginCode' => $photoLogin,
                     'status' => $sourceState('photo_release'),
-                    'detail' => 'DancePro',
+                    'detail' => $sourceState('photo_release') === 'complete'
+                        ? 'Your photos are available to view and order. Share the gallery access code with your dancers and families.'
+                        : 'Your gallery will be available here after DancePro has uploaded and released the photos.',
                     'url' => $concert && $sourceState('photo_release') === 'complete'
                         ? route('customer.concerts.photos.show', $concert) : null,
                 ] : null,
@@ -302,22 +309,26 @@ class StudioCommunicationHistory
                     'label' => 'Concert video released',
                     'loginCode' => $videoReleased ? $this->loginCodes->video($concert, $studio) : null,
                     'status' => $videoReleased ? 'complete' : 'waiting',
-                    'detail' => $videoReleased ? 'Share the access code with your dancers and families.' : 'Waiting for studio review and release.',
+                    'detail' => $videoReview['releaseDetail'],
                     'url' => $videoReleased ? route('concerts.show', $concert) : null,
                 ] : null,
             ])->filter()->values();
+            $numbersTask = $sourceTasks->get('final_numbers_received');
+            $detailsDueDate = ($numbersTask['override'] ?? null)?->due_date_override ?? ($numbersTask['dueDate'] ?? null);
             $checklist = collect([
                 $videoReview && ($videoReview['url'] || $videoReleased) ? $this->hubTask('video_review', $videoReview['label'], $videoReleased, null, $videoReview['instruction']) : null,
-                $this->hubTask('booking', 'Check booking details', $bookingItem?->approval_status === 'approved', null,
-                    'Review the date, venue, times and booked services. Send a change request if anything is incorrect.'),
+                $this->hubTask('event_details', 'Confirm event details', $event->studioEventAcknowledgements->contains('requirement', 'event_details'), $detailsDueDate,
+                    'Please check that arrival/setup times, start and finish times, date and venue are correct. Click Request changes as soon as possible if there are any errors.'),
                 $portraitRequired ? $this->hubTask('portrait_requirements', 'Confirm portrait shoot requirements', $portraitRequirementsComplete, $concertDate?->copy()->subDay(),
                     'Confirm the portrait area is ready and every dancer will be brought for their photo.') : null,
-                $this->hubTask('seating', 'Enter reserved seats', $seatingComplete, $seatedRoles->isNotEmpty() ? $concertDate?->copy()->subDays(7) : null,
-                    $seatedRoles->isEmpty() ? 'No auditorium seats are required for this event.' : 'Enter the row and seat for every photography and videography position.'),
-                $this->hubTask('programme', 'Upload programme', ! $isConcert || $programme !== null, $isConcert ? $concertDate?->copy()->subDays(7) : null,
-                    $isConcert ? 'Upload the programme for this event. PDF is preferred, but other file types are accepted.' : 'A programme is not required for this event.'),
-                $this->hubTask('video', 'Upload videos and slideshows', ! $videoRequired || $videos->isNotEmpty(), $videoRequired ? $concertDate?->copy()->addDays(2) : null,
-                    $videoRequired ? 'Upload every opening video, slideshow or supplied clip for this concert.' : 'No studio video files are required for the booked services.'),
+                $isConcert && $booking ? $this->hubTask('families', 'Confirm final family numbers', (bool) $booking->family_count_confirmed_at, $sourceTasks->get('final_numbers_received')['dueDate'] ?? null,
+                    'Confirm one total of unique performing families across all concerts in this booking.') : null,
+                $isConcert && $seatedRoles->isNotEmpty() ? $this->hubTask('seating', 'Enter reserved seats', $seatingComplete, ($sourceTasks->get('final_numbers_received')['dueDate'] ?? null),
+                    'Enter the row and seat for every photography and videography position.') : null,
+                $isConcert ? $this->hubTask('programme', 'Upload programme', $programme !== null, ($sourceTasks->get('programme_prepared')['dueDate'] ?? null),
+                    'Upload the programme for this event. PDF is preferred, but other file types are accepted.') : null,
+                $videoRequired ? $this->hubTask('video', 'Upload videos and slideshows', $videos->isNotEmpty(), $concertDate?->copy()->addDays(2),
+                    'Upload every opening video, slideshow or supplied clip for this concert.') : null,
             ])->filter()->values();
 
             return [
@@ -342,6 +353,9 @@ class StudioCommunicationHistory
                 'videoReview' => $videoReview,
                 'changeRequests' => $event->studioBookingChangeRequests,
                 'checklist' => $checklist,
+                'actionCount' => $checklist->where('complete', false)->count(),
+                'overdueCount' => $checklist->where('overdue', true)->count(),
+                'overdueTasks' => $checklist->where('overdue', true)->pluck('label')->values(),
                 'completeCount' => $checklist->where('complete', true)->count(),
                 'totalCount' => $checklist->count(),
                 'nextTask' => $checklist->firstWhere('complete', false),
@@ -349,11 +363,18 @@ class StudioCommunicationHistory
             ];
         });
 
+        $pendingEvents = ConcertBookingItem::awaitingApproval()
+            ->whereHas('booking', fn ($query) => $query->where('studio_id', $studio->id)->whereNotNull('submission_snapshot'))
+            ->with('booking')->orderBy('event_date')->orderBy('id')->get();
+
         return [
+            'pendingEvents' => $pendingEvents,
             'events' => $eventCards,
             'upcomingCount' => $eventCards->filter(fn (array $card): bool => $card['event']->event_date?->copy()->endOfDay()->isFuture() ?? false)->count(),
-            'actionCount' => $eventCards->sum(fn (array $card): int => $card['totalCount'] - $card['completeCount']),
-            'messageCount' => $communications->count(),
+            'actionCount' => $eventCards->sum('actionCount'),
+            'overdueCount' => $eventCards->sum('overdueCount'),
+            'invoiceCount' => StudioInvoice::where('studio_id', $studio->id)->where('status', 'issued')->with('payments')->get()->filter(fn ($invoice) => $invoice->balanceCents() > 0)->count(),
+            'messageCount' => $communications->where('direction', 'from_dancepro')->whereNull('read_at')->count(),
         ];
     }
 
@@ -368,6 +389,12 @@ class StudioCommunicationHistory
             'label' => 'Review & release concert video',
             'complete' => $released,
             'status' => $released ? 'Complete' : ($ready ? 'Ready for review' : 'Not ready'),
+            'releaseDetail' => match (true) {
+                $released => 'Your concert video is available. Share the access code with your dancers and families.',
+                (bool) $data['canRelease'] => 'Ready for your studio owner or director to review and release in Your actions.',
+                $data['review']->revision > 0 => 'DancePro is preparing the requested corrections. We will email you when the updated video is ready for review.',
+                default => 'Not yet ready for review. DancePro will email you when your concert video is ready for your studio owner or director to review and release.',
+            },
             'instruction' => match (true) {
                 $released => 'Your concert video has been released to dancers and families.',
                 ! $canReview => 'The studio owner or director will review and release this concert video.',

@@ -2,34 +2,20 @@
 
 namespace App\Features\Tracking\Requests;
 
-use App\Features\Tracking\Services\BookingTrackerBar;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UpdateBookingTrackerBarRequest extends FormRequest
+class UpdateBookingTrackerBarRequest extends UpdateTaskTrackerBarRequest
 {
-    public function authorize(): bool
-    {
-        return $this->user()?->can('manageScheduling') ?? false;
-    }
-
     public function rules(): array
     {
         $panel = $this->input('panel');
 
-        return [
-            'panel' => ['required', Rule::in(['status', 'due', 'assignment', 'follow_up'])],
-            'status_override' => [Rule::excludeIf($panel !== 'status'), 'present', 'nullable', Rule::in([...array_keys(BookingTrackerBar::STATUSES), 'approved'])],
-            'studio_uuid' => [Rule::excludeIf($panel !== 'status' || $this->input('status_override') !== 'approved'), 'nullable', 'uuid', Rule::exists('studios', 'uuid')->whereNull('deleted_at')],
-            'due_date_override' => [Rule::excludeIf($panel !== 'due'), 'present', 'nullable', 'date_format:Y-m-d'],
-            'assignee_user_id' => [Rule::excludeIf($panel !== 'assignment'), 'present', 'nullable', 'integer', function ($attribute, $value, $fail): void {
-                if (! app(BookingTrackerBar::class)->assignees()->whereKey($value)->exists()) {
-                    $fail('Choose an active staff or crew member.');
-                }
-            }],
-            'follow_up_status' => [Rule::excludeIf($panel !== 'follow_up'), 'required', Rule::in(array_keys(BookingTrackerBar::FOLLOW_UP_STATUSES))],
-            'follow_up_date' => [Rule::excludeIf($panel !== 'follow_up'), 'present', 'nullable', 'date_format:Y-m-d'],
-            'note' => [Rule::excludeIf($panel !== 'follow_up'), 'nullable', 'string', 'max:3000'],
-        ];
+        return array_replace(parent::rules(), [
+            'status_override' => [Rule::excludeIf($panel !== 'status'), 'required', Rule::in(['pending', 'received', 'approved', 'partial_approval', 'cancelled'])],
+            'studio_uuid' => [Rule::excludeIf($panel !== 'status' || ! in_array($this->input('status_override'), ['approved', 'partial_approval'], true)), 'nullable', 'uuid', Rule::exists('studios', 'uuid')->whereNull('deleted_at')],
+            'event_ids' => [Rule::excludeIf($panel !== 'status' || $this->input('status_override') !== 'partial_approval'), 'required', 'array', 'min:1'],
+            'event_ids.*' => ['uuid', 'distinct'],
+            'reason' => [Rule::excludeIf($panel !== 'status' || $this->input('status_override') !== 'cancelled'), 'required', 'string', 'max:3000'],
+        ]);
     }
 }

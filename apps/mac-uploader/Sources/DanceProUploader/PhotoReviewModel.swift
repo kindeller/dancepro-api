@@ -9,6 +9,20 @@ enum ReviewUndoAction { case trash, move }
 final class PhotoReviewModel: ObservableObject {
   @Published var local: LocalEvent
   @Published var photographerSelection: PhotographerSelection?
+  @Published private(set) var confirmedConcertRole: String?
+  var isConcert: Bool { local.manifest.programme.eventType == "concert" }
+  var isPortraitSession: Bool { local.manifest.programme.isPortraitSession }
+  var roleConfirmed: Bool {
+    !isConcert || (confirmedConcertRole != nil && confirmedConcertRole == photographerSelection?.selected?.roleUuid)
+  }
+  var canStartPhotoUpload: Bool {
+    !busy && roleConfirmed && photographerSelection?.selected != nil
+      && photographerSelection?.selected?.isVideo != true
+      && (isConcert ? (photos.contains(where: { !$0.uploaded }) || needsConcertCompletion) : !queuedIDs.isEmpty)
+  }
+  func beginVisit() {
+    if isConcert { confirmedConcertRole = nil }
+  }
   @Published var loadingPhotographers = false
   @Published var photographerError: String?
   @Published var serverProgress: PhotoUploadProgress?
@@ -245,14 +259,20 @@ final class PhotoReviewModel: ObservableObject {
   func selectPhotographer(_ id: String?) {
     guard !busy, !loadingPhotographers, var saved = photographerSelection else { return }
     guard saved.selectedId == nil || id == saved.selectedId || queuedIDs.isEmpty else {
-      photographerError = "Upload or clear queued photos before changing this event's role. Then mark the new role's photos Ready."
+      photographerError = "Upload or clear queued photos before changing this event’s role."
       return
     }
     guard id == nil || saved.roster.photographers.contains(where: { $0.id == id }) else { return }
+    if local.manifest.isVideoPreparation,
+      saved.roster.photographers.first(where: { $0.id == id })?.isVideo != true {
+      photographerError = "This folder is prepared for video. Prepare photo folders from the event list for P1 or P2."
+      return
+    }
     saved.selectedId = id
     do {
       try saved.save(root: local.url)
       photographerSelection = saved
+      if isConcert { confirmedConcertRole = saved.selected?.roleUuid }
       photographerError = nil
     } catch { photographerError = error.localizedDescription }
   }
@@ -269,51 +289,67 @@ final class PhotoReviewModel: ObservableObject {
 
   private var completionSummary: String {
     let waived = syncReceipt?.photoCompletion?.waivedItemCount ?? 0
-    return waived > 0 ? "Completion recorded · \(waived) items waived · gallery private" : "Finish recorded · gallery private"
+    return waived > 0 ? "Completion recorded · \(waived) items waived · gallery private" : (isConcert ? "Upload complete · tracker updated · gallery private" : "Finish recorded · gallery private")
   }
 
   var canFinishUploads: Bool {
-    competitionFolders?.issues.isEmpty != false && !busy && photographerSelection?.selected != nil && photographerSelection?.selected?.isVideo != true && queuedIDs.isEmpty
+    competitionFolders?.issues.isEmpty != false && !busy && roleConfirmed && photographerSelection?.selected != nil && photographerSelection?.selected?.isVideo != true && queuedIDs.isEmpty
       && photos.allSatisfy(\.uploaded) && pending.values.allSatisfy { $0 == 0 }
   }
 
+  var needsConcertCompletion: Bool {
+    guard isConcert, let receipt = syncReceipt, receipt.matches(local.manifest),
+      let role = photographerSelection?.selected?.roleUuid,
+      receipt.photoContributions?.roleUuid.lowercased() == role.lowercased() else { return false }
+    return !photos.isEmpty && photos.allSatisfy(\.uploaded)
+      && queuedIDs.isEmpty && pending.values.allSatisfy { $0 == 0 } && !completionRecorded
+  }
+
   func finishUploads(client: APIClient) async {
-    guard !busy, let photographer = photographerSelection?.selected else { return }
+    guard !busy, roleConfirmed, let photographer = photographerSelection?.selected else { return }
     guard !photographer.isVideo else {
-      error = "This is the V station. Video uploading is not connected yet."
+      error = "Select a photo role (P1 or P2) before confirming photo uploads."
       return
     }
     busy = true
     error = nil
     defer { busy = false }
     do {
-      applySnapshot(try await library.scan())
-      guard competitionFolders?.issues.isEmpty != false else {
-        throw PreparationError.invalid("Check the unmatched or unsafe competition folders in Programme before marking Upload Complete. Other uploads can continue.")
-      }
-      guard queuedIDs.isEmpty, photos.allSatisfy(\.uploaded), pending.values.allSatisfy({ $0 == 0 }) else {
-        throw PreparationError.invalid("Mark the remaining photos Ready and upload them before finishing.")
-      }
-      var receipt = try await client.syncProgramme(local.manifest)
-      receipt.photoCompletion = try await client.finishPhotoUploads(
-        manifest: local.manifest, receipt: receipt, photographer: photographer)
-      try receipt.save(root: local.url)
-      syncReceipt = receipt
-      applySnapshot(try await library.scan())
-      uploadStatus = completionRecorded
-        ? completionSummary
-        : "Completion recorded · new photos need Ready and Upload"
+      try await recordUploadCompletion(client: client, photographer: photographer)
     } catch { self.error = error.localizedDescription }
+  }
+
+  private func recordUploadCompletion(client: APIClient, photographer: EventPhotographer) async throws {
+    applySnapshot(try await library.scan())
+    guard competitionFolders?.issues.isEmpty != false else {
+      throw PreparationError.invalid("Check the unmatched or unsafe competition folders in Programme before marking Upload Complete. Other uploads can continue.")
+    }
+    guard queuedIDs.isEmpty, photos.allSatisfy(\.uploaded), pending.values.allSatisfy({ $0 == 0 }) else {
+      throw PreparationError.invalid(isConcert ? "Upload the remaining photos before finishing." : "Mark the remaining photos Ready and upload them before finishing.")
+    }
+    var receipt = try await client.syncProgramme(local.manifest)
+    receipt.photoCompletion = try await client.finishPhotoUploads(
+      manifest: local.manifest, receipt: receipt, photographer: photographer)
+    try receipt.save(root: local.url)
+    syncReceipt = receipt
+    applySnapshot(try await library.scan())
+    uploadStatus = completionRecorded
+      ? completionSummary
+      : (isConcert ? "Completion recorded · new photos need Upload" : "Completion recorded · new photos need Ready and Upload")
   }
 
   func startUploads(client: APIClient) {
     guard !busy, !isUploading else { return }
+    guard roleConfirmed else {
+      error = "Choose your role for this concert before uploading."
+      return
+    }
     guard let photographer = photographerSelection?.selected else {
       error = "Choose this event’s role beneath the event name before uploading."
       return
     }
     guard !photographer.isVideo else {
-      error = "This is the V station. Select a photo role before uploading JPEGs. Video upload is not connected yet."
+      error = "Select a photo role (P1 or P2) before uploading JPEGs."
       return
     }
     isUploading = true
@@ -336,6 +372,15 @@ final class PhotoReviewModel: ObservableObject {
       busy = false
       uploadTask = nil
     }
+    if isConcert {
+      do {
+        applySnapshot(try await library.queueConcertPhotos())
+      } catch {
+        self.error = error.localizedDescription
+        uploadStatus = "Photos kept on this Mac"
+        return
+      }
+    }
     while !Task.isCancelled {
       do {
         uploadStatus = "Preparing queued photos…"
@@ -344,8 +389,17 @@ final class PhotoReviewModel: ObservableObject {
         applySnapshot(refreshed)
         if prepared.isEmpty && !refreshed.queuedIDs.isEmpty { continue }
         guard !prepared.isEmpty else {
-          uploadStatus =
-            completed > 0 ? "\(completed) photos uploaded · gallery private" : "No photos queued"
+          try Task.checkCancellation()
+          if needsConcertCompletion {
+            uploadStatus = "Photos uploaded · updating tracker…"
+            try await recordUploadCompletion(client: client, photographer: photographer)
+          } else {
+            uploadStatus =
+              completed > 0 ? "\(completed) photos uploaded · gallery private" : "No photos queued"
+            if isConcert && !completionRecorded && (!photos.isEmpty || !pending.isEmpty) {
+              uploadStatus = "More photos found · click Upload when they are ready"
+            }
+          }
           uploadPaused = false
           return
         }
@@ -386,12 +440,12 @@ final class PhotoReviewModel: ObservableObject {
           continue
         }
         self.error = error.localizedDescription
-        uploadStatus = "Upload paused · photos kept on this Mac"
+        uploadStatus = needsConcertCompletion ? "Photos uploaded · tracker update failed · retry completion" : "Upload paused · photos kept on this Mac"
         uploadPaused = true
         return
       }
     }
-    uploadPaused = !queuedIDs.isEmpty
+    uploadPaused = !queuedIDs.isEmpty || needsConcertCompletion
     uploadStatus = uploadPaused ? "Upload paused" : "Uploads verified · gallery private"
   }
 
@@ -412,7 +466,7 @@ final class PhotoReviewModel: ObservableObject {
       receipt.photoCompletion?.matches(receipt: receipt, photographer: person) == true {
       uploadStatus = completionRecorded
         ? completionSummary
-        : "New photos · Ready and Upload, then finish again"
+        : (isConcert ? "New photos · click Upload to update completion" : "New photos · Ready and Upload, then finish again")
     }
     reconcileSelection()
   }
@@ -432,6 +486,16 @@ final class PhotoReviewModel: ObservableObject {
       do { try await Task.sleep(for: .seconds(2)) } catch { return }
     }
   }
+  func importConcertPhotos(_ plan: ConcertImportPlan) async throws -> ConcertImportResult {
+    guard !busy, !isUploading else { throw PreparationError.invalid("Pause uploading before importing photos.") }
+    busy = true
+    defer { busy = false }
+    let result = try await library.importConcertPhotos(plan)
+    busy = false
+    await refresh()
+    return result
+  }
+
   func refresh() async {
     guard !refreshing, !busy else { return }
     refreshing = true
@@ -484,6 +548,7 @@ final class PhotoReviewModel: ObservableObject {
     photoID = visiblePhotos[min(max(0, position + offset), visiblePhotos.count - 1)].id
     loadPreview()
   }
+  var uploadListPhotos: [ReviewPhoto] { isConcert ? photos.filter { !$0.uploaded } : queuedPhotos }
   var queuedPhotos: [ReviewPhoto] { photos.filter { queuedIDs.contains($0.id) } }
   func itemIDs(in groupID: String) -> Set<String> {
     let nodes = local.manifest.programme.nodes

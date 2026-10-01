@@ -155,7 +155,8 @@ class SchedulingEvent extends Model
 
     protected function casts(): array
     {
-        return [
+        return ['website_visible' => 'boolean',
+            'website_hidden' => 'boolean',
             'event_type' => SchedulingEventType::class,
             'event_date' => 'date',
             'availability_status' => AvailabilityRoundStatus::class,

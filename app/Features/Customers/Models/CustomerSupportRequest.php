@@ -16,6 +16,13 @@ class CustomerSupportRequest extends Model
 
     protected $guarded = ['id'];
 
+    public function scopeForMessageAudience($query, string $audience): void
+    {
+        $audience === 'crew'
+            ? $query->where('context->message_audience', 'crew')
+            : $query->where(fn ($query) => $query->whereNull('context->message_audience')->orWhere('context->message_audience', '!=', 'crew'));
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

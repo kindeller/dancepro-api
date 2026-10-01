@@ -1,9 +1,15 @@
-@extends('layouts.public', ['title' => 'Your submitted booking'])
+@extends('layouts.public', ['title' => 'My booking'])
 @section('headerParentUrl', $parentUrl ?? route('concert-bookings.thanks'))
+@include('customers.studios._styles')
 @section('content')
-<section class="section"><div class="container" style="max-width:900px">
+@if(isset($studio))
+    @include('customers.studios._header', ['hubHeading' => 'My booking', 'hubDescription' => $studio->name.' · Your submitted booking form.'])
+@else
+    <section class="hero"><div class="container">@include('customers._heading', ['showMediaLogo' => false, 'eyebrow' => 'Your DancePro booking', 'heading' => 'My booking', 'description' => 'Your submitted booking form.'])</div></section>
+@endif
+<section class="section"><div class="container">
     @php($details = $receipt['details'])
-    <h1>Your submitted booking</h1>
+    @if(isset($studio))<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px"><a class="button secondary" href="{{ route('customer.studio-communications.index', [$studio, 'tab' => 'events']) }}">← Back to My Events</a><a class="button secondary" href="{{ $parentUrl }}">My timeline</a><a class="button secondary" href="{{ route('customer.studio-bookings.previous', $studio) }}">See previous booking forms</a></div>@endif
     <p class="muted">Submitted {{ \Carbon\CarbonImmutable::parse($receipt['submitted_at'])->format('j M Y · g:i a') }} ({{ config('app.timezone') }}). This is a read-only copy of your original submission.</p>
     <div class="card card-body"><h2>Studio details</h2><dl>
         @foreach(['studio_name' => 'Studio/company name', 'contact_name' => 'Owner/director name', 'contact_email' => 'Email', 'contact_phone' => 'Phone number', 'postal_address' => 'Postal address'] as $key => $label)

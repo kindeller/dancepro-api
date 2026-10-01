@@ -14,6 +14,6 @@ class CustomerProfilePageRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['tab' => ['nullable', Rule::in(['details', 'dancers', 'studios', 'preferences'])]];
+        return ['tab' => ['nullable', Rule::in(['details', 'family', 'dancers', 'studios', 'preferences'])]];
     }
 }

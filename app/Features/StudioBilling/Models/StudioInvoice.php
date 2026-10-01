@@ -61,6 +61,11 @@ class StudioInvoice extends Model
         return $this->status === 'void' ? 0 : max(0, $this->total_cents - $this->paidCents());
     }
 
+    public function isPaid(): bool
+    {
+        return $this->status === 'issued' && $this->total_cents > 0 && $this->balanceCents() === 0;
+    }
+
     public function hasPendingPayment(): bool
     {
         return $this->relationLoaded('payments') ? $this->payments->whereIn('status', ['processing', 'unknown', 'submitted'])->isNotEmpty() : $this->payments()->whereIn('status', ['processing', 'unknown', 'submitted'])->exists();

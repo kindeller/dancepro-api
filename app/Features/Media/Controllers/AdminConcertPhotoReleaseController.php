@@ -19,6 +19,11 @@ class AdminConcertPhotoReleaseController extends Controller
 
     public function store(StoreConcertPhotoReleaseGroupRequest $request, ConcertPhotoReleases $releases): RedirectResponse
     {
+        if ($request->filled('event_uuids')) {
+            $group = $releases->releaseEvents($request->user(), $request->validated());
+
+            return to_route('admin.concert-photo-releases.email', $group)->with('status', 'Selected events released together. Review the customer, guest and studio announcements before sending.');
+        }
         $group = $releases->create($request->user(), $request->validated());
 
         return back()->with('status', $group->name.' release group created. Review it, then release all albums together.');
@@ -28,7 +33,7 @@ class AdminConcertPhotoReleaseController extends Controller
     {
         $releases->release($group, $request->user());
 
-        return to_route('admin.concert-photo-releases.email', $group)->with('status', $group->name.' released. Review the registered-account announcement before sending.');
+        return to_route('admin.concert-photo-releases.email', $group)->with('status', $group->name.' released. Review the customer, guest and studio announcements before sending.');
     }
 
     public function updateCover(UpdateConcertPhotoCoverRequest $request, ConcertPhotoReleaseGroup $group, ConcertPhotoReleases $releases): RedirectResponse

@@ -105,6 +105,7 @@ class CustomerAccountWorkspace
         }
         if (in_array($activeTab, ['favourites', 'cart'], true)) {
             $selectionData = $this->selections->forUser($customer, $activeTab);
+            $selectionData['groups'] = $selectionData['groups']->flatMap(fn ($group) => $group['events'] ?? [$group])->values();
             if (! empty($filters['event'])) {
                 $selectionData['groups'] = $selectionData['groups']->filter(fn ($group) => $group['event']->uuid === $filters['event'])->values();
             }

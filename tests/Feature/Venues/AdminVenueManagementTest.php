@@ -22,7 +22,7 @@ class AdminVenueManagementTest extends TestCase
             Venue::query()->create(['name' => sprintf('Test Venue %02d', $number)]);
         }
 
-        $this->actingAs($staff)->get(route('admin.venues.index'))
+        $page = $this->actingAs($staff)->get(route('admin.venues.index'))
             ->assertOk()
             ->assertSee('Venue management')
             ->assertSee('Regal Theatre')
@@ -30,8 +30,12 @@ class AdminVenueManagementTest extends TestCase
             ->assertSee($regal->mapUrl(), false)
             ->assertSee('Quarry Amphitheatre')
             ->assertSee('Showing 1 to 25 of 26 results')
-            ->assertSee('?page=2', false)
-            ->assertDontSee('<svg', false);
+            ->assertSee('?page=2', false);
+
+        // Pagination stays compact; SVG icons in the global navigation are allowed.
+        preg_match('/<nav class="admin-pagination".*?<\/nav>/s', $page->getContent(), $pagination);
+        $this->assertNotEmpty($pagination);
+        $this->assertStringNotContainsString('<svg', $pagination[0]);
 
         $this->actingAs($staff)->get(route('admin.venues.index', ['search' => 'Subiaco']))
             ->assertOk()

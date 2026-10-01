@@ -22,6 +22,14 @@ final class AppModel: ObservableObject {
   @Published var selected: EventSummary?
   @Published var programme: Programme?
   @Published var folders: [PlannedFolder] = []
+  @Published var preparationRoles: PhotographerRoster?
+  @Published var preparationRoleID: String?
+  var preparationRole: EventPhotographer? {
+    preparationRoles?.photographers.first { $0.id == preparationRoleID }
+  }
+  var canPrepare: Bool {
+    !busy && programme != nil && (programme?.eventType != "concert" || preparationRole != nil)
+  }
   @Published var locals: [LocalEvent] = []
   @Published var review: PhotoReviewModel?
   @Published var busy = false
@@ -30,6 +38,7 @@ final class AppModel: ObservableObject {
   @Published var search = ""
   @Published var includePast = false
   @Published var hasMore = false
+  private var eventSearchTask: Task<Void, Never>?
   private var page = 0
   private var bookmarks: [Data] = []
   private var accessed: [URL] = []
@@ -101,6 +110,7 @@ final class AppModel: ObservableObject {
       _ = try await APIClient(server: session.server, token: session.token).request(
         "/api/auth/logout", body: [:])
       try KeychainSession.remove()
+      self.eventSearchTask?.cancel()
       self.session = nil
       self.events = []
       self.selected = nil
@@ -110,22 +120,41 @@ final class AppModel: ObservableObject {
     }
   }
 
+  func searchEvents() {
+    eventSearchTask?.cancel()
+    eventSearchTask = Task { [weak self] in
+      do {
+        try await Task.sleep(for: .milliseconds(300))
+        // Let an active prepare/upload operation finish before loading results.
+        while self?.busy == true {
+          try await Task.sleep(for: .milliseconds(100))
+        }
+        try Task.checkCancellation()
+        await self?.refresh()
+      } catch { /* A newer search superseded this one. */ }
+    }
+  }
+
   func refresh(more: Bool = false) async {
     guard session != nil else { return }
+    let query = search
+    let past = includePast
     await perform("Loading approved events…") {
       var parts = URLComponents()
       parts.path = "/api/staff/programme-events"
       parts.queryItems = [
         URLQueryItem(name: "page", value: String(more ? self.page + 1 : 1)),
-        URLQueryItem(name: "search", value: self.search),
+        URLQueryItem(name: "search", value: query),
       ]
-      if !self.includePast {
+      if !past {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.locale = Locale(identifier: "en_US_POSIX")
         parts.queryItems?.append(URLQueryItem(name: "from", value: formatter.string(from: Date())))
       }
       let response = try await self.client().decode([EventSummary].self, path: parts.string!)
+      try Task.checkCancellation()
+      guard query == self.search, past == self.includePast, self.session != nil else { return }
       self.events = more ? self.events + response.data : response.data
       self.page = response.meta?.currentPage ?? 1
       self.hasMore = self.page < (response.meta?.lastPage ?? 1)
@@ -139,6 +168,8 @@ final class AppModel: ObservableObject {
   func select(_ event: EventSummary) async {
     guard !busy else { return }
     selected = event
+    preparationRoles = nil
+    preparationRoleID = nil
     programme = nil
     folders = []
     await perform("Downloading approved programme…") {
@@ -151,8 +182,14 @@ final class AppModel: ObservableObject {
       let plan = try FolderPlan(programme: programme)
       self.programme = programme
       self.folders = plan.folders
-      self.message =
-        "Ready to prepare \(plan.folders.count) folders from approved version \(programme.version)."
+      if programme.eventType == "concert" {
+        let manifest = PreparedEvent(server: self.session!.server, programme: programme,
+          folders: plan.folders, preparedAt: Date(), hasPdf: programme.sourceUrl != nil)
+        self.preparationRoles = try await self.client().photographers(for: manifest)
+      }
+      self.message = programme.eventType == "concert"
+        ? (programme.isPortraitSession ? "Choose your photographer role, then prepare the portrait folder. No programme is needed." : "Choose your role, then prepare this concert.")
+        : "Ready to prepare \(plan.folders.count) folders from approved version \(programme.version)."
     }
   }
 
@@ -176,13 +213,16 @@ final class AppModel: ObservableObject {
   }
 
   func prepare() async {
-    guard let programme, let session else { return }
+    guard canPrepare, let programme, let session else { return }
+    let role = preparationRole
     let panel = NSOpenPanel()
     panel.canChooseDirectories = true
     panel.canChooseFiles = false
     panel.canCreateDirectories = true
     panel.prompt = "Prepare Here"
-    panel.message = "Choose where this event’s folders and programme should be saved."
+    panel.message = role?.isVideo == true
+      ? "Choose where the programme and video titles should be saved."
+      : "Choose where this event’s photo folders and programme should be saved."
     guard await panel.begin() == .OK, let destination = panel.url else { return }
     let accessing = destination.startAccessingSecurityScopedResource()
     defer { if accessing { destination.stopAccessingSecurityScopedResource() } }
@@ -196,6 +236,19 @@ final class AppModel: ObservableObject {
           "A newer programme has been approved. Select the event again to review it before preparing."
         )
       }
+      var selection: PhotographerSelection?
+      if programme.eventType == "concert" {
+        let manifest = PreparedEvent(server: session.server, programme: programme,
+          folders: self.folders, preparedAt: Date(), hasPdf: programme.sourceUrl != nil)
+        let roster = try await self.client().photographers(for: manifest)
+        guard let role, let currentRole = roster.photographers.first(where: { $0.roleUuid == role.roleUuid }),
+          currentRole.isVideo == role.isVideo else {
+          throw PreparationError.invalid("This role is no longer available. Refresh the event and choose a role again.")
+        }
+        selection = PhotographerSelection(server: session.server, roster: roster, selectedId: currentRole.id)
+      }
+      let titles = role?.isVideo == true ? try await TitleCardDownloads.download(
+        client: self.client(), eventUuid: programme.eventUuid, revisionUuid: programme.revisionUuid) : nil
       var pdf: Data?
       if let path = programme.sourceUrl {
         let expected =
@@ -206,17 +259,28 @@ final class AppModel: ObservableObject {
         pdf = try await self.client().request(path)
       }
       let root = try LocalPreparation.prepare(
-        programme: programme, pdf: pdf, server: session.server, destination: destination)
+        programme: programme, pdf: pdf, server: session.server, destination: destination, videoTitles: titles)
       let bookmark = try root.bookmarkData(
         options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
       self.bookmarks.append(bookmark)
       UserDefaults.standard.set(self.bookmarks, forKey: "preparedBookmarks")
       self.loadLocalEvents()
-      self.message =
-        "Prepared \(self.folders.count) folders. Programme\(pdf == nil ? "" : " and PDF") saved for offline use."
+      self.message = role?.isVideo == true
+        ? "Programme and video titles saved for offline use."
+        : "Prepared \(self.folders.count) folders. Programme\(pdf == nil ? "" : " and PDF") saved for offline use."
       let manifest = try ProgrammeCoding.decoder().decode(
         PreparedEvent.self, from: Data(contentsOf: root.appendingPathComponent("preparation.json")))
-      self.openReview(LocalEvent(url: root, manifest: manifest))
+      let preparedReview = try self.reviewModel(for: LocalEvent(url: root, manifest: manifest))
+      preparedReview.beginVisit()
+      if let selection {
+        let review = preparedReview
+        await review.refresh()
+        var saved = review.photographerSelection ?? selection
+        try saved.refresh(selection.roster)
+        review.photographerSelection = saved
+        review.selectPhotographer(selection.selectedId)
+      }
+      self.review = preparedReview
     }
   }
 
@@ -241,7 +305,15 @@ final class AppModel: ObservableObject {
         PreparedEvent.self, from: Data(contentsOf: root.appendingPathComponent("preparation.json")))
       let local = LocalEvent(url: root, manifest: manifest)
       let review = try reviewModel(for: local)
+      if !locals.contains(where: { $0.url.standardizedFileURL == root.standardizedFileURL }) {
+        let bookmark = try root.bookmarkData(
+          options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+        bookmarks.append(bookmark)
+        UserDefaults.standard.set(bookmarks, forKey: "preparedBookmarks")
+        locals.append(local)
+      }
       if accessing { accessed.append(root) }
+      review.beginVisit()
       self.review = review
     } catch {
       if accessing { root.stopAccessingSecurityScopedResource() }
@@ -250,7 +322,11 @@ final class AppModel: ObservableObject {
   }
 
   func openReview(_ local: LocalEvent) {
-    do { review = try reviewModel(for: local) } catch {
+    do {
+      let opened = try reviewModel(for: local)
+      opened.beginVisit()
+      review = opened
+    } catch {
       self.error = error.localizedDescription
     }
   }
@@ -333,6 +409,7 @@ final class AppModel: ObservableObject {
     message = status
     defer { busy = false }
     do { try await work() } catch {
+      if Task.isCancelled || error is CancellationError { return }
       if case APIError.expired = error {
         do {
           try KeychainSession.remove()
@@ -377,6 +454,7 @@ final class AppModel: ObservableObject {
         }
       } catch { unavailable += 1 }
     }
+    locals.sort { $0.manifest.preparedAt > $1.manifest.preparedAt }
     UserDefaults.standard.set(bookmarks, forKey: "preparedBookmarks")
     if unavailable > 0 {
       message =

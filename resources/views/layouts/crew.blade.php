@@ -278,6 +278,7 @@
             .directory-action { grid-column:2; grid-row:1/3; }
         }
     </style>
+    @include('layouts.partials.app-switch-styles')
     @stack('styles')
 </head>
 <body>
@@ -288,10 +289,10 @@
                 <a class="brand" href="{{ route('crew.availability.index') }}" aria-label="DancePro Crew home"><img src="{{ asset('images/brand/dancepro-logo-inverse-landscape.png') }}" alt="DancePro Photography & Video"></a>
                 <div class="user-menu">
                     @if(auth()->user()?->canAccessCustomer())
-                        <a class="admin-return" href="{{ route('customer.media.index') }}">Back to Media</a>
+                        <x-app-switch-link app="media" />
                     @endif
                     @if(auth()->user()?->canAccessAdmin())
-                        <a class="admin-return" href="{{ route('admin.dashboard') }}">Back to Admin</a>
+                        <x-app-switch-link app="admin" />
                     @endif
                     <a class="user-profile-link {{ request()->routeIs('crew.profile.*') ? 'active' : '' }}" href="{{ route('crew.profile.edit') }}" title="Open My Profile" aria-label="Open My Profile for {{ auth()->user()?->name }}">
                         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>

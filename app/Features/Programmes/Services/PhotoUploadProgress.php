@@ -70,6 +70,7 @@ class PhotoUploadProgress
                 $people[] = [
                     'id' => $person['id'], 'role_uuid' => $person['role_uuid'],
                     'name' => $person['name'], 'role_name' => $person['role_name'], 'status' => $status,
+                    'completed_at' => $status === 'complete' ? $own->whereIn('item_uuid', array_keys($expected))->max('completed_at')?->toIso8601String() : null,
                     'expected_item_count' => $count, 'complete_item_count' => $complete, 'waived_item_count' => $waived,
                     'verified_file_count' => $verified, 'pending_file_count' => $pending, 'uploaders' => $uploaders,
                 ];

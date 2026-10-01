@@ -15,6 +15,7 @@ class RecordPurchasedMediaDownload
     {
         return DB::transaction(function () use ($user, $entitlement, $asset, $request, $channel): OrderMediaAssetDownload {
             $download = OrderMediaAssetDownload::query()->lockForUpdate()->firstOrNew([
+                'user_id' => $user->id,
                 'order_media_entitlement_id' => $entitlement->id,
                 'media_asset_id' => $asset->id,
             ]);

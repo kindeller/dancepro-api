@@ -87,11 +87,42 @@ class AdminTopPicsTest extends TestCase
         $this->photo($f['gallery'], $f['contribution'], 'duplicate.jpg', ['duplicate_of_file_id' => $f['photo']->id]);
         $this->actingAs(User::factory()->staff()->create());
         $this->get(route('admin.top-pics.index'))->assertOk()->assertSee($f['event']->name)->assertDontSee($concert['event']->name);
-        $this->get(route('admin.top-pics.index', ['type' => 'concert']))->assertOk()->assertSee($concert['event']->name)->assertDontSee($f['event']->name);
+        $this->get(route('admin.top-pics.index', ['type' => 'concert', 'unlinked' => 1]))->assertOk()->assertSee($concert['event']->name)->assertDontSee($f['event']->name);
         $this->get(route('admin.top-pics.show', $f['event']))->assertOk()->assertSee('selected.jpg')->assertSee('Junior Jazz')->assertSee('Opening routine')
             ->assertSee('data-top-pic-preview', false)->assertSee('data-grant-media', false)
             ->assertDontSee('not-selected.jpg')->assertDontSee('not-verified.jpg')->assertDontSee('duplicate.jpg');
         $this->get(route('admin.top-pics.index', ['type' => 'invalid']))->assertSessionHasErrors('type');
+    }
+
+    public function test_concert_browsers_group_by_studio_and_share_selected_event_covers(): void
+    {
+        $studio = Studio::factory()->create(['name' => 'Album studio']);
+        $first = $this->fixture('concert');
+        $first['event']->update(['studio_id' => $studio->id, 'name' => 'Older concert', 'event_date' => '2026-09-01']);
+        $second = $this->fixture('concert');
+        $second['event']->update(['studio_id' => $studio->id, 'name' => 'Newer concert', 'event_date' => '2026-09-29']);
+        $other = $this->fixture('concert');
+        $other['event']->update(['studio_id' => Studio::factory()->create(['name' => 'Other studio'])->id, 'name' => 'Other event']);
+        $chosen = $this->photo($first['gallery'], $first['contribution'], 'chosen-cover.jpg');
+        $this->actingAs(User::factory()->staff()->create());
+        $this->postJson(route('admin.top-pics.cover', $first['event']), ['photo_uuid' => $chosen->uuid])
+            ->assertOk()->assertJsonPath('photo_uuid', $chosen->uuid);
+        $this->assertSame($chosen->id, $first['gallery']->fresh()->top_pic_cover_photo_id);
+        foreach (['admin.concert-photo-gallery.events' => [], 'admin.top-pics.index' => ['type' => 'concert']] as $route => $parameters) {
+            $this->get(route($route, $parameters))->assertOk()->assertSee('Album studio')->assertSee('Other studio')
+                ->assertDontSee('Older concert')->assertDontSee('Newer concert');
+            $this->get(route($route, $parameters + ['studio' => $studio->uuid]))->assertOk()
+                ->assertSeeInOrder(['Newer concert', 'Older concert'])->assertDontSee('Other event')
+                ->assertSee(route('admin.concert-photo-gallery.image', ['schedulingEvent' => $first['event'], 'photo' => $chosen->uuid, 'size' => 'cover']), false);
+        }
+        $this->postJson(route('admin.top-pics.cover', $first['event']), ['photo_uuid' => $other['photo']->uuid])->assertNotFound();
+        $chosen->update(['is_top_pic' => false]);
+        $this->postJson(route('admin.top-pics.cover', $first['event']), ['photo_uuid' => $chosen->uuid])->assertNotFound();
+        $this->get(route('admin.top-pics.index', ['type' => 'concert', 'studio' => $studio->uuid]))->assertOk()
+            ->assertDontSee($chosen->uuid)->assertSee($first['photo']->uuid);
+        $this->postJson(route('admin.top-pics.cover', $first['event']), ['photo_uuid' => null])->assertOk();
+        $this->assertNull($first['gallery']->fresh()->top_pic_cover_photo_id);
+        $this->actingAs(User::factory()->customer()->create())->postJson(route('admin.top-pics.cover', $first['event']), ['photo_uuid' => $first['photo']->uuid])->assertForbidden();
     }
 
     public function test_download_uses_original_bytes_and_logs_admin_access_without_copying(): void
@@ -131,10 +162,10 @@ class AdminTopPicsTest extends TestCase
         $concert = Concert::factory()->create(['studio_id' => $studio->id, 'concert_booking_item_id' => $item->id]);
         $this->actingAs(User::factory()->staff()->create());
         $url = route('admin.top-pics.show', $f['event']);
-        $this->get($url)->assertOk()->assertSee('Sync verified photos in the concert gallery');
+        $this->get($url)->assertOk()->assertSee('For older uploads, use Gallery repair in Concert photos');
         app(ConcertPhotoGallerySetup::class)->sync($f['event']);
         $asset = $concert->mediaCollections()->first()->assets()->first();
-        $this->get($url)->assertOk()->assertSee('data-source-uuid="'.$asset->uuid.'"', false)->assertDontSee('Sync verified photos in the concert gallery');
+        $this->get($url)->assertOk()->assertSee('data-source-uuid="'.$asset->uuid.'"', false)->assertDontSee('For older uploads, use Gallery repair in Concert photos');
         $this->get(route('admin.concert-photo-gallery.image', ['schedulingEvent' => $f['event'], 'photo' => $f['photo']->uuid]))->assertOk();
         $this->get(route('admin.concert-photo-gallery.show', $f['event']))->assertOk()->assertSee($url, false);
     }

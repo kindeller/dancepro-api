@@ -15,6 +15,7 @@ class CustomerCompetitionsRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'size' => ['nullable', Rule::in(['thumbnail', 'cover'])],
             'page' => ['nullable', 'integer', 'min:1'],
             'tab' => ['nullable', Rule::in(['overview', 'events', 'files', 'messages'])],
             'focus_kind' => ['nullable', Rule::in(['competition', 'concert'])],

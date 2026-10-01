@@ -2,6 +2,7 @@
 
 namespace App\Features\Programmes\Actions;
 
+use App\Features\Media\Services\ConcertPhotoGallerySetup;
 use App\Features\Programmes\Models\ProgrammePhotoContribution;
 use App\Features\Programmes\Models\ProgrammePhotoFile;
 use App\Features\Programmes\Models\ProgrammePhotoGallery;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Storage;
 
 class ReceiveProgrammePhoto
 {
-    public function __construct(private readonly PhotoUploadContext $context, private readonly VerifyPhotoBytes $bytes) {}
+    public function __construct(private readonly PhotoUploadContext $context, private readonly VerifyPhotoBytes $bytes, private readonly ConcertPhotoGallerySetup $galleries) {}
 
     public function execute(SchedulingEvent $event, ProgrammePhotoFile $file, User $user, mixed $input): array
     {
@@ -75,6 +76,8 @@ class ReceiveProgrammePhoto
                 } elseif ($contribution->status === 'awaiting_files') {
                     $contribution->update(['status' => 'receiving']);
                 }
+
+                $this->galleries->syncVerifiedPhoto($event, $file);
 
                 return [
                     'uuid' => $file->uuid, 'photo_uuid' => $file->client_photo_uuid,

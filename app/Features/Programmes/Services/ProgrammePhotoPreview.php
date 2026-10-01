@@ -16,12 +16,12 @@ class ProgrammePhotoPreview
     /** Produce a private derivative; never return the original when processing fails. */
     public function key(ProgrammePhotoFile $file, string $size, ?SchedulingEvent $event = null): string
     {
-        $edge = $size === 'thumbnail' ? 480 : 1600;
-        $watermark = $this->watermarks->competition($event);
+        $edge = $size === 'cover' ? 600 : ($size === 'thumbnail' ? 480 : 1600);
+        $watermark = $size === 'cover' ? $this->watermarks->galleryCover() : $this->watermarks->competition($event);
 
         $version = hash('sha256', 'v2:'.$file->sha256.':'.$watermark['fingerprint'].':'.$edge.':88');
 
-        return $this->derivative($file, $edge, $watermark, 'programme-previews', $version);
+        return $this->derivative($file, $edge, $watermark, 'programme-previews', $version, $size === 'cover');
     }
 
     /** Only private publicity endpoints may expose this derivative, never customer galleries. */
@@ -30,7 +30,7 @@ class ProgrammePhotoPreview
         return $this->derivative($file, 1920, null, 'publicity/photos', hash('sha256', 'unwatermarked-v1:'.$file->sha256.':1920:88'));
     }
 
-    private function derivative(ProgrammePhotoFile $file, int $edge, ?array $watermark, string $prefix, string $version): string
+    private function derivative(ProgrammePhotoFile $file, int $edge, ?array $watermark, string $prefix, string $version, bool $cover = false): string
     {
         $disk = Storage::disk('local');
         abort_unless($file->storage_disk === 'local' && $disk->exists($file->storage_key), 404);
@@ -45,7 +45,7 @@ class ProgrammePhotoPreview
         try {
             abort_unless(flock($lock, LOCK_EX), 503, 'Unable to lock photo preview.');
             if (! is_file($path)) {
-                $this->render($disk->path($file->storage_key), $watermark, $path, $edge, $file->sha256);
+                $this->render($disk->path($file->storage_key), $watermark, $path, $edge, $file->sha256, $cover);
             }
         } finally {
             flock($lock, LOCK_UN);
@@ -55,7 +55,7 @@ class ProgrammePhotoPreview
         return $key;
     }
 
-    private function render(string $source, ?array $watermark, string $destination, int $edge, string $sha256): void
+    private function render(string $source, ?array $watermark, string $destination, int $edge, string $sha256, bool $cover): void
     {
         $info = @getimagesize($source);
         abort_unless($info && $info[2] === IMAGETYPE_JPEG && $info[0] > 0 && $info[1] > 0
@@ -76,6 +76,9 @@ class ProgrammePhotoPreview
         $preview = $this->orient($preview, (int) ($exif['Orientation'] ?? 1));
         $width = imagesx($preview);
         $height = imagesy($preview);
+        if ($cover) {
+            $preview = $this->renderer->coverCanvas($preview);
+        }
         if ($watermark !== null) {
             $this->renderer->apply($preview, $watermark);
         }

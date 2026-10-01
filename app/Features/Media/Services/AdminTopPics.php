@@ -11,6 +11,7 @@ use App\Features\Programmes\Services\UploadAudit;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -32,10 +33,31 @@ class AdminTopPics
             ->whereNull('programme_photo_files.duplicate_of_file_id');
     }
 
+    public function counts(): Builder
+    {
+        return $this->files()->selectRaw('galleries.scheduling_event_id, COUNT(*) as top_pic_count,
+            COALESCE(MAX(CASE WHEN programme_photo_files.id = galleries.top_pic_cover_photo_id
+                THEN programme_photo_files.uuid END), MIN(programme_photo_files.uuid)) as cover_uuid')
+            ->groupBy('galleries.scheduling_event_id');
+    }
+
+    public function chooseCover(SchedulingEvent $event, ?string $photoUuid, User $actor): void
+    {
+        abort_unless($event->event_type->value === 'concert', 404);
+        DB::transaction(function () use ($event, $photoUuid, $actor): void {
+            $gallery = ProgrammePhotoGallery::where('scheduling_event_id', $event->id)->lockForUpdate()->firstOrFail();
+            $photo = $photoUuid ? $this->files()->where('galleries.id', $gallery->id)
+                ->where('programme_photo_files.uuid', $photoUuid)->select('programme_photo_files.*')->firstOrFail() : null;
+            $gallery->update(['top_pic_cover_photo_id' => $photo?->id]);
+            if ($photo) {
+                $this->audit->record($event, $photo->contribution->role->uuid, $actor, 'admin_top_pic_cover', $photo->uuid);
+            }
+        });
+    }
+
     public function events(string $type): array
     {
-        $counts = $this->files()->selectRaw('galleries.scheduling_event_id, COUNT(*) as top_pic_count, MIN(programme_photo_files.uuid) as cover_uuid')
-            ->groupBy('galleries.scheduling_event_id');
+        $counts = $this->counts();
         $events = SchedulingEvent::query()->joinSub($counts, 'top_pics', 'top_pics.scheduling_event_id', '=', 'scheduling_events.id')
             ->where('event_type', $type)->with('studio')
             ->select('scheduling_events.*', 'top_pics.top_pic_count', 'top_pics.cover_uuid')
@@ -76,7 +98,8 @@ class AdminTopPics
             ];
         });
 
-        return ['event' => $event, 'photos' => $photos, 'type' => $event->event_type->value];
+        return ['event' => $event, 'photos' => $photos, 'type' => $event->event_type->value,
+            'coverPhotoId' => $gallery?->top_pic_cover_photo_id];
     }
 
     public function galleryUrl(SchedulingEvent $event, ?string $folder = null): string

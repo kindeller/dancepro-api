@@ -7,8 +7,12 @@ use App\Features\Bookings\Models\ConcertBookingItem;
 use App\Features\Concerts\Models\Concert;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Customers\Models\CustomerStudio;
+use App\Features\Customers\Services\CustomerConcertGallery;
+use App\Features\Customers\Services\GuestGalleryCatalogue;
 use App\Features\Media\Models\ConcertPhotoReleaseGroup;
 use App\Features\Media\Models\MediaCollection;
+use App\Features\Media\Services\AdminTopPics;
+use App\Features\Media\Services\ConcertPhotoGallerySetup;
 use App\Features\Programmes\Models\Programme;
 use App\Features\Programmes\Models\ProgrammePhotoContribution;
 use App\Features\Programmes\Models\ProgrammePhotoFile;
@@ -16,8 +20,10 @@ use App\Features\Programmes\Models\ProgrammePhotoGallery;
 use App\Features\Programmes\Models\ProgrammeUploadPlan;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Studios\Models\Studio;
+use App\Features\Tracking\Models\ConcertTrackerEmailDelivery;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -92,7 +98,8 @@ class ConcertPhotoGallerySetupTest extends TestCase
         $page = route('admin.concert-photo-gallery.show', $f['event']);
         $sync = route('admin.concert-photo-gallery.sync', $f['event']);
 
-        $this->get(route('admin.concert-photo-gallery.events'))->assertOk()->assertSee('Spring concert');
+        $this->get(route('admin.concert-photo-gallery.events'))->assertOk()->assertSee($f['studio']->name);
+        $this->get(route('admin.concert-photo-gallery.events', ['studio' => $f['studio']->uuid]))->assertOk()->assertSee('Spring concert');
         $this->get($page)->assertOk()->assertSee('Opening Dance')->assertSee('1 verified photo');
         $this->post($sync)->assertRedirect();
 
@@ -118,6 +125,59 @@ class ConcertPhotoGallerySetupTest extends TestCase
         $this->assertSame(4, $album->fresh()->sort_order);
         $this->assertDatabaseCount('media_collections', 1);
         $this->assertDatabaseCount('media_assets', 1);
+    }
+
+    public function test_admin_can_open_only_the_selected_events_photo_albums(): void
+    {
+        Storage::fake('local');
+        $fixture = $this->fixture();
+        app(ConcertPhotoGallerySetup::class)->sync($fixture['event']);
+        $album = $fixture['concert']->mediaCollections()->firstOrFail();
+        $photo = $album->assets()->firstOrFail();
+        $url = route('admin.concert-photo-gallery.show', ['schedulingEvent' => $fixture['event'], 'album' => $album->uuid]);
+        $this->actingAs($fixture['staff'])->get(route('admin.concert-photo-gallery.show', $fixture['event']))
+            ->assertOk()->assertSee($url);
+        $this->get($url)->assertOk()->assertSee($album->name)->assertSee('Back to event albums')
+            ->assertSee(route('admin.concert-photo-gallery.asset', ['schedulingEvent' => $fixture['event'], 'asset' => $photo, 'size' => 'thumbnail']), false);
+        $other = $this->fixture();
+        $this->get(route('admin.concert-photo-gallery.show', ['schedulingEvent' => $other['event'], 'album' => $album->uuid]))->assertNotFound();
+        $this->get(route('admin.concert-photo-gallery.show', ['schedulingEvent' => $fixture['event'], 'album' => (string) Str::uuid()]))->assertNotFound();
+        $this->actingAs(User::factory()->customer()->create())->get($url)->assertForbidden();
+    }
+
+    public function test_automatic_sync_preserves_album_edits_and_hides_late_photos_in_released_albums(): void
+    {
+        Storage::fake('local');
+        $f = $this->fixture();
+        $setup = app(ConcertPhotoGallerySetup::class);
+        $setup->syncVerifiedPhoto($f['event'], $f['photo']);
+        $album = MediaCollection::where('concert_id', $f['concert']->id)->sole();
+        $album->update(['name' => 'Edited title', 'sort_order' => 9, 'status' => 'published',
+            'visibility' => 'customer', 'published_at' => now()]);
+        $late = $f['photo']->replicate(['uuid', 'client_photo_uuid']);
+        $late->uuid = (string) Str::uuid();
+        $late->client_photo_uuid = (string) Str::uuid();
+        $late->storage_key = 'concert-source/'.$late->uuid.'/late.jpg';
+        Storage::disk('local')->copy($f['photo']->storage_key, $late->storage_key);
+        $late->save();
+        $setup->syncVerifiedPhoto($f['event'], $late);
+        $album->refresh();
+        $this->assertSame('Edited title', $album->name);
+        $this->assertSame(9, $album->sort_order);
+        $this->assertSame('customer', $album->visibility->value);
+        $this->assertSame(2, $album->assets()->count());
+        $this->assertSame(1, $album->assets()->where('is_visible', true)->count());
+        $this->assertFalse($album->assets()->where('metadata->programme_photo_file_uuid', $late->uuid)->sole()->is_visible);
+        $setup->sync($f['event']);
+        $this->assertSame(1, $album->assets()->where('is_visible', true)->count());
+        $original = $album->assets()->where('is_visible', true)->sole();
+        $original->update(['status' => 'archived', 'display_name' => 'Edited caption']);
+        $setup->syncVerifiedPhoto($f['event'], $f['photo']);
+        $this->assertSame('archived', $original->fresh()->status->value);
+        $this->assertSame('Edited caption', $original->fresh()->display_name);
+        $original->delete();
+        $setup->syncVerifiedPhoto($f['event'], $f['photo']);
+        $this->assertSoftDeleted('media_assets', ['id' => $original->id]);
     }
 
     public function test_unlinked_events_and_non_admin_users_cannot_create_customer_albums(): void
@@ -180,7 +240,7 @@ class ConcertPhotoGallerySetupTest extends TestCase
             ->assertSee('Photo release')->assertDontSee('Choose parent album cover');
         $this->get(route('admin.concert-tracker.tasks.show', [$f['event'], 'photo_release']))->assertOk()
             ->assertSee('Photo release')
-            ->assertSee('Choose parent album cover')->assertSee('Top Pic');
+            ->assertSee('Release photos together')->assertSee('Select all ready')->assertDontSee('Choose parent album cover');
 
         $this->post(route('admin.concert-photo-releases.release', $group))->assertRedirect();
         $album->refresh();
@@ -193,7 +253,7 @@ class ConcertPhotoGallerySetupTest extends TestCase
         $this->get(route('admin.concert-tracker.tasks.show', [$f['event'], 'photo_release']))
             ->assertOk()->assertSee('Spring concert photos')->assertSee('Released');
         $this->actingAs($customer)->get(route('customer.concerts.photos.show', $f['concert']))
-            ->assertOk()->assertSee('Spring concert photos')->assertDontSee('01 Opening Dance');
+            ->assertOk()->assertSee('01 Opening Dance')->assertDontSee('group='.$group->uuid, false);
         $this->actingAs($customer)->get(route('customer.concerts.photos.show', [
             'concert' => $f['concert'], 'group' => $group->uuid,
         ]))->assertOk()->assertSee('01 Opening Dance')->assertSee('cover');
@@ -204,9 +264,14 @@ class ConcertPhotoGallerySetupTest extends TestCase
             'concert' => $f['concert'], 'group' => $group,
         ]))->assertOk()->assertHeader('Content-Type', 'image/jpeg');
         $this->post(route('logout'))->assertRedirect();
-        $this->get(route('guest-galleries.index', ['type' => 'concert']))->assertOk()
-            ->assertSee('Spring concert photos')
-            ->assertSee(route('guest-galleries.concerts.cover', ['concert' => $f['concert'], 'group' => $group]), false);
+        $this->get(route('guest-galleries.studios.show', $f['studio']))
+            ->assertRedirect(route('guest-galleries.studios.access', $f['studio']));
+        $this->post(route('guest-galleries.studios.unlock', $f['studio']), [
+            'email' => 'guest@example.test', 'login_code' => $f['studio']->code,
+        ])->assertRedirect(route('guest-galleries.studios.show', $f['studio']));
+        $this->get(route('guest-galleries.studios.show', $f['concert']->studio))->assertOk()
+            ->assertSee('Spring concert')->assertDontSee('Spring concert photos')
+            ->assertSee(route('guest-galleries.concerts.show', ['concert' => $f['concert']]), false);
 
         $asset = $album->assets->first();
         $this->actingAs($f['staff'])->post(route('admin.concert-photo-releases.cover.update', $group), [
@@ -217,6 +282,127 @@ class ConcertPhotoGallerySetupTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('concert_photo_release_group_changes', ['action' => 'cover_updated']);
         $this->assertDatabaseHas('concert_photo_release_group_changes', ['action' => 'album_cover_updated']);
+    }
+
+    public function test_event_release_includes_all_albums_and_sends_one_combined_announcement(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $first = $this->fixture();
+        $second = $this->fixture();
+        $second['event']->update(['studio_id' => $first['studio']->id]);
+        $second['concert']->update(['studio_id' => $first['studio']->id, 'name' => 'Senior Concert']);
+        foreach ([$first, $second] as $fixture) {
+            $fixture['concert']->bookingItem->update(['approval_status' => 'approved']);
+            $fixture['concert']->update(['status' => 'draft', 'is_enabled' => false, 'requires_approval' => true, 'approved_at' => null]);
+            app(ConcertPhotoGallerySetup::class)->sync($fixture['event'], $first['staff']);
+        }
+        $album = MediaCollection::where('concert_id', $first['concert']->id)->firstOrFail();
+        $extra = $album->replicate();
+        $extra->fill(['uuid' => (string) Str::uuid(), 'name' => 'Finale'])->save();
+        $asset = $album->assets()->firstOrFail()->replicate();
+        $extraKey = 'concert-source/'.Str::uuid().'/finale.jpg';
+        Storage::disk('local')->copy($asset->storage_key, $extraKey);
+        $asset->fill(['uuid' => (string) Str::uuid(), 'media_collection_id' => $extra->id, 'storage_key' => $extraKey])->save();
+        $this->actingAs($first['staff'])->post(route('admin.concert-photo-releases.store'), [
+            'name' => 'Combined announcement', 'event_uuids' => [$first['event']->uuid, $second['event']->uuid],
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $group = ConcertPhotoReleaseGroup::sole();
+        $this->assertCount(3, $group->collections);
+        $this->assertNotNull($group->released_at);
+        foreach ([$first, $second] as $fixture) {
+            $this->assertTrue($fixture['concert']->fresh()->isPhotoGalleryAvailable());
+            $this->assertFalse($fixture['concert']->fresh()->isPubliclyAvailable()); // Video still needs director release.
+        }
+        $cards = app(GuestGalleryCatalogue::class)->concerts($first['studio']);
+        $this->assertCount(2, $cards);
+        $customer = User::factory()->customer()->create();
+        CustomerStudio::create(['user_id' => $customer->id, 'studio_id' => $first['studio']->id, 'access_verified_at' => now()]);
+        $this->actingAs($customer)->get(route('customer.concerts.photos.show', $first['concert']))
+            ->assertOk()->assertSee('01 Opening Dance')->assertSee('Finale')->assertDontSee('Combined announcement')->assertDontSee('Senior Concert');
+        $email = route('admin.concert-photo-releases.email.send', $group);
+        $this->actingAs($first['staff'])->post($email, ['confirm_send' => true])->assertSessionHasNoErrors();
+        $this->post($email, ['confirm_send' => true])->assertSessionHasNoErrors();
+        $delivery = ConcertTrackerEmailDelivery::where('photo_release_group_id', $group->id)->sole();
+        $this->assertSame($customer->email, $delivery->recipient_email);
+        $this->assertStringContainsString('Spring concert', $delivery->body);
+        $this->assertStringContainsString('Senior Concert', $delivery->body);
+    }
+
+    public function test_event_release_rejects_mixed_studios_and_unfinished_uploads_without_partial_release(): void
+    {
+        Storage::fake('local');
+        $first = $this->fixture();
+        $second = $this->fixture();
+        foreach ([$first, $second] as $fixture) {
+            $fixture['concert']->bookingItem->update(['approval_status' => 'approved']);
+            app(ConcertPhotoGallerySetup::class)->sync($fixture['event'], $first['staff']);
+        }
+        $payload = ['name' => 'Cannot release', 'event_uuids' => [$first['event']->uuid, $second['event']->uuid]];
+        $this->actingAs($first['staff'])->post(route('admin.concert-photo-releases.store'), $payload)->assertSessionHasErrors('event_uuids');
+        $second['event']->update(['studio_id' => $first['studio']->id]);
+        $second['concert']->update(['studio_id' => $first['studio']->id]);
+        $second['photo']->contribution->update(['status' => 'uploading', 'completed_at' => null]);
+        $this->post(route('admin.concert-photo-releases.store'), $payload)->assertSessionHasErrors('event_uuids');
+        $this->assertDatabaseCount('concert_photo_release_groups', 0);
+        $this->assertSame(0, MediaCollection::whereNotNull('published_at')->count());
+    }
+
+    public function test_event_cards_use_their_own_selected_top_pic_and_date_in_a_shared_release(): void
+    {
+        Storage::fake('local');
+        $first = $this->fixture();
+        $second = $this->fixture();
+        $third = $this->fixture();
+        $events = [$first, $second, $third];
+        foreach ($events as $index => $fixture) {
+            $fixture['event']->update(['studio_id' => $first['studio']->id]);
+            $fixture['concert']->update(['studio_id' => $first['studio']->id, 'event_date' => '2026-09-'.(20 + $index)]);
+            app(ConcertPhotoGallerySetup::class)->sync($fixture['event']);
+        }
+        $selected = $second['photo']->replicate(['uuid', 'client_photo_uuid']);
+        $selected->uuid = (string) Str::uuid();
+        $selected->client_photo_uuid = (string) Str::uuid();
+        $selected->storage_key = 'concert-source/'.$selected->uuid.'/photo.jpg';
+        Storage::disk('local')->copy($second['photo']->storage_key, $selected->storage_key);
+        $selected->save();
+        app(ConcertPhotoGallerySetup::class)->sync($second['event']);
+        app(AdminTopPics::class)->chooseCover($second['event'], $selected->uuid, $first['staff']);
+        $this->actingAs($first['staff'])->post(route('admin.concert-photo-releases.store'), [
+            'name' => 'Shared studio release', 'collection_uuids' => MediaCollection::pluck('uuid')->all(),
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $group = ConcertPhotoReleaseGroup::firstOrFail();
+        $this->post(route('admin.concert-photo-releases.release', $group))->assertRedirect();
+        $gallery = app(CustomerConcertGallery::class);
+        $covers = collect($events)->map(fn ($fixture) => $gallery->parentCoverAsset($fixture['concert']));
+        $this->assertCount(3, $covers->pluck('id')->unique());
+        foreach ($events as $index => $fixture) {
+            $this->assertSame($fixture['concert']->id, $covers[$index]->collection->concert_id);
+        }
+        $this->assertSame($selected->uuid, $covers[1]->metadata['programme_photo_file_uuid']);
+        $customer = User::factory()->customer()->create();
+        CustomerStudio::create(['user_id' => $customer->id, 'studio_id' => $first['studio']->id, 'access_verified_at' => now()]);
+        $page = $this->actingAs($customer)->get(route('customer.media.index'))->assertOk();
+        foreach ($events as $index => $fixture) {
+            $page->assertSee($fixture['concert']->event_date->format('j M Y'))
+                ->assertSee(route('customer.concerts.photos.image', ['concert' => $fixture['concert'], 'asset' => $covers[$index]->uuid, 'size' => 'cover']), false);
+        }
+        $this->get(route('customer.profile.studio', $first['studio']))->assertOk()
+            ->assertSee('gallery-navigation-grid')->assertSee('gallery-nav-image')->assertSee('20 Sep 2026');
+        $this->get(route('customer.concerts.photos.show', $second['concert']))->assertOk()
+            ->assertSee('gallery-navigation-grid concert-albums')->assertSee('gallery-nav-footer')
+            ->assertSee('2 photos')->assertSee('View album');
+        $guestCards = app(GuestGalleryCatalogue::class)->concerts($first['studio'])->keyBy('concert.id');
+        foreach ($events as $index => $fixture) {
+            $this->assertSame(route('guest-galleries.concerts.image', [
+                'concert' => $fixture['concert'], 'asset' => $covers[$index]->uuid, 'size' => 'cover',
+            ]), $guestCards[$fixture['concert']->id]['image']);
+        }
+        // A hidden selection must never become a customer card cover.
+        $covers[1]->update(['is_visible' => false]);
+        $fallback = $gallery->parentCoverAsset($second['concert']);
+        $this->assertSame($second['photo']->uuid, $fallback->metadata['programme_photo_file_uuid']);
+        $this->assertSame($second['concert']->id, $fallback->collection->concert_id);
     }
 
     public function test_parent_album_can_contain_routine_albums_from_multiple_concerts(): void

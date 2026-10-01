@@ -2,7 +2,9 @@
 
 @section('content')
 @php($event=$assignment->shift->schedulingEvent)
-<div class="page-heading"><div><p class="eyebrow">Shift cover</p><h1>Organise cover</h1><p class="muted">{{ $event->name }} · {{ $assignment->shift->shift_date->format('D j M Y') }} · {{ $assignment->role->name }}</p></div><a class="button secondary" href="{{ route('crew.assignments.show',$assignment) }}">Back to shift</a></div>
+<div class="page-heading"><div>
+@include('crew._brand')
+<p class="eyebrow">Shift cover</p><h1>Organise cover</h1><p class="muted">{{ $event->name }} · {{ $assignment->shift->shift_date->format('D j M Y') }} · {{ $assignment->role->name }}</p></div><a class="button secondary" href="{{ route('crew.assignments.show',$assignment) }}">Back to shift</a></div>
 
 <section class="card profile-section">
     <h2>Who would you like to ask?</h2>

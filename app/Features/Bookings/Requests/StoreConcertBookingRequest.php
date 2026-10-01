@@ -61,6 +61,8 @@ class StoreConcertBookingRequest extends FormRequest
 
         return [
             'website' => ['nullable', 'prohibited'],
+            'draft_uuid' => ['nullable', 'uuid'],
+            'draft_version' => ['nullable', 'integer', 'min:0'],
             'studio' => ['nullable', 'uuid'],
             'studio_name' => ['required', 'string', 'max:255'],
             'contact_name' => ['required', 'string', 'max:255'],

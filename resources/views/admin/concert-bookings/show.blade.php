@@ -4,8 +4,8 @@
 <div class="booking-page-controls">
     <a class="button secondary" href="{{ route('admin.concert-bookings.index') }}">Event bookings</a>
     <div class="booking-page-actions">
-        <span class="badge booking-status {{ $booking->status->value }}">{{ ucfirst($booking->status->value) }}</span>
-        @if($bookingTab === 'booking' && $booking->status->value === 'pending')
+        <span class="badge booking-status {{ $booking->status->value }}">{{ $booking->status->label() }}</span>
+        @if($bookingTab === 'booking' && in_array($booking->status->value, ['pending', 'received', 'partial_approval']))
             @php($hasUnresolvedVenues = $booking->items->contains(fn ($item) => $item->approval_status === 'pending' && !$item->venue_id))
             <form method="POST" action="{{ route('admin.concert-bookings.approve', $booking) }}" data-approve-booking>
                 @csrf
@@ -15,7 +15,7 @@
         @endif
     </div>
 </div>
-@if($bookingTab === 'booking' && $booking->status->value === 'pending' && ($hasUnresolvedVenues ?? false))
+@if($bookingTab === 'booking' && in_array($booking->status->value, ['pending', 'received', 'partial_approval']) && ($hasUnresolvedVenues ?? false))
     <p class="card card-pad" role="status">Booking approval is unavailable until every proposed venue is resolved. Select an existing venue or resolve the proposed venue below, then save the booking.</p>
 @endif
 <nav class="booking-task-tabs" aria-label="Booking tasks">
@@ -32,12 +32,16 @@
     @include('admin.concert-bookings._invoice-workspace')
 @elseif($bookingTab === 'programme')
     <div class="toolbar" style="margin:18px 0"><a class="button secondary" href="{{ route('admin.scheduling-events.index') }}">← Back to event availability</a></div>
-    @if($programmeWorkspace)
+    @if($programmeEvents->isNotEmpty())
         <form method="get" class="card card-pad" style="margin-bottom:18px">
             <input type="hidden" name="tab" value="programme">
-            <label>Event<select name="event">@foreach($programmeEvents as $programmeEvent)<option value="{{ $programmeEvent->uuid }}" @selected($programmeWorkspace['event']->id === $programmeEvent->id)>{{ $programmeEvent->name }} · {{ $programmeEvent->event_date?->format('j M Y') }}</option>@endforeach</select></label><button>Open programme</button>
+            <label>Event<select name="event">@foreach($programmeEvents as $programmeEvent)<option value="{{ $programmeEvent->uuid }}" @selected($selectedProgrammeEvent->id === $programmeEvent->id)>{{ $programmeEvent->name }} · {{ $programmeEvent->event_date?->format('j M Y') }}</option>@endforeach</select></label><button>Open programme</button>
         </form>
+    @endif
+    @if($programmeWorkspace)
         @include('admin.programmes._editor', $programmeWorkspace)
+    @elseif($programmeNotRequired ?? false)
+        <p class="card card-pad">Programmes are not required for dress rehearsals.</p>
     @else
         <p class="card card-pad">Programme preparation is available once an event is approved.</p>
     @endif
@@ -77,8 +81,13 @@
 </form>
 
 @if($currentQuote['video_concerts'])<p class="booking-section"><strong>Current video quote:</strong> {{ $currentQuote['video_quote_cents'] !== null ? '$'.number_format($currentQuote['video_quote_cents'] / 100, 2) : 'Awaiting family numbers' }} AUD including GST · {{ $currentQuote['families'] }} {{ $currentQuote['families_confirmed'] ? 'confirmed' : 'estimated' }} families.</p>@endif
-@include('admin.concert-bookings._event-materials')
 @include('admin.concert-bookings._revision-history')
+@if($booking->statusNotifications->isNotEmpty())
+<section class="card card-pad" style="margin-top:18px"><h2>Booking notifications</h2>
+@foreach($booking->statusNotifications as $notification)<p><a href="{{ route('admin.concert-bookings.status-email', [$booking, $notification]) }}">{{ $notification->subject }}</a> · {{ ucfirst($notification->delivery_status) }}@if($notification->sent_at) · {{ $notification->sent_at->format('j M Y, g:i a') }}@endif</p>@endforeach
+</section>
+@endif
+
 
 @foreach($booking->items as $item)
     <form class="programme-upload-form" id="programme-{{ $item->uuid }}" method="POST" enctype="multipart/form-data" action="{{ route('admin.concert-booking-events.programme.store', $item) }}">
@@ -169,7 +178,7 @@
     @endif
 </div></details>
 
-@if($booking->status->value !== 'cancelled')<details class="card booking-danger"><summary>Cancel entire booking</summary><form method="POST" action="{{ route('admin.concert-bookings.cancel',$booking) }}" class="card-pad" onsubmit="return confirm('Cancel this entire booking and every remaining event? This cannot be undone.')">@csrf<h2>Cancel every event in this booking</h2><p class="muted">Use this only when the studio has cancelled the complete booking. To remove just one concert, use “Cancel event” on that event above.</p><button class="danger" type="submit">Cancel entire booking</button></form></details>@endif
+@if($booking->status->value !== 'cancelled')<details class="card booking-danger"><summary>Cancel entire booking</summary><form method="POST" action="{{ route('admin.concert-bookings.cancel',$booking) }}" class="card-pad" onsubmit="return confirm('Cancel this entire booking and every remaining event? This cannot be undone.')">@csrf<h2>Cancel every event in this booking</h2><p class="muted">Use this only when the studio has cancelled the complete booking. To remove just one concert, use “Cancel event” on that event above.</p><label>Reason for cancellation<textarea name="reason" required maxlength="3000">{{ old('reason') }}</textarea></label><button class="danger" type="submit">Cancel and review email</button></form></details>@endif
 
 @endif
 </section>
@@ -214,17 +223,18 @@
     .booking-page-controls { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
     .booking-page-actions { display:flex; align-items:center; gap:10px; }
     .booking-status { padding:5px 10px; text-transform:capitalize; }
+    .booking-status.received{background:#fff5df;color:#795400}.booking-status.approved,.booking-status.partial_approval{background:#e7f7ec;color:#126236}.booking-status.cancelled{background:#eef1f3;color:#576573}
     .booking-status.pending { border-color:#e8aaa4; background:#fff0ef; color:#a8241b; }
     .contact-tabs { flex-wrap:wrap; }
-    .booking-follow-on { max-width:900px; }
-    .booking-materials { max-width:900px; margin:24px 0; }
+    .booking-follow-on { width:100%; min-width:0; }
+    .booking-materials { width:100%; min-width:0; margin:24px 0; }
     .booking-materials details { margin-top:16px; padding-top:16px; border-top:1px solid var(--line); }
     .booking-materials form { display:grid; gap:12px; margin:16px 0; }
     .booking-materials textarea { min-height:76px; }
     .booking-materials input[type=file] { min-width:0; max-width:100%; }
     .booking-materials .material-file { padding:12px 0; overflow-wrap:anywhere; }
     .booking-materials summary { cursor:pointer; font-weight:700; }
-    .booking-edit-form { display:grid; gap:18px; max-width:900px; }
+    .booking-edit-form { display:grid; gap:18px; width:100%; min-width:0; }
     .booking-edit-form input[type="checkbox"],
     .booking-edit-form input[type="radio"],
     .contact-check input[type="checkbox"],
@@ -263,7 +273,7 @@
     .event-cancel-button { min-height:34px; padding:6px 10px; }
     .badge.cancelled { border-color:#e8aaa4; background:#fff0ef; color:#a8241b; }
     .event-number { color:var(--brand-strong); font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
-    .booking-secondary, .booking-danger { max-width:900px; margin-top:18px; overflow:visible; }
+    .booking-secondary, .booking-danger { width:100%; min-width:0; margin-top:18px; overflow:visible; }
     .booking-secondary > summary, .booking-danger > summary { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; list-style:none; cursor:pointer; }
     .booking-secondary > summary::-webkit-details-marker, .booking-danger > summary::-webkit-details-marker { display:none; }
     .booking-secondary > summary::after, .booking-danger > summary::after { content:'+'; color:var(--brand-strong); font-size:22px; }

@@ -20,8 +20,8 @@ class ConcertPhotoPreview
         $source = $disk->path($asset->storage_key);
         $digest = hash_file('sha256', $source);
         abort_unless($digest !== false, 503);
-        $edge = $size === 'thumbnail' ? 480 : 1600;
-        $watermark = $this->watermarks->concert($asset->collection);
+        $edge = $size === 'cover' ? 600 : ($size === 'thumbnail' ? 480 : 1600);
+        $watermark = $size === 'cover' ? $this->watermarks->galleryCover() : $this->watermarks->concert($asset->collection);
         $key = 'concert-previews/'.$asset->uuid.'/'.hash('sha256', 'v3:'.$digest.':'.$edge.':'.$watermark['fingerprint']).'.jpg';
         if ($disk->exists($key)) {
             return $key;
@@ -33,7 +33,7 @@ class ConcertPhotoPreview
         try {
             abort_unless(flock($lock, LOCK_EX), 503);
             if (! is_file($destination)) {
-                $this->render($source, $destination, $edge, $watermark);
+                $this->render($source, $destination, $edge, $watermark, $size === 'cover');
             }
         } finally {
             flock($lock, LOCK_UN);
@@ -43,7 +43,7 @@ class ConcertPhotoPreview
         return $key;
     }
 
-    private function render(string $source, string $destination, int $edge, array $watermark): void
+    private function render(string $source, string $destination, int $edge, array $watermark, bool $cover): void
     {
         $info = @getimagesize($source);
         abort_unless($info && $info[2] === IMAGETYPE_JPEG && $info[0] > 0 && $info[1] > 0
@@ -56,6 +56,9 @@ class ConcertPhotoPreview
         $preview = imagecreatetruecolor($width, $height);
         imagecopyresampled($preview, $original, 0, 0, 0, 0, $width, $height, $info[0], $info[1]);
         unset($original);
+        if ($cover) {
+            $preview = $this->renderer->coverCanvas($preview);
+        }
         $this->renderer->apply($preview, $watermark);
         $temp = tempnam(dirname($destination), '.preview-');
         abort_unless($temp !== false, 503);

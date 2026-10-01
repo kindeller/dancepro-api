@@ -75,7 +75,7 @@ class CustomerAccountIntelligence
     {
         $request = CustomerPrivacyRequest::create(['user_id' => $customer->id, 'handled_by_user_id' => $actor->id, 'type' => 'export', 'status' => 'completed', 'reason' => $reason, 'requested_at' => now(), 'completed_at' => now()]);
         $customer->load('customerProfile', 'orders.items', 'creditTransactions');
-        $data = ['generated_at' => now()->toIso8601String(), 'customer' => $customer->only(['id', 'name', 'email', 'created_at', 'last_login_at']), 'profile' => $customer->customerProfile?->toArray(), 'orders' => $customer->orders->toArray(), 'credits' => $customer->creditTransactions->toArray(), 'activities' => CustomerAccountActivity::where('user_id', $customer->id)->get()->toArray(), 'consents' => CustomerConsentHistory::where('user_id', $customer->id)->get()->toArray()];
+        $data = ['generated_at' => now()->toIso8601String(), 'customer' => $customer->only(['id', 'name', 'first_name', 'last_name', 'email', 'pending_email', 'created_at', 'last_login_at']), 'profile' => $customer->customerProfile?->toArray(), 'orders' => $customer->orders->toArray(), 'credits' => $customer->creditTransactions->toArray(), 'activities' => CustomerAccountActivity::where('user_id', $customer->id)->get()->toArray(), 'consents' => CustomerConsentHistory::where('user_id', $customer->id)->get()->toArray()];
         $data['account_records'] = app(CustomerPrivacyData::class)->export($customer);
         $this->activity($customer, $actor, 'privacy_export', 'Privacy data export generated.', ['request_uuid' => $request->uuid]);
 
@@ -107,7 +107,7 @@ class CustomerAccountIntelligence
             DB::table('customer_consent_histories')->where('user_id', $customer->id)->update(['reason' => null, 'snapshot' => null]);
             DB::table('customer_account_activities')->where('user_id', $customer->id)->update(['metadata' => null]);
             app(CustomerPrivacyData::class)->redact($customer, $anonymousEmail);
-            $customer->update(['account_status_reason' => '[redacted]', 'name' => $anonymousName, 'email' => $anonymousEmail, 'email_verified_at' => null, 'is_active' => false, 'account_status' => 'cancelled', 'anonymized_at' => now()]);
+            $customer->update(['account_status_reason' => '[redacted]', 'name' => $anonymousName, 'email' => $anonymousEmail, 'pending_email' => null, 'pending_email_requested_at' => null, 'email_verified_at' => null, 'is_active' => false, 'account_status' => 'cancelled', 'anonymized_at' => now()]);
         });
     }
 

@@ -5,6 +5,7 @@ namespace App\Features\Auth\Controllers;
 use App\Features\Auth\Requests\WebLoginRequest;
 use App\Features\Customers\Services\RecordCustomerLogin;
 use App\Features\Customers\Services\TransferGuestGalleryActivity;
+use App\Features\Families\Services\FamilyInvitationPrefill;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -14,9 +15,16 @@ use Illuminate\View\View;
 
 class WebAuthController extends Controller
 {
-    public function create(): View
+    public function create(Request $request, FamilyInvitationPrefill $prefill): View
     {
-        return view('auth.login');
+        return view('auth.login', ['familyInvitation' => $prefill->details($request->session())]);
+    }
+
+    public function legacyCreate(Request $request): RedirectResponse
+    {
+        $request->session()->reflash();
+
+        return to_route('login');
     }
 
     public function store(WebLoginRequest $request, TransferGuestGalleryActivity $guestActivity, RecordCustomerLogin $loginEvents): RedirectResponse
@@ -26,7 +34,7 @@ class WebAuthController extends Controller
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
             $loginEvents->execute($request, $request->string('email')->toString(), null, false);
 
-            return back()
+            return to_route('login')
                 ->withErrors(['email' => 'The provided credentials could not be verified.'])
                 ->onlyInput('email');
         }
@@ -41,7 +49,7 @@ class WebAuthController extends Controller
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return back()
+            return to_route('login')
                 ->withErrors(['email' => 'This account is inactive.'])
                 ->onlyInput('email');
         }
@@ -72,12 +80,11 @@ class WebAuthController extends Controller
 
     public function destroy(Request $request): RedirectResponse
     {
-        $loginRoute = $request->user()?->canAccessCustomer() && ! $request->user()->canAccessAdmin() ? 'customer.login' : 'login';
         Auth::logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route($loginRoute);
+        return redirect()->route('login');
     }
 }

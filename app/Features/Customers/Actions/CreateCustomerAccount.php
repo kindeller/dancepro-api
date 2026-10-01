@@ -15,6 +15,7 @@ class CreateCustomerAccount
             return DB::transaction(function () use ($input, $source): User {
                 $user = User::create([
                     'name' => $input['name'], 'email' => strtolower(trim($input['email'])),
+                    ...array_intersect_key($input, array_flip(['first_name', 'last_name'])),
                     'password' => $input['password'], 'type' => 'customer', 'is_admin' => false,
                     'is_active' => true,
                 ]);

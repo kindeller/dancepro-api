@@ -21,20 +21,16 @@ class BookingTrackerBar
 
     public function source(ConcertBooking $booking, ?ConcertTrackerTask $task): array
     {
-        $approved = $booking->status === ConcertBookingStatus::Approved;
-        $key = $approved ? 'complete' : 'in_progress';
-        $label = $booking->status === ConcertBookingStatus::Pending ? 'Not approved' : ucfirst($booking->status->value);
-        $detail = 'Booking and selected services are held in the unified booking record.';
-        if ($task?->status_override !== null) {
-            $key = $task->status_override;
-            $label = self::STATUSES[$key];
-            $detail = 'Manual tracker override. Booking: '.ucfirst($booking->status->value).'.';
-        }
+        $tone = $booking->status->tone();
 
         return [
-            'key' => $key, 'label' => $label, 'detail' => $detail,
+            'key' => match ($tone) {
+                'overdue' => 'in_progress', 'near-due' => 'waiting', default => $tone
+            },
+            'tone' => $tone, 'label' => $booking->status->label(),
+            'detail' => $booking->status === ConcertBookingStatus::Received ? '' : 'Booking and selected services are held in the unified booking record.',
             'sourceUrl' => route('admin.concert-bookings.show', $booking),
-            'completedAt' => $task?->status_override !== null ? $task->completed_at : ($approved ? $booking->reviewed_at : null),
+            'completedAt' => $tone === 'complete' ? $booking->reviewed_at : null,
             'activity' => null,
         ];
     }
@@ -74,7 +70,7 @@ class BookingTrackerBar
         return [
             'definition' => $detail['definition'], 'task' => $detail['task'], 'status' => $detail['status'],
             'statusTone' => $detail['status']['tone'], 'automaticOnly' => true,
-            'automaticHelp' => $detail['definition']['key'] === 'photos_uploaded' ? 'Upload progress comes from the uploader. Each required photo role must finish uploading and confirm Upload Complete; waived work stays separate.' : ($detail['definition']['key'] === 'crew_ready' ? 'This status follows Event availability. Assign, publish and acknowledge the required crew roles there.' : $detail['definition']['description']),
+            'automaticHelp' => $detail['definition']['key'] === 'photos_uploaded' ? 'Upload progress comes from the uploader. Each required photo role completes automatically after its concert uploads are verified; waived work stays separate.' : ($detail['definition']['key'] === 'crew_ready' ? 'This status follows Event availability. Assign, publish and acknowledge the required crew roles there.' : $detail['definition']['description']),
             'statusCaption' => $detail['definition']['key'] === 'photos_uploaded' ? 'Automatic from photo uploads' : ($detail['definition']['key'] === 'crew_ready' ? 'Automatic from event availability' : 'Automatic from source records'),
             'context' => $event->name.' · '.$event->event_date?->format('j M Y'),
             'dueDate' => $detail['status']['dueDate'], 'overdue' => $detail['status']['overdue'],
@@ -201,7 +197,9 @@ class BookingTrackerBar
 
         return [
             'eventUrl' => $this->bookingEventUrl($booking),
-            'statusTone' => $booking->status === ConcertBookingStatus::Pending ? 'overdue' : $status['key'],
+            'statusTone' => $status['tone'],
+            'bookingStatus' => $booking->status->value, 'bookingItems' => $booking->items,
+            'statusCaption' => 'Automatic from booking',
             'confirmationState' => $confirmationState,
             'confirmationUrl' => $booking->status === ConcertBookingStatus::Approved ? route('admin.concert-bookings.confirmation', $booking) : null,
             'definition' => app(ConcertTrackerTaskCatalog::class)->find('booking_received'),
@@ -211,7 +209,7 @@ class BookingTrackerBar
             'dueDate' => $due,
             'overdue' => $due?->isBefore(today()) && ! in_array($status['key'], ['complete', 'not_required'], true),
             'assignees' => $this->assignees()->orderBy('name')->get(),
-            'statuses' => self::STATUSES,
+            'statuses' => collect(ConcertBookingStatus::cases())->reject(fn ($status) => $status === ConcertBookingStatus::Declined)->mapWithKeys(fn ($status) => [$status->value => $status->label()])->all(),
             'followUpStatuses' => self::FOLLOW_UP_STATUSES,
             'updateUrl' => route('admin.concert-bookings.tracker.update', $booking),
             'returnUrl' => route('admin.concert-tracker.index', $returnContext ?: [

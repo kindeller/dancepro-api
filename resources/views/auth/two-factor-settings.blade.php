@@ -1,7 +1,9 @@
 @extends('layouts.auth', ['title' => 'Account security'])
 @section('content')
 <h1>Account security</h1>
-@if($user->two_factor_confirmed_at)
+@if(!config('security.two_factor.enabled'))
+    <p>Two-factor authentication is not currently available. Your account still requires your email address and password to sign in.</p>
+@elseif($user->two_factor_confirmed_at)
     <p><strong>Two-factor authentication is active.</strong> You will use your authenticator app each time you sign in.</p>
     @if($recoveryCodes)<div class="message"><strong>Save these recovery codes now.</strong><p>Each code works once. Store them somewhere private.</p>@foreach($recoveryCodes as $code)<div><code>{{ $code }}</code></div>@endforeach</div>@endif
     <form method="POST" action="{{ route('two-factor.recovery-codes') }}">@csrf<label>Current password<input type="password" name="current_password" required></label><button>Generate new recovery codes</button></form>
@@ -16,5 +18,5 @@
     <p>Add an authenticator app to protect the personal and financial information in your account.</p>
     <form method="POST" action="{{ route('two-factor.begin') }}">@csrf<label>Confirm your password<input type="password" name="current_password" autocomplete="current-password" required></label><button>Set up two-factor authentication</button></form>
 @endif
-<p style="margin-top:18px"><a href="{{ $user->crewProfile ? route('crew.profile.edit') : route('admin.dashboard') }}">Back to DancePro</a></p>
+<p style="margin-top:18px"><a href="{{ $user->crewProfile ? route('crew.profile.edit') : route('customer.profile.edit') }}">Back to DancePro</a></p>
 @endsection

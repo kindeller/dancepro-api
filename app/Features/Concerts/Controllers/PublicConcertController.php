@@ -9,6 +9,7 @@ use App\Features\Concerts\Requests\UnlockConcertRequest;
 use App\Features\Concerts\Services\ConcertAccessSession;
 use App\Features\Concerts\Services\ConcertCloudFrontSigner;
 use App\Features\Concerts\Services\ConcertDownloadFilename;
+use App\Features\Concerts\Services\ConcertStoredFiles;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Support\MediaAssetStatus;
 use App\Features\Media\Support\MediaCollectionStatus;
@@ -25,6 +26,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PublicConcertController extends Controller
 {
+    public function __construct(private readonly ConcertStoredFiles $storedFiles) {}
+
     public function show(Request $request, Concert $concert, ConcertAccessSession $access): View
     {
         abort_unless($concert->isPubliclyAvailable(), 404);
@@ -75,6 +78,12 @@ class PublicConcertController extends Controller
         $this->authorizeAsset($request, $concert, $asset, $access, true);
         abort_unless($asset->media_type === MediaType::Video, 404);
 
+        if ($asset->storage_disk === 's3_concerts_legacy') {
+            return ApiResponse::success('Concert playback source returned.',
+                $this->storedFiles->playback($asset, $this->temporaryPlaybackUrl($concert, $asset)))
+                ->header('Cache-Control', 'private, no-store');
+        }
+
         $local = app()->environment('local');
         $source = $resolvePlayback->execute($asset, ! $local && $cloudFront->canSignCookies());
         if ($local) {
@@ -120,6 +129,10 @@ class PublicConcertController extends Controller
         $this->authorizeAsset($request, $concert, $asset, $access, true);
         abort_unless($asset->media_type === MediaType::Video, 404);
 
+        if ($asset->storage_disk === 's3_concerts_legacy') {
+            return $this->storedFiles->response($asset);
+        }
+
         $local = app()->environment('local');
         $source = $resolvePlayback->execute(
             $asset,
@@ -151,6 +164,9 @@ class PublicConcertController extends Controller
     public function download(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access, ConcertDownloadFilename $filenames, ConcertCloudFrontSigner $cloudFront): RedirectResponse|BinaryFileResponse
     {
         $this->authorizeAsset($request, $concert, $asset, $access);
+        if ($asset->storage_disk === 's3_concerts_legacy') {
+            return $this->storedFiles->response($asset, $filenames->for($concert, $asset));
+        }
         if (app()->environment('local')) {
             abort_unless(in_array($asset->storage_disk, ['s3_concerts', 'local'], true), 503);
             abort_unless(Storage::disk($asset->storage_disk)->exists($asset->storage_key), 404);

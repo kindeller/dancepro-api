@@ -2,6 +2,7 @@
 
 namespace App\Features\Programmes\Services;
 
+use App\Features\Bookings\Support\ConcertBookingItemType;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Programmes\Models\Programme;
 use App\Features\Programmes\Models\ProgrammePhotoContribution;
@@ -18,6 +19,9 @@ class ProgrammeUploadRoles
         $competition = $event->event_type->value === 'competition';
         $codes = $competition ? ['competition-photographer-p1', 'competition-photographer-p2', 'competition-videographer']
             : ['concert-photographer-p1', 'concert-photographer-p2', 'photographer-p', 'concert-videographer', 'videographer'];
+        if ($event->concertBookingItem?->item_type === ConcertBookingItemType::DressRehearsal) {
+            $codes = ['photographer-p', 'concert-photographer-p1', 'concert-photographer-p2'];
+        }
         $existingRoleIds = ProgrammePhotoContribution::whereIn('programme_upload_plan_id', ProgrammeUploadPlan::whereIn('programme_id', Programme::where('scheduling_event_id', $event->id)->select('id'))->select('id'))->pluck('crew_role_id');
         $plannedIds = $event->roleRequirements->pluck('crew_role_id')->merge($existingRoleIds);
         foreach ($event->shifts as $shift) {

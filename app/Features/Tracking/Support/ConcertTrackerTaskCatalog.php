@@ -23,7 +23,7 @@ class ConcertTrackerTaskCatalog
             $this->task('booking_received', 'booking', 'Booking & services', 'booking', 'source'),
             $this->task('final_numbers_email', 'booking', 'Seats & families email', 'booking', 'manual', 'booking_first', -30, 'final_numbers_email'),
             $this->task('final_numbers_received', 'booking', 'Seats & families numbers', 'booking', 'source'),
-            $this->task('concert_week_email', 'booking', 'Concert week email', 'event', 'manual', 'event', -7, 'concert_week_email'),
+            $this->task('concert_week_email', 'booking', 'Concert week email', 'event', 'manual', 'event', -10, 'concert_week_email'),
 
             $this->task('crew_ready', 'preparation', 'Crew ready', 'event', 'source'),
             $this->task('programme_prepared', 'preparation', 'Prepare programme', 'event', 'source', 'event', -7),
@@ -98,8 +98,8 @@ class ConcertTrackerTaskCatalog
         return [
             'booking_received' => [
                 'Review the studio contact, services, event dates, venues and requirements. Save any changes before approval.',
-                'Resolve proposed venues, then use Approve booking (or Approved in the status box). Review and send the confirmation email on the next page.',
-                'Booking approval completes 1.1. Confirmation delivery is recorded separately; approval alone does not send an email.',
+                'Use Received when scheduling has not started; an optional acknowledgement email opens. Resolve venues, then choose Approved for all events or Partial Approval and select only the events you can confirm.',
+                'Review and send the notification after approval. Cancellation requires a reason and opens an editable email. Status changes alone do not send emails; sent notifications remain in booking history and Studio messages.',
             ],
             'final_numbers_email' => [
                 'Review the recipient and email preview, including the link to the Studio Hub.',
@@ -112,8 +112,8 @@ class ConcertTrackerTaskCatalog
                 'Completion is automatic only when families are confirmed and seats are recorded for every concert. Each update records the staff member and date. DR portraits are not required.',
             ],
             'concert_week_email' => [
-                'Check the event details and final requirements in the preview; the standard deadline is seven days before this event.',
-                'Send once and check the delivery result. Successful delivery completes this task; queued or scheduled messages are not yet complete.',
+                'Check the event details and final requirements in the preview; events in the same booking within a 20-day window share one email, due ten days before the first event in that group, including dress rehearsals.',
+                'Send once and check the delivery result. Successful delivery completes 1.4 for every event in the group; queued or scheduled messages are not yet complete.',
                 'Use Approved only if the email is unnecessary. An additional copy requires explicit resend confirmation.',
             ],
             'crew_ready' => [
@@ -132,8 +132,8 @@ class ConcertTrackerTaskCatalog
                 'If the programme or title content changes, review and publish a fresh package. Reopening the task withdraws the ready download.',
             ],
             'post_concert_email' => [
-                'Review the post-concert message and studio recipient. The standard deadline is the day after this event.',
-                'Send once and check delivery history. Successful delivery completes the task.',
+                'Review the post-concert message and studio recipient. One email covers the same 20-day booking group as 1.4; the standard deadline is the day after the final event in that group.',
+                'Review every included event. Sending after the group has finished is recommended; you may send earlier after checking the timing warning and email wording. Successful delivery completes 2.4 for all included events; scheduling alone does not complete it.',
                 'Choose Approved if the email is unnecessary; review the previous delivery before confirming any resend.',
             ],
             'slideshow_received' => [
@@ -143,7 +143,7 @@ class ConcertTrackerTaskCatalog
             ],
             'photos_uploaded' => [
                 'Check the current working programme and each photographer role. Queued and verified counts come from the laptop uploader.',
-                'Each required photographer must finish their queue and confirm Finished upload in the uploader. All required roles must be complete.',
+                'Each required photographer clicks Upload. The concert uploader records completion automatically after all photos are verified. All required roles must be complete.',
                 'A waiver records missing work but does not itself complete an upload or release the gallery. Waiting stays blue until overdue; uploading is blue and complete is green.',
             ],
             'concert_edited' => [
@@ -172,9 +172,9 @@ class ConcertTrackerTaskCatalog
                 'Both checks open the corrections email. Send it to complete the task. New feedback reopens the task; release without any feedback shows No corrections.',
             ],
             'photo_release' => [
-                'Finish every required photographer upload and prepare the studio photo albums and release group. The target is 48 hours after the final booking event.',
-                'Resolve the release reasons shown for each group, choose its cover and watermark, then select Release all albums.',
-                'Release publishes the gallery and opens an announcement for registered studio accounts. Review and send it separately; gallery release alone does not email customers.',
+                'Finish every required photographer upload. The target is 48 hours after the final booking event.',
+                'Select ready events from this studio, or use Select all ready. Release selected events makes all their photo albums available together. Watermark and release name are under Advanced options.',
+                'Review the customer, guest and studio messages, then send all release announcements once. Linked customers and gallery guests receive one announcement for the selected events; Studio Hub accounts receive family instructions and a code-free joining link. Studio Hub contacts with customer access also receive the standard gallery update. Sent or queued messages are skipped. Customers find each event under their studio.',
             ],
             'invoice_sent' => [
                 'Approve and link the booking to its studio, and confirm final family numbers before preparing the video invoice.',
@@ -196,12 +196,12 @@ class ConcertTrackerTaskCatalog
             'confirmation_information_email' => 'Send the booking confirmation and initial information to the studio. Use the task email template; successful delivery completes this step.',
             'final_numbers_email' => 'Ask the studio for reserved seat numbers and final unique-family numbers, normally one month before the first concert. Successful sending completes this step and sets the numbers deadline to 10 days later; approve it manually when an email is unnecessary.',
             'final_numbers_received' => 'Confirm the total unique families and reserved crew seats for every concert in the booking. Completes automatically when all required fields are recorded. Not required for DR portraits.',
-            'concert_week_email' => 'Send the final concert week requirements for this event, normally seven days before it. Successful template delivery completes this step.',
+            'concert_week_email' => 'Send one concert-week email for the booking’s events in a 20-day group, ten days before its first event (including dress rehearsal). Successful delivery completes every included 1.4 cell.',
             'crew_ready' => 'Make sure every required role is filled, the roster is published and assigned crew have acknowledged it. Completes automatically from the event roster.',
-            'programme_prepared' => 'Attach the programme, check its items and confirm the final working order by seven days before the event. Progress updates automatically from Programme preparation.',
-            'photos_uploaded' => 'Track each photo role as Waiting, Uploading or Complete. All required roles must confirm Finished upload for the current programme; verified photos or waivers alone do not complete the task.',
+            'programme_prepared' => 'Attach the programme, check its items and confirm the final working order by seven days before the first concert in its 20-day booking group (not dress rehearsal). Progress updates automatically from Programme preparation.',
+            'photos_uploaded' => 'Track each photo role as Waiting, Uploading or Complete. The concert uploader automatically records completion for the current programme after verification; all required roles must be complete. Waivers stay separate.',
             'video_titles' => 'Prepare and check the concert video title cards using the approved programme. Video titles ready publishes the JPEG package for the uploader and completes this task.',
-            'post_concert_email' => 'Send the studio its post-concert information and explain what happens next. Successful template delivery completes this step.',
+            'post_concert_email' => 'Send one post-concert email the day after the final event in its 20-day booking group. Explain Studio Hub uploads, photo access and video review/release; successful delivery completes every included 2.4 cell.',
             'slideshow_received' => 'Obtain and check any studio video, opening sequence or slideshow needed for the finished concert. Uploaded files complete this step automatically once all are approved. Open Review studio files to check them; use manual completion for files received outside the portal, or Not required when none are needed.',
             'concert_edited' => 'Complete the main concert edit, including the programme order, titles and supplied studio media. Mark complete when the edit is ready for final checking.',
             'quality_check' => 'Confirm all 20 checks for files, titles, video and audio. Each change saves automatically; every check is required for completion.',
@@ -210,7 +210,7 @@ class ConcertTrackerTaskCatalog
             'approval_link_email' => 'Send the director the private video approval link and review instructions. Successful template delivery completes this step.',
             'director_corrections' => 'Review director feedback, confirm corrections complete and uploaded, then send the corrections email. Successful delivery completes the task; new feedback reopens it.',
             'director_approval' => 'Obtain and record the studio director’s approval of the final concert. Completes automatically when approval is recorded on the concert.',
-            'photo_release' => 'Due 48 hours after the final booking event. Finish all photo uploads, prepare and release the albums, then email registered studio accounts.',
+            'photo_release' => 'Due 48 hours after the final booking event. Select completed events from this studio, release their photos together, then review and send the customer, guest and Studio Hub announcements together.',
             'invoice_sent' => 'Wait for confirmed final family numbers, then prepare and send the studio invoice seven days before the final event. Payment is due 14 days after the first invoice email is sent. Completes when the balance is paid.',
             'payment_received' => 'Completes automatically when the issued invoice balance is paid. Record received bank transfers on the invoice; pending card payments do not count until settled.',
             'final_release' => 'The studio director approves and releases the current concert video from their review page. Families use the video access code shared by the studio.',

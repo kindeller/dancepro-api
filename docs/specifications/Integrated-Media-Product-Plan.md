@@ -246,7 +246,7 @@ These operations must preserve stable internal identities and must not accidenta
 ### Customer programmes
 
 - Customers can view competition programmes to find routines.
-- Concert programmes remain downloadable and are included in the concert video ZIP, as in the existing system.
+- Concert programmes remain separately downloadable. Owner clarification (28 September 2026): concert videos use individual downloads and the existing multiple-file download manager, not a concert ZIP.
 - Customer programme files do not contain internal notes.
 
 ---
@@ -274,7 +274,10 @@ Roles come from Crew Management, for example:
 - Photographer 2.
 - Videographer.
 
-Role identification is needed for contribution tracking and the appropriate screen mode. It should not be an unnecessary prerequisite for preparing folders in advance.
+Role identification is needed for contribution tracking and the appropriate screen mode.
+Owner update, 29 September 2026: concerts require explicit role selection before
+Prepare. P1/P2 prepare programme/photo folders; V prepares programme/video titles.
+This supersedes the earlier optional-role preparation rule for concerts.
 
 Remember the selected role where appropriate.
 
@@ -301,11 +304,12 @@ Offline changes must synchronise safely when connectivity returns.
 The event role identifies the media; the signed-in account identifies who performed
 the upload. Keep those identities separate from the roster's assigned crew member.
 
-- **Concerts:** automatically select the signed-in person's assigned event role when
-  there is one clear match. Allow an explicit choice of another event role so someone
-  can upload on a colleague's behalf, for example P1 uploading P2's photos. Ask for a
-  role only when the default is ambiguous or unavailable; do not require choosing a
-  colleague's name or signing in with their account.
+- **Concerts (owner update, 29 September 2026):** require an explicit role before
+  Prepare and confirmation each time an existing concert is opened. The choice
+  made for preparation also confirms that immediate opening. P1/P2 create photo
+  folders; V downloads ready video titles into a separate video preparation folder.
+  Both save programme data and the source PDF when supplied. Never require choosing
+  a colleague's name or signing in with their account. Existing photos are retained.
 - **Competitions:** set the prepared laptop's event role once, as P1, P2 or V. It is
   an equipment station that stays at the event, not a laptop assigned to a crew member.
   Persist the role across app restarts and offline work. Crew handovers do not require
@@ -448,6 +452,12 @@ They can:
 - Prepare folders using the programme.
 - Copy photographs from the SD card into folders.
 - Use the uploader to review and upload.
+
+Owner update (30 September 2026): concert photo Upload automatically records the
+selected role as complete after verification, without a separate finish prompt.
+Later uploads reopen that role and complete again after verification. Tracker 3.1
+still requires every configured photo role. Competitions retain explicit finish;
+gallery release remains separate.
 
 ### Black-frame sorting
 
@@ -715,6 +725,14 @@ Do not start a customer’s download entitlement while their required media is s
 
 ## 13. Concert photo galleries
 
+Owner update (30 September 2026): dress rehearsal portraits use
+**Studio → Dress Rehearsal Portraits → images** with no extra concert/group/item
+navigation. Approval automatically creates a single portrait upload preparation;
+no programme is required. Existing verified-transfer, per-role completion and
+explicit gallery release rules apply. Older grouping examples below continue to
+apply to concert performance albums.
+
+
 Studio gallery structure is flexible.
 
 Examples:
@@ -809,6 +827,22 @@ The code grants access to all events/videos assigned to it.
 Codes may cover multiple concerts from the same studio/year.
 
 Codes are usually less guessable than competition event codes.
+
+### Storage and downloads (owner clarification, 28 September 2026)
+
+Retain each existing video's recorded storage disk and complete object key. Do not
+move or rename live originals. Legacy originals use short-lived signed delivery
+from their configured disk; new uploads keep their existing configured destination.
+The documented legacy bucket is `dance-pro-videos`, but the live catalogue and
+configuration must be verified before connecting production data.
+
+Keep individual video downloads and the browser's multiple-file download manager
+with Start, Pause/Resume and Reset. The manager remains available during the
+12-month download period after streaming ends. It reports requests sent to the
+browser, not completed transfers; the browser may require multiple-download
+permission. Pause and Reset do not cancel files already transferring. Do not add
+a concert ZIP workflow. This does not change programme/title packages or purchased
+photo archive workflows.
 
 ### Access periods
 
@@ -1006,6 +1040,17 @@ Customers can:
 - Access orders, invoices and media.
 
 ### Family sharing
+
+Concert-video family invitations are implemented locally (28 September 2026):
+three distinct recipients per account/concert, selected released videos, verified
+recipient email without a full account, fourteen days to accept and thirty days
+from acceptance, bounded by the original concert entitlement. Each recipient may
+save one intended copy per video, with at most three download requests for retries.
+Renewals retain counts. Customer renew/revoke and approximate activity, studio/admin
+sharing/download controls, and contact-data retention are included. Existing video
+storage is unchanged. See [the decision](../decisions/Concert-Family-Sharing.md).
+This does not implement the broader family cart/payment permissions below.
+
 
 - Shared access to family purchases.
 - Dancers can add items to a cart for a parent to pay.
@@ -2081,12 +2126,15 @@ still requires a configured mail transport, queue worker and scheduler.
 
 ### Concert parent albums and covers (23 September 2026)
 
-Released concert photo groups now form the visible parent-album level and can
-combine routine albums from several concerts for one studio. Parent covers use
-uploader Top Pics and routine albums default to their first photo; staff can change
-either cover after release. Public gallery cards show a watermarked parent cover,
-and customer/guest carts preserve the actual concert for photos reached through a
-multi-concert parent. Existing media files and storage identities are unchanged.
+Updated 30 September 2026: release groups are an admin publication/announcement
+batch for whole events from one studio, rather than another customer folder.
+Tracker 4.1 presents event cards with photo counts and readiness, selects every
+album in each selected event, releases them atomically and opens one editable
+announcement listing the included events. Retries skip previously queued/sent
+recipients. Customers see Studio → event → routine albums → photos; DR portraits
+open straight to images. Existing group links and cover records stay compatible.
+Photo publication does not approve or release concert video. Media files and
+storage identities are unchanged.
 
 ### Admin Top Pics browsing implementation (26 September 2026)
 
@@ -2222,9 +2270,11 @@ The Concert Tracker and current Event timeline use the invoice ledger for financ
 
 Date view includes unconfirmed booking items with red studio headings and explicit Pending booking labels. Review opens the booking; approval replaces that preview with the scheduled event and its production tasks. Cancelled and declined requests are excluded. Tracker phases and tasks have stable hierarchical display numbers (1. Booking, 1.1 Booking & services), independent of filtering; internal task identifiers remain unchanged.
 
+Event Availability also previews pending concert/DR portrait booking items alongside scheduled shifts in chronological order, with one shared paginator and studio/search/type/status filters. Pending rows show requested times, venue and red Pending approval, link to booking review and expose no crew response or bulk scheduling controls. No scheduling records are created until approval; the resulting draft shift replaces the preview and still requires a separate availability request. Tracker 2.1 uses the same studio-filtered view.
+
 ### Shared tracker controls on canonical pages — 27 September 2026
 
-Task 1.1 Booking & services now opens the existing booking review/edit page. It always includes a shared sticky tracker bar, including direct entry from Event management. Booking-scoped task state persists from pending through approval. Status overrides are separate from actual approval, deadlines and assignments save independently, and follow-up dialogs retain dated notes. Other task destinations will be migrated individually as agreed with the owner; see ADR-0055.
+Task 1.1 Booking & services now opens the existing booking review/edit page. It always includes a shared sticky tracker bar, including direct entry from Event management. Booking-scoped task state persists from pending through approval. As updated on 29 September 2026, 1.1 changes the actual booking status: Pending approval (red), Received (yellow), Approved or Partial Approval (green), and Cancelled (grey/hidden from active lists). Partial Approval selects which events proceed; Received leaves them unscheduled and appears without a description in Studio Hub. Cancellation requires a reason. Editable received/partial/cancelled notification drafts use branded mail and Studio messages; approval retains the confirmation workflow. Deadlines and assignments save independently, and follow-up dialogs retain dated notes. Other task destinations will be migrated individually as agreed with the owner; see ADR-0055.
 
 
 ### Booking approval and confirmation combined — 27 September 2026
@@ -2240,6 +2290,12 @@ Tracker 1.3 now presents families and seats independently: an explicit final-fam
 Tracker email tasks 1.2 and 1.4 share the same tracker bar and email workflow. Successful sends show recipient, sender and time; pending deliveries block duplicates and subsequent copies require explicit resend confirmation. Test captures are labelled separately from live sends.
 
 Tasks 2.1 and 2.2 reuse operational workspaces: 2.1 displays the studio-filtered live availability sheet, with shared readiness labels and assigned-crew summaries; 2.2 is a booking tab containing the existing per-event programme editor. Studio-supplied programmes and admin PDF uploads use the same preparation and revision workflow. Existing preparation URLs resolve to the canonical booking tab for administrators.
+
+Event Availability and the 2.1 snapshot share clickable empty role cells and event-status controls. Active applicable roles can be added to an event's three role slots without opening availability or notifying crew. Concert columns use V / P1 / P2; DR portraits retain their own role order. A newly required role participates in readiness and uploader requirements. Status actions use the existing Draft, Request availability (with response deadline), Close availability and Publish roster workflows; Ready remains automatic. Published rosters cannot be reset to Draft through this control. Choosing a bulk action reveals a checkbox column on the left; selecting any shift selects the whole event, while pending bookings remain excluded until approval.
+
+Admin assignment dropdowns prioritise active crew who have marked the specific shift Available and have Approved training for its role, with a tick before their name. Other active crew remain selectable below, alphabetically; recommendations ignore overlapping assignments while existing clash indicators remain visible. Assigning other crew does not grant a qualification. Saving or clearing Crew Hub availability retains the Availability tab and selected layout even when no unanswered requests remain.
+
+Competition and concert assignments share numbered video/backdrop kit controls and separate Photos and Videos bring/take controls. Photo/video selections are independent; the roster combines them into one 💾 marker with direction-specific descriptions such as “Bring photos · Take photos & videos”. Crew Hub uses the same combined description. On My Shifts, numbered equipment uses plain instructions (Bring, Take, or Bring & Take) and the full Video Kit/Backdrop Kit name alongside the existing coloured kit emoji and directional arrows; note-only assignments show the kit name and notes. Legacy Media allocations migrate to both types with their flags and notes preserved; rollback merges them back into Media (losing the distinction between types). The equipment popup saves each change while remaining open, serialises rapid changes and shows save feedback; × or an outside click closes it. Sheet markers and journey warnings refresh after closing and completion of pending saves. Required Setup/Set down shift indicators turn green when an assigned crew member on that same shift is bringing/taking any numbered video or backdrop kit respectively. They remain yellow without that responsibility, including when only Media or notes are recorded, and return to yellow if the responsibility or assignment is removed. Green means assigned, not physically completed. Clicking the Shift cell opens an autosaving Setup/Set down popup; it stays open until closed with × or an outside click. Concert approval continues to default both requirements on; competitions retain their event-form settings. Admin can override each shift independently for consecutive events at one venue. Saved times are preserved. Changes to published shifts reset acknowledgement and notify only that shift’s assigned published crew.
 
 Concert tracker follow-up (27 September 2026): Photo uploads is 3.1, ahead of the existing editing tasks. Post-concert email is 2.3 and uses the shared email workflow with deliberate resend protection. Studio video/slideshow is 2.4 and opens an event-scoped tab in the canonical booking workspace, reusing studio submissions and admin upload/review controls. Task keys and historical records are retained when display numbers change.
 
@@ -2322,3 +2378,136 @@ On the web, crew members can open personal Media from **Back to Media**, and Med
 Studio records now support **Organisation type: Dance studio / School**. This identifies schools for future pricing and features, without recalculating existing quotes or invoices. School discount rates remain to be supplied. See [Account access and schools](../handbook/Account-Access-and-Schools.md).
 
 Crew web navigation uses a top row for the logo, return links and profile, with crew menu items spread across the lower row. My editing is renamed **My Tasks** in navigation, headings and return links; its current scope remains assigned concert editing.
+
+The Admin sidebar includes **My Media** directly below **My Hub** for accounts with customer media access, linking to the same signed-in account’s personal media page.
+
+Admin My Hub and My Media shortcuts display the supplied Crew Hub and Media icons at a matching small size, with the My Hub notification badge retained.
+
+### Shared web sign-in (28 September 2026)
+
+Use one `/login` page for customers, crew and administrators, based on the shared customer page heading design with the supplied landscape Media logo image left of the heading and “Sign in to access your DancePro account.” Keep old customer sign-in URLs as compatibility redirects and preserve pending gallery joins, intended destinations, account access checks and two-factor authentication. All new web sign-in links use the shared page; the separate mobile apps retain their existing authentication contracts.
+
+The shared blue account label, heading and description apply to sign-in and sign-up as well as My Media, My Messages, My Profile and Help. Each uses `DPM copy.png` as the proportional heading image. Studio Hub keeps its studio-specific image and notification boxes.
+
+### Gallery headings and navigation consistency (28 September 2026)
+
+- Gallery and studio pages use the shared Media hero: logo image, blue context label, title and description. Directory pages use DancePro Media branding; competition gallery pages use the event logo (competition logo fallback), and concert pages use the studio logo. Missing logos fall back to the Media image.
+- Released event cards and studio cards are clickable across their full area using an accessible native link. Unreleased-event registration controls retain their own interaction.
+- Switching between Competitions and Concerts preserves the current vertical scroll position, consistent with customer page tabs. Shorter pages naturally clamp to their available height.
+
+### Media header and gallery registration (28 September 2026)
+
+- Admin Hub uses the same highlighted navigation style as My Hub, with a shield icon. All signed-in customer header items use coordinated line icons. The signed-out header contains Media galleries and a highlighted Sign in button last on the right, each with an icon; the duplicate Studios & concerts menu item is removed.
+- Competition and concert catalogue cards share the same grid sizing and layout. Upcoming events show Coming soon and a Register now button; the email/notification-consent fields live in an accessible dialog with the event/studio logo, event name and date. The existing one-time gallery-release notification registration rules are unchanged. Dialogs close with Cancel, Close, Escape or a backdrop click, and reopen with entered details after validation errors.
+
+### Studio-first concert browsing (28 September 2026)
+
+- Media galleries → Concerts shows one card per studio in the existing public catalogue. Opening the card shows that studio’s event galleries and a studio-level Register now action.
+- Studio registration is ongoing: notify the subscriber once as each new studio event photo gallery becomes available, including events created after registration. Previously released galleries are excluded; unsubscribe stops future studio notifications. Existing event-only registrations remain event-only.
+- Competition cards show the event title and date without the repeated organiser/subtitle. Registration pop-ups put the title and date beside the event/studio logo.
+
+### Portfolio gallery type — started, deferred (28 September 2026)
+
+Portfolio is the reserved third type under Media galleries, after Competitions and Concerts. The catalogue recognises its key and label but currently returns no portfolio cards, so the tab is hidden. A direct `?type=portfolio` request falls back to Competitions while unavailable.
+
+This is a placeholder only. Do not treat Portfolio as implemented or expose the tab simply to show an empty page. Resume later to agree the portfolio content, management/publishing workflow, card/detail rendering and access requirements, then connect published content and reveal the tab only when non-empty. No Portfolio database schema, uploader, admin pages or registration/delivery process has been built.
+
+### Admin Message Centre and quick access (28 September 2026)
+
+Admin has five coordinated navy shortcuts: Event availability, Concert tracker, My Hub, My Media and Message Centre. The ordinary top-bar account name is removed; local test-account identification remains. The sidebar places My Hub under Hub management and My Media/Concert tracker under Media management. Studio messages and Customer support no longer appear as separate navigation entries.
+
+The Message Centre at `/admin/messages` combines customer requests/conversations, studio account and email history, and crew email conversations. All/Customers/Studios/Crew page tabs, history filters, recipient search, formatting preview, private attachments and replies reuse the existing delivery systems. Search accepts names, emails and existing account/studio/crew IDs; customer lookup also accepts order display numbers/UUIDs. Customer support decisions/download reactivation and studio conversation ownership remain available. Attachments are downloaded through authenticated conversation links. Raw HTML and unsafe links are stripped from rendered message formatting.
+
+Legacy admin customer-support and studio-message entry routes redirect into this one workspace. Task-specific tracker email pages and customer/crew inboxes remain their own role-appropriate interfaces to the same records. Crew Hub chat remains separate, reached through an Open Crew Hub chat button. Crew email conversations carry an explicit audience tag so accounts with both customer and crew roles keep separate email contexts. Existing email routing, inbound mailbox ingestion and local rehearsal settings are unchanged.
+
+Badges: Availability counts actionable scheduling exceptions; Tracker retains its task attention count; My Hub counts shift/time-sheet/invoice actions; My Media counts unread account notices/replies; Message Centre combines pending customer requests, unread studio messages and pending crew email conversations. Opening studio threads clears their read state; customer and crew email conversations remain actionable until answered or decided. Parent sidebar badges roll up the queues within their new groups.
+
+Account identifiers now follow the same public UUID convention as studios and conversations. Existing database relationship IDs stay intact, and old account URLs remain valid. Account IDs displayed in the admin directory/details are UUIDs; order numbers remain their existing numeric format. Numeric customer search no longer interprets an order number as a second account's internal ID.
+
+### Navigation consistency and live Message Centre search (28 September 2026)
+
+My Media and My Hub use matching compact landscape app-switch buttons (36px minimum height, 24px icons), with the supplied app icon on the left and consistent Admin Hub/My Hub/My Media labels. Admin shortcuts remain square. The Admin sidebar uses the supplied Admin icon with the original dark menu background (#101820), restored following owner feedback; menu badges appear to the left of their icon/title. Message Centre opens on All, with live partial-entry search in inbox and new-message mode. Results update without replacing a message draft. Event Availability filters, keys and bulk selections are collapsed under Advanced options.
+
+### Crew page branding and biography (28 September 2026)
+
+Crew Hub retains the landscape DancePro menu logo. Page headings use the supplied outline Crew Hub artwork. My Profile includes a Biography section after contact details, with collapsed guidance and eight prompts, no external examples link, and a saved text field of up to 5,000 characters.
+
+The biography deadline is calculated as the admin-managed commencement date plus four weeks (28 days), updating automatically when that date changes. An empty biography is overdue from the day after the deadline and shown in red; a saved biography is complete and green. If the start date is missing, show that the deadline awaits a start date rather than using account creation as a substitute. Biography does not block initial onboarding during the four-week writing period.
+
+### Website content editing and publishing (28 September 2026)
+
+Website Management follows Media management in admin, with Pages, Events, Crew
+bios and Help & FAQ. The editor uses the established DancePro layout: headings,
+text, optional images, section cards with links, visibility and ordering. Drafts
+can be saved and previewed; publishing explicitly replaces the public snapshot.
+This is a structured editor, not a free-form page designer.
+
+Home, About, Services and public Help share the Media website. Eligible accounts
+have Studio Hub, Crew Hub and Admin Hub in a second navigation row. Upcoming
+competition and concert scheduling events appear automatically within the next
+six calendar months; past and cancelled events are excluded. Admin can manually
+hide an event until it is restored. Competition cards show logo, date range and
+venue; concerts show one logo per studio and the section is hidden when empty. Crew biographies stay private until admin
+approval, and later crew changes require review without replacing published text.
+Help articles use the existing customer library with draft/publish/hide controls.
+No media storage, gallery access or live website records were changed. See
+`docs/handbook/Website-Management.md` and `docs/decisions/Website-Publishing.md`.
+
+The September content refresh expands the live site's service, booking, About
+and FAQ details into editable pages, replacing legacy forms, transfer emails,
+expired shoot dates and old rates with the current account workflow. Detailed
+service, media terms and privacy pages share the same editor. Three labelled
+placeholder crew bios live in About's editable sections without creating crew
+accounts. See the Website Management handbook for sources and migration rules.
+
+Public website presentation uses the supplied Top Pics collections rather than
+Media app icons in headings: large photographs with readable text overlays,
+varied editorial sections, photographic service cards and restrained transitions.
+Original photographs remain intact; optimised responsive derivatives are public
+website assets. Public Help shares this design while signed-in Media Help keeps
+the account heading. Editor image uploads override each curated hero. Motion is
+optional and respects reduced-motion preferences.
+
+### Public homepage account entry
+
+The primary homepage journey is DancePro account access. Guests see Sign in and
+Create an account; authenticated users with Media access see Open My Media and an
+Add a studio or event shortcut into My Events. Public gallery browsing remains
+available. Account setup guidance precedes separate concert/competition imagery,
+upcoming events and secondary organiser enquiries. Photography must match the
+service and avoid repeated default images across public pages.
+
+### Family account implementation (29 September 2026)
+
+My Family is the profile management surface for manager/member permissions, email invitations and dancer-only profiles. Accepted members automatically share eligible direct purchases; each keeps a personal favourites/cart and private order/payment history. A parent can upgrade a dancer-only profile by adding email and account permissions. See `docs/decisions/Customer-Family-Accounts.md` for the authoritative eligibility, permission, expiry and one-family-per-account rules. Native management UI and multiple-family/manager-transfer workflows remain follow-up work.
+
+
+### Seats & families email and Studio Hub entry
+
+Task 1.2 explains the exact Concert events workflow: open a concert card, confirm the unique-family total once across the booking under Your actions, and save row/seat allocations separately for every concert role. Its branded Open Concert events button links to the studio's events tab with actionable event cards expanded. Final family confirmation is available in those cards and returns there after saving. Family/seating due dates use tracker 1.3, which is set to ten days after successful 1.2 delivery. Other uploads retain their separate deadlines. Sent message bodies remain historical snapshots.
+
+
+### Studio event confirmations and applicable action totals
+
+Every Studio Hub event includes an explicit confirmation of arrival/setup times, start/finish times, date and venue. Incorrect details should be raised promptly through Request changes. Confirmation is stored per event with the user/date and can be unchecked independently of portrait requirements. It shares the existing seats/families deadline (ten days after task 1.2 is sent), without adding a tracker task. The 1.2 email describes this step.
+
+Studio progress counts only applicable studio actions, excluding automatic booking approval and not-required placeholders. Dress rehearsal portraits have two actions: event details and portrait requirements. Concerts with video normally have five: event details, family total, seats, programme and supplied videos/slideshows. Photo-only concerts normally have four. Video review/release joins the count when actionable and remains counted after completion. Family confirmation is shared across the booking; other confirmations are per event.
+
+### Save-position convention
+
+Saving a form should preserve page position and expanded sections by default, including newly added forms. The Studio Hub event workspace automatically applies the shared scroll helper to its forms and restores stable panel IDs, including after successful uploads. Do not require users to ask for this separately for each new form.
+
+
+### Simple seats and visible save feedback
+
+Reserved seats accept row shorthand such as J16-20 (five individual seats), J16, 18 (two separate seats), lowercase row letters, ranges with typographic dashes and one row per line. The previous Row J: 16, 17 format remains supported. Ranges are bounded; duplicate seats cannot inflate completion counts. Existing per-role limits still apply.
+
+Studio Hub event saves keep the section open and show success feedback beside the save button after the server confirms success. Validation errors appear there in red. Editing clears the success message. Successful uploads use the same feedback after reloading. Page position and expanded sections remain preserved.
+
+
+### Compact seats/families tracker cell
+
+Task 1.3 keeps the family and role-seat badges, using consecutive seat ranges (for example V: J16-20). Gaps and different rows remain explicit. Beneath the badges, show only the latest relevant editor's name and date across the booking's confirmed family total and this event's seating records, without repeating separate family/role activity logs or times.
+
+
+Concert-week email (task 1.4) uses the same compact seat formatter as the tracker. Event-detail email blocks list each role on its own line, for example Photographer P1: J15 and Videographer V: J16-20. The shared renderer also keeps other event-detail emails consistent; previously frozen/sent message bodies are retained.

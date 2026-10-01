@@ -20,6 +20,7 @@ struct PhotoReviewView: View {
   @State private var showPhotographers = false
   @State private var fitRequest = UUID()
   @State private var expanded = false
+  @State private var showPhotoImport = false
   @State private var showProgramme = false
   @State private var showConcertEditor = false
   @State private var showQueue = false
@@ -59,19 +60,25 @@ struct PhotoReviewView: View {
           }
         }
         Spacer(minLength: 12)
-        Button("\(model.queuedIDs.count) queued") { showQueue = true }
+        Button(model.isConcert ? "\(model.uploadListPhotos.count) to upload" : "\(model.queuedIDs.count) queued") { showQueue = true }
         if model.isUploading {
           Button("Pause", action: model.pauseUploads).buttonStyle(.borderedProminent)
         } else {
-          Button(model.uploadPaused ? "Resume" : "Upload", action: uploadPhotos)
+          Button(model.needsConcertCompletion ? "Retry completion" : (model.uploadPaused ? "Resume" : "Upload"), action: uploadPhotos)
             .buttonStyle(.borderedProminent).tint(.blue)
-            .disabled(model.busy || model.queuedIDs.isEmpty)
+            .disabled(!model.canStartPhotoUpload)
         }
-        Button("Upload Complete") {
-          confirmFinish = true
+        if model.isConcert {
+          Label(model.completionRecorded ? "Complete" : "Completes automatically after upload",
+                systemImage: model.completionRecorded ? "checkmark.circle.fill" : "arrow.triangle.2.circlepath")
+            .font(.caption).foregroundStyle(model.completionRecorded ? Color.green : Color.secondary)
+        } else {
+          Button("Upload Complete") {
+            confirmFinish = true
+          }
+          .disabled(!model.canFinishUploads)
+          .help("Confirm this event role has finished the event. All local photos must be uploaded first.")
         }
-        .disabled(!model.canFinishUploads)
-        .help("Confirm this event role has finished the event. All local photos must be uploaded first.")
       }.font(.callout).padding(14)
       if let error = model.error {
         HStack {
@@ -84,11 +91,12 @@ struct PhotoReviewView: View {
     }
     .background(Color(red: 0.12, green: 0.13, blue: 0.15))
     .preferredColorScheme(.dark)
+    .onAppear { if model.isConcert && !model.roleConfirmed { showPhotographers = true } }
     .task { await model.watch() }
     .task { await refreshPhotographers() }
     .task {
       while !Task.isCancelled {
-        if model.local.manifest.programme.eventType == "concert" { await refreshSharedProgramme() }
+        if model.isConcert && !model.isPortraitSession { await refreshSharedProgramme() }
         else { await checkCompetitionFolders() }
         do { try await Task.sleep(for: .seconds(30)) } catch { return }
       }
@@ -100,10 +108,11 @@ struct PhotoReviewView: View {
     } message: {
       Text("Confirm that all photos for \(model.photographerSelection?.selected?.roleName ?? "this role") have been uploaded, including work from other Macs. Empty items are included. The gallery stays private.")
     }
+    .sheet(isPresented: $showPhotoImport) { ConcertPhotoImportView(model: model) }
     .sheet(isPresented: $showProgramme) { programmeSheet }
     .sheet(isPresented: $showConcertEditor) { ConcertEditorView(model: model) }
     .sheet(isPresented: $showPhotographers) {
-      PhotographerSelectionView(model: model, refresh: refreshPhotographers)
+      PhotographerSelectionView(model: model, refresh: refreshPhotographers, back: close)
     }
     .sheet(isPresented: $showQueue) { PhotoQueueView(model: model, refreshProgress: refreshProgress) }
   }
@@ -129,7 +138,7 @@ struct PhotoReviewView: View {
       }
       Spacer()
       Button("Open Folders", systemImage: "folder") { NSWorkspace.shared.open(model.local.url) }
-      if model.local.manifest.programme.eventType == "concert" {
+      if model.isConcert && !model.isPortraitSession {
         Button(downloadingTitles ? "Downloading…" : "Video Titles…", systemImage: "arrow.down.doc") {
           Task {
             downloadingTitles = true
@@ -140,14 +149,16 @@ struct PhotoReviewView: View {
         Button("Edit Items", systemImage: "pencil") { showConcertEditor = true }.disabled(
           model.busy || !model.lockedItemIDs.isEmpty)
       }
-      Button("Programme", systemImage: "doc.text") { showProgramme = true }
+      if !model.isPortraitSession {
+        Button("Programme", systemImage: "doc.text") { showProgramme = true }
+      }
       if model.local.manifest.programme.eventType == "competition" {
         Text(model.competitionTag).font(.caption.weight(.semibold))
           .padding(.horizontal, 8).padding(.vertical, 4)
           .background(Color.orange.opacity(0.18), in: Capsule())
           .help("Open Programme to compare capture folders across P1/P2/V. Uploads can continue.")
       }
-      if model.local.manifest.programme.eventType == "concert" {
+      if model.isConcert && !model.isPortraitSession {
         Text(model.programmeTag).font(.caption.weight(.semibold))
           .padding(.horizontal, 8).padding(.vertical, 4)
           .background((model.sharedProgrammeMatches && model.sharedProgrammeError == nil ? Color.green : Color.orange).opacity(0.18), in: Capsule())
@@ -159,6 +170,14 @@ struct PhotoReviewView: View {
   private var sidebar: some View {
     VStack(spacing: 0) {
       if !model.movingPhotos {
+        if model.isConcert {
+          Button("Import Photos…", systemImage: "square.and.arrow.down") { showPhotoImport = true }
+            .disabled(model.busy || model.isUploading).padding(.top, 12)
+        }
+        if model.isPortraitSession {
+          Text("Import Photos, or use Open Folders to copy portraits into Dress Rehearsal Portraits. Then click Upload.")
+            .font(.caption).foregroundStyle(.secondary).padding(12)
+        }
         folderButton(
           id: "top-pics", title: "Top Pics", count: model.photos.filter(\.isTopPic).count,
           symbol: "star.fill"
@@ -178,7 +197,7 @@ struct PhotoReviewView: View {
                   Text([node.number, node.title].compactMap { $0 }.joined(separator: " ")).font(
                     .headline)
                   Spacer()
-                  readyButton(node.uuid)
+                  if !model.isConcert { readyButton(node.uuid) }
                 }.padding(.top, 12)
               } else if node.isActiveItem {
                 HStack(spacing: 4) {
@@ -188,9 +207,6 @@ struct PhotoReviewView: View {
                       separator: " · "),
                     count: model.photos.filter { $0.itemID == node.uuid }.count, symbol: nil
                   )
-                  if model.local.manifest.programme.eventType == "concert" {
-                    readyButton(node.uuid)
-                  }
                 }.id(node.uuid)
               }
             }
@@ -390,7 +406,7 @@ struct PhotoReviewView: View {
         Spacer()
         Button("Done") { showProgramme = false }
       }
-      if model.local.manifest.programme.eventType == "concert" {
+      if model.isConcert && !model.isPortraitSession {
         HStack {
           Text(model.programmeTag).font(.headline)
           Spacer()

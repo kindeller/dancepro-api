@@ -17,11 +17,9 @@ class TwoFactorController extends Controller
 {
     public function settings(Request $request, TwoFactorAuthentication $twoFactor): View
     {
-        abort_unless(config('security.two_factor.enabled'), 404);
-
         return view('auth.two-factor-settings', [
             'user' => $request->user(),
-            'qrCode' => $twoFactor->qrCodeDataUri($request->user()),
+            'qrCode' => config('security.two_factor.enabled') ? $twoFactor->qrCodeDataUri($request->user()) : null,
             'recoveryCodes' => session('two_factor_recovery_codes'),
         ]);
     }

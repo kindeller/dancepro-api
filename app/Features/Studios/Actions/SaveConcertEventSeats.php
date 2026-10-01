@@ -71,21 +71,39 @@ class SaveConcertEventSeats
 
     private function parseSeating(string $value, string $code): Collection
     {
-        $seats = collect(preg_split('/\R+/', trim($value)) ?: [])->filter()->flatMap(function (string $line) use ($code): array {
-            if (! str_contains($line, ':')) {
-                throw ValidationException::withMessages(["roles.{$code}.seating" => 'Use one line per row, for example: Row A: 12, 13, 14.']);
+        return collect(preg_split('/\R+/', trim($value)) ?: [])->filter()->flatMap(function (string $line) use ($code): array {
+            $line = str_replace(['–', '—'], '-', trim($line));
+            if (str_contains($line, ':')) {
+                [$row, $numbers] = array_map('trim', explode(':', $line, 2));
+                $row = preg_replace('/^row\s+/i', '', $row) ?? $row;
+            } elseif (preg_match('/^([a-z]+)\s*(\d.*)$/i', $line, $parts)) {
+                [, $row, $numbers] = $parts;
+            } else {
+                throw ValidationException::withMessages(["roles.{$code}.seating" => 'Enter seats like J16-20 or J16, 18. Use a new line for another row.']);
             }
 
-            [$row, $numbers] = array_map('trim', explode(':', $line, 2));
-            $row = preg_replace('/^row\s+/i', '', $row) ?? $row;
-            $numbers = collect(preg_split('/\s*,\s*/', $numbers) ?: [])->filter();
-            if ($row === '' || $numbers->isEmpty()) {
-                throw ValidationException::withMessages(["roles.{$code}.seating" => 'Enter a row and at least one seat number on every line.']);
+            $row = mb_strtoupper(trim($row));
+            if ($row === '' || trim($numbers) === '') {
+                throw ValidationException::withMessages(["roles.{$code}.seating" => 'Enter a row letter and seat numbers, for example J16-20.']);
             }
 
-            return $numbers->map(fn (string $seat): array => ['row' => $row, 'seat' => trim($seat)])->all();
-        })->values();
+            return collect(explode(',', $numbers))->flatMap(function (string $number) use ($row, $code): array {
+                $number = trim($number);
+                if (preg_match('/^(\d{1,9})\s*-\s*([a-z]*)(\d{1,9})$/i', $number, $range)) {
+                    $start = (int) $range[1];
+                    $end = (int) $range[3];
+                    if ($end < $start || $end - $start >= 6 || ($range[2] !== '' && mb_strtoupper($range[2]) !== $row)) {
+                        throw ValidationException::withMessages(["roles.{$code}.seating" => 'Use an increasing range of up to 6 seats in the same row, for example J16-20.']);
+                    }
 
-        return $seats;
+                    return array_map(fn (int $seat): array => ['row' => $row, 'seat' => (string) $seat], range($start, $end));
+                }
+                if ($number === '' || preg_match('/^\d+\s*-/', $number)) {
+                    throw ValidationException::withMessages(["roles.{$code}.seating" => 'Check the seat numbers. Use J16-20 for a range, or J16, 18 for separate seats.']);
+                }
+
+                return [['row' => $row, 'seat' => ctype_digit($number) ? ltrim($number, '0') ?: '0' : $number]];
+            })->all();
+        })->unique(fn (array $seat): string => $seat['row'].'|'.mb_strtoupper($seat['seat']))->values();
     }
 }

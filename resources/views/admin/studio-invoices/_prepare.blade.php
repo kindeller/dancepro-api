@@ -1,4 +1,4 @@
-<section class="card card-pad" style="max-width:1000px;margin-top:20px">
+<section class="card card-pad" style="width:100%;min-width:0;margin-top:20px">
 <h2>Create invoice from booking</h2>
 @if($errors->any())<p role="alert">{{ $errors->first() }}</p>@endif
 @if($booking->status->value !== 'approved' || !$booking->studio_id)
@@ -7,6 +7,7 @@
 <p>Pending final family numbers. The invoice has no deadline until they are confirmed.</p><a class="button secondary" href="{{ route('admin.concert-bookings.show', [$booking, 'tab' => 'seats-families']) }}">Confirm final family numbers</a>
 @else
 <p>Review the quote, add any adjustments or discounts, then send the invoice. The studio can view, download and pay it through their account.</p>
+@if($booking->wants_concert_videography)<p>Concert video uses the greater of $1,500 per concert or $15 per unique performing family, including GST. Families appearing in more than one concert are counted once. The invoice shows the applicable rate and quantity.</p>@endif
 <form method="post" action="{{ route('admin.studio-invoices.store', $booking) }}">@csrf
 <label>Invoice type<select name="kind">@if($booking->wants_concert_videography)<option value="video">Confirmed video quote</option>@endif<option value="custom">Custom invoice</option></select></label>
 <label style="display:flex;align-items:center;gap:8px;margin:18px 0"><input type="checkbox" name="is_test" value="1" @checked(app(\App\Features\Tracking\Services\ConcertEmailRehearsal::class)->simulated())> Test invoice (no live payment)</label>

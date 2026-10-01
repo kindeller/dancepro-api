@@ -10,6 +10,8 @@ use App\Features\Customers\Models\CustomerSupportRequest;
 use App\Features\Customers\Observers\CustomerInboxSourceObserver;
 use App\Features\Customers\Observers\CustomerSupportRequestObserver;
 use App\Features\Customers\Services\CustomerInbox;
+use App\Features\Customers\Services\CustomerProfileCompletion;
+use App\Features\Customers\Services\EmailVerificationMessage;
 use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Downloads\Policies\DownloadLinkPolicy;
 use App\Features\Exceptions\Services\AdminExceptionOverview;
@@ -30,6 +32,7 @@ use App\Features\Tracking\Models\ConcertTrackerEmailDelivery;
 use App\Features\Tracking\Services\ConcertTracker;
 use App\Models\User;
 use App\Shared\Support\LocalDevelopmentSafety;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
@@ -61,13 +64,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        VerifyEmail::toMailUsing(fn (object $user, string $url) => app(EmailVerificationMessage::class)->for($user, $url));
+
         CustomerSupportRequest::observe(CustomerSupportRequestObserver::class);
         foreach ([CustomerMediaNotification::class, CustomerAccountEmail::class, ConcertTrackerEmailDelivery::class, DatabaseNotification::class] as $source) {
             $source::observe(CustomerInboxSourceObserver::class);
         }
         View::composer('layouts.public', function (ViewContract $view): void {
+            $crewCounts = auth()->user()?->canAccessCrew() ? app(CrewNavigationIndicators::class)->for(auth()->user()) : [];
+            $view->with('publicCrewActionCount', ($crewCounts['shifts'] ?? 0) + ($crewCounts['timesheets'] ?? 0));
             $view->with('customerInboxCounts', auth()->user()?->canAccessCustomer()
                 ? app(CustomerInbox::class)->counts(auth()->user()) : ['notifications' => 0, 'conversations' => 0, 'total' => 0]);
+        });
+        View::composer(['customers.profile.edit', 'layouts.partials.customer-navigation'], function (ViewContract $view): void {
+            $view->with('customerProfileCounts', auth()->user()?->canAccessCustomer()
+                ? app(CustomerProfileCompletion::class)->counts(auth()->user()) : ['family' => 0, 'studios' => 0, 'total' => 0]);
         });
         if ($this->app->environment('local')) {
             $this->app->make(LocalDevelopmentSafety::class)->assertSafe();
@@ -197,6 +208,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manageStudios', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('manageConcerts', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('manageCrew', fn (User $user): bool => $user->canAccessAdmin());
+        Gate::define('manageWebsite', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('manageScheduling', fn (User $user): bool => $user->canAccessAdmin());
         Gate::define('viewProgramme', [ProgrammePolicy::class, 'view']);
         Gate::define('updateProgramme', [ProgrammePolicy::class, 'update']);
@@ -218,7 +230,7 @@ class AppServiceProvider extends ServiceProvider
             });
         }
 
-        View::composer(['layouts.admin', 'admin.event-management._tabs', 'admin.media.support', 'admin.customers.follow-ups'], function (ViewContract $view): void {
+        View::composer(['layouts.admin', 'admin.messages.index', 'admin.event-management._tabs', 'admin.contacts._tabs', 'admin.customers.follow-ups'], function (ViewContract $view): void {
             $view->with('adminNavigationIndicators', app(AdminNavigationIndicators::class)->for(auth()->user()));
         });
 
@@ -237,6 +249,15 @@ class AppServiceProvider extends ServiceProvider
 
     private function registerConcertMediaRateLimiters(): void
     {
+        foreach ([
+            'family-code' => 5, 'family-verify' => 10, 'family-playback' => 30,
+            'family-media' => 120, 'family-activity' => 30, 'family-download-request' => 10,
+            'family-download' => 30, 'family-invite' => 10,
+        ] as $name => $limit) {
+            RateLimiter::for($name, fn (Request $request) => Limit::perMinute($limit)
+                ->by($name.':'.($request->user()?->id ?? $request->ip())));
+        }
+
         foreach ([
             'concert-playback' => 'playback_per_minute',
             'concert-media' => 'media_per_minute',

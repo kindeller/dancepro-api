@@ -47,7 +47,7 @@ class GuestGalleryAccessTest extends TestCase
         SchedulingEvent::create(['name' => 'Old unreleased event', 'event_type' => 'competition', 'event_date' => today()->subDay()]);
 
         $this->get(route('guest-galleries.index'))->assertOk()->assertSee('Competitions')->assertSee('Concerts')
-            ->assertSee('Seven day event')->assertSee('Coming soon — register now')
+            ->assertSee('Seven day event')->assertSee('Coming soon')->assertSee('Register now')
             ->assertDontSee('Eight day event')->assertDontSee('Old unreleased event');
         $input = ['email' => ' Guest@Example.test ', 'notification_consent' => '1'];
         $this->post(route('guest-galleries.notifications.store', $visible), $input)->assertRedirect()
@@ -107,7 +107,8 @@ class GuestGalleryAccessTest extends TestCase
         $fixture = $this->concert(true);
         $show = route('guest-galleries.concerts.show', $fixture['concert']);
         $this->get($show)->assertForbidden();
-        $this->get(route('guest-galleries.index', ['type' => 'concert']))->assertOk()->assertSee('Guest concert');
+        $this->get(route('guest-galleries.index', ['type' => 'concert']))->assertOk()->assertSee($fixture['studio']->name);
+        $this->get(route('guest-galleries.studios.show', $fixture['studio']))->assertRedirect(route('guest-galleries.studios.access', $fixture['studio']));
         $this->post(route('guest-galleries.concerts.unlock', $fixture['concert']), [
             'email' => 'guest@example.test', 'login_code' => 'WRONG-CODE',
         ])->assertSessionHasErrors('login_code')->assertSessionMissing('_old_input.login_code');
@@ -130,7 +131,7 @@ class GuestGalleryAccessTest extends TestCase
         $this->get(route('guest-galleries.concerts.cart', ['concert' => $fixture['concert'], 'tab' => 'favourites']))
             ->assertOk()->assertSee('Saved favourites')->assertSee('Album One')->assertSee('Remove from favourites');
         $this->get(route('guest-galleries.concerts.checkout', ['concert' => $fixture['concert'], 'account' => 'login']))
-            ->assertRedirect(route('customer.login'));
+            ->assertRedirect(route('login'));
         $this->assertSame(route('customer.concerts.photos.cart', $fixture['studio']), session('url.intended'));
 
         $accessUuid = DB::table('guest_gallery_accesses')->value('uuid');
@@ -156,6 +157,53 @@ class GuestGalleryAccessTest extends TestCase
             ->where('media_asset_id', $fixture['asset']->id)->where('is_favourite', true)->where('in_cart', true)->exists());
         $this->assertDatabaseCount('guest_gallery_accesses', 0);
         $this->assertDatabaseCount('guest_gallery_selections', 0);
+    }
+
+    public function test_one_studio_code_unlocks_released_events_but_not_other_studios_or_unreleased_media(): void
+    {
+        $first = $this->concert(true);
+        $second = $this->concert(true, 'SECOND');
+        $second['concert']->update(['studio_id' => $first['studio']->id]);
+        $second['concert']->bookingItem->update(['item_type' => 'dress_rehearsal']);
+        $private = $this->concert(false, 'PRIVATE');
+        $private['concert']->update(['studio_id' => $first['studio']->id]);
+        $other = $this->concert(true, 'OTHER');
+        $access = route('guest-galleries.studios.access', $first['studio']);
+        $this->get($access)->assertOk()->assertSee('Studio access code')->assertSee('Open studio galleries');
+        $this->post(route('guest-galleries.studios.unlock', $first['studio']), [
+            'email' => 'guest@example.test', 'login_code' => 'wrong',
+        ])->assertSessionHasErrors('login_code');
+        $this->post(route('guest-galleries.studios.unlock', $first['studio']), [
+            'email' => 'guest@example.test', 'login_code' => 'STUDIO-GALLERY',
+        ])->assertRedirect(route('guest-galleries.studios.show', $first['studio']));
+        $expires = DB::table('guest_gallery_accesses')->value('expires_at');
+        $this->travel(1)->days();
+        foreach ([$first, $second] as $fixture) {
+            $show = route('guest-galleries.concerts.show', $fixture['concert']);
+            $this->get(route('guest-galleries.concerts.access', $fixture['concert']))->assertRedirect($show);
+            $this->get($show)->assertOk()->assertSee(route('guest-galleries.studios.show', $first['studio']), false);
+            $this->get(route('guest-galleries.concerts.image', [$fixture['concert'], $fixture['asset']->uuid]))->assertOk();
+            $this->post(route('guest-galleries.concerts.selections', $fixture['concert']), [
+                'asset_uuid' => $fixture['asset']->uuid, 'action' => 'add',
+            ])->assertRedirect();
+        }
+        $this->get(route('guest-galleries.concerts.show', $second['concert']))->assertOk()
+            ->assertSee('class="header-back" href="'.route('guest-galleries.studios.show', $first['studio']).'"', false);
+        $this->get(route('guest-galleries.studios.show', $first['studio']))->assertOk()
+            ->assertSee(route('guest-galleries.concerts.show', $second['concert']), false);
+        $this->get(route('guest-galleries.concerts.cart', $first['concert']))->assertOk()
+            ->assertViewHas('cart', fn ($cart) => $cart->count() === 2);
+        $this->assertSame([$expires], DB::table('guest_gallery_accesses')->distinct()->pluck('expires_at')->all());
+        $this->get(route('guest-galleries.concerts.show', $other['concert']))->assertForbidden();
+        $this->get(route('guest-galleries.concerts.show', $private['concert']))->assertNotFound();
+        $this->get(route('guest-galleries.concerts.image', [$private['concert'], $private['asset']->uuid]))->assertNotFound();
+        $this->get(route('guest-galleries.concerts.image', [$first['concert'], $other['asset']->uuid]))->assertNotFound();
+        $private['collection']->update(['status' => 'published', 'visibility' => 'customer', 'published_at' => now()]);
+        $this->get(route('guest-galleries.concerts.show', $private['concert']))->assertOk();
+        $this->assertSame([$expires], DB::table('guest_gallery_accesses')->distinct()->pluck('expires_at')->all());
+        $this->travel(30)->days();
+        $this->get(route('guest-galleries.studios.show', $first['studio']))->assertRedirect($access);
+        $this->get(route('guest-galleries.concerts.show', $second['concert']))->assertForbidden();
     }
 
     public function test_guest_can_unlock_and_browse_only_ready_competition_media(): void
@@ -225,10 +273,10 @@ class GuestGalleryAccessTest extends TestCase
         $this->assertDatabaseCount('guest_gallery_accesses', 0);
     }
 
-    private function concert(bool $released): array
+    private function concert(bool $released, string $code = 'STUDIO-GALLERY'): array
     {
         $studio = Studio::factory()->create();
-        $studio->forceFill(['gallery_code_hash' => Hash::make('STUDIO-GALLERY')])->save();
+        $studio->forceFill(['code' => $code, 'gallery_code_hash' => Hash::make($code)])->save();
         $event = SchedulingEvent::create([
             'studio_id' => $studio->id, 'name' => 'Guest concert', 'event_type' => 'concert', 'event_date' => today()->addDays(3),
         ]);
@@ -251,10 +299,11 @@ class GuestGalleryAccessTest extends TestCase
             'published_at' => $released ? now() : null,
         ]);
         $bytes = $this->jpeg();
-        Storage::disk('local')->put('guest-concert/photo.jpg', $bytes);
+        $key = 'guest-concert/'.$concert->uuid.'/photo.jpg';
+        Storage::disk('local')->put($key, $bytes);
         $asset = MediaAsset::factory()->create([
             'media_collection_id' => $collection->id, 'media_type' => 'photo', 'status' => 'available', 'is_visible' => true,
-            'storage_disk' => 'local', 'storage_key' => 'guest-concert/photo.jpg', 'mime_type' => 'image/jpeg',
+            'storage_disk' => 'local', 'storage_key' => $key, 'mime_type' => 'image/jpeg',
         ]);
 
         return compact('studio', 'event', 'concert', 'collection', 'asset');

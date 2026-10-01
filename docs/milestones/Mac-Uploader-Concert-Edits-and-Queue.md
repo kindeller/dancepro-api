@@ -1195,3 +1195,196 @@ Verification for video-title downloads: 90 Swift tests passed, including stale
 revision, wrong event/URL, oversize manifest and damaged download rejection.
 The release app was rebuilt successfully. Laravel's full suite passed 861 tests
 with 8,318 assertions; browser-generated ZIPs passed the server archive validator.
+
+
+### Concert customer delivery verification — 28 September 2026
+
+The existing concert upload protocol was exercised through signed local transfer,
+checksum verification, Finished Uploading, tracker readiness, studio review and
+release, and customer code access/playback/individual download. Completion now
+orders exported items naturally by filename. Customer bulk downloading retains
+the existing multiple-file manager, not a concert ZIP. No uploader storage
+destination or live object path changed. Production catalogue/disk verification
+remains necessary; the current single-file upload limit is 5 GiB. See the customer
+web gallery milestone for delivery checks and remaining rollout work.
+
+### Approved-event search and concert separator import — 29 September 2026
+
+- Approved event cards display studio name followed by the booking event title.
+  The API adds optional studio/title fields without changing the legacy name;
+  the app remains compatible with older responses. Partial searches match studio,
+  scheduling-event name or booking title and retain existing access/approval gates.
+- Search refreshes after a 300 ms typing pause, cancels superseded work and rejects
+  stale results. It waits for an active preparation operation rather than dropping
+  the latest search.
+- Added offline JPEG import to prepared concerts. Local downsampled luminance
+  detection proposes black separators and groups in natural folder/filename order.
+  Crew review first/last images, choose destinations, split/combine groups, rename
+  conflicting files, exclude frames or restore false positives before confirming.
+- Import is serialized through the photo library, preserves source files, excludes
+  separators, rejects changed files/unsafe paths/locked uploaded items and refuses
+  destination collisions. Hidden staging avoids discovering partially copied JPEGs;
+  completed copies are removed from the dialog's retry plan after a partial failure.
+  Upload remains separate. No cloud AI, live-storage change or source-file deletion.
+- Verification: all 100 Swift tests passed, including new detector/group editing,
+  safe-copy, collision and changed-source checks. Release app rebuilt and locally
+  signed successfully. Scoped Pint and diff checks passed. All 1,087 Laravel tests
+  passed (11,576 assertions). Next: pilot with real concert camera JPEGs to assess
+  separator sensitivity and folder/filename ordering. No real photos were imported.
+
+
+### Folder accents and clear import completion — 29 September 2026
+
+- Newly generated concert folder titles remove composed/decomposed accents while
+  display titles and video-title text retain their original spelling. Existing
+  approved snapshots, event root names and saved folder paths stay readable.
+  Uploader Edit Items → Save Changes uses the existing journalled rename flow to
+  clean old unuploaded folders without changing item identity or losing photos.
+  Server sync accepts old and new cleaned folder spellings; competition comparison
+  behaviour is unchanged.
+- Successful photo import now displays a green Import complete panel with the
+  imported count and next step, and replaces Import 0 photos with a bottom Done
+  button. Partial failures retain the remaining-photo controls. The completion
+  copy distinguishes local import from Upload.
+- Checked the current local runtime: photo uploads enabled, local filesystem,
+  website URL http://localhost. Upload receipts feed tracker 3.1; all expected photo
+  roles must explicitly complete their uploads. Admin Concert Photos provides a
+  private preview; customer galleries retain their release/access gates.
+- Accent/import verification: 101 Swift tests passed and release app rebuilt.
+  Full Laravel suite passed 1,090 tests (11,579 assertions); subsequent focused
+  programme sync/title checks passed 21 tests (65 assertions).
+
+
+### Concert role confirmation, upload all and automatic private galleries
+
+- Every concert open requires an explicit role confirmation, including cached and
+  reopened prepared folders. Stored role choice remains a suggestion. Competitions
+  retain their saved station role and per-section Ready workflow.
+- Concert Upload queues all current stable, unuploaded JPEGs. No per-item Ready
+  controls. Later photos need another click; already verified files are not resent.
+  Unreadable/copying files explain why uploading cannot start. Pending queues must
+  be explicitly cleared or uploaded before a role change; clearing keeps photos.
+- Verified linked-concert photos are attached incrementally to private customer
+  albums in the receipt transaction, with a watermarked thumbnail and existing
+  storage key. Retries/reservations are idempotent; duplicate receipts resolve to
+  the canonical file. Top Pic changes update customer asset metadata as well.
+- No queue worker or manual gallery sync is needed. Gallery repair remains under
+  a collapsed admin control for legacy uploads / later event linking. Standalone
+  scheduling events without a customer concert continue private capture uploads.
+- Existing album edits, cover choice, visibility and release status are retained.
+  New photos in an already published album remain hidden for admin review; normal
+  unreleased albums stay draft/private until explicit 4.1 release. Upload Complete
+  remains the photographer's explicit finish declaration for tracker 3.1.
+- Verification: 104 Swift tests passed and the signed release app rebuilt. The full
+  Laravel run passed 1,092 of 1,093 tests; its sole failure was an assertion for the
+  replaced manual-sync help text. Updated that expectation and reran all affected
+  upload/gallery/Top Pic suites: 60 tests passed (641 assertions), including
+  archive/deletion preservation. Scoped Pint and diff checks passed. No real media
+  uploaded or released; restart the rebuilt uploader to use the new flow.
+
+
+### Role selection before concert preparation — 29 September 2026
+
+- Concert selection loads current configured media roles; Prepare stays disabled
+  until an explicit choice. Roles and the programme revision are rechecked before
+  writing. P1/P2 save programme/photo folders; V downloads the verified ready title
+  ZIP plus programme in a separate Video directory with no photo folders.
+- Optional manifest preparation mode preserves old prepared folders. New video
+  preparations use a dedicated programme/title view and retain the edited concert
+  video uploader. Existing photos, local review state and role queues are preserved.
+  A role chosen for preparation confirms the immediate opening; subsequent opens
+  still request confirmation. Pending queues retain the role-change safeguard.
+- Missing/stale titles fail with the existing actionable 2.3 message before file
+  creation. ZIP title JPEGs are opened/extracted locally. Competition preparation
+  keeps its existing workflow. Updated the product plan to record the owner's
+  newer explicit concert-role requirement over the earlier optional-role rule.
+- Verification: 105 Swift tests passed, including separate video preparation,
+  no photo-folder creation, preservation of existing photos and mismatched title
+  rejection. Release app rebuilt and signed. Full Sail suite passed 1,093 tests
+  (11,613 assertions); diff check passed. No user preparation folders or photos
+  changed. Next: reopen the rebuilt app and choose a concert role before Prepare.
+
+
+### Recovering an existing photo preparation — 29 September 2026
+
+- Diagnosed an empty nested Energy preparation created by selecting the existing
+  event folder as the destination for Prepare. The outer preparation still has
+  all 146 JPEGs and its review records; no missing expected folders. No original
+  files or the nested copy were moved/deleted.
+- Prepare now detects a preparation manifest in the selected directory, validates
+  event/server/revision/media mode and reopens a match without rebuilding anything.
+  Mismatches explain how to resume or select a parent folder for a new preparation.
+- Open Existing Event Folder now remembers the selected location. Prepared cards
+  display their paths to distinguish similarly named roots. Regression coverage
+  checks no nested directory, unchanged photos/review/manifest, and mismatches.
+- Verification: 106 Swift tests passed; release app rebuilt and signed. Full Sail
+  suite passed 1,093 tests (11,613 assertions); diff check passed. Observed the
+  user's uploader showing the original photos and actively uploading its 146-photo
+  batch after opening the outer folder. No re-import was needed. Restart the rebuilt
+  app after the current upload finishes to pick up the nested-folder prevention.
+
+- Confirmed the existing watcher also supports external sorting: JPEGs copied or
+  exported directly into prepared numbered folders are detected automatically
+  after the stability checks. Import Photos is optional; keep folder names and
+  preparation files intact. Documented the Finder/editing-software workflow.
+
+
+### Automatic concert photo completion — 30 September 2026
+
+- Owner replaced the proposed end-of-upload prompt with unattended completion:
+  concert Upload now records role completion after the local queue drains and
+  the server verifies every reservation. Other required photo roles still gate
+  tracker 3.1. No gallery is released by this action.
+- Concert footer replaces Upload Complete with an automatic-completion indicator.
+  A failed completion request offers Retry completion without retransferring
+  acknowledged photos, including after restarting. Transient failures retry in
+  the upload loop. Competitions retain explicit completion.
+- Paused/failed uploads, copying files and newly discovered unuploaded photos
+  cannot auto-complete. Later uploads reopen the role through existing reservation
+  logic. Empty local preparations are not automatically marked complete.
+- Completion recovery is tied to the role in the upload receipt: switching roles
+  cannot complete another photographer using the existing uploaded batch.
+- Updated tracker guidance and release blockers to match. Verification: 109 Swift
+  tests passed and the signed release app rebuilt. Full Sail run passed 1,091 of
+  1,093 tests; two assertions loaded the previous completion wording while it was
+  being updated. Both affected suites then passed all 56 tests (628 assertions).
+  Scoped Pint and diff checks passed. No live uploads or releases performed.
+- Next: reopen the rebuilt uploader after any running transfer ends. Concert
+  uploads now finish unattended; older verified batches offer Retry completion.
+
+
+### Dress rehearsal portrait uploads — 30 September 2026
+
+- Approved dress rehearsal bookings with portrait photography automatically get
+  one stable portrait preparation, without PDF upload or task 2.2 approval. An
+  idempotent data migration prepares existing approved sessions while preserving
+  existing programme drafts/revisions. Rollback intentionally retains identities
+  because photo uploads can reference them.
+- The API advertises a dress_rehearsal capture mode. The uploader creates one plain
+  Dress Rehearsal Portraits folder, requests the photographer role and hides
+  programme editing, title/video controls and black-frame sorting for this mode.
+  Copy JPEGs into the folder and Upload; existing automatic completion drives 3.1.
+  The portrait assistant is not a separate photo-upload role.
+- Customer albums use Dress Rehearsal Portraits without a numeric prefix. Studio
+  gallery cards lead directly to the released images, bypassing release-group and
+  album navigation. Release, studio access, shopping and private storage checks
+  remain in force; albums are still private until 4.1 release.
+- Explicit photo release also publishes the draft DR media record created by
+  booking approval; preparing or uploading portraits does not open customer access.
+- The local migration prepared five existing approved DR sessions, including Energy
+  Dance Studio on 30 December 2026. The signed uploader release was rebuilt; all
+  110 Swift tests and the two focused upload/release tests (38 assertions) passed.
+  The full Sail suite passed all 1,095 tests (11,651 assertions). Scoped Pint and
+  diff checks passed. No real photos were uploaded and no customer galleries
+  were released.
+- Next: reopen the rebuilt uploader, refresh approved events, choose the DR event
+  and photographer role, prepare its folder, copy JPEGs into Dress Rehearsal
+  Portraits, then click Upload.
+
+### Newest prepared projects first — 30 September 2026
+
+- Local prepared projects sort by their saved preparation date, newest first,
+  whenever the project list loads. Opening an older project does not move it ahead
+  of a more recently prepared project.
+- All 111 Swift tests passed and the signed release app rebuilt. Reopen the rebuilt
+  uploader to load the updated ordering.

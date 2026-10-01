@@ -10,6 +10,7 @@ use App\Features\Concerts\Models\Concert;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Crew\Models\CrewRole;
 use App\Features\Customers\Models\CustomerStudio;
+use App\Features\Customers\Services\StudioCommunicationHistory;
 use App\Features\Media\Models\MediaCollection;
 use App\Features\Programmes\Models\Programme;
 use App\Features\Programmes\Models\ProgrammeSource;
@@ -24,7 +25,10 @@ use App\Features\Studios\Models\StudioContact;
 use App\Features\Studios\Models\StudioEventAcknowledgement;
 use App\Features\Studios\Models\StudioEventFile;
 use App\Features\Studios\Notifications\StudioAccountInvitation;
+use App\Features\Tracking\Actions\ConsolidateConcertEmailTasks;
+use App\Features\Tracking\Actions\ConsolidateConcertWeekTasks;
 use App\Features\Tracking\Actions\CreateConcertTrackerAlerts;
+use App\Features\Tracking\Actions\UpdateConcertTrackerTask;
 use App\Features\Tracking\Jobs\SendConcertTrackerEmail;
 use App\Features\Tracking\Mail\ConcertTrackerMessage;
 use App\Features\Tracking\Mail\StudioConversationReply;
@@ -35,24 +39,80 @@ use App\Features\Tracking\Models\ConcertTrackerEmailTemplate;
 use App\Features\Tracking\Models\ConcertTrackerInboundEmail;
 use App\Features\Tracking\Models\ConcertTrackerTask;
 use App\Features\Tracking\Models\StudioConversationAttachment;
+use App\Features\Tracking\Services\BookingTrackerBar;
 use App\Features\Tracking\Services\ConcertTracker;
 use App\Features\Tracking\Services\ConcertTrackerAutomation;
 use App\Features\Tracking\Services\EmailContentFormatter;
 use App\Features\Tracking\Support\ConcertTrackerTaskCatalog;
+use App\Features\Tracking\Support\SeatsFamiliesEmailContent;
 use App\Features\Venues\Models\Venue;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\ViewErrorBag;
 use Tests\TestCase;
 
 class ConcertTrackerTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_collapsed_studio_events_show_overdue_actions_and_clear_them_when_completed(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-15 12:00:00'));
+        [, $event, , $booking] = $this->fixture();
+        ConcertBookingItem::where('concert_booking_id', $booking->id)->update(['approval_status' => 'approved']);
+        ConcertTrackerTask::create(['scope_type' => 'booking', 'scope_id' => $booking->id, 'task_key' => 'final_numbers_received', 'status' => 'not_started', 'due_date_override' => '2026-10-14']);
+        $director = User::factory()->customer()->create();
+        StudioAccountAccess::create(['studio_id' => $event->studio_id, 'user_id' => $director->id,
+            'email' => $director->email, 'role' => 'director', 'status' => 'active']);
+        $hub = fn () => app(StudioCommunicationHistory::class)->forUser($director, $event->studio)['hub'];
+        $card = fn () => $hub()['events']->firstWhere('event.id', $event->id);
+        $this->assertSame(['Junior Concert', 'Senior Concert'], $hub()['events']->pluck('title')->all());
+        $this->assertSame(5, $card()['actionCount']);
+        $this->assertSame(4, $card()['overdueCount']);
+        $this->assertSame(8, $hub()['overdueCount']);
+        $this->assertSame(['Confirm event details', 'Confirm final family numbers', 'Enter reserved seats', 'Upload programme'], $card()['overdueTasks']->all());
+        $response = $this->actingAs($director)->get(route('customer.studio-communications.index', $event->studio))->assertOk();
+        $dom = new \DOMDocument;
+        @$dom->loadHTML($response->getContent());
+        $xpath = new \DOMXPath($dom);
+        $summary = $xpath->query('//details[contains(@class,"hub-card")]/summary[contains(.,"Junior Concert")]')->item(0);
+        $this->assertNotNull($summary);
+        $this->assertFalse($summary->parentNode->hasAttribute('open'));
+        $this->assertStringContainsString('4 overdue', $summary->textContent);
+        $this->assertStringContainsString('Upload programme', $summary->textContent);
+        $expanded = $this->get(route('customer.studio-communications.index', [$event->studio, 'actions' => 1]))->assertOk();
+        @$dom->loadHTML($expanded->getContent());
+        $this->assertSame(2, (new \DOMXPath($dom))->query('//details[contains(@class,"hub-card")][@open]')->length);
+
+        foreach (['programme', 'studio_video'] as $kind) {
+            StudioEventFile::create(['scheduling_event_id' => $event->id, 'kind' => $kind, 'status' => 'submitted',
+                'is_current' => true, 'disk' => 'local', 'storage_key' => 'example/'.$kind,
+                'original_name' => $kind, 'mime_type' => 'application/octet-stream', 'size_bytes' => 100,
+                'uploaded_by_user_id' => $director->id, 'uploaded_at' => now()]);
+        }
+        $this->assertSame(3, $card()['actionCount']);
+        $this->assertSame(3, $card()['overdueCount']);
+        foreach ($card()['seatedRoles'] as $requirement) {
+            $seatCount = str_contains($requirement->crewRole->code, 'videographer') ? 5 : 2;
+            ConcertEventRoleSeats::create(['scheduling_event_id' => $event->id, 'crew_role_id' => $requirement->crew_role_id,
+                'submitted_by_user_id' => $director->id, 'submitted_at' => now(),
+                'seats' => collect(range(1, $seatCount))->map(fn ($seat) => ['row' => 'A', 'seat' => (string) $seat])->all()]);
+        }
+        $this->post(route('customer.studio-events.requirements.store', [$event->studio, $event]), ['group' => 'event_details', 'requirements' => ['event_details']])->assertSessionHasNoErrors();
+        $booking->update(['final_family_count' => 90, 'family_count_confirmed_at' => now()]);
+        $this->assertSame(0, $card()['actionCount'], $card()['checklist']->toJson());
+        $this->assertSame(0, $card()['overdueCount']);
+        $this->assertSame(3, $hub()['overdueCount']);
+        $this->get(route('customer.studio-communications.index', $event->studio))->assertOk()->assertSee('Your actions complete');
+    }
 
     public function test_email_formatting_is_rendered_safely_in_the_branded_layout(): void
     {
@@ -109,6 +169,8 @@ class ConcertTrackerTest extends TestCase
     {
         $this->travelTo(Carbon::parse('2026-09-01'));
         [$staff, $first, $second, $booking] = $this->fixture();
+        $second->update(['event_date' => '2026-11-21']);
+        $second->concertBookingItem->update(['event_date' => '2026-11-21']);
         $overdue = ConcertTrackerTask::create([
             'scope_type' => 'event', 'scope_id' => $first->id, 'task_key' => 'concert_week_email',
             'status' => 'waiting', 'due_date_override' => '2026-08-31',
@@ -213,9 +275,47 @@ class ConcertTrackerTest extends TestCase
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $delivery = ConcertTrackerEmailDelivery::firstOrFail();
-        $this->assertStringContainsString($event->name, $delivery->subject);
+        $this->assertStringContainsString($event->studio->name, $delivery->subject);
         $this->assertSame('queued', $delivery->status);
         Queue::assertPushed(SendConcertTrackerEmail::class, fn ($job) => $job->deliveryId === $delivery->id);
+    }
+
+    public function test_one_off_edits_are_frozen_without_changing_templates_and_defaults_still_work(): void
+    {
+        Queue::fake();
+        Mail::fake();
+        [$staff, $event] = $this->fixture();
+        $this->actingAs($staff);
+        foreach (['confirmation_information_email', 'final_numbers_email', 'concert_week_email', 'post_concert_email'] as $key) {
+            $data = app(ConcertTracker::class)->detail($event, $key);
+            $original = $data['template']->only('subject', 'body');
+            $this->post(route('admin.concert-tracker.tasks.email.send', [$event, $key]), [
+                'recipient_email' => 'alex@example.test',
+                'email_subject' => 'One-off '.$key,
+                'email_body' => "Hi Alex,\n\n**Just for this send.**",
+                'scheduled_at' => now()->addDay()->format('Y-m-d H:i:s'),
+            ])->assertSessionHasNoErrors();
+            $delivery = ConcertTrackerEmailDelivery::latest('id')->firstOrFail();
+            $this->assertSame('One-off '.$key, $delivery->subject);
+            $this->assertSame("Hi Alex,\n\n**Just for this send.**", $delivery->body);
+            $this->assertSame($original, $data['template']->fresh()->only('subject', 'body'));
+            $data['template']->update(['body' => 'Changed future template']);
+            $this->travelTo($delivery->scheduled_at->copy()->addMinute());
+            (new SendConcertTrackerEmail($delivery->id))->handle();
+            $this->assertSame('sent', $delivery->fresh()->status);
+            Mail::assertSent(ConcertTrackerMessage::class, fn ($mail) => $mail->messageSubject === 'One-off '.$key && $mail->messageBody === $delivery->body);
+        }
+    }
+
+    public function test_one_off_email_fields_reject_empty_messages_and_subject_header_injection(): void
+    {
+        Queue::fake();
+        [$staff, $event] = $this->fixture();
+        $url = route('admin.concert-tracker.tasks.email.send', [$event, 'concert_week_email']);
+        $this->actingAs($staff)->post($url, ['recipient_email' => 'alex@example.test', 'email_subject' => "Subject\r\nBcc: other@example.test", 'email_body' => ' '])
+            ->assertSessionHasErrors(['email_subject', 'email_body']);
+        $this->assertDatabaseCount('concert_tracker_email_deliveries', 0);
+        Queue::assertNothingPushed();
     }
 
     public function test_successful_tracker_email_completes_the_manual_task(): void
@@ -274,9 +374,9 @@ class ConcertTrackerTest extends TestCase
             'studio_id' => $studio->id, 'direction' => 'to_dancepro', 'subject' => 'Updated arrival details',
         ]);
 
-        $this->actingAs($staff)->get(route('admin.concert-tracker.studio-communications.index'))
+        $this->actingAs($staff)->get(route('admin.messages.index', ['channel' => 'studio']))
             ->assertOk()->assertSee($studio->name)->assertSee('Updated arrival details');
-        $this->get(route('admin.concert-tracker.studio-communications.show', $studio))
+        $this->get(route('admin.messages.index', ['channel' => 'studio', 'thread' => $studio->uuid]))
             ->assertOk()->assertSee('Please arrive through the stage door.')->assertSee('stage-door-map.pdf');
         $attachment = StudioConversationAttachment::firstOrFail();
         $this->get(route('admin.concert-tracker.studio-communications.attachments.show', $attachment))->assertDownload('stage-door-map.pdf');
@@ -328,6 +428,7 @@ class ConcertTrackerTest extends TestCase
 
     public function test_studio_account_can_save_role_seats_for_each_concert_event(): void
     {
+        $this->withoutMiddleware(ThrottleRequests::class);
         [, $event, , $booking] = $this->fixture();
         $booking->update(['wants_concert_photography' => true]);
         $customer = User::factory()->customer()->create(['email' => 'director@example.test']);
@@ -343,8 +444,9 @@ class ConcertTrackerTest extends TestCase
         ]);
 
         $this->actingAs($customer)->get(route('customer.studio-communications.index', [$event->studio, 'tab' => 'files']))
-            ->assertOk()->assertSee('Events')->assertSee('Photographer P1')->assertSee('Videographer')
-            ->assertSee('Row A: 12, 13, 14');
+            ->assertOk()->assertSee('Concert events')->assertSee('Photographer P1')->assertSee('Videographer')
+            ->assertSeeInOrder(['Tue 20 Oct 2026', '6:00 pm', '8:00 pm', 'Theatre'])
+            ->assertSee('J16-20 or J16, 18');
         $this->post(route('customer.studio-events.seats.store', [$event->studio, $event]), [
             'roles' => [
                 'concert-photographer-p1' => [['row' => 'H', 'seat' => '12']],
@@ -370,6 +472,22 @@ class ConcertTrackerTest extends TestCase
             ['row' => 'K', 'seat' => '1'], ['row' => 'K', 'seat' => '2'],
         ], ConcertEventRoleSeats::where('crew_role_id', $video->id)->firstOrFail()->seats);
 
+        foreach (['j16-20', 'J16–20', 'Row J: 16-20', 'J16-J20', 'J16-18, 19, 20'] as $input) {
+            $this->post(route('customer.studio-events.seats.store', [$event->studio, $event]), [
+                'roles' => ['concert-videographer' => ['seating' => $input]],
+            ])->assertSessionHasNoErrors();
+            $this->assertSame(collect(range(16, 20))->map(fn ($seat) => ['row' => 'J', 'seat' => (string) $seat])->all(), ConcertEventRoleSeats::where('crew_role_id', $video->id)->firstOrFail()->seats);
+        }
+        $this->post(route('customer.studio-events.seats.store', [$event->studio, $event]), [
+            'roles' => ['concert-photographer-p1' => ['seating' => 'j16, 18']],
+        ])->assertSessionHasNoErrors();
+        $this->assertSame([['row' => 'J', 'seat' => '16'], ['row' => 'J', 'seat' => '18']], ConcertEventRoleSeats::where('crew_role_id', $photo->id)->firstOrFail()->seats);
+        foreach (['J20-16', 'J1-999999999', 'J16-K20', 'J16-', 'J16-18, 16-17'] as $input) {
+            $this->post(route('customer.studio-events.seats.store', [$event->studio, $event]), [
+                'roles' => ['concert-videographer' => ['seating' => $input]],
+            ])->assertSessionHasErrors();
+            $this->assertCount(5, ConcertEventRoleSeats::where('crew_role_id', $video->id)->firstOrFail()->seats);
+        }
         $this->post(route('customer.studio-events.seats.store', [$event->studio, $event]), [
             'roles' => ['concert-videographer' => [['row' => 'J', 'seat' => '20']]],
         ])->assertSessionHasErrors('roles.concert-videographer');
@@ -396,6 +514,18 @@ class ConcertTrackerTest extends TestCase
             'requirements' => ['portrait_space', 'portrait_dancers'],
         ])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('studio_event_acknowledgements', 2);
+        $card = fn () => app(StudioCommunicationHistory::class)->forUser($customer, $event->studio)['hub']['events']->first();
+        $this->assertSame(2, $card()['totalCount']);
+        $this->assertSame(1, $card()['completeCount']);
+        ConcertTrackerTask::create(['scope_type' => 'booking', 'scope_id' => $booking->id, 'task_key' => 'final_numbers_received', 'status' => 'not_started', 'due_date_override' => '2026-10-14']);
+        $this->assertSame('2026-10-14', $card()['checklist']->firstWhere('key', 'event_details')['dueDate']->toDateString());
+        $this->post(route('customer.studio-events.requirements.store', [$event->studio, $event]), ['group' => 'event_details', 'requirements' => ['event_details']])->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('studio_event_acknowledgements', 3);
+        $this->assertSame(2, $card()['completeCount']);
+        $this->post(route('customer.studio-events.requirements.store', [$event->studio, $event]), ['requirements' => ['portrait_space', 'portrait_dancers']])->assertSessionHasNoErrors();
+        $this->assertSame(2, $card()['completeCount']);
+        $this->post(route('customer.studio-events.requirements.store', [$event->studio, $event]), ['group' => 'event_details'])->assertSessionHasNoErrors();
+        $this->assertSame(1, $card()['completeCount']);
         $this->assertSame($customer->id, StudioEventAcknowledgement::firstOrFail()->completed_by_user_id);
         $this->get(route('customer.studio-communications.index', $event->studio))
             ->assertOk()->assertSee('Confirm portrait shoot requirements')->assertSee('Complete');
@@ -688,8 +818,16 @@ class ConcertTrackerTest extends TestCase
         $this->assertStringContainsString('**Senior Concert**', $video['body']);
         $this->assertStringContainsString('- **Curtain up:** 6:00 pm', $video['body']);
         $this->assertStringContainsString('- **Venue access/setup:** 4:30 pm', $video['body']);
-        $this->assertStringContainsString('- **Reserved DancePro seats:** Photographer P1: Row H, Seat 12 | Videographer V: Row J, Seat 20; Row J, Seat 21', $video['body']);
+        $this->assertStringContainsString("- **Reserved DancePro seats:**\n  - **Photographer P1:** H12\n  - **Videographer V:** J20-21", $video['body']);
         $this->assertSame(2, substr_count($video['body'], '- **Reserved DancePro seats:**'));
+        $weekTemplate = ConcertTrackerEmailTemplate::where('task_key', 'concert_week_email')->firstOrFail();
+        $week = $tracker->renderTemplate($weekTemplate->subject, $weekTemplate->body, $event, 'concert_week_email');
+        $this->assertStringContainsString('- **Photographer P1:** H12', $week['body']);
+        $this->assertStringContainsString('- **Videographer V:** J20-21', $week['body']);
+        $this->assertStringNotContainsString('Row J, Seat 20', $week['body']);
+        $weekHtml = app(EmailContentFormatter::class)->html($week['body']);
+        $this->assertStringContainsString('<li><strong>Videographer V:</strong> J20-21</li>', $weekHtml);
+
         $this->assertStringNotContainsString("**Dress rehearsal portraits**\n\n- **Date:** Monday 19 October 2026\n- **Venue access/setup:** 3:00 pm\n- **Reserved DancePro seats:**", $video['body']);
         $this->assertStringContainsString('- **Services:** Photography and videography', $video['body']);
         $this->assertStringNotContainsString('concert photography', $video['body']);
@@ -700,6 +838,51 @@ class ConcertTrackerTest extends TestCase
         $this->assertStringNotContainsString('VIDEO DELIVERY', $photoOnly['body']);
         $this->assertStringNotContainsString('XLR feed', $photoOnly['body']);
         $this->assertStringContainsString('PHOTOGRAPHY', $photoOnly['body']);
+    }
+
+    public function test_concert_week_email_lists_each_events_crew_and_links_to_current_upload_actions(): void
+    {
+        Mail::fake();
+        Queue::fake();
+        [$staff, $event, $second, $booking] = $this->fixture();
+        $role = CrewRole::where('code', 'concert-videographer')->firstOrFail();
+        foreach ([[$event, 'Alex', '15:30'], [$second, 'Casey', '16:15']] as [$concert, $name, $arrival]) {
+            $shift = $concert->shifts()->create(['period' => 'afternoon', 'shift_date' => $concert->event_date, 'posted_arrival_at' => $concert->event_date->format('Y-m-d').' '.$arrival]);
+            $shift->assignments()->create(['crew_role_id' => $role->id, 'crew_profile_id' => CrewProfile::factory()->create(['preferred_name' => $name])->id, 'status' => 'assigned']);
+            $shift->assignments()->create(['crew_role_id' => CrewRole::where('code', 'concert-photographer-p1')->value('id'), 'crew_profile_id' => CrewProfile::factory()->create(['preferred_name' => 'Removed crew'])->id, 'status' => 'cancelled']);
+        }
+        $template = ConcertTrackerEmailTemplate::where('task_key', 'concert_week_email')->firstOrFail();
+        $tracker = app(ConcertTracker::class);
+        $body = $tracker->renderTemplate($template->subject, $template->body, $event, 'concert_week_email')['body'];
+        [$junior, $senior] = explode('**Senior Concert**', $body, 2);
+        $this->assertStringContainsString("You'll have Alex capturing your event.", $junior);
+        $this->assertStringContainsString('**Venue access/setup:** 3:30 pm', $junior);
+        $this->assertStringNotContainsString('Casey', $junior);
+        $this->assertStringContainsString("You'll have Casey capturing your event.", $senior);
+        $this->assertStringContainsString('**Venue access/setup:** 4:15 pm', $senior);
+        $this->assertStringNotContainsString('Removed crew', $body);
+        $this->assertSame($body, $tracker->renderTemplate($template->subject, $template->body, $second, 'concert_week_email')['body']);
+        foreach (['Your actions', 'Upload programme', 'Replace programme', 'Upload videos & slideshows', 'Upload studio files', 'Submitted files', 'due dates shown'] as $instruction) {
+            $this->assertStringContainsString($instruction, $body);
+        }
+        $this->assertStringNotContainsString('Planned arrival:', $body);
+        $this->assertStringNotContainsString('Please send the final programme', $body);
+        $this->actingAs($staff)->post(route('admin.concert-tracker.tasks.email.send', [$event, 'concert_week_email']), [
+            'recipient_name' => 'Studio Director', 'recipient_email' => 'director@example.test',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $delivery = ConcertTrackerEmailDelivery::sole();
+        (new SendConcertTrackerEmail($delivery->id))->handle();
+        $url = route('customer.studio-communications.index', [$event->studio, 'tab' => 'events', 'actions' => 1]).'#events';
+        Mail::assertSent(ConcertTrackerMessage::class, function (ConcertTrackerMessage $mail) use ($url): bool {
+            $this->assertStringContainsString('Open Concert events', $mail->render());
+
+            return $mail->accountUrl === $url && $mail->accountLabel === 'Open Concert events';
+        });
+        $booking->update(['wants_concert_videography' => false]);
+        $photoOnly = $tracker->renderTemplate($template->subject, $template->body, $event->fresh(), 'concert_week_email')['body'];
+        $this->assertStringNotContainsString('## Videos & slideshows', $photoOnly);
+        $this->assertStringNotContainsString('XLR', $photoOnly);
+        $this->assertStringContainsString('## Programme', $photoOnly);
     }
 
     public function test_every_tracker_task_has_a_working_action_page(): void
@@ -759,6 +942,8 @@ class ConcertTrackerTest extends TestCase
     {
         $this->travelTo(Carbon::parse('2026-09-01'));
         [$staff, $first, $second] = $this->fixture();
+        $second->update(['event_date' => '2026-11-21']);
+        $second->concertBookingItem->update(['event_date' => '2026-11-21']);
         ConcertTrackerTask::create([
             'scope_type' => 'event', 'scope_id' => $second->id, 'task_key' => 'concert_week_email',
             'status' => 'waiting', 'due_date_override' => '2026-08-31',
@@ -803,8 +988,8 @@ class ConcertTrackerTest extends TestCase
         $this->actingAs($staff)->get(route('admin.concert-tracker.index', ['year' => 2026]))
             ->assertOk()->assertDontSee('Parent album name')->assertDontSee('Current studio album');
         $this->get(route('admin.concert-tracker.tasks.show', [$event, 'photo_release']))
-            ->assertOk()->assertSee('Parent album name')->assertSee('Current studio album')
-            ->assertSee('Related concert album')->assertDontSee('Other studio album');
+            ->assertOk()->assertSee('Release photos together')->assertSee($event->uuid)->assertSee($related->uuid)
+            ->assertDontSee($other->uuid)->assertDontSee('Other studio album');
         $this->get(route('admin.concert-tracker.tasks.show', [$event, 'concert_edited']))
             ->assertOk()->assertDontSee('Parent album name');
     }
@@ -1037,6 +1222,328 @@ class ConcertTrackerTest extends TestCase
                 ->assertSee('This task cannot be completed yet')->assertSee('Task navigation')
                 ->assertSee('Back to tracker')->assertSee('Back to event')->assertSee('Task instructions');
         }
+    }
+
+    public function test_seats_families_email_links_to_hub_actions_and_studio_can_confirm_the_shared_total(): void
+    {
+        Mail::fake();
+        Queue::fake();
+        [$staff, $event, $second, $booking] = $this->fixture();
+        $studio = $event->studio;
+        $booking->forceFill(['studio_id' => $studio->id, 'submission_snapshot' => [], 'approximate_family_count' => 80])->save();
+        $customer = User::factory()->customer()->create();
+        StudioAccountAccess::create(['studio_id' => $studio->id, 'user_id' => $customer->id, 'email' => $customer->email, 'role' => 'director', 'status' => 'active', 'activated_at' => now()]);
+        $this->actingAs($staff)->post(route('admin.concert-tracker.tasks.email.send', [$event, 'final_numbers_email']), [
+            'recipient_name' => 'Studio Director', 'recipient_email' => $customer->email,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $delivery = ConcertTrackerEmailDelivery::firstOrFail();
+        $this->assertStringContainsString('within 10 days', $delivery->body);
+        $this->assertStringContainsString('Save seating details', $delivery->body);
+        $this->assertStringNotContainsString('Please reply with the final details', $delivery->body);
+        (new SendConcertTrackerEmail($delivery->id))->handle();
+        $url = route('customer.studio-communications.index', [$studio, 'tab' => 'events', 'actions' => 1]).'#events';
+        Mail::assertSent(ConcertTrackerMessage::class, function (ConcertTrackerMessage $mail) use ($url): bool {
+            $this->assertStringContainsString('Open Concert events', $mail->render());
+
+            return $mail->accountUrl === $url && $mail->accountLabel === 'Open Concert events';
+        });
+        $this->actingAs($customer)->get($url)->assertOk()->assertSee('Confirm final family numbers')->assertSee('Unique performing families')->assertSee('Confirm final numbers');
+        $this->post(route('customer.studio-bookings.families', [$studio, $booking]), ['final_family_count' => 92, 'confirm_unique_families' => 1])
+            ->assertRedirect($url)->assertSessionHasNoErrors();
+        $this->assertSame(92, $booking->fresh()->final_family_count);
+        $this->get($url)->assertOk()->assertSee('92 families confirmed')->assertSee('Update confirmed numbers');
+    }
+
+    public function test_concert_action_counts_exclude_unbooked_services_and_details_are_confirmed_per_event(): void
+    {
+        [, $event, $other, $booking] = $this->fixture();
+        $customer = User::factory()->customer()->create();
+        StudioAccountAccess::create(['studio_id' => $event->studio_id, 'user_id' => $customer->id, 'email' => $customer->email, 'role' => 'director', 'status' => 'active']);
+        $cards = fn () => app(StudioCommunicationHistory::class)->forUser($customer, $event->studio)['hub']['events'];
+        $this->assertSame(['event_details', 'families', 'seating', 'programme', 'video'], $cards()->first()['checklist']->pluck('key')->all());
+        $this->assertSame(5, $cards()->first()['totalCount']);
+        $this->assertSame(0, $cards()->first()['completeCount']);
+        $this->actingAs($customer)->post(route('customer.studio-events.requirements.store', [$event->studio, $event]), ['group' => 'event_details', 'requirements' => ['event_details']])->assertSessionHasNoErrors();
+        $this->assertSame(1, $cards()->first()['completeCount']);
+        $this->assertSame(0, $cards()->firstWhere('event.id', $other->id)['completeCount']);
+        $this->post(route('customer.studio-events.requirements.store', [$event->studio, $event]), ['group' => 'event_details', 'requirements' => ['portrait_space']])->assertSessionHasErrors('requirements');
+        $this->assertSame(1, $cards()->first()['completeCount']);
+        $booking->update(['wants_concert_videography' => false, 'wants_concert_photography' => true]);
+        $this->assertSame(['event_details', 'families', 'seating', 'programme'], $cards()->first()['checklist']->pluck('key')->all());
+        $this->assertSame(4, $cards()->first()['totalCount']);
+        $this->get(route('customer.studio-communications.index', $event->studio))->assertOk()->assertDontSee('Upload videos &amp; slideshows', false);
+        $outsider = User::factory()->customer()->create();
+        $this->actingAs($outsider)->post(route('customer.studio-events.requirements.store', [$event->studio, $event]), ['group' => 'event_details', 'requirements' => ['event_details']])->assertForbidden();
+    }
+
+    public function test_concert_week_groups_use_twenty_day_windows_and_distinct_email_and_programme_deadlines(): void
+    {
+        Queue::fake();
+        Mail::fake();
+        [$staff, $event, $second, $booking] = $this->fixture();
+        $add = function (string $date, string $title, string $type = 'concert') use ($event, $booking): SchedulingEvent {
+            $added = SchedulingEvent::create(['studio_id' => $event->studio_id, 'name' => $title, 'event_type' => 'concert', 'event_date' => $date]);
+            ConcertBookingItem::create(['concert_booking_id' => $booking->id, 'scheduling_event_id' => $added->id, 'item_type' => $type,
+                'title' => $title, 'event_date' => $date, 'starts_at' => '18:00', 'finishes_at' => '20:00', 'venue_name' => 'Theatre', 'venue_address' => 'Example street']);
+
+            return $added;
+        };
+        $dr = $add('2026-10-18', 'Dress rehearsal', 'dress_rehearsal');
+        $boundary = $add('2026-11-07', 'Within twenty days');
+        $later = $add('2026-11-08', 'Next event group');
+        $cancelled = $add('2026-10-01', 'Cancelled rehearsal', 'dress_rehearsal');
+        $cancelled->concertBookingItem->update(['cancelled_at' => now()]);
+        $tracker = app(ConcertTracker::class);
+        foreach ([$dr, $event, $second, $boundary] as $included) {
+            $detail = $tracker->detail($included->fresh(), 'concert_week_email');
+            $this->assertSame($dr->id, $detail['task']->scope_id);
+            $this->assertSame('2026-10-08', $detail['status']['dueDate']->toDateString());
+            $this->assertStringContainsString('Within twenty days', $detail['renderedTemplate']['body']);
+            $this->assertStringNotContainsString('Next event group', $detail['renderedTemplate']['body']);
+            $this->assertStringNotContainsString('Cancelled rehearsal', $detail['renderedTemplate']['body']);
+            $this->assertStringContainsString('Tuesday 13 October 2026', $detail['renderedTemplate']['body']);
+        }
+        $drProgramme = $tracker->detail($dr->fresh(), 'programme_prepared')['status'];
+        $this->assertSame('not_required', $drProgramme['key']);
+        $this->assertSame('not_required', $drProgramme['tone']);
+        $this->assertNull($drProgramme['dueDate']);
+        $this->actingAs($staff)->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'programme', 'event' => $dr->uuid]))
+            ->assertOk()->assertSee('Programmes are not required for dress rehearsals.')->assertViewHas('programmeWorkspace', null);
+        foreach ([$event, $second, $boundary] as $concert) {
+            $this->assertSame('2026-10-13', $tracker->detail($concert->fresh(), 'programme_prepared')['status']['dueDate']->toDateString());
+        }
+        $this->assertSame('2026-10-29', $tracker->detail($later, 'concert_week_email')['status']['dueDate']->toDateString());
+        $this->assertSame('2026-11-01', $tracker->detail($later, 'programme_prepared')['status']['dueDate']->toDateString());
+        $director = User::factory()->customer()->create();
+        StudioAccountAccess::create(['studio_id' => $event->studio_id, 'user_id' => $director->id, 'email' => $director->email, 'role' => 'director', 'status' => 'active', 'activated_at' => now()]);
+        $cards = app(StudioCommunicationHistory::class)->forUser($director, $event->studio)['hub']['events'];
+        foreach ([$event, $second, $boundary] as $concert) {
+            $card = $cards->first(fn ($card) => $card['event']->id === $concert->id);
+            $this->assertSame('2026-10-13', $card['checklist']->firstWhere('key', 'programme')['dueDate']->toDateString());
+        }
+        $candidates = app(ConcertTrackerAutomation::class)->candidatesForYear(2026)->where('task_key', 'concert_week_email')->values();
+        $this->assertCount(2, $candidates);
+        $this->assertSame(['2026-10-08', '2026-10-29'], $candidates->map(fn ($candidate) => $candidate['planned_at']->toDateString())->all());
+
+        $this->actingAs($staff)->post(route('admin.concert-tracker.tasks.email.send', [$second, 'concert_week_email']), ['recipient_email' => 'director@example.test'])->assertSessionHasNoErrors();
+        $delivery = ConcertTrackerEmailDelivery::sole();
+        $this->post(route('admin.concert-tracker.tasks.email.send', [$event, 'concert_week_email']), ['recipient_email' => 'director@example.test'])->assertSessionHasErrors('email');
+        (new SendConcertTrackerEmail($delivery->id))->handle();
+        foreach ([$dr, $event, $second, $boundary] as $included) {
+            $detail = $tracker->detail($included->fresh(), 'concert_week_email');
+            $this->assertSame('complete', $detail['status']['key']);
+            $this->assertSame($delivery->id, $detail['task']->deliveries->sole()->id);
+            $this->assertSame($staff->id, $detail['task']->completed_by_user_id);
+        }
+        $this->assertNotSame('complete', $tracker->detail($later->fresh(), 'concert_week_email')['status']['key']);
+        $this->post(route('admin.concert-tracker.tasks.email.send', [$boundary, 'concert_week_email']), ['recipient_email' => 'director@example.test'])->assertSessionHasErrors('email');
+        Mail::assertSentCount(1);
+        $this->actingAs($staff)->get(route('admin.concert-tracker.tasks.show', [$dr, 'concert_week_email']))->assertOk()->assertSee('20-day booking group');
+    }
+
+    public function test_grouping_preserves_already_sent_email_and_invalidates_old_scheduled_duplicates(): void
+    {
+        [$staff, $event, $second] = $this->fixture();
+        $oldTask = ConcertTrackerTask::create(['scope_type' => 'event', 'scope_id' => $second->id, 'task_key' => 'concert_week_email', 'status' => 'complete']);
+        $template = ConcertTrackerEmailTemplate::where('task_key', 'concert_week_email')->firstOrFail();
+        $sent = ConcertTrackerEmailDelivery::create(['scheduling_event_id' => $second->id, 'concert_tracker_task_id' => $oldTask->id,
+            'concert_tracker_email_template_id' => $template->id, 'created_by_user_id' => $staff->id, 'recipient_email' => 'director@example.test',
+            'subject' => 'Original subject', 'body' => 'Original sent body', 'status' => 'sent', 'sent_at' => now()->subDay()]);
+        $pending = $sent->replicate(['uuid']);
+        $pending->fill(['status' => 'scheduled', 'sent_at' => null, 'scheduled_at' => now()->addDay()])->save();
+        app(ConsolidateConcertWeekTasks::class)->execute($event);
+        foreach ([$event, $second] as $included) {
+            $detail = app(ConcertTracker::class)->detail($included->fresh(), 'concert_week_email');
+            $this->assertSame('complete', $detail['status']['key']);
+            $this->assertSame($event->id, $detail['task']->scope_id);
+            $this->assertSame($sent->sent_at->toDateTimeString(), $detail['task']->completed_at->toDateTimeString());
+            $this->assertTrue($detail['task']->deliveries->contains('id', $sent->id));
+        }
+        $this->assertSame('Original sent body', $sent->fresh()->body);
+        $this->assertSame('cancelled', $pending->fresh()->status);
+        $this->assertNotNull($pending->fresh()->invalidated_at);
+    }
+
+    public function test_post_concert_email_groups_share_final_deadline_delivery_and_current_instructions(): void
+    {
+        Queue::fake();
+        Mail::fake();
+        $this->travelTo(Carbon::parse('2026-10-22 10:00:00'));
+        [$staff, $first, $second, $booking] = $this->fixture();
+        $booking->update(['wants_concert_photography' => true]);
+        $add = function (string $date, string $title) use ($first, $booking): SchedulingEvent {
+            $event = SchedulingEvent::create(['studio_id' => $first->studio_id, 'name' => $title, 'event_type' => 'concert', 'event_date' => $date]);
+            ConcertBookingItem::create(['concert_booking_id' => $booking->id, 'scheduling_event_id' => $event->id, 'item_type' => 'concert',
+                'title' => $title, 'event_date' => $date, 'starts_at' => '18:00', 'finishes_at' => '20:00', 'venue_name' => 'Theatre', 'venue_address' => 'Example street']);
+
+            return $event;
+        };
+        $last = $add('2026-11-09', 'Final concert in group');
+        $next = $add('2026-11-10', 'Separate group');
+        $cancelled = $add('2026-11-08', 'Cancelled concert');
+        $cancelled->concertBookingItem->update(['cancelled_at' => now()]);
+        $tracker = app(ConcertTracker::class);
+        foreach ([$first, $second, $last] as $event) {
+            $detail = $tracker->detail($event->fresh(), 'post_concert_email');
+            $this->assertSame($first->id, $detail['task']->scope_id);
+            $this->assertSame('2026-11-10', $detail['status']['dueDate']->toDateString());
+            foreach (['Junior Concert', 'Senior Concert', 'Final concert in group', 'Studio Hub', 'Upload studio files', 'Studio messages', 'Access Code', 'My Purchases', 'select multiple videos', 'Review & release concert video'] as $text) {
+                $this->assertStringContainsString($text, $detail['renderedTemplate']['body']);
+            }
+            foreach (['Separate group', 'Cancelled concert', 'principal offer', 'Please send a PDF', "You'll have", '{{'] as $text) {
+                $this->assertStringNotContainsString($text, $detail['renderedTemplate']['body']);
+            }
+        }
+        $this->assertSame('2026-11-11', $tracker->detail($next, 'post_concert_email')['status']['dueDate']->toDateString());
+        $candidates = app(ConcertTrackerAutomation::class)->candidatesForYear(2026)->where('task_key', 'post_concert_email')->values();
+        $this->assertCount(2, $candidates);
+        $this->assertSame(['2026-11-10 09:00', '2026-11-11 09:00'], $candidates->map(fn ($candidate) => $candidate['planned_at']->format('Y-m-d H:i'))->all());
+        $this->actingAs($staff)->get(route('admin.concert-tracker.tasks.show', [$second, 'post_concert_email']))
+            ->assertOk()->assertSee('You are sending before the recommended date')->assertSee('You can still send now')->assertSee('Open Concert events');
+        $send = fn ($event, array $extra = []) => $this->post(route('admin.concert-tracker.tasks.email.send', [$event, 'post_concert_email']), ['recipient_email' => 'director@example.test'] + $extra);
+        $send($second, ['scheduled_at' => '2026-11-08 09:00'])->assertSessionHasNoErrors();
+        $delivery = ConcertTrackerEmailDelivery::sole();
+        $send($last, ['scheduled_at' => '2026-11-10 10:00'])->assertSessionHasErrors('email');
+        (new SendConcertTrackerEmail($delivery->id))->handle();
+        Mail::assertNothingSent();
+        $this->travelTo(Carbon::parse('2026-11-08 09:00:00'));
+        (new SendConcertTrackerEmail($delivery->id))->handle();
+        foreach ([$first, $second, $last] as $event) {
+            $detail = $tracker->detail($event->fresh(), 'post_concert_email');
+            $this->assertSame('complete', $detail['status']['key']);
+            $this->assertSame($delivery->id, $detail['task']->deliveries->sole()->id);
+        }
+        $this->assertNotSame('complete', $tracker->detail($next->fresh(), 'post_concert_email')['status']['key']);
+        $send($last)->assertSessionHasErrors('email');
+        Mail::assertSent(ConcertTrackerMessage::class, fn ($mail): bool => $mail->accountLabel === 'Open Concert events'
+            && $mail->accountUrl === SeatsFamiliesEmailContent::url($first));
+        Mail::assertSentCount(1);
+    }
+
+    public function test_post_concert_consolidation_preserves_history(): void
+    {
+        Mail::fake();
+        [$staff, $first, $second] = $this->fixture();
+        $this->travelTo(Carbon::parse('2026-10-20 10:00:00'));
+        $task = ConcertTrackerTask::create(['scope_type' => 'event', 'scope_id' => $second->id, 'task_key' => 'post_concert_email', 'status' => 'complete']);
+        $template = ConcertTrackerEmailTemplate::where('task_key', 'post_concert_email')->firstOrFail();
+        $sent = ConcertTrackerEmailDelivery::create(['scheduling_event_id' => $second->id, 'concert_tracker_task_id' => $task->id,
+            'concert_tracker_email_template_id' => $template->id, 'created_by_user_id' => $staff->id, 'recipient_email' => 'director@example.test',
+            'subject' => 'Historical subject', 'body' => 'Historical body', 'status' => 'sent', 'sent_at' => now()->subDay()]);
+        $pending = $sent->replicate(['uuid']);
+        $pending->fill(['status' => 'scheduled', 'sent_at' => null, 'scheduled_at' => now()->addDay()])->save();
+        app(ConsolidateConcertEmailTasks::class)->execute($first, 'post_concert_email');
+        $detail = app(ConcertTracker::class)->detail($first->fresh(), 'post_concert_email');
+        $this->assertSame('complete', $detail['status']['key']);
+        $this->assertSame($detail['task']->id, $sent->fresh()->concert_tracker_task_id);
+        $this->assertSame('Historical body', $sent->fresh()->body);
+        $this->assertSame('cancelled', $pending->fresh()->status);
+        $this->assertNotNull($pending->fresh()->invalidated_at);
+        Mail::assertNothingSent();
+    }
+
+    public function test_post_concert_content_uses_only_booked_services_and_allows_custom_automation_timing(): void
+    {
+        [, $event, , $booking] = $this->fixture();
+        $booking->update(['wants_concert_videography' => false, 'wants_concert_photography' => false, 'wants_portrait_photography' => true]);
+        $body = app(ConcertTracker::class)->detail($event->fresh(), 'post_concert_email')['renderedTemplate']['body'];
+        $this->assertStringContainsString('Photo gallery released', $body);
+        $this->assertStringNotContainsString('## Concert video review', $body);
+        $this->assertStringNotContainsString('Upload studio files', $body);
+        ConcertTrackerAutomationRule::where('task_key', 'post_concert_email')->update(['offset_days' => -1]);
+        $candidate = app(ConcertTrackerAutomation::class)->candidatesForYear(2026)->firstWhere('task_key', 'post_concert_email');
+        $this->assertSame('2026-10-20', $candidate['planned_at']->toDateString());
+    }
+
+    public function test_post_concert_email_can_be_sent_immediately_before_the_final_event(): void
+    {
+        Queue::fake();
+        Mail::fake();
+        $this->travelTo(Carbon::parse('2026-10-01 10:00:00'));
+        [$staff, $event, $second] = $this->fixture();
+        $page = route('admin.concert-tracker.tasks.show', [$event, 'post_concert_email']);
+        $this->actingAs($staff)->get($page)->assertOk()->assertSee('You can still send now or choose another send date.');
+        $this->post(route('admin.concert-tracker.tasks.email.send', [$event, 'post_concert_email']), ['recipient_email' => 'director@example.test'])->assertSessionHasNoErrors();
+        $delivery = ConcertTrackerEmailDelivery::sole();
+        $this->assertNull($delivery->scheduled_at);
+        (new SendConcertTrackerEmail($delivery->id))->handle();
+        $this->assertSame('sent', $delivery->fresh()->status);
+        $this->assertSame('complete', app(ConcertTracker::class)->detail($second->fresh(), 'post_concert_email')['status']['key']);
+        $this->post(route('admin.concert-tracker.tasks.email.send', [$second, 'post_concert_email']), ['recipient_email' => 'director@example.test'])->assertSessionHasErrors('email');
+        Mail::assertSentCount(1);
+        $this->travelTo(Carbon::parse('2026-10-22 10:00:00'));
+        $this->get($page)->assertOk()->assertDontSee('You are sending before the recommended date');
+    }
+
+    public function test_email_completion_assigns_the_sender_and_shows_the_completion_timestamp(): void
+    {
+        Queue::fake();
+        Mail::fake();
+        $this->travelTo(Carbon::parse('2026-09-29 18:05:00'));
+        [$staff, $event] = $this->fixture();
+        $this->actingAs($staff)->post(route('admin.concert-tracker.tasks.email.send', [$event, 'concert_week_email']), [
+            'recipient_email' => 'alex@example.test',
+        ])->assertSessionHasNoErrors();
+        $delivery = ConcertTrackerEmailDelivery::latest('id')->firstOrFail();
+        $this->assertNull($delivery->task->assignee_user_id);
+        (new SendConcertTrackerEmail($delivery->id))->handle();
+        $task = $delivery->task->fresh();
+        $this->assertSame($staff->id, $task->assignee_user_id);
+        $this->assertSame($staff->id, $task->completed_by_user_id);
+        $this->get(route('admin.concert-tracker.tasks.show', [$event, 'concert_week_email']))
+            ->assertOk()->assertSee('Completed on')->assertSee('29 Sep 2026')->assertSee('6:05 pm')
+            ->assertDontSee('id="tracker-due"', false);
+    }
+
+    public function test_completing_a_manual_task_preserves_its_assignee_and_reopening_restores_due_controls(): void
+    {
+        [$staff, $event] = $this->fixture();
+        $editor = User::factory()->staff()->create();
+        $action = app(UpdateConcertTrackerTask::class);
+        $task = $action->execute($event, 'concert_edited', $staff, ['status' => 'in_progress', 'assignee_user_id' => $editor->id]);
+        $task = $action->execute($event, 'concert_edited', $staff, ['status' => 'complete']);
+        $this->assertSame($editor->id, $task->assignee_user_id);
+        $this->assertSame($staff->id, $task->completed_by_user_id);
+        $page = route('admin.concert-tracker.tasks.show', [$event, 'concert_edited']);
+        $this->actingAs($staff)->get($page)->assertOk()->assertSee('Completed on');
+        $action->execute($event, 'concert_edited', $staff, ['status' => 'in_progress']);
+        $this->get($page)->assertOk()->assertDontSee('Completed on')->assertSee('id="tracker-due"', false);
+        $this->assertSame($editor->id, $task->fresh()->assignee_user_id);
+    }
+
+    public function test_completed_source_task_uses_its_source_date_and_missing_dates_are_not_invented(): void
+    {
+        [$staff, $event, , $booking] = $this->fixture();
+        $booking->update(['reviewed_at' => '2026-09-28 09:42:00']);
+        $bar = app(BookingTrackerBar::class)->page($booking->fresh());
+        $html = view('admin.tracking._task-bar', ['bar' => $bar, 'errors' => new ViewErrorBag])->render();
+        $this->assertStringContainsString('Completed on', $html);
+        $this->assertStringContainsString('28 Sep 2026', $html);
+        $this->assertStringContainsString('9:42 am', $html);
+        $bar['status']['completedAt'] = null;
+        $html = view('admin.tracking._task-bar', ['bar' => $bar, 'errors' => new ViewErrorBag])->render();
+        $this->assertStringContainsString('Not recorded', $html);
+        $bar['status']['key'] = 'not_required';
+        $html = view('admin.tracking._task-bar', ['bar' => $bar, 'errors' => new ViewErrorBag])->render();
+        $this->assertStringNotContainsString('Completed on', $html);
+    }
+
+    public function test_completed_assignment_backfill_keeps_existing_assignments_and_skips_unknown_completers(): void
+    {
+        [$staff, $event] = $this->fixture();
+        $other = User::factory()->staff()->create();
+        $tasks = collect(['concert_edited', 'concert_week_email', 'post_concert_email'])->map(fn ($key) => ConcertTrackerTask::create([
+            'scope_type' => 'event', 'scope_id' => $event->id, 'task_key' => $key, 'status' => 'complete', 'completed_at' => now(),
+        ]));
+        DB::table('concert_tracker_tasks')->whereIn('id', $tasks->take(2)->pluck('id')->all())->update(['completed_by_user_id' => $staff->id]);
+        $tasks[1]->update(['assignee_user_id' => $other->id]);
+        $migration = require database_path('migrations/2026_09_29_260000_assign_completed_concert_tasks.php');
+        $migration->up();
+        $this->assertSame($staff->id, $tasks[0]->fresh()->assignee_user_id);
+        $this->assertSame($other->id, $tasks[1]->fresh()->assignee_user_id);
+        $this->assertNull($tasks[2]->fresh()->assignee_user_id);
+        $migration->down();
+        $this->assertSame($staff->id, $tasks[0]->fresh()->assignee_user_id);
     }
 
     private function fixture(string $studioCode = 'AUR'): array

@@ -30,7 +30,7 @@ class ConcertTrackerEmails
         ?User $actor,
         array $recipient,
     ): ConcertTrackerEmailDelivery {
-        if ($event->cancelled_at) {
+        if ($event->cancelled_at || $event->concertBookingItem?->cancelled_at) {
             throw ValidationException::withMessages(['email' => 'Emails cannot be scheduled for a cancelled event.']);
         }
         if (! $template->is_active || $template->task_key !== $this->catalog->find($task->task_key)['templateKey']) {
@@ -41,7 +41,9 @@ class ConcertTrackerEmails
         abort_if($task->task_key === 'photo_release', 422, 'Use the registered-account release email page.');
         $invoice = $task->task_key === 'invoice_sent' ? app(InvoiceTrackerWorkflow::class)->forEmail($event) : null;
         abort_if($invoice && ($recipient['studio_invoice_uuid'] ?? null) !== $invoice->uuid, 409, 'The invoice changed. Reload before sending.');
-        $rendered = $this->tracker->renderTemplate($template->subject, $template->body, $event);
+        $rendered = $this->tracker->renderTemplate($template->subject, $template->body, $event, $task->task_key);
+        $rendered['subject'] = $recipient['email_subject'] ?? $rendered['subject'];
+        $rendered['body'] = $recipient['email_body'] ?? $rendered['body'];
         $scheduledAt = filled($recipient['scheduled_at'] ?? null) ? Carbon::parse($recipient['scheduled_at']) : null;
         $delivery = DB::transaction(function () use ($event, $task, $template, $actor, $recipient, $rendered, $scheduledAt, $workflowContext, $invoice): ConcertTrackerEmailDelivery {
             if (in_array($task->task_key, ConcertTrackerTaskCatalog::GUARDED_EMAIL_TASKS, true)) {

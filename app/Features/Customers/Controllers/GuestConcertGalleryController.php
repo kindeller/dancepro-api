@@ -31,7 +31,7 @@ class GuestConcertGalleryController extends Controller
 
         return response()->view('customers.concerts.gallery', $galleryData
             + ['shopping' => $shopping,
-                'concertRoutes' => $this->routes(), 'concertHomeUrl' => route('guest-galleries.index'),
+                'concertRoutes' => $this->routes(), 'concertHomeUrl' => route('guest-galleries.studios.show', $concert->studio),
                 'concertCartTarget' => $concert])
             ->header('Cache-Control', 'private, no-store')
             ->header('X-Robots-Tag', 'noindex, nofollow');
@@ -54,7 +54,7 @@ class GuestConcertGalleryController extends Controller
         $request->session()->put('checkout.discount_code', $request->validated('discount_code'));
         $request->session()->put('url.intended', route('customer.concerts.photos.cart', $concert->studio));
 
-        return to_route($request->query('account') === 'login' ? 'customer.login' : 'customer.register');
+        return to_route($request->query('account') === 'login' ? 'login' : 'customer.register');
     }
 
     public function image(GuestConcertGalleryRequest $request, Concert $concert, string $asset, CustomerConcertGallery $gallery, ConcertPhotoPreview $preview): StreamedResponse

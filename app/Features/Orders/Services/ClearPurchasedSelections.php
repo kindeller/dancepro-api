@@ -65,7 +65,7 @@ class ClearPurchasedSelections
             }
         } elseif (($group['kind'] ?? null) === 'concert') {
             CustomerConcertPhotoSelection::where('user_id', $order->user_id)
-                ->whereHas('concert', fn ($query) => $query->where('uuid', $group['source_uuid'] ?? null))
+                ->whereHas(($group['scope'] ?? null) === 'studio' ? 'concert.studio' : 'concert', fn ($query) => $query->where('uuid', $group['source_uuid'] ?? null))
                 ->whereIn('id', $ids)->delete();
         }
     }

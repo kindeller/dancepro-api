@@ -61,6 +61,7 @@
                         @else<span>{{ $group['title'] }}</span><strong>{{ $asset?->collection?->name ?: 'Concert item' }}</strong>
                         @endif
                         <span>{{ $productLabel }}@if($mode === 'cart') · ${{ number_format(($group['lineAmounts'][$selection->id] ?? 0) / 100, 2) }}@endif</span>
+                        @if($mode === 'cart' && $isPhoto)<x-cart-photo-filename :filename="$competition ? ($detail['photo_filename'] ?? null) : ($asset?->original_filename ?: $asset?->display_name)" />@endif
                         @if($itemGalleryUrl)<a href="{{ $itemGalleryUrl }}">Go to gallery →</a>@endif
                     </div>
                 </article>
@@ -79,14 +80,23 @@
             if (!dialog) return;
             const image = dialog.querySelector('[data-admin-preview-image]');
             const title = dialog.querySelector('[data-admin-preview-title]');
+            let opener;
             document.querySelectorAll('[data-admin-media-preview]').forEach(button => button.addEventListener('click', () => {
+                opener = button;
                 image.src = button.dataset.previewSrc;
                 title.textContent = button.dataset.previewTitle || 'Media preview';
                 dialog.showModal();
             }));
             dialog.querySelector('[data-admin-preview-close]').addEventListener('click', () => dialog.close());
             dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
-            dialog.addEventListener('close', () => image.removeAttribute('src'));
+            dialog.addEventListener('close', () => { image.removeAttribute('src'); opener?.focus({preventScroll:true}); });
+            dialog.addEventListener('keydown', event => {
+                if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+                event.preventDefault();
+                const buttons = [...document.querySelectorAll('[data-admin-media-preview]')];
+                const index = buttons.indexOf(opener);
+                if (index >= 0) buttons[index + (event.key === 'ArrowRight' ? 1 : -1)]?.click();
+            });
         })();
     </script>
 @endif

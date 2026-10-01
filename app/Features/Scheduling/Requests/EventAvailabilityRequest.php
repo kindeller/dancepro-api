@@ -14,6 +14,6 @@ class EventAvailabilityRequest extends FormRequest
     public function rules(): array
     {
         return ['studio' => ['nullable', 'uuid', 'exists:studios,uuid'], 'search' => ['nullable', 'string', 'max:255'],
-            'type' => ['nullable', 'uuid'], 'status' => ['nullable', 'in:draft,open,closed']];
+            'type' => ['nullable', 'uuid'], 'status' => ['nullable', 'in:pending,draft,open,closed']];
     }
 }

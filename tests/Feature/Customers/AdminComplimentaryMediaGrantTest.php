@@ -66,8 +66,8 @@ class AdminComplimentaryMediaGrantTest extends TestCase
         $admin = User::factory()->admin()->create();
         $customer = User::factory()->customer()->create(['name' => 'Review Customer', 'email' => 'review@example.test']);
 
-        $this->actingAs($admin)->get(route('admin.customers.index', ['q' => (string) $customer->id]))
-            ->assertOk()->assertSee('Review Customer')->assertSee('ID #'.$customer->id);
+        $this->actingAs($admin)->get(route('admin.customers.index', ['q' => $customer->uuid]))
+            ->assertOk()->assertSee('Review Customer')->assertSee('Account ID: '.$customer->uuid);
         $this->get(route('admin.customers.index', ['q' => 'review@example.test']))
             ->assertOk()->assertSee(route('admin.customers.show', $customer), false);
     }
@@ -85,11 +85,13 @@ class AdminComplimentaryMediaGrantTest extends TestCase
             ->assertOk()
             ->assertExactJson(['data' => [[
                 'id' => $customer->id,
+                'uuid' => $customer->uuid,
                 'name' => 'Taylor Example',
                 'email' => 'taylor@example.test',
+                'phone' => null,
             ]]]);
 
-        $this->getJson(route('admin.customers.search', ['q' => (string) $customer->id]))
+        $this->getJson(route('admin.customers.search', ['q' => $customer->uuid]))
             ->assertOk()
             ->assertJsonPath('data.0.id', $customer->id);
     }

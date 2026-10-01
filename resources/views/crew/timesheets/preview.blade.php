@@ -5,7 +5,9 @@
     $dates = $entries->pluck('assignment.shift.shift_date')->sort()->values();
     $period = $dates->first()->isSameDay($dates->last()) ? $dates->first()->format('j M Y') : $dates->first()->format('j M').'–'.$dates->last()->format('j M Y');
 @endphp
-<div class="page-heading"><div><span class="eyebrow">My Timesheets</span><h1>Invoice {{ $invoiceNumber }} preview</h1><span class="status-pill attention">Preview only</span></div><a class="button secondary" href="{{ route('crew.timesheets.index') }}">Back to timesheets</a></div>
+<div class="page-heading"><div>
+@include('crew._brand')
+<span class="eyebrow">My Timesheets</span><h1>Invoice {{ $invoiceNumber }} preview</h1><span class="status-pill attention">Preview only</span></div><a class="button secondary" href="{{ route('crew.timesheets.index') }}">Back to timesheets</a></div>
 <p class="muted invoice-preview-note">Check every detail before accepting. Accepting sends this invoice directly to DancePro as pending payment.</p>
 <div class="card card-pad">
     <div class="invoice-overview">

@@ -15,7 +15,7 @@ class BookingFamilyNumbersController extends Controller
     {
         $confirm->execute($concertBooking, (int) $request->validated('final_family_count'), $request->user());
 
-        return redirect()->route('customer.studio-bookings.show', [$studio, $concertBooking])->with('status', 'Final family numbers confirmed.'.($concertBooking->wants_concert_videography ? ' Your video quote has been updated.' : ''));
+        return redirect()->to(route('customer.studio-communications.index', [$studio, 'tab' => 'events', 'actions' => 1]).'#events')->with('status', 'Final family numbers confirmed.'.($concertBooking->wants_concert_videography ? ' Your video quote has been updated.' : ''));
     }
 
     public function admin(ConfirmBookingFamiliesRequest $request, ConcertBooking $concertBooking, ConfirmBookingFamilies $confirm): RedirectResponse

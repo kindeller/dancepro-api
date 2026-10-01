@@ -20,6 +20,78 @@ final class PreparationTests: XCTestCase {
     addTeardownBlock { try FileManager.default.removeItem(at: url) }
     return url
   }
+  func testDressRehearsalPreparationUsesOnePlainPhotoFolderWithoutPdf() throws {
+    var programme = concert(1)
+    programme.captureMode = "dress_rehearsal"
+    programme.nodes[0].title = "Dress Rehearsal Portraits"
+    programme.nodes[0].folderTitle = "Dress Rehearsal Portraits"
+    let root = try LocalPreparation.prepare(programme: programme, pdf: nil,
+      server: "test", destination: destination())
+    let saved = try ProgrammeCoding.decoder().decode(PreparedEvent.self,
+      from: Data(contentsOf: root.appendingPathComponent("preparation.json")))
+    XCTAssertTrue(saved.programme.isPortraitSession)
+    XCTAssertEqual(saved.folders.map(\.relativePath), ["Dress Rehearsal Portraits"])
+    XCTAssertFalse(saved.hasPdf)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("programme.pdf").path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("Dress Rehearsal Portraits").path))
+    let reopened = try LocalPreparation.prepare(programme: programme, pdf: nil,
+      server: "test", destination: root)
+    XCTAssertEqual(reopened, root)
+  }
+
+  func testSelectingPreparedFolderReopensItWithoutCreatingNestedFoldersOrReplacingWork() throws {
+    let programme = concert()
+    let root = try LocalPreparation.prepare(programme: programme, pdf: nil,
+      server: "test", destination: destination())
+    let photo = root.appendingPathComponent("01 Its Ballet Jazz/Keep.jpg")
+    let state = root.appendingPathComponent("photo-review.json")
+    try Data("sorted photo".utf8).write(to: photo)
+    try Data("existing review state".utf8).write(to: state)
+    let manifestBytes = try Data(contentsOf: root.appendingPathComponent("preparation.json"))
+    let reopened = try LocalPreparation.prepare(programme: programme, pdf: nil,
+      server: "test", destination: root)
+    XCTAssertEqual(reopened, root)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(root.lastPathComponent).path))
+    XCTAssertEqual(try Data(contentsOf: photo), Data("sorted photo".utf8))
+    XCTAssertEqual(try Data(contentsOf: state), Data("existing review state".utf8))
+    XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("preparation.json")), manifestBytes)
+    XCTAssertThrowsError(try LocalPreparation.prepare(programme: concert(), pdf: nil,
+      server: "test", destination: root))
+    XCTAssertThrowsError(try LocalPreparation.prepare(programme: programme, pdf: nil,
+      server: "another-server", destination: root))
+    XCTAssertThrowsError(try LocalPreparation.prepare(programme: programme, pdf: nil,
+      server: "test", destination: root, videoTitles: Data("PK titles".utf8)))
+    XCTAssertEqual(try Data(contentsOf: photo), Data("sorted photo".utf8))
+  }
+
+  func testVideoPreparationSavesTitlesWithoutPhotoFoldersAndKeepsExistingPhotos() throws {
+    let programme = concert()
+    let destination = try destination()
+    let photoRoot = try LocalPreparation.prepare(programme: programme, pdf: nil,
+      server: "test", destination: destination)
+    let photo = photoRoot.appendingPathComponent("01 Its Ballet Jazz/Keep.jpg")
+    try Data("existing photo".utf8).write(to: photo)
+    let titles = Data("PK titles".utf8)
+    let videoRoot = try LocalPreparation.prepare(programme: programme, pdf: nil,
+      server: "test", destination: destination, videoTitles: titles)
+    XCTAssertNotEqual(photoRoot, videoRoot)
+    XCTAssertEqual(try Data(contentsOf: photo), Data("existing photo".utf8))
+    let manifest = try ProgrammeCoding.decoder().decode(PreparedEvent.self,
+      from: Data(contentsOf: videoRoot.appendingPathComponent("preparation.json")))
+    XCTAssertTrue(manifest.isVideoPreparation)
+    XCTAssertTrue(manifest.folders.isEmpty)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: videoRoot.appendingPathComponent("01 Its Ballet Jazz").path))
+    XCTAssertEqual(try Data(contentsOf: videoRoot.appendingPathComponent("Video Titles.zip")), titles)
+    XCTAssertEqual(try LocalPreparation.prepare(programme: programme, pdf: nil,
+      server: "test", destination: destination, videoTitles: titles), videoRoot)
+    XCTAssertThrowsError(try LocalPreparation.prepare(programme: programme, pdf: nil,
+      server: "test", destination: destination, videoTitles: Data("changed".utf8)))
+    let photos = try ProgrammeCoding.decoder().decode(PreparedEvent.self,
+      from: Data(contentsOf: photoRoot.appendingPathComponent("preparation.json")))
+    XCTAssertFalse(photos.isVideoPreparation)
+    XCTAssertEqual(photos.folders.count, 2)
+  }
+
   func testCombineDraftKeepsFirstPositionAndExistingIdentityWithUnsavedRows() throws {
     var programme = concert(3)
     programme.nodes[0].title = "First!"
@@ -184,11 +256,31 @@ final class PreparationTests: XCTestCase {
     programme.nodes.append(
       ProgrammeNode(uuid: UUID().uuidString, kind: "item", title: "Interval", itemKind: "break"))
     XCTAssertEqual(try FolderPlan(programme: programme).folders.count, 2)
-    XCTAssertEqual(FolderPlan.clean("It's / Ballet: Café—Jazz?!"), "Its Ballet CaféJazz")
+    XCTAssertEqual(FolderPlan.clean("It's / Ballet: Café—Jazz?!"), "Its Ballet CafeJazz")
     let roundTrip = try ProgrammeCoding.decoder().decode(
       Programme.self, from: ProgrammeCoding.encoder().encode(programme))
     XCTAssertEqual(roundTrip.nodes[0].title, "It's Ballet / Jazz!")
   }
+  func testAccentCleanupPreservesLegacyFoldersUntilExplicitSave() throws {
+    XCTAssertEqual(FolderPlan.clean("BREAKÍN DISHES"), "BREAKIN DISHES")
+    XCTAssertEqual(FolderPlan.clean("BREAKI\u{0301}N DISHES"), "BREAKIN DISHES")
+    var programme = concert(1)
+    programme.nodes[0].title = "BREAKI\u{0301}N DISHES"
+    programme.nodes[0].folderTitle = programme.nodes[0].title
+    let root = try LocalPreparation.prepare(programme: programme, pdf: nil, server: "test", destination: destination())
+    let base = try ProgrammeCoding.decoder().decode(PreparedEvent.self, from: Data(contentsOf: root.appendingPathComponent("preparation.json")))
+    let oldPath = base.folders[0].relativePath
+    try Data("original photo".utf8).write(to: root.appendingPathComponent(oldPath + "/photo.jpg"))
+    // A legacy local working copy must still load after an app update.
+    try ProgrammeCoding.encoder().encode(programme).write(to: root.appendingPathComponent("local-programme.json"))
+    XCTAssertEqual(try ConcertLayout.load(root: root, base: base).folders[0].relativePath, oldPath)
+    let updated = try ConcertLayout.apply(programme, root: root, base: base)
+    XCTAssertEqual(updated.folders[0].relativePath, "01 BREAKIN DISHES")
+    XCTAssertEqual(updated.programme.nodes[0].title, programme.nodes[0].title)
+    XCTAssertEqual(try Data(contentsOf: root.appendingPathComponent("01 BREAKIN DISHES/photo.jpg")), Data("original photo".utf8))
+    XCTAssertEqual(try ConcertLayout.load(root: root, base: base).folders[0].relativePath, "01 BREAKIN DISHES")
+  }
+
   func testUnsafeNamesDuplicateIdentitiesAndMissingNumberingAreRejected() throws {
     for title in ["../escape", "bad\\path", "bad:path", "bad\npath"] {
       var programme = concert()

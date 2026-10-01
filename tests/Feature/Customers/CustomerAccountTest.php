@@ -21,11 +21,11 @@ class CustomerAccountTest extends TestCase
             'password' => 'local-test-password', 'password_confirmation' => 'local-test-password', 'policy_accepted' => '1'], $overrides);
     }
 
-    public function test_customer_entry_pages_and_guest_redirect_are_separate_from_staff(): void
+    public function test_customer_and_staff_entry_points_share_sign_in_with_customer_registration(): void
     {
-        $this->get(route('customer.media.index'))->assertRedirect(route('customer.login'));
+        $this->get(route('customer.media.index'))->assertRedirect(route('login'));
         $this->get(route('admin.dashboard'))->assertRedirect(route('login'));
-        $this->get(route('customer.login'))->assertOk()->assertSee('Welcome back')->assertSee(route('customer.register'), false)->assertSee(route('password.request'), false);
+        $this->get(route('login'))->assertOk()->assertSee('Welcome back')->assertSee(route('customer.register'), false)->assertSee(route('password.request'), false);
         $this->get(route('customer.register'))->assertOk()->assertSee('Create your account');
     }
 
@@ -94,7 +94,7 @@ class CustomerAccountTest extends TestCase
         $this->post(route('customer.login.store'), ['email' => $user->email, 'password' => 'incorrect'])->assertSessionHasErrors('email');
         $this->post(route('customer.login.store'), ['email' => $user->email, 'password' => 'local-test-password'])->assertRedirect(route('customer.media.index'));
         $this->assertAuthenticatedAs($user);
-        $this->post(route('logout'))->assertRedirect(route('customer.login'));
+        $this->post(route('logout'))->assertRedirect(route('login'));
         $user->update(['is_active' => false]);
         $this->post(route('customer.login.store'), ['email' => $user->email, 'password' => 'local-test-password'])->assertSessionHasErrors('email');
         $this->assertGuest();

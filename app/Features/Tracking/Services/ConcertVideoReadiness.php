@@ -6,6 +6,7 @@ use App\Features\Programmes\Models\ConcertVideoBatch;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Tracking\Models\ConcertTrackerTask;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class ConcertVideoReadiness
@@ -52,6 +53,9 @@ class ConcertVideoReadiness
         return compact('batch', 'files', 'studioFiles', 'inclusions', 'verified', 'blockers') + [
             'queued' => $files->count(), 'percent' => $files->isEmpty() ? 0 : (int) floor(100 * $verified / $files->count()),
             'ready' => $batch && $files->isNotEmpty() && ! $blockers,
+            'completedAt' => collect([$batch?->completed_at, $editing?->completed_at, $tasks->get('quality_check')?->completed_at])
+                ->merge($studioFiles->pluck('reviewed_at'))->merge(collect($inclusions)->pluck('confirmed_at'))
+                ->filter()->map(fn ($date) => Carbon::parse($date))->max(),
         ];
     }
 
@@ -63,7 +67,7 @@ class ConcertVideoReadiness
             'label' => $data['ready'] ? 'Ready for studio' : ($data['queued'] ? $data['verified'].' / '.$data['queued'].' verified' : 'Waiting for uploads'),
             'detail' => $data['ready'] ? 'All queued videos verified, Finished Uploading recorded, editing and quality checks complete, studio media accounted for.' : implode(' ', $data['blockers']),
             'sourceUrl' => route('admin.concert-tracker.tasks.show', [$event, 'video_uploaded']),
-            'completedAt' => $data['ready'] ? $data['batch']->completed_at : null,
+            'completedAt' => $data['ready'] ? $data['completedAt'] : null,
             'activity' => $data['batch']?->completed_at ? 'Finished uploading '.$data['batch']->completed_at->format('j M Y, g:i a').' · '.($data['batch']->completedBy?->name ?? 'Former staff member') : null];
     }
 

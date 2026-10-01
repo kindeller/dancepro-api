@@ -19,7 +19,14 @@ class AdminNavigationTest extends TestCase
         $this->actingAs($staff)->get(route('admin.dashboard'))
             ->assertOk()
             ->assertSee('My Hub')
-            ->assertSee('href="'.route('crew.availability.index').'">My Hub</a>', false)
+            ->assertSeeInOrder([
+                'href="'.route('crew.availability.index').'"',
+                'images/brand/dancepro-crew-hub-icon.png',
+                '<span>My Hub</span>',
+                'href="'.route('customer.media.index').'"',
+                'images/brand/dancepro-media-icon.png',
+                '<span>My Media</span>',
+            ], false)
             ->assertSee('Hub management')
             ->assertSee(route('admin.hub.dashboard'), false)
             ->assertSee('Exceptions')
@@ -148,7 +155,7 @@ class AdminNavigationTest extends TestCase
         $this->actingAs($staff)->get(route('crew.availability.index'))
             ->assertOk()
             ->assertSee('data-dancepro-foundation', false)
-            ->assertSee('Back to Admin')
-            ->assertSee('href="'.route('admin.dashboard').'">Back to Admin</a>', false);
+            ->assertSee('Admin Hub')
+            ->assertSee('href="'.route('admin.dashboard').'"', false);
     }
 }

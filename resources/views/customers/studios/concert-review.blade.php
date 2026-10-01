@@ -1,12 +1,13 @@
 @extends('layouts.public', ['title' => 'Review concert video'])
 @section('content')
-<div class="concert-review-page">
+<div class="container concert-review-page">
 <a class="button secondary" href="{{ route('customer.studio-communications.index', $event->studio) }}">← Back to Studio Hub</a>
 <h1>{{ $event->name }}</h1><h2>Review concert video</h2>
+<p><a href="{{ route('customer.media.help') }}#article-guide-studio-review-guide">How review, corrections and release work</a></p>
 @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<p role="alert">{{ $errors->first() }}</p>@endif
 @if($released)
-<section class="card card-pad"><h2>Concert released</h2><p>Share this code with your dancers and families so they can add the video to their DancePro account.</p>
+<section class="card card-pad"><h2>Concert released</h2>@if($event->concertBookingItem?->concert)<p><a class="button secondary" href="{{ route('customer.concert-family.settings', $event->concertBookingItem->concert) }}">Family sharing settings</a></p>@endif<p>Share this code with your dancers and families so they can add the video to their DancePro account.</p>
 @if($loginCode)<strong class="badge">Access Code: {{ $loginCode['value'] ?? 'Contact DancePro' }}</strong>@endif</section>
 @elseif(!$uploads['ready'])<p>Your concert video is still being prepared. DancePro will email you when it is ready.</p>
 @else
@@ -33,7 +34,7 @@
 
 @push('styles')
 <style>
-.concert-review-page{max-width:1100px;margin:30px auto;padding:0 20px}
+.concert-review-page{margin-block:30px}
 .concert-review-page h1{font-size:clamp(28px,4vw,44px);line-height:1.15;margin:24px 0 12px;overflow-wrap:anywhere}
 .concert-review-page h2{font-size:26px;line-height:1.25}
 .concert-review-page h3{font-size:20px;overflow-wrap:anywhere}

@@ -24,7 +24,7 @@ class GuestConcertGalleryRequest extends FormRequest
     public function rules(): array
     {
         return ['group' => ['nullable', 'uuid'], 'folder' => ['nullable', 'uuid'], 'page' => ['nullable', 'integer', 'min:1'],
-            'size' => ['sometimes', 'in:thumbnail,preview'],
+            'size' => ['sometimes', 'in:thumbnail,preview,cover'],
             'tab' => ['nullable', 'in:favourites,cart'],
             'discount_code' => ['nullable', 'regex:/\A[A-Z0-9-]{4,32}\z/']];
     }

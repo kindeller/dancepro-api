@@ -24,7 +24,7 @@ class ManageStudioAccountAccess
             'user_id' => $user?->id, 'role' => $data['role'], 'status' => $active ? 'active' : 'pending',
             'invited_by_user_id' => $actor->id, 'invited_at' => now(), 'activated_at' => $active ? now() : null, 'revoked_at' => null,
         ]);
-        Notification::route('mail', $email)->notify(new StudioAccountInvitation($studio, $user !== null));
+        Notification::route('mail', $email)->notify(new StudioAccountInvitation($studio, $user !== null, $active, $user?->emailGreetingName(), $data['role']));
 
         return $access;
     }

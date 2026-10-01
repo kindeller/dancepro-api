@@ -4,8 +4,8 @@ namespace App\Features\Bookings\Controllers;
 
 use App\Features\Bookings\Actions\ApproveBookingForConfirmation;
 use App\Features\Bookings\Actions\BulkUpdateConcertBookingItems;
-use App\Features\Bookings\Actions\CancelConcertBooking;
 use App\Features\Bookings\Actions\CancelConcertBookingItem;
+use App\Features\Bookings\Actions\ChangeBookingStatus;
 use App\Features\Bookings\Actions\CreateStudioFromBooking;
 use App\Features\Bookings\Actions\ReconcileBookingStudioContact;
 use App\Features\Bookings\Actions\ResolveConcertBookingVenue;
@@ -14,6 +14,7 @@ use App\Features\Bookings\Actions\UpdateConcertBooking;
 use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Bookings\Models\ConcertBookingItem;
 use App\Features\Bookings\Requests\BulkUpdateConcertBookingItemsRequest;
+use App\Features\Bookings\Requests\CancelBookingRequest;
 use App\Features\Bookings\Requests\CancelConcertBookingItemRequest;
 use App\Features\Bookings\Requests\CreateStudioFromBookingRequest;
 use App\Features\Bookings\Requests\ReconcileBookingStudioContactRequest;
@@ -95,7 +96,7 @@ class AdminConcertBookingController extends Controller
 
     public function createStudio(CreateStudioFromBookingRequest $request, ConcertBooking $concertBooking, CreateStudioFromBooking $createStudio): RedirectResponse
     {
-        $studio = $createStudio->execute($concertBooking, $request->validated());
+        $studio = $createStudio->execute($concertBooking, $request->validated(), $request->user());
 
         return redirect()
             ->route('admin.concert-bookings.show', [$concertBooking, 'studio_uuid' => $studio->uuid])
@@ -172,12 +173,12 @@ class AdminConcertBookingController extends Controller
         return back()->with('status', 'Booking details updated.');
     }
 
-    public function cancel(Request $request, ConcertBooking $concertBooking, CancelConcertBooking $cancel): RedirectResponse
+    public function cancel(CancelBookingRequest $request, ConcertBooking $concertBooking, ChangeBookingStatus $change): RedirectResponse
     {
         Gate::authorize('manageScheduling');
-        $cancel->execute($concertBooking, $request->user());
+        $url = $change->execute($concertBooking, $request->user(), $request->validated() + ['status_override' => 'cancelled']);
 
-        return redirect()->route('admin.concert-bookings.index')->with('status', 'Booking cancelled.');
+        return redirect()->to($url)->with('status', 'Booking cancelled. Review and send the studio notification.');
     }
 
     public function cancelItem(CancelConcertBookingItemRequest $request, ConcertBookingItem $concertBookingItem, CancelConcertBookingItem $cancel): RedirectResponse

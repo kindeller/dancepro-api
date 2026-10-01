@@ -24,7 +24,7 @@ class GuestCompetitionGalleryRequest extends FormRequest
     public function rules(): array
     {
         return ['folder' => ['nullable', 'uuid'], 'page' => ['nullable', 'integer', 'min:1'],
-            'photo' => ['nullable', 'uuid'], 'size' => ['sometimes', 'in:thumbnail,preview'],
+            'photo' => ['nullable', 'uuid'], 'size' => ['sometimes', 'in:thumbnail,preview,cover'],
             'discount_code' => ['nullable', 'regex:/\A[A-Z0-9-]{4,32}\z/']];
     }
 }

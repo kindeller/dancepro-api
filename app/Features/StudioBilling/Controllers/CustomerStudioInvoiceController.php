@@ -2,6 +2,7 @@
 
 namespace App\Features\StudioBilling\Controllers;
 
+use App\Features\Bookings\Services\StudioBookingDrafts;
 use App\Features\Bookings\Services\StudioBookingPlans;
 use App\Features\Customers\Services\StudioCommunicationHistory;
 use App\Features\StudioBilling\Models\StudioInvoice;
@@ -24,8 +25,10 @@ class CustomerStudioInvoiceController extends Controller
 
         return response()->view('customers.studio-invoices.index', [
             'studio' => $studio,
-            'hub' => $history->forUser($request->user(), $studio, markMessagesRead: false)['hub'],
+            'hub' => $history->forUser($request->user(), $studio)['hub'],
             'estimates' => $plans->estimates($request->user(), $studio),
+            'latestBooking' => $plans->latestForStudio($request->user(), $studio),
+            'bookingDraft' => app(StudioBookingDrafts::class)->find($request->user(), $studio),
             'invoices' => StudioInvoice::with('payments')->where('studio_id', $studio->id)->where('status', '!=', 'draft')->latest('id')->paginate(20),
         ])->header('Cache-Control', 'private, no-store');
     }
@@ -36,7 +39,7 @@ class CustomerStudioInvoiceController extends Controller
 
         return response()->view('customers.studio-invoices.show', [
             'studio' => $studio,
-            'hub' => $history->forUser($request->user(), $studio, markMessagesRead: false)['hub'],
+            'hub' => $history->forUser($request->user(), $studio)['hub'],
             'invoice' => $studioInvoice->load('payments'),
             'gateway' => $gateway,
         ])->header('Cache-Control', 'private, no-store');

@@ -61,7 +61,7 @@ class AdminAccessBoundaryTest extends TestCase
         $this->actingAs($crewUser)
             ->get('/crew/directory')
             ->assertOk()
-            ->assertDontSee('Back to Admin');
+            ->assertDontSee('Admin Hub');
     }
 
     public function test_inactive_accounts_and_accounts_without_crew_profiles_cannot_access_crew_routes(): void

@@ -4,7 +4,7 @@ namespace App\Features\Tracking\Controllers;
 
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Tracking\Actions\SaveConcertTrackerTaskFields;
-use App\Features\Tracking\Requests\UpdateBookingTrackerBarRequest;
+use App\Features\Tracking\Requests\UpdateTaskTrackerBarRequest;
 use App\Features\Tracking\Services\BookingTrackerBar;
 use App\Features\Tracking\Services\ConcertTracker;
 use App\Http\Controllers\Controller;
@@ -14,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 
 class AdminSourceTrackerBarController extends Controller
 {
-    public function __invoke(UpdateBookingTrackerBarRequest $request, SchedulingEvent $schedulingEvent, string $taskKey, SaveConcertTrackerTaskFields $save, ConcertTracker $tracker, BookingTrackerBar $bar): JsonResponse|RedirectResponse
+    public function __invoke(UpdateTaskTrackerBarRequest $request, SchedulingEvent $schedulingEvent, string $taskKey, SaveConcertTrackerTaskFields $save, ConcertTracker $tracker, BookingTrackerBar $bar): JsonResponse|RedirectResponse
     {
         abort_unless(in_array($taskKey, ['crew_ready', 'programme_prepared', 'slideshow_received', 'video_titles', 'photos_uploaded', 'concert_edited', 'quality_check', 'video_uploaded', 'director_corrections', 'photo_release', 'final_release', 'invoice_sent'], true), 404);
         $detail = $tracker->detail($schedulingEvent, $taskKey);

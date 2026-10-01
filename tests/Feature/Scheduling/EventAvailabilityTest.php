@@ -288,10 +288,10 @@ class EventAvailabilityTest extends TestCase
         $this->actingAs($staff)->putJson(route('admin.scheduling-shifts.roles.assignment', [$shift, $role]), ['crew_profile_uuid' => $profile->uuid])->assertOk();
         $this->actingAs($staff)->putJson(route('admin.scheduling-shifts.crew.team-leader', [$shift, $profile]), ['is_team_leader' => true])->assertOk();
         $draftAssignment = $shift->assignments()->firstOrFail();
-        $this->actingAs($staff)->putJson(route('admin.scheduling-assignments.equipment', $draftAssignment), ['item_code' => 'media', 'is_bringing' => true, 'is_taking' => true, 'other_notes' => 'David will collect it later.'])->assertOk();
-        $this->assertDatabaseHas('assignment_equipment_responsibilities', ['scheduling_shift_assignment_id' => $draftAssignment->id, 'item_code' => 'media', 'is_bringing' => true, 'is_taking' => true, 'other_notes' => 'David will collect it later.']);
-        $this->actingAs($staff)->putJson(route('admin.scheduling-assignments.equipment', $draftAssignment), ['item_code' => 'media', 'is_bringing' => false, 'is_taking' => false, 'other_notes' => 'Left at venue overnight.'])->assertOk();
-        $this->assertDatabaseHas('assignment_equipment_responsibilities', ['scheduling_shift_assignment_id' => $draftAssignment->id, 'item_code' => 'media', 'is_bringing' => false, 'is_taking' => false, 'other_notes' => 'Left at venue overnight.']);
+        $this->actingAs($staff)->putJson(route('admin.scheduling-assignments.equipment', $draftAssignment), ['item_code' => 'photos', 'is_bringing' => true, 'is_taking' => true, 'other_notes' => 'David will collect it later.'])->assertOk();
+        $this->assertDatabaseHas('assignment_equipment_responsibilities', ['scheduling_shift_assignment_id' => $draftAssignment->id, 'item_code' => 'photos', 'is_bringing' => true, 'is_taking' => true, 'other_notes' => 'David will collect it later.']);
+        $this->actingAs($staff)->putJson(route('admin.scheduling-assignments.equipment', $draftAssignment), ['item_code' => 'photos', 'is_bringing' => false, 'is_taking' => false, 'other_notes' => 'Left at venue overnight.'])->assertOk();
+        $this->assertDatabaseHas('assignment_equipment_responsibilities', ['scheduling_shift_assignment_id' => $draftAssignment->id, 'item_code' => 'photos', 'is_bringing' => false, 'is_taking' => false, 'other_notes' => 'Left at venue overnight.']);
 
         $this->actingAs($staff)->post(route('admin.scheduling-events.roster.publish', $event))->assertRedirect();
         $assignment = $shift->assignments()->firstOrFail();
@@ -322,7 +322,7 @@ class EventAvailabilityTest extends TestCase
         $this->assertSame('acknowledged', $assignment->refresh()->acknowledgement_status);
         $this->assertTrue($event->refresh()->rosterIsReady());
 
-        $this->actingAs($staff)->putJson(route('admin.scheduling-assignments.equipment', $assignment), ['item_code' => 'media', 'is_bringing' => true, 'is_taking' => false])->assertOk();
+        $this->actingAs($staff)->putJson(route('admin.scheduling-assignments.equipment', $assignment), ['item_code' => 'photos', 'is_bringing' => true, 'is_taking' => false])->assertOk();
         $this->assertSame('reset_by_material_change', $assignment->refresh()->acknowledgement_status);
         $this->assertFalse($event->refresh()->rosterIsReady());
 

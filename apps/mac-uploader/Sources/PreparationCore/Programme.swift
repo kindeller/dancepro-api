@@ -3,12 +3,15 @@ import Foundation
 public struct EventSummary: Codable, Identifiable, Hashable, Sendable {
   public var uuid: String
   public var name: String
+  public var studioName: String? = nil
+  public var eventTitle: String? = nil
   public var eventType: String
   public var eventDate: String?
   public var eventCode: String?
   public var revisionUuid: String
   public var itemCount: Int
   public var hasPdf: Bool
+  public var captureMode: String? = nil
   public var preparationReady: Bool
   public var id: String { uuid }
 }
@@ -41,6 +44,8 @@ public struct Programme: Codable, Sendable {
   public var sourceUuid: String?
   public var sourceUrl: String?
   public var nodes: [ProgrammeNode]
+  public var captureMode: String? = nil
+  public var isPortraitSession: Bool { captureMode == "dress_rehearsal" }
 }
 
 public enum PreparationError: LocalizedError, Equatable {

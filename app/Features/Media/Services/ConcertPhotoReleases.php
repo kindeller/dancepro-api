@@ -6,6 +6,7 @@ use App\Features\Media\Models\ConcertPhotoReleaseGroup;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Models\MediaCollection;
 use App\Features\Media\Models\MediaWatermark;
+use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Tracking\Services\ConcertPhotoUploadStatus;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,32 @@ use Illuminate\Validation\ValidationException;
 
 class ConcertPhotoReleases
 {
+    public function releaseEvents(User $actor, array $input): ConcertPhotoReleaseGroup
+    {
+        return DB::transaction(function () use ($actor, $input) {
+            $events = SchedulingEvent::whereIn('uuid', $input['event_uuids'])
+                ->with('concertBookingItem.concert.mediaCollections')->lockForUpdate()->get();
+            if ($events->count() !== count($input['event_uuids']) || $events->pluck('studio_id')->filter()->unique()->count() !== 1
+                || $events->contains(fn ($event) => ! $event->studio_id || $event->cancelled_at || $event->concertBookingItem?->approval_status !== 'approved' || $event->concertBookingItem?->cancelled_at || $event->concertBookingItem?->concert?->studio_id !== $event->studio_id)) {
+                throw ValidationException::withMessages(['event_uuids' => 'Choose approved, active events from one studio.']);
+            }
+            $collections = collect();
+            foreach ($events as $event) {
+                $albums = $event->concertBookingItem?->concert?->mediaCollections?->filter(fn ($album) => $album->media_type->value === 'photo') ?? collect();
+                if ($albums->isEmpty() || app(ConcertPhotoUploadStatus::class)->forEvent($event)['key'] !== 'complete'
+                    || $albums->contains(fn ($album) => $album->status->value !== 'draft' || $album->visibility->value !== 'private' || $album->published_at || $album->concertPhotoReleaseGroups()->exists())) {
+                    throw ValidationException::withMessages(['event_uuids' => $event->name.': finish all photo uploads and check that the event has not already been grouped or released.']);
+                }
+                $collections = $collections->concat($albums);
+            }
+            $group = $this->create($actor, ['name' => $input['name'], 'watermark_uuid' => $input['watermark_uuid'] ?? null,
+                'collection_uuids' => $collections->pluck('uuid')->all()]);
+            $this->release($group, $actor);
+
+            return $group->fresh();
+        });
+    }
+
     public function create(User $actor, array $input): ConcertPhotoReleaseGroup
     {
         $collections = MediaCollection::query()->whereIn('uuid', $input['collection_uuids'])
@@ -83,6 +110,11 @@ class ConcertPhotoReleases
             }
             $collections = $group->collections;
             foreach ($collections as $collection) {
+                $concert = $collection->concert;
+                if ($concert?->isDressRehearsal() && $concert->status->value === 'draft') {
+                    // Booking approval creates a disabled media record; explicit photo release opens it.
+                    $concert->update(['status' => 'published', 'is_enabled' => true, 'published_at' => now()]);
+                }
                 $collection->update(['status' => 'published', 'visibility' => 'customer',
                     'published_at' => now(), 'media_watermark_id' => $group->media_watermark_id]);
             }
@@ -112,7 +144,7 @@ class ConcertPhotoReleases
                 if ($event->cancelled_at) {
                     $blockers[] = $event->name.': this event has been cancelled.';
                 } elseif (app(ConcertPhotoUploadStatus::class)->forEvent($event)['key'] !== 'complete') {
-                    $blockers[] = $event->name.': all required photographers must confirm Finished upload before this gallery can be released.';
+                    $blockers[] = $event->name.': all required photo roles must finish uploading before this gallery can be released.';
                 }
             }
             if (! $collection->assets()->where('media_type', 'photo')->where('status', 'available')->where('is_visible', true)->exists()) {

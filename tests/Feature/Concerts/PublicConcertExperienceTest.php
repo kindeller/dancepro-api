@@ -26,7 +26,7 @@ class PublicConcertExperienceTest extends TestCase
         Concert::factory()->published()->for($alpha)->create();
         Concert::factory()->for($hidden)->create();
 
-        $this->get('/')
+        $this->get(route('studios.index'))
             ->assertOk()
             ->assertSeeInOrder(['Alpha Dance', 'Zulu Dance'])
             ->assertDontSee('Hidden Dance');
@@ -304,7 +304,8 @@ class PublicConcertExperienceTest extends TestCase
         $asset->update(['storage_disk' => 's3_concerts_legacy']);
         Storage::disk('s3_concerts_legacy')->put($asset->storage_key, 'legacy-video');
 
-        $this->getJson(route('concerts.media.playback', [$concert, $asset]))->assertStatus(503);
+        $response = $this->getJson(route('concerts.media.playback', [$concert, $asset]))->assertOk()->assertJsonPath('data.format', 'progressive');
+        $this->assertStringNotContainsString('media.dancepro.test', $response->json('data.url'));
     }
 
     public function test_playback_returns_not_found_when_no_expected_source_exists(): void

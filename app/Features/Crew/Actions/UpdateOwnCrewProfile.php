@@ -10,9 +10,10 @@ class UpdateOwnCrewProfile
     public function execute(CrewProfile $crewProfile, array $data): CrewProfile
     {
         return DB::transaction(function () use ($crewProfile, $data): CrewProfile {
-            $crewProfile->user->update(['name' => $data['preferred_name'], 'email' => $data['email']]);
+            $crewProfile->user->update(['name' => $data['name'] ?? $crewProfile->user->name, 'email' => $data['email'],
+                ...array_intersect_key($data, array_flip(['first_name', 'last_name']))]);
             $crewProfile->fill(collect($data)->only([
-                'preferred_name', 'legal_name', 'phone', 'shirt_size', 'jacket_size', 'date_of_birth',
+                'preferred_name', 'biography', 'legal_name', 'phone', 'shirt_size', 'jacket_size', 'date_of_birth',
                 'address_line_1', 'address_line_2', 'suburb', 'state', 'postcode',
                 'emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone',
                 'abn', 'bank_account_name', 'bank_name', 'bank_bsb', 'bank_account_number',

@@ -393,6 +393,20 @@ public actor PhotoLibrary {
     }
   }
 
+  /// A concert Upload click explicitly queues all current stable, unuploaded photos.
+  /// Files arriving afterwards require another Upload click; competitions keep Ready.
+  public func queueConcertPhotos() throws -> ReviewSnapshot {
+    guard baseManifest.programme.eventType == "concert" else {
+      throw PreparationError.invalid("Competition folders must be marked Ready individually.")
+    }
+    let snapshot = try scan()
+    guard snapshot.pending.values.allSatisfy({ $0 == 0 }) else {
+      throw PreparationError.invalid("Some photos are still being copied or are unreadable. Wait for copying to finish, then click Upload again.")
+    }
+    try markReady(itemIDs: Set(folders.map(\.itemUuid)))
+    return try scan()
+  }
+
   public func markReady(itemIDs: Set<String>) throws {
     let previous = state.queued
     var queued = state.queued ?? [:]
@@ -806,6 +820,47 @@ public actor PhotoLibrary {
       throw error
     }
     observations[entry.originalPath] = nil
+  }
+
+  public func importConcertPhotos(_ plan: ConcertImportPlan) throws -> ConcertImportResult {
+    guard baseManifest.programme.eventType == "concert", !layoutBlocked else {
+      throw PreparationError.invalid("Open a prepared concert before importing photos.")
+    }
+    var copies: [(ImportPhoto, URL)] = []
+    var destinations = Set<String>()
+    var sources = Set<String>()
+    for group in plan.groups {
+      guard let folder = folders.first(where: { $0.itemUuid == group.itemID }) else {
+        throw PreparationError.invalid("Choose a programme item for every group.")
+      }
+      guard !lockedItemIDs.contains(folder.itemUuid) else {
+        throw PreparationError.invalid("This item has already been uploaded. Choose an unuploaded item.")
+      }
+      for photo in group.photos {
+        try ConcertPhotoImport.validate(photo)
+        let destination = try safeDestination(folder.relativePath + "/" + photo.filename)
+        guard !FileManager.default.fileExists(atPath: destination.path),
+          destinations.insert(destination.path.lowercased()).inserted else {
+          throw PreparationError.invalid("\(photo.filename) already exists in the destination. Rename it in Review photos or choose another item.")
+        }
+        guard sources.insert(photo.id).inserted else {
+          throw PreparationError.invalid("A source photo appears in more than one group.")
+        }
+        copies.append((photo, destination))
+      }
+    }
+    var copied = Set<String>()
+    for (photo, destination) in copies {
+      do {
+        // Recheck the prepared folder immediately before each write.
+        _ = try safeDestination(String(destination.path.dropFirst(root.path.count + 1)))
+        try ConcertPhotoImport.copy(photo, to: destination)
+        copied.insert(photo.id)
+      } catch {
+        return ConcertImportResult(copiedIDs: copied, error: "Imported \(copied.count) photos before stopping: " + error.localizedDescription)
+      }
+    }
+    return ConcertImportResult(copiedIDs: copied, error: nil)
   }
 
   public func preview(_ id: String, maxPixelSize: Int = 2400) throws -> Data {

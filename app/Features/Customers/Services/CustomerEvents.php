@@ -3,7 +3,7 @@
 namespace App\Features\Customers\Services;
 
 use App\Features\Concerts\Models\Concert;
-use App\Features\Customers\Models\CustomerCompetitionRegistration;
+use App\Features\Families\Services\FamilyGalleryAccess;
 use App\Features\Programmes\Services\CompetitionGallerySettings;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -15,7 +15,7 @@ class CustomerEvents
     public function forUser(User $user, Collection $verifiedStudios, array $purchases): array
     {
         $events = [];
-        $registrations = CustomerCompetitionRegistration::where('user_id', $user->id)->whereNotNull('access_verified_at')
+        $registrations = app(FamilyGalleryAccess::class)->competitions($user)->whereNotNull('access_verified_at')
             ->whereHas('event', fn ($query) => $query->where('event_type', 'competition')->whereNull('cancelled_at'))
             ->with('event.competitionContact')->get();
         $competitionEvents = $registrations->pluck('event');
@@ -28,8 +28,8 @@ class CustomerEvents
         }
 
         $studioConcerts = Concert::with('studio', 'bookingItem')->whereIn('studio_id', $verifiedStudios->pluck('id'))
-            ->where('status', 'published')->where('is_enabled', true)->get()
-            ->filter(fn (Concert $concert) => $concert->isPubliclyAvailable()
+            ->whereIn('status', ['draft', 'published'])->get()
+            ->filter(fn (Concert $concert) => $concert->isPhotoGalleryAvailable()
                 && ($concert->galleryForDisplay() || $this->concertGallery->hasNativeAlbums($concert)));
         foreach ($studioConcerts as $concert) {
             $key = 'concert:'.$concert->id;
@@ -68,7 +68,7 @@ class CustomerEvents
         return ['event' => $concert, 'kind' => 'concert', 'title' => $concert->name,
             'gallery' => false, 'photos' => false, 'native_photos' => false, 'video' => false, 'purchased' => false,
             'thumbnail_url' => $cover ? route('customer.concerts.photos.image', [
-                'concert' => $concert, 'asset' => $cover->uuid, 'size' => 'thumbnail',
+                'concert' => $concert, 'asset' => $cover->uuid, 'size' => 'cover',
             ]) : null];
     }
 }

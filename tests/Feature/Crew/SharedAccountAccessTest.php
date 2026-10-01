@@ -23,11 +23,11 @@ class SharedAccountAccessTest extends TestCase
         CrewProfile::factory()->for($crew)->create();
 
         $this->actingAs($crew)->get(route('customer.media.index'))->assertOk()
-            ->assertSee('My Hub')->assertSee(route('crew.availability.index'))
+            ->assertSee('Crew Hub')->assertSee(route('crew.availability.index'))
             ->assertDontSee('Admin Hub');
         $this->get(route('crew.availability.index'))->assertOk()
-            ->assertSee('Back to Media')->assertSee(route('customer.media.index'))
-            ->assertDontSee('Back to Admin');
+            ->assertSee('My Media')->assertSee(route('customer.media.index'))
+            ->assertDontSee('Admin Hub');
         $this->get(route('admin.crew.create'))->assertForbidden();
         $this->get(route('customer.studio-communications.index', Studio::factory()->create()))->assertForbidden();
     }
@@ -55,9 +55,9 @@ class SharedAccountAccessTest extends TestCase
         Notification::assertNothingSent();
 
         $this->actingAs($customer)->get(route('customer.media.index'))->assertOk()
-            ->assertSee('My Hub')->assertSee('Studio Hub');
+            ->assertSee('Crew Hub')->assertSee('Studio Hub');
         $this->get(route('crew.availability.index'))->assertRedirect(route('crew.profile.edit'));
-        $this->get(route('crew.profile.edit'))->assertOk()->assertSee('Back to Media');
+        $this->get(route('crew.profile.edit'))->assertOk()->assertSee('My Media');
 
         $this->actingAs($admin)->put(route('admin.crew.update', $customer->crewProfile), [
             'preferred_name' => $customer->name, 'email' => $customer->email,

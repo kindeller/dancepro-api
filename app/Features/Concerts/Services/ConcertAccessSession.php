@@ -12,6 +12,9 @@ class ConcertAccessSession
 
     public function allows(Request $request, Concert $concert): bool
     {
+        if ($concert->concert_code_group_id !== null && ! $concert->codeGroup?->downloadEndsAt()?->isFuture()) {
+            return false;
+        }
         if ($request->user() && $concert->accessGrants()->withTrashed()->where('user_id', $request->user()->id)->where('source', 'password')->exists()) {
             return $this->customerAccess->allows($request->user(), $concert);
         }
@@ -23,6 +26,9 @@ class ConcertAccessSession
 
     public function allowsStreaming(Request $request, Concert $concert): bool
     {
+        if ($concert->concert_code_group_id !== null && ! $concert->codeGroup?->streamEndsAt()?->isFuture()) {
+            return false;
+        }
         if ($request->user() && $concert->accessGrants()->withTrashed()->where('user_id', $request->user()->id)->where('source', 'password')->exists()) {
             return $this->customerAccess->allowsStreaming($request->user(), $concert);
         }

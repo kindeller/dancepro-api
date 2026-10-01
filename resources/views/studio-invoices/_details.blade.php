@@ -1,10 +1,29 @@
 <article class="studio-billing-sheet">
-    <div class="studio-billing-heading"><div><p class="eyebrow">{{ $invoice->is_test ? 'TEST INVOICE - no live payment' : 'Tax invoice' }}</p><h2>Invoice {{ $invoice->number() }}</h2><p>{{ $invoice->paymentLabel() }}</p></div><div><strong>{{ $invoice->issuer['business_name'] ?? 'Draft invoice' }}</strong><p>{{ $invoice->issuer['email'] ?? '' }}<br>ABN {{ $invoice->issuer['abn'] ?? 'Not set' }}</p><p style="white-space:pre-line">{{ $invoice->issuer['address'] ?? '' }}</p></div></div>
+    <div class="studio-billing-heading"><div><p class="eyebrow">{{ $invoice->is_test ? 'TEST INVOICE - no live payment' : 'Tax invoice' }}</p><h2>Invoice {{ $invoice->number() }}</h2><p>{{ $invoice->paymentLabel() }}</p></div><div>@if($invoice->isPaid())<div class="studio-invoice-paid" role="status"><strong>✓ Invoice paid</strong><span>Paid in full · {{ $invoice->payments->where('status', 'succeeded')->max('paid_at')?->format('j M Y') }}</span></div>@endif<strong>{{ $invoice->issuer['business_name'] ?? 'Draft invoice' }}</strong><p>{{ $invoice->issuer['email'] ?? '' }}<br>ABN {{ $invoice->issuer['abn'] ?? 'Not set' }}</p><p style="white-space:pre-line">{{ $invoice->issuer['address'] ?? '' }}</p></div></div>
     <div class="studio-billing-heading"><div><h3>Bill to</h3><strong>{{ $invoice->bill_to['name'] }}</strong><p>{{ $invoice->bill_to['contact'] }}<br>{{ $invoice->bill_to['email'] }}<br>{{ $invoice->bill_to['phone'] ?? '' }}</p><p style="white-space:pre-line">{{ $invoice->bill_to['address'] ?? '' }}</p></div><div><p>Issued: {{ $invoice->issued_at?->format('j M Y') ?? 'Draft' }}<br>Due: {{ $invoice->sent_at ? $invoice->due_date->format('j M Y') : '14 days after sending' }}</p>@foreach($invoice->bill_to['events'] ?? [] as $event)<p>{{ $event['title'] }} · {{ $event['date'] }}</p>@endforeach</div></div>
     <div class="studio-billing-table"><table><thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Amount</th></tr></thead><tbody>@foreach($invoice->lines as $line)<tr><td>{{ $line['description'] }}</td><td>{{ $line['quantity'] }}</td><td>{{ $line['unit_cents'] < 0 ? '-$' : '$' }}{{ number_format(abs($line['unit_cents'])/100,2) }}</td><td>{{ $line['unit_cents'] < 0 ? '-$' : '$' }}{{ number_format(abs($line['quantity']*$line['unit_cents'])/100,2) }}</td></tr>@endforeach</tbody></table></div>
     <div class="studio-billing-totals"><p>Total (AUD) <strong>${{ number_format($invoice->total_cents/100,2) }}</strong></p><p>GST included <strong>${{ number_format($invoice->gst_cents/100,2) }}</strong></p><p>Payments received <strong>${{ number_format($invoice->paidCents()/100,2) }}</strong></p><p class="studio-billing-balance">Balance due <strong>{{ $invoice->status==='void' ? 'Voided' : '$'.number_format($invoice->balanceCents()/100,2) }}</strong></p></div>
     @if($invoice->notes)<p style="white-space:pre-line">{{ $invoice->notes }}</p>@endif
-    @if(!empty($invoice->issuer['bank_account']))<div class="studio-billing-bank"><h3>Direct transfer (preferred)</h3><p>{{ $invoice->issuer['bank_name'] }}<br>BSB {{ $invoice->issuer['bank_bsb'] }} · Account {{ $invoice->issuer['bank_account'] }}<br>Reference: Invoice {{ $invoice->number() }}</p><p class="muted">Your payment will appear here after it has been received and recorded.</p></div>@endif
+    @if(!$invoice->isPaid() && !empty($invoice->issuer['bank_account']))
+        <div class="studio-billing-bank">
+            <h3>Direct transfer (preferred)</h3>
+            <p>{{ $invoice->issuer['bank_name'] }}</p>
+            <div class="studio-bank-fields">
+                @foreach(['bank_bsb' => 'BSB', 'bank_account' => 'Account number'] as $field => $label)
+                    <div class="studio-bank-field" data-bank-copy-field>
+                        <label><span>{{ $label }}</span><input readonly type="text" aria-label="{{ $label }}" value="{{ preg_replace('/\D/', '', (string) ($invoice->issuer[$field] ?? '')) }}"></label>
+                        <button type="button" class="button secondary studio-bank-copy" data-bank-copy aria-label="Copy {{ $label }}">Copy</button>
+                        <span class="studio-bank-copy-status" role="status" aria-live="polite"></span>
+                    </div>
+                @endforeach
+            </div>
+            <p>Reference: Invoice {{ $invoice->number() }}</p>
+            <p class="muted">Your payment will appear here after it has been received and recorded.</p>
+        </div>
+        @once
+            <script nonce="{{ request()->attributes->get('csp_nonce') }}" src="{{ asset('js/studio-invoice-copy.js') }}" defer></script>
+        @endonce
+    @endif
     <h3>Payment history</h3>
     @forelse($invoice->payments as $payment)<p>{{ ($payment->paid_at ?? $payment->created_at)->format('j M Y') }} · {{ ucfirst($payment->provider) }} · ${{ number_format($payment->amount_cents/100,2) }} · {{ ucfirst($payment->status) }} @if($payment->reference) · {{ $payment->reference }} @endif</p>@empty<p class="muted">No payments recorded.</p>@endforelse
 </article>

@@ -63,7 +63,7 @@ class GallerySharingTest extends TestCase
         $this->assertDatabaseCount('concert_access_grants', 0);
         $this->assertDatabaseCount('order_media_entitlements', 0);
         $this->get($link.'changed')->assertForbidden();
-        $studio->forceFill(['gallery_code_hash' => bcrypt('REPLACEMENT')])->save();
+        $studio->forceFill(['code' => 'REPLACEMENT', 'gallery_code_hash' => bcrypt('REPLACEMENT')])->save();
         $this->get($link)->assertForbidden();
         $fresh = $access->studioLink($studio);
         $studio->update(['status' => 'inactive']);
@@ -74,8 +74,8 @@ class GallerySharingTest extends TestCase
     {
         Notification::fake();
         $studio = $this->studio();
-        $this->get(app(PublicityEventAccess::class)->studioLink($studio))->assertRedirect(route('customer.login'));
-        $this->get(route('customer.login'))->assertOk()->assertSee($studio->name)->assertSee('Create account');
+        $this->get(app(PublicityEventAccess::class)->studioLink($studio))->assertRedirect(route('login'));
+        $this->get(route('login'))->assertOk()->assertSee($studio->name)->assertSee('Create account');
         $this->get(route('customer.register'))->assertOk()->assertSee($studio->name);
         $this->post(route('customer.register.store'), ['name' => 'QR Customer', 'email' => 'qr-new@example.test',
             'password' => 'Example-password-123', 'password_confirmation' => 'Example-password-123', 'policy_accepted' => '1'])
@@ -94,7 +94,7 @@ class GallerySharingTest extends TestCase
         CompetitionGallerySetting::create(['scheduling_event_id' => $event->id, 'login_code_hash' => bcrypt('EXAMPLE')]);
         $customer = User::factory()->create(['type' => 'customer', 'is_admin' => false, 'email_verified_at' => now(), 'password' => bcrypt('Example-password-123')]);
         $link = app(PublicityEventAccess::class)->link($event);
-        $this->get($link)->assertRedirect(route('customer.login'));
+        $this->get($link)->assertRedirect(route('login'));
         $this->post(route('customer.login.store'), ['email' => $customer->email, 'password' => 'Example-password-123'])->assertRedirect(route('publicity.join.complete'));
         $this->get(route('publicity.join.complete'))->assertRedirect(route('customer.media.index'));
         $this->assertDatabaseHas('customer_competition_registrations', ['user_id' => $customer->id, 'scheduling_event_id' => $event->id]);

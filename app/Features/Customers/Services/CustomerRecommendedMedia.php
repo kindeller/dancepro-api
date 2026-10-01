@@ -2,7 +2,7 @@
 
 namespace App\Features\Customers\Services;
 
-use App\Features\Customers\Models\CustomerCompetitionRegistration;
+use App\Features\Families\Services\FamilyGalleryAccess;
 use App\Features\Programmes\Models\ProgrammePhotoFile;
 use App\Features\Programmes\Models\ProgrammePhotoGallery;
 use App\Features\Scheduling\Models\SchedulingEvent;
@@ -17,7 +17,7 @@ class CustomerRecommendedMedia
         $galleries = ProgrammePhotoGallery::all()->keyBy('scheduling_event_id');
         $events = SchedulingEvent::with('competitionContact')->whereIn('id', $galleries->keys())
             ->where('event_type', 'competition')->whereNull('cancelled_at')->orderByDesc('event_date')->get();
-        $registered = CustomerCompetitionRegistration::where('user_id', $user->id)->whereNotNull('access_verified_at')
+        $registered = app(FamilyGalleryAccess::class)->competitions($user)->whereNotNull('access_verified_at')
             ->whereIn('scheduling_event_id', $events->pluck('id'))->pluck('scheduling_event_id')->flip();
         $result = ['dancers' => [], 'studios' => []];
 

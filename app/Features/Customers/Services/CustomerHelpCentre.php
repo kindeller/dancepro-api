@@ -25,7 +25,7 @@ class CustomerHelpCentre
         ];
     }
 
-    public function articles(?string $query, User $user): Collection
+    public function articles(?string $query, ?User $user = null): Collection
     {
         $query = trim((string) $query);
         $articles = CustomerHelpArticle::query()->where('is_published', true)
@@ -42,7 +42,7 @@ class CustomerHelpCentre
                 });
             })->orderBy('sort_order')->orderBy('title')->get();
 
-        if ($query !== '') {
+        if ($query !== '' && $user) {
             DB::table('customer_help_searches')->insert([
                 'user_id' => $user->id, 'query' => mb_substr($query, 0, 255),
                 'result_count' => $articles->count(), 'created_at' => now(), 'updated_at' => now(),

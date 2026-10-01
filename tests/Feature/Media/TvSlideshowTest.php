@@ -334,7 +334,7 @@ class TvSlideshowTest extends TestCase
         $settings = CompetitionGallerySetting::create(['scheduling_event_id' => $f['event']->id, 'login_code_hash' => bcrypt('EXAMPLE')]);
         $access = app(PublicityEventAccess::class);
         $link = $access->link($f['event']);
-        $this->get($link)->assertRedirect(route('customer.login'))->assertSessionHas('publicity_join');
+        $this->get($link)->assertRedirect(route('login'))->assertSessionHas('publicity_join');
         $customer = User::factory()->create(['type' => 'customer', 'is_admin' => false, 'email_verified_at' => now()]);
         $this->actingAs($customer)->get(route('publicity.join.complete'))->assertRedirect(route('customer.media.index'));
         $this->assertDatabaseHas('customer_competition_registrations', ['user_id' => $customer->id, 'scheduling_event_id' => $f['event']->id]);

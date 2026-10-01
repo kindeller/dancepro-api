@@ -7,6 +7,7 @@ use App\Features\Concerts\Models\ConcertAccessGrant;
 use App\Features\Customers\Models\CustomerAccountActivity;
 use App\Features\Customers\Models\CustomerAccountEmail;
 use App\Features\Customers\Models\CustomerCompetitionRegistration;
+use App\Features\Customers\Models\CustomerSupportRequest;
 use App\Features\Customers\Notifications\CustomerAccountMessage;
 use App\Features\Orders\Models\Order;
 use App\Features\Orders\Models\OrderRefund;
@@ -14,6 +15,7 @@ use App\Features\Orders\Support\OrderStatus;
 use App\Features\Payments\Services\CustomerCredits;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -49,6 +51,7 @@ class CustomerAccountAdministration
             $emailChanged = $customer->email !== $input['email'];
             $customer->update([
                 'name' => $input['name'],
+                ...array_intersect_key($input, array_flip(['first_name', 'last_name'])),
                 'email' => $input['email'],
                 'email_verified_at' => $emailChanged ? null : $customer->email_verified_at,
             ]);
@@ -102,14 +105,19 @@ class CustomerAccountAdministration
         $this->activity($customer, $actor, 'event_access_added', $label.' added manually.', ['kind' => $kind, 'reason' => $reason, 'subject_id' => $subjectId]);
     }
 
-    public function email(User $customer, User $actor, string $subject, string $body): CustomerAccountEmail
+    public function email(User $customer, User $actor, string $subject, string $body, ?UploadedFile $attachment = null, string $audience = 'customer'): CustomerAccountEmail
     {
         $email = CustomerAccountEmail::create([
             'user_id' => $customer->id, 'sent_by_user_id' => $actor->id, 'recipient_email' => $customer->email,
             'subject' => $subject, 'body' => $body, 'status' => 'queued', 'queued_at' => now(),
         ]);
+        $thread = CustomerSupportRequest::where('customer_account_email_id', $email->id)->firstOrFail();
+        $thread->update(['context' => array_merge($thread->context ?? [], ['message_audience' => $audience])]);
+        if ($attachment) {
+            app(CustomerConversations::class)->attach($thread->messages()->firstOrFail(), $attachment);
+        }
         try {
-            $customer->notify(new CustomerAccountMessage($subject, $body));
+            $customer->notify(new CustomerAccountMessage($subject, $body, $thread->uuid));
             $email->update(['status' => 'sent', 'sent_at' => now()]);
         } catch (\Throwable $exception) {
             report($exception);

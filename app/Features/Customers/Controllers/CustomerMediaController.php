@@ -58,6 +58,6 @@ class CustomerMediaController extends Controller
     {
         abort_unless($recommendations->allowsThumbnail($request->user(), $schedulingEvent, $item, $photo), 404);
 
-        return $preview->image($schedulingEvent, $photo, 'thumbnail');
+        return $preview->image($schedulingEvent, $photo, $request->validated('size', 'thumbnail'));
     }
 }

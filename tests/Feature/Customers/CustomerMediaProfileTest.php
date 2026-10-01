@@ -19,14 +19,14 @@ class CustomerMediaProfileTest extends TestCase
     {
         $user = User::factory()->customer()->create();
         $studio = Studio::factory()->create();
-        $studio->forceFill(['gallery_code_hash' => Hash::make('GALLERY-TEST')])->save();
+        $studio->forceFill(['code' => 'GALLERY-TEST', 'gallery_code_hash' => Hash::make('GALLERY-TEST')])->save();
         $this->actingAs($user)->get(route('customer.media.index'))->assertOk()
             ->assertSee('Add media')->assertSee('Add a dancer in My Profile')->assertSee('Add your studio in My Profile')
-            ->assertSee(route('customer.profile.edit', ['tab' => 'dancers']), false)
+            ->assertSee(route('customer.profile.edit', ['tab' => 'family']), false)
             ->assertSee(route('customer.profile.edit', ['tab' => 'studios']), false)
             ->assertDontSee('name="concert_code"', false)->assertDontSee('<select name="event_uuid"', false);
-        $this->get(route('customer.profile.edit', ['tab' => 'studios']))->assertOk()->assertSee($studio->name);
-        foreach ([['action' => 'dancer', 'name' => 'Jessica Smith'], ['action' => 'studio', 'studio_uuid' => $studio->uuid, 'studio_gallery_code' => 'GALLERY-TEST']] as $input) {
+        $this->get(route('customer.profile.edit', ['tab' => 'studios']))->assertOk()->assertSee('Find your studio')->assertSee('data-studio-search', false);
+        foreach ([['action' => 'dancer', 'name' => 'Jessica Smith'], ['action' => 'studio_gallery', 'studio_uuid' => $studio->uuid, 'studio_gallery_code' => 'GALLERY-TEST']] as $input) {
             $this->post(route('customer.profile.store'), $input + ['user_id' => 999])->assertRedirect();
             $this->post(route('customer.profile.store'), $input)->assertRedirect();
         }
@@ -38,7 +38,7 @@ class CustomerMediaProfileTest extends TestCase
             ->assertSee(route('customer.profile.studio', $studio), false)->assertDontSee('Add now');
         $this->get(route('customer.profile.studio', $studio))->assertOk()->assertSee('not available yet');
         Concert::factory()->published()->create(['studio_id' => $studio->id, 'external_gallery_url' => 'https://photos.example.test/studio-gallery']);
-        $this->get(route('customer.profile.studio', $studio))->assertOk()->assertSee('View/order photos')->assertSee('https://photos.example.test/studio-gallery', false);
+        $this->get(route('customer.profile.studio', $studio))->assertOk()->assertSee('View gallery')->assertSee('gallery-navigation-card')->assertSee('https://photos.example.test/studio-gallery', false);
         $this->actingAs(User::factory()->customer()->create())->get(route('customer.profile.edit', ['tab' => 'dancers']))->assertOk()->assertDontSee('Jessica Smith');
         $this->get(route('customer.profile.studio', $studio))->assertForbidden();
     }
@@ -61,11 +61,11 @@ class CustomerMediaProfileTest extends TestCase
 
     public function test_profile_validation_permissions_and_dancer_prerequisite(): void
     {
-        $this->get(route('customer.profile.edit'))->assertRedirect(route('customer.login'));
+        $this->get(route('customer.profile.edit'))->assertRedirect(route('login'));
         $this->actingAs(User::factory()->customer()->create());
         $this->post(route('customer.profile.store'), ['action' => 'dancer', 'name' => '   '])->assertSessionHasErrors('name');
         $inactive = Studio::factory()->inactive()->create();
-        $this->post(route('customer.profile.store'), ['action' => 'studio', 'studio_uuid' => $inactive->uuid])->assertSessionHasErrors('studio_uuid');
+        $this->post(route('customer.profile.store'), ['action' => 'studio_gallery', 'studio_uuid' => $inactive->uuid])->assertSessionHasErrors('studio_uuid');
         $this->post(route('customer.competitions.store'), ['event_uuid' => (string) Str::uuid(), 'login_code' => 'TEST-CODE'])->assertSessionHasErrors(['login_code' => 'Add a dancer in My Profile first.']);
         $this->assertDatabaseCount('customer_dancers', 0);
         $this->assertDatabaseCount('customer_studios', 0);

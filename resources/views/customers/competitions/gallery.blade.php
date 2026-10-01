@@ -14,25 +14,11 @@
 
 @push('styles')
 <style>
-    .gallery-intro { padding: 34px 0; }
-    .gallery-intro-inner { display: flex; align-items: center; gap: 24px; }
-    .gallery-cover { max-width: 150px; max-height: 110px; width: auto; height: auto; border-radius: 8px; }
-    .gallery-intro h1 { font-size: clamp(32px, 5vw, 54px); margin-bottom: 0; }
     .gallery-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-bottom: 24px; }
     .gallery-crumbs a { text-underline-offset: 3px; }
-    .gallery-folders { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,240px)); gap:16px; align-items:stretch; }
-    .gallery-folder { display:flex; min-width:0; overflow:hidden; flex-direction:column; padding:0; text-decoration:none; }
-    .gallery-folder:hover,.gallery-folder:focus-visible { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 16%,transparent); }
-    .gallery-folder-cover { display:block; width:100%; aspect-ratio:4/3; object-fit:cover; background:#10202c; }
-    .gallery-folder-placeholder { display:grid; width:100%; aspect-ratio:4/3; place-items:center; background:#10202c; color:#8ddcff; font-size:38px; }
-    .gallery-folder-copy { display:flex; min-height:132px; flex:1; flex-direction:column; padding:16px 18px; }
-    .gallery-folder-title { font-size:18px; font-weight:850; line-height:1.3; }
-    .gallery-folder-kind { display:block; margin-top:7px; color:var(--muted); font-size:14px; font-weight:700; }
-    .gallery-folder-action { display:block; margin-top:auto; padding-top:16px; color:#0879a7; font-weight:850; }
     .gallery-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-items: start; }
     .gallery-photo { display: block; overflow: hidden; padding: 0; cursor: zoom-in; }
     .gallery-photo img { display: block; width: 100%; height: auto; }
-    .gallery-photo:hover, .gallery-photo:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     .gallery-products { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,270px)); gap:14px; margin:6px 0 32px; }
     .gallery-product { display:flex; flex-direction:column; align-items:center; min-height:220px; padding:22px 18px 17px; text-align:center; border-color:#d0e0e8; box-shadow:0 12px 28px #112c3a0a; }
     .gallery-product-symbol { display:grid; place-items:center; width:52px; height:52px; margin-bottom:13px; border-radius:15px; background:#e5f6fd; color:#087bab; }
@@ -101,7 +87,7 @@
     .gallery-viewer-controls button { min-height: 40px; border: 1px solid #52636c; border-radius: 7px; background: #24323a; color: #fff; cursor: pointer; font: inherit; font-weight: 700; padding: 8px 12px; }
     .gallery-viewer-controls button:disabled { opacity: .4; cursor: default; }
     @media (hover:none) { .gallery-photo-actions { opacity:1; } }
-    @media (max-width: 650px) { .gallery-intro-inner { align-items: flex-start; } .gallery-cover { max-width: 82px; max-height: 82px; } .gallery-products { grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); } .gallery-photos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; } .gallery-individual-heading { display:block; } .gallery-viewer-bar { flex-wrap:wrap; } }
+    @media (max-width: 650px) { .gallery-products { grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); } .gallery-photos { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; } .gallery-individual-heading { display:block; } .gallery-viewer-bar { flex-wrap:wrap; } }
 </style>
 @endpush
 
@@ -122,30 +108,21 @@
     $photoPrice = $mediaPricing->competitionPrice($event, 'competition_photo', $pricingItemUuid);
     $photoPriceText = '$'.number_format($photoPrice / 100, 2);
 @endphp
-<section class="hero gallery-intro"><div class="container gallery-intro-inner">
-    @if($coverUrl)<img class="gallery-cover" src="{{ $coverUrl }}" alt="{{ $title }} cover">@endif
-    <div><div class="eyebrow">{{ $eventCode }}</div><h1>{{ $title }}</h1></div>
-</div></section>
+<section class="hero"><div class="container">@include('customers._heading', ['headingImageUrl' => $event->logoUrl() ?? $event->crewLogoUrl(), 'eyebrow' => $eventCode ?: 'Competition media', 'heading' => $title, 'description' => 'Browse your event’s released photos and videos.'])</div></section>
 <section class="section" id="gallery-content"><div class="container">
     @include('customers.competitions.partials.tabs')
     @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
     @if($errors->any())<p class="error" role="alert">{{ $errors->first() }}</p>@endif
-    <nav class="gallery-crumbs" aria-label="Gallery folders">
-        <a href="{{ route($competitionRoutes['show'], $event).'#gallery-content' }}" @if(!$selected)aria-current="page"@endif>Whole Event</a>
-        @foreach($breadcrumbs as $crumb)
-            <span aria-hidden="true">/</span>
-            @if($loop->last)<strong aria-current="page">{{ $crumb['label'] }}</strong>
-            @else<a href="{{ route($competitionRoutes['show'], ['schedulingEvent' => $event, 'folder' => $crumb['uuid']]).'#gallery-content' }}">{{ $crumb['label'] }}</a>@endif
-        @endforeach
-    </nav>
+    @php
+        $galleryBreadcrumbs = [['label' => $title, 'url' => route($competitionRoutes['show'], $event).'#gallery-content']];
+        foreach ($breadcrumbs as $crumb) $galleryBreadcrumbs[] = ['label' => $crumb['label'], 'url' => route($competitionRoutes['show'], ['schedulingEvent' => $event, 'folder' => $crumb['uuid']]).'#gallery-content'];
+    @endphp
+    <x-gallery-breadcrumbs :items="$galleryBreadcrumbs" />
     @if(!$selected)<h2>Browse the event</h2>@elseif($selected['kind'] !== 'item')<h2>{{ $selected['label'] }}</h2>@endif
     @if($children)
-        <div class="gallery-folders">
+        <div class="gallery-navigation-grid">
             @foreach($children as $child)
-                <a class="card gallery-folder" href="{{ route($competitionRoutes['show'], ['schedulingEvent' => $event, 'folder' => $child['uuid']]).'#gallery-content' }}">
-                    @if($child['cover_uuid'] ?? null)<img class="gallery-folder-cover" src="{{ route($competitionRoutes['image'], ['schedulingEvent' => $event, 'photo' => $child['cover_uuid'], 'size' => 'thumbnail']) }}" alt="">@else<span class="gallery-folder-placeholder" aria-hidden="true">{{ $child['kind'] === 'item' ? '▣' : '▱' }}</span>@endif
-                    <span class="gallery-folder-copy"><span class="gallery-folder-title">{{ $child['label'] }}</span><span class="gallery-folder-kind">{{ $child['kind'] === 'item' ? 'Routine' : ($child['kind'] === 'day' ? 'Day' : 'Section') }}</span><span class="gallery-folder-action">View {{ $child['kind'] === 'item' ? 'routine' : strtolower($child['kind']) }} →</span></span>
-                </a>
+                <x-gallery-navigation-card class="gallery-folder" :title="$child['label']" :image="($child['cover_uuid'] ?? null) ? route($competitionRoutes['image'], ['schedulingEvent' => $event, 'photo' => $child['cover_uuid'], 'size' => 'cover']) : null" :subtitle="$child['kind'] === 'item' ? 'Routine' : ($child['kind'] === 'day' ? 'Day' : 'Section')" :href="route($competitionRoutes['show'], ['schedulingEvent' => $event, 'folder' => $child['uuid']]).'#gallery-content'" :action="'View '.($child['kind'] === 'item' ? 'routine' : strtolower($child['kind']))" />
             @endforeach
         </div>
     @elseif($photos && $photos->isNotEmpty())

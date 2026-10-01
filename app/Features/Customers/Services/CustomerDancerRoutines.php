@@ -4,6 +4,8 @@ namespace App\Features\Customers\Services;
 
 use App\Features\Customers\Models\CustomerDancer;
 use App\Features\Customers\Support\CustomerDancerNameMatcher;
+use App\Features\Families\Services\FamilyAccess;
+use App\Features\Programmes\Services\CompetitionFolderCovers;
 use App\Features\Programmes\Services\CompetitionGallery;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Studios\Models\Studio;
@@ -22,7 +24,7 @@ class CustomerDancerRoutines
     public function forEvent(User $user, SchedulingEvent $event): array
     {
         $data = $this->gallery->browse($event, null);
-        $dancers = CustomerDancer::where('user_id', $user->id)->orderBy('name')->get()
+        $dancers = app(FamilyAccess::class)->dancers($user)
             ->filter(fn (CustomerDancer $dancer): bool => ! $this->studioNames()->has($this->nameMatcher->canonical($dancer->name)))
             ->values();
         $nodes = $data['nodes'];
@@ -38,6 +40,8 @@ class CustomerDancerRoutines
             return ['uuid' => $item['uuid'], 'label' => $item['label'], 'section' => $section['label'] ?? null,
                 'day' => $day['label'] ?? null, 'dancers' => $matched];
         })->values()->all();
+
+        $routines = app(CompetitionFolderCovers::class)->apply(array_map(fn (array $routine) => $routine + ['kind' => 'item'], $routines), $nodes, $event);
 
         return ['event' => $event, 'routines' => $routines, 'dancers' => $dancers,
             'title' => $data['presentation']['title']];

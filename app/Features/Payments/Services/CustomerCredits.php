@@ -31,7 +31,7 @@ class CustomerCredits
                 if (ctype_digit($term)) {
                     $query->whereKey((int) $term)->orWhere('email', 'like', "%{$escaped}%");
                 } else {
-                    $query->where('email', 'like', "%{$escaped}%")->orWhere('name', 'like', "%{$escaped}%");
+                    $query->where('email', 'like', "%{$escaped}%")->orWhere('name', 'like', "%{$escaped}%")->orWhere('uuid', $term);
                 }
             })->withSum('creditTransactions as credit_balance', 'amount')->orderBy('email')->limit(20)->get();
     }

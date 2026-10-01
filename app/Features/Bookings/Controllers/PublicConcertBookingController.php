@@ -6,8 +6,10 @@ use App\Features\Bookings\Actions\CreateConcertBooking;
 use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Bookings\Requests\CreateConcertBookingRequest;
 use App\Features\Bookings\Requests\StoreConcertBookingRequest;
+use App\Features\Bookings\Services\BookingSubmissionAcknowledgements;
 use App\Features\Bookings\Services\ConcertBookingPrefill;
 use App\Features\Bookings\Services\ConcertBookingSummary;
+use App\Features\Bookings\Services\StudioBookingDrafts;
 use App\Features\Scheduling\Models\EventTypeDefinition;
 use App\Features\Venues\Models\Venue;
 use App\Http\Controllers\Controller;
@@ -26,11 +28,15 @@ class PublicConcertBookingController extends Controller
         ] + $prefill->forUser($request->user(), $request->validated('studio')))->header('Cache-Control', 'private, no-store');
     }
 
-    public function store(StoreConcertBookingRequest $request, CreateConcertBooking $createBooking): RedirectResponse
+    public function store(StoreConcertBookingRequest $request, CreateConcertBooking $createBooking, BookingSubmissionAcknowledgements $acknowledgements, StudioBookingDrafts $drafts): RedirectResponse
     {
         $booking = $createBooking->execute($request->validated(), $request->bookingStudio());
         $request->session()->put('concert_booking_receipts.'.$booking->uuid, true);
         $request->session()->put('latest_concert_booking', $booking->uuid);
+        if ($request->bookingStudio()) {
+            $drafts->submitted($request->bookingStudio(), $request->validated());
+        }
+        $acknowledgements->send($booking, $request->user());
 
         return $request->bookingStudio()
             ? redirect()->route('customer.studio-bookings.show', [$request->bookingStudio(), $booking])

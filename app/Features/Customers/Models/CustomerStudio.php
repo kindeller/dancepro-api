@@ -12,7 +12,7 @@ class CustomerStudio extends Model
 
     protected function casts(): array
     {
-        return ['access_verified_at' => 'datetime'];
+        return ['access_verified_at' => 'datetime', 'membership_confirmed_at' => 'datetime'];
     }
 
     public function studio(): BelongsTo

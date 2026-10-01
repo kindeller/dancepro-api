@@ -3,10 +3,12 @@
 namespace App\Features\Customers\Notifications;
 
 use App\Features\Customers\Models\CustomerSupportRequest;
+use App\Features\Tracking\Services\EmailContentFormatter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class CustomerConversationReply extends Notification implements ShouldQueue
 {
@@ -22,7 +24,7 @@ class CustomerConversationReply extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)->subject('DancePro: '.$this->conversation->subject)
-            ->greeting('Hi '.$notifiable->name.',')->line($this->body)
+            ->greeting('Hi '.$notifiable->emailGreetingName().',')->line(new HtmlString(app(EmailContentFormatter::class)->html($this->body)))
             ->action('Read and reply', route('customer.messages.show', $this->conversation));
     }
 }

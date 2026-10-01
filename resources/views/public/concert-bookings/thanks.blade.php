@@ -1,8 +1,8 @@
-@extends('layouts.public', ['title' => 'Event timeline'])
+@extends('layouts.public', ['title' => 'My timeline'])
+@include('customers.studios._styles')
 @section('headerParentUrl', $parentUrl ?? '')
 @push('styles')
 <style nonce="{{ request()->attributes->get('csp_nonce') }}">
-    .booking-plan { max-width:1000px; }
     .booking-timeline { list-style:none; margin:32px 0; padding:0; }
     .booking-timeline>li { position:relative; padding:0 0 28px 68px; }
     .booking-timeline>li:not(:last-child)::before { content:''; position:absolute; top:44px; bottom:0; left:23px; width:2px; background:#bedce8; }
@@ -16,8 +16,13 @@
 </style>
 @endpush
 @section('content')
-<section class="hero"><div class="container"><div class="eyebrow">{{ !empty($receipt['live']) ? 'Event timeline · '.ucfirst($receipt['status']) : 'Booking request received' }}</div><h1>{{ $receipt ? $receipt['details']['studio_name'] : 'Thank you.' }}</h1><p class="lead">{{ $receipt ? 'Your events. Your next steps.' : 'Your booking request has been received.' }}</p></div></section>
+@if(isset($studio))
+    @include('customers.studios._header', ['hubHeading' => 'My timeline', 'hubDescription' => $studio->name.' · Your events. Your next steps.'])
+@else
+    <section class="hero"><div class="container">@include('customers._heading', ['showMediaLogo' => false, 'eyebrow' => 'Booking request received', 'heading' => 'My timeline', 'description' => $receipt ? $receipt['details']['studio_name'].' · Your events. Your next steps.' : 'Your booking request has been received.'])</div></section>
+@endif
 <section class="section"><div class="container booking-plan">
+    <p><a class="button secondary" href="{{ isset($studio) ? route('customer.studio-communications.index', [$studio, 'tab' => 'events']) : route('customer.media.index') }}">← Back to My Events</a></p>
     @if(!empty($receipt['live']))
         <p>This timeline uses your current booking details and production progress. Your original submitted form is kept separately.</p>
         <p class="muted">Booking status: <strong>{{ ucfirst($receipt['status']) }}</strong> · Booking updated {{ $receipt['updated_at']->format('j M Y, g:i a') }}</p>
@@ -28,12 +33,6 @@
     @if($receipt)
         @php($quote = $receipt['quote'])
         @include('public.concert-bookings._quote', ['quote' => $quote])
-        @if(!empty($receipt['live']) && isset($booking))
-            @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
-            @if($errors->any())<p role="alert">{{ $errors->first() }}</p>@endif
-            <p><a class="button secondary" href="{{ route('customer.studio-invoices.index', $studio) }}">Studio invoices</a></p>
-            @include('public.concert-bookings._family-numbers', ['familyNumbersUrl' => route('customer.studio-bookings.families', [$studio, $booking])])
-        @endif
         @if(!empty($receipt['live']))
             <section aria-label="Current event progress">
                 <h2>Current progress</h2>
@@ -49,8 +48,7 @@
                 @endforeach
             </section>
         @endif
-        <h2>Event timeline</h2>
-        <p class="muted">All times are {{ config('app.timezone') }}. Programme, supplied-media and invoice dates use the current tracker deadlines.</p>
+        <h2>My timeline</h2>
         <ol class="booking-timeline">
             <li><span class="booking-milestone-icon">@include('public.concert-bookings._timeline-icon', ['icon' => 'check'])</span><div class="card card-body"><time class="booking-milestone-time" datetime="{{ $receipt['submitted_at'] }}">{{ \Carbon\CarbonImmutable::parse($receipt['submitted_at'])->format('j M Y · g:i a') }}</time><h3>Booking submitted</h3><p>We have received your booking request.</p><a href="{{ $submissionUrl ?? route('concert-bookings.submission', $bookingUuid) }}">View your submitted booking form →</a></div></li>
             @foreach($receipt['timeline'] as $entry)

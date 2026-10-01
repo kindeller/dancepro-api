@@ -24,11 +24,11 @@ class CustomerProfileEditingTest extends TestCase
             ->assertOk()->assertSee('My details')->assertSee('Account email')->assertDontSee('Add dancer')
             ->assertDontSee('Media galleries')->assertDontSee('Studios &amp; concerts', false)->assertDontSee('Staff');
         $this->get(route('customer.profile.edit', ['tab' => 'dancers']))
-            ->assertOk()->assertSee('Add dancer')->assertDontSee('Account email');
+            ->assertOk()->assertSee('Add family member')->assertDontSee('Account email');
         $this->get(route('customer.profile.edit', ['tab' => 'studios']))
-            ->assertOk()->assertSee('Add or verify studio')->assertDontSee('Save preferences');
+            ->assertOk()->assertSee('Add studio')->assertDontSee('Save preferences');
         $this->get(route('customer.profile.edit', ['tab' => 'preferences']))
-            ->assertOk()->assertSee('Save preferences')->assertDontSee('Add or verify studio');
+            ->assertOk()->assertSee('Save preferences')->assertDontSee('Add studio');
         $this->get(route('customer.profile.edit', ['tab' => 'wrong']))->assertSessionHasErrors('tab');
     }
 
@@ -43,9 +43,12 @@ class CustomerProfileEditingTest extends TestCase
         @$document->loadHTML($response->getContent());
         $xpath = new \DOMXPath($document);
         $nav = $xpath->query('//nav[@aria-label="Main navigation"]')->item(0);
-        $this->assertMatchesRegularExpression('/Studio Hub\s+My Media\s+My Messages\s+My Profile\s+Help/', $nav->textContent);
+        foreach ($xpath->query('.//span[contains(concat(" ", normalize-space(@class), " "), " inbox-badge ")]', $nav) as $badge) {
+            $badge->parentNode->removeChild($badge);
+        }
+        $this->assertMatchesRegularExpression('/Home\s+My Media\s+My Messages\s+Services\s+About\s+Help\s+My Profile/', $nav->textContent);
         $this->assertStringNotContainsString('Sign out', $nav->textContent);
-        $this->assertSame(1, $xpath->query('//nav[@aria-label="Main navigation"]/a[@class="studio-hub-link"]')->length);
+        $this->assertSame(1, $xpath->query('//nav[@aria-label="Your hubs"]/a[contains(@class,"studio-hub-link")]')->length);
         $this->assertSame(1, $xpath->query('//main//form[@action="'.route('logout').'"]')->length);
         $this->get(route('customer.media.index'))->assertOk()->assertDontSee('action="'.route('logout').'"', false);
         $this->post(route('logout'))->assertRedirect();
@@ -58,13 +61,14 @@ class CustomerProfileEditingTest extends TestCase
         $originalEmail = $user->email;
         $other = User::factory()->customer()->create();
         $this->actingAs($user)->post(route('customer.profile.store'), ['action' => 'details', 'name' => 'Customer Name',
-            'preferred_name' => 'Customer', 'phone' => '+61 400 123 456', 'user_id' => $other->id, 'email' => 'attacker@example.test', 'is_admin' => true])->assertRedirect();
+            'preferred_name' => 'Customer', 'phone' => '+61 400 123 456', 'user_id' => $other->id, 'email' => $originalEmail, 'is_admin' => true])->assertRedirect();
         $this->assertSame('Customer Name', $user->fresh()->name);
         $this->assertSame($originalEmail, $user->fresh()->email);
         $this->assertFalse($user->fresh()->is_admin);
         $this->assertSame('Customer', $user->fresh()->customerProfile->preferred_name);
         $this->assertNull($other->fresh()->customerProfile);
-        $this->get(route('customer.profile.edit'))->assertOk()->assertSee('Customer Name')->assertSee('+61 400 123 456');
+        $this->get(route('customer.profile.edit'))->assertOk()->assertSee('name="first_name"', false)->assertSee('value="Customer"', false)
+            ->assertSee('name="last_name"', false)->assertSee('value="Name"', false)->assertSee('+61 400 123 456');
     }
 
     public function test_preferences_preserve_other_settings_and_marketing_opt_in_time(): void

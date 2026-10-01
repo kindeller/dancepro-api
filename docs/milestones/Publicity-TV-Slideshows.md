@@ -390,3 +390,27 @@ See [ADR-0053](../decisions/ADR-0053-Publicity-TV-Playback.md) and
   New migration rollback methods were reviewed without rolling back local data.
 - Pint and whitespace checks passed. Temporary review media, screenshots and
   generated output remain local and are excluded from version control.
+
+## Admin concert album browsing — 30 September 2026
+
+- Concert Photos and Publicity → Top Pics → Concerts share a studio-first browser.
+  Studio cards reuse the customer gallery card component. Open a studio to see its
+  event cards, newest first, with the booking event title, date and Top Pic cover.
+  Events without a linked studio remain accessible under Unlinked events.
+- Studio logos and event covers use the same image area (3:2) and responsive
+  card dimensions in both admin views. Logos fit without cropping; photos fill the
+  area. Card spacing, headings, rounded corners and whole-card links match the
+  existing customer gallery presentation.
+- In a concert Top Pics album, **Use as event cover** saves the chosen verified
+  Top Pic for both admin event browsers without reloading or resetting scroll.
+  **Use automatic event cover** clears that preference. If a chosen file is no
+  longer a current, verified Top Pic, the browser automatically falls back to
+  another eligible Top Pic, or a placeholder if none remain.
+- The nullable gallery cover reference does not move or alter uploaded photos,
+  customer release/access rules or album contents. Its migration rollback removes
+  only the cover preference column/foreign key; photos remain intact.
+- Verification: focused gallery tests passed (17 tests, 234 assertions); full Sail
+  suite passed (1,107 tests, 11,847 assertions). Scoped Pint, route registration,
+  JavaScript syntax and whitespace checks passed. Browser checks at 1440px and
+  390px confirmed identical studio/event image dimensions, working images and
+  navigation, newest-first ordering, and cover-save feedback without scroll reset.

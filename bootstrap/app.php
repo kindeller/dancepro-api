@@ -35,7 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('my/*') ? route('customer.login') : route('login'));
+        $middleware->redirectGuestsTo(fn () => route('login'));
         $middleware->append(AddSecurityHeaders::class);
         $middleware->appendToGroup('web', AuthenticateSession::class);
         $middleware->alias([
@@ -58,7 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        $exceptions->dontFlash(['login_code', 'concert_code', 'studio_gallery_code', 'gallery_code']);
+        $exceptions->dontFlash(['login_code', 'concert_code', 'studio_gallery_code', 'studio_code', 'gallery_code']);
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

@@ -168,12 +168,123 @@ def concert_pair(row, width):
     return None
 
 
+def concert_panels(words, width):
+    """Read side-by-side acts down each panel, not across unrelated routines."""
+    for row in rows(words):
+        headings = [(a[0], b[2]) for a, b in zip(row, row[1:])
+                    if re.fullmatch(r'ACT|PART', a[4], re.I)
+                    and re.fullmatch(r'\d+|ONE|TWO|THREE|FOUR', b[4], re.I)]
+        if len(headings) < 2:
+            continue
+        body = sorted((w[0], w[2]) for w in words if w[1] >= row[0][1]-4)
+        # Find actual whitespace gutters so a long class name is not cut at
+        # an assumed page midpoint. If there is no clear gutter, do not split.
+        gaps, edge = [], 0
+        for left, right in body:
+            if left-edge > width*.015:
+                gaps.append((edge, left))
+            edge = max(edge, right)
+        boundaries = [0]
+        for first, second in zip(headings, headings[1:]):
+            candidates = [(a+b)/2 for a,b in gaps if a >= first[1] and b <= second[0]]
+            if not candidates:
+                break
+            centre = (sum(first)+sum(second))/4
+            boundaries.append(min(candidates, key=lambda x:abs(x-centre)))
+        if len(boundaries) != len(headings):
+            continue
+        boundaries.append(width)
+        return [(right-left, [(x-left,y,x2-left,y2,value) for x,y,x2,y2,value in words if left <= x < right])
+                for left,right in zip(boundaries,boundaries[1:])]
+    return [(width, words)]
+
+
+def reading_panels(path, competition):
+    for page, width, height, words, ocr in pages(path):
+        if not competition:
+            words = without_concert_date_footer(words, width, height)
+        panels = [(width, words)] if competition else concert_panels(words, width)
+        for panel_width, panel_words in panels:
+            yield page, panel_width, height, panel_words, ocr
+
+
+def without_concert_date_footer(words, width, height):
+    """Exclude oversized printed dates that vertically overlap the last routines."""
+    heights = [w[3]-w[1] for w in words if re.search(r'\w', w[4])]
+    typical = median(heights) if heights else 0
+    candidates = [w for w in words if w[0] > width*.5 and w[1] > height*.85
+                  and w[3]-w[1] > typical*1.5]
+    for row in rows(candidates):
+        if not re.fullmatch(r'\d{1,2}[\s./-]+\d{1,2}[\s./-]+20\d{2}', text(row)):
+            continue
+        left, top = min(w[0] for w in row)-2, min(w[1] for w in row)-2
+        right, bottom = max(w[2] for w in row)+2, max(w[3] for w in row)+2
+        words = [w for w in words if not (left <= w[0] and w[2] <= right and top <= w[1] and w[3] <= bottom)]
+    return words
+
+
+def normalise_ocr_times(value):
+    # Only repair letter/digit confusions inside explicit am/pm time ranges.
+    value = re.sub(r'(\d(?:am|pm)\s*-\s*)[tIl](?=[ap]m\b)', r'\g<1>1', value, flags=re.I)
+    return re.sub(r'(\d)[Il](?=[ap]m\b)', r'\g<1>1', value)
+
+
+def unnumbered_concert(lines, width, page, nodes, group):
+    pairs = [concert_pair(row, width) for row in lines]
+    inferred = sum(pair is not None for pair in pairs) >= max(4, len(lines)*.6)
+    explicit = any(re.match(r'^(ACT|PART)\s+(\d+|ONE|TWO|THREE|FOUR)\b', text(row), re.I) for row in lines)
+    if not inferred and not explicit:
+        return [], [], group
+    starts = []
+    for row, pair in zip(lines, pairs):
+        if pair:
+            starts.append(row[len(row)-len(pair[1].split())][0])
+        elif explicit:
+            gaps = [(b[0]-a[2], b[0]) for a,b in zip(row,row[1:])
+                    if b[0]-a[2] > width*.075 and b[0] > width*.32]
+            if gaps:
+                starts.append(max(gaps)[1])
+    split = median(starts)-3 if starts else width+1
+    result, active, previous = [], inferred, None
+    for row in lines:
+        value = text(row)
+        if re.match(r'^(ACT|PART)\s+(\d+|ONE|TWO|THREE|FOUR)\b', value, re.I):
+            active, previous = True, None
+            group = next((n for n in reversed(nodes) if n['kind']=='group' and n['title']==value), None)
+            continue
+        if not active:
+            continue
+        if re.match(r'^(INTERVAL|INTERMISSION|PRESENTATIONS|FINALE)\b', value, re.I):
+            result.append(node('item', value, page, group['uuid'] if group else None, item_kind=item_kind(value)))
+            active, previous = False, None
+            continue
+        title = text([w for w in row if w[0] < split])
+        classes = text([w for w in row if w[0] >= split])
+        if not title and classes and previous:
+            previous['class_name'] = ((previous.get('class_name') or '')+' '+classes).strip()[:500]
+            continue
+        if re.search(r'choreograph|thank|sponsor|cast|performers', title, re.I):
+            active, previous = False, None
+            continue
+        if title and classes:
+            previous = node('item', title, page, group['uuid'] if group else None,
+                            class_name=classes[:500], item_kind=item_kind(title+' '+classes))
+            result.append(previous)
+        elif title and previous:
+            # A continuation aligned with the title column belongs to the
+            # preceding item, rather than becoming an invented extra routine.
+            previous['title'] = (previous['title']+' '+title)[:500]
+    warnings = [f'PDF page {page}: unnumbered title/class list detected. Check the running order; no printed item numbers were invented.'] if inferred else []
+    return result, warnings, group
+
+
 def extract(path, competition, year=None):
     nodes, issues, read_pages, skipped, ocr_pages = [], [], [], [], []
     day, section, group, pending, session = None, None, None, None, None
     known_days = {}
     session_times = {}
-    for page, width, height, words, ocr in pages(path):
+    for page, width, height, words, ocr in reading_panels(path, competition):
+        panel_start = len(nodes)
         if ocr:
             ocr_pages.append(page)
         lines = rows(words)
@@ -208,7 +319,7 @@ def extract(path, competition, year=None):
                         break
                 if split is None:
                     split = median(column_starts) if column_starts else width + 1
-                title_parts, class_parts = [], []
+                title_parts, class_parts, full_parts = [], [], []
                 for r in band:
                     if re.fullmatch(r'\d{1,2}[./-]\d{1,2}[./-]\d{2,4}', text(r)):
                         continue
@@ -216,12 +327,16 @@ def extract(path, competition, year=None):
                     left_text = text(left)
                     if re.match(r'^(ACT|PART|SECTION|INTERVAL|INTERMISSION|THANK)', left_text, re.I):
                         break
+                    full_parts.append(text(r))
                     title_parts.append(left_text)
                     class_parts.append(text(right))
                 title = re.sub(r'^\d{1,3}[A-Za-z]?\s*[.)]\s*', '', ' '.join(filter(None, title_parts)))
                 classes = ' '.join(filter(None, class_parts))
-                inline = re.split(r'\s+[-–]\s+(?=(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|PPID|Everyone)\b)', title, maxsplit=1, flags=re.I)
-                if len(inline)==2 and not classes:
+                full_title = re.sub(r'^\d{1,3}[A-Za-z]?\s*[.)]\s*', '', ' '.join(full_parts))
+                # Explicit schedule separators are stronger evidence than gaps
+                # in a long line. Keep wrapped schedules in printed line order.
+                inline = re.split(r'\s+[-–]\s+(?=(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|PPID|Everyone)\b)', full_title, maxsplit=1, flags=re.I)
+                if len(inline)==2:
                     title, classes = inline
                 if not classes:
                     weekly = re.search(r'\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\s+\d', title, re.I)
@@ -229,46 +344,17 @@ def extract(path, competition, year=None):
                         title, classes = title[:weekly.start()].rstrip(' -–'), title[weekly.start():].rstrip(' -–')
                 if not classes:
                     title, classes = split_concert_class(title)
+                if ocr and classes:
+                    classes = normalise_ocr_times(classes)
                 nodes.append(node('item', title, page, parent['uuid'] if parent else None,
                                   match.group(1), class_name=(classes or '')[:500] or None, item_kind=item_kind(title)))
             if not any(match is not None for _,match,_ in numbered):
-                nodes = [n for n in nodes if not (n['kind']=='item' and n['source_page']==page)]
-                # Unnumbered lists need an explicit act heading or repeated class
-                # columns. Cast/narrative pages remain for manual review.
-                pairs = [concert_pair(row, width) for row in lines]
-                # Repeated title/class pairs are strong evidence even when an Act
-                # label is decorative artwork that OCR cannot read. Do not infer
-                # isolated names/cast/credits or narrative paragraphs.
-                inferred = sum(pair is not None for pair in pairs) >= 4 and sum(pair is not None for pair in pairs) >= len(lines)*.6
-                active = inferred
-                if inferred:
-                    issues.append(f'PDF page {page}: unnumbered title/class list detected. Check the running order; no printed item numbers were invented.')
-                for row in lines:
-                    value = text(row)
-                    if re.match(r'^(ACT|PART)\s+(\d+|ONE|TWO)\b', value, re.I):
-                        active = True
-                        group = next((n for n in reversed(nodes) if n['kind'] == 'group' and n['title'] == value), None)
-                        continue
-                    if active and re.match(r'^(INTERVAL|INTERMISSION|PRESENTATIONS|FINALE)\b', value, re.I):
-                        nodes.append(node('item',value,page,group['uuid'] if group else None,item_kind=item_kind(value)))
-                        active = False
-                        continue
-                    if inferred and active:
-                        pair = concert_pair(row, width)
-                        if pair:
-                            title, classes = pair
-                            nodes.append(node('item', title, page, group['uuid'] if group else None, class_name=classes[:500], item_kind=item_kind(title)))
-                        continue
-                    if not active or re.search(r'choreograph|thank|sponsor|cast|performers', value, re.I):
-                        continue
-                    gaps = sorted([(a,b) for a,b in zip(row,row[1:]) if b[0]-a[2] > width*.02 and b[0] > width*.32], key=lambda pair:pair[1][0]-pair[0][2], reverse=True)
-                    if not gaps:
-                        continue
-                    split = gaps[0][1][0]-3
-                    title, classes = text([w for w in row if w[0]<split]), text([w for w in row if w[0]>=split])
-                    if title and classes:
-                        nodes.append(node('item', title, page, group['uuid'] if group else None,
-                                          class_name=classes[:500], item_kind=item_kind(title)))
+                # Replace only this panel's preliminary interval rows, keeping
+                # earlier acts on the same printed page.
+                nodes = nodes[:panel_start] + [n for n in nodes[panel_start:] if n['kind'] != 'item']
+                items, warnings, group = unnumbered_concert(lines, width, page, nodes, group)
+                nodes.extend(items)
+                issues.extend(warnings)
         else:
             for row in lines:
                 value = text(row)
@@ -348,6 +434,9 @@ def extract(path, competition, year=None):
             for i,n in zip(indices,ordered): nodes[i]=n
         used={n['parent_uuid'] for n in nodes if n['kind']=='section'}
         nodes=[n for n in nodes if n['kind']!='day' or n['uuid'] in used]
+    read_pages = list(dict.fromkeys(read_pages))
+    skipped = sorted(set(skipped) - set(read_pages))
+    ocr_pages = list(dict.fromkeys(ocr_pages))
     if skipped:
         issues.append('No running-order entries recognised on PDF pages '+', '.join(map(str,skipped))+'. Check these pages for missed items; covers and credits may be expected.')
     if ocr_pages:

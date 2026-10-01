@@ -3,6 +3,7 @@
 namespace App\Features\Customers\Controllers;
 
 use App\Features\Customers\Actions\AcceptCustomerPolicy;
+use App\Features\Customers\Actions\VerifyCustomerEmail;
 use App\Features\Customers\Requests\AcceptCustomerPolicyRequest;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -17,7 +18,7 @@ class CustomerOnboardingController extends Controller
     {
         abort_unless($request->user()?->canAccessCustomer(), 403);
 
-        return $request->user()->hasVerifiedEmail() ? to_route($request->session()->has('publicity_join') ? 'publicity.join.complete' : 'customer.media.index')
+        return $request->user()->hasVerifiedEmail() ? ($request->session()->has('family_invitation_url') ? redirect($request->session()->get('family_invitation_url')) : to_route($request->session()->has('publicity_join') ? 'publicity.join.complete' : 'customer.media.index'))
             : view('customers.account.verify-email');
     }
 
@@ -31,21 +32,19 @@ class CustomerOnboardingController extends Controller
         return back()->with('status', 'If verification is still needed, a new email has been sent.');
     }
 
-    public function verify(Request $request, int $id, string $hash): RedirectResponse
+    public function verify(Request $request, int $id, string $hash, VerifyCustomerEmail $verify): RedirectResponse
     {
         $user = User::findOrFail($id);
         abort_unless($user->canAccessCustomer() && hash_equals(sha1($user->getEmailForVerification()), $hash), 403);
-        if (! $user->hasVerifiedEmail()) {
-            $user->markEmailAsVerified();
-        }
+        $verify->execute($user);
 
         if ($request->user()?->is($user)) {
             Auth::setUser($user);
         }
 
         return $request->user()?->is($user)
-            ? to_route($request->session()->has('publicity_join') ? 'publicity.join.complete' : 'customer.media.index')->with('status', 'Email verified.')
-            : to_route('customer.login')->with('status', 'Email verified. Sign in to continue.');
+            ? ($request->session()->has('family_invitation_url') ? redirect($request->session()->get('family_invitation_url')) : to_route($request->session()->has('publicity_join') ? 'publicity.join.complete' : 'customer.media.index'))->with('status', 'Email verified.')
+            : to_route('login')->with('status', 'Email verified. Sign in to continue.');
     }
 
     public function edit(Request $request): View|RedirectResponse
@@ -62,6 +61,6 @@ class CustomerOnboardingController extends Controller
     {
         $accept->execute($request->user());
 
-        return to_route($request->session()->has('publicity_join') ? 'publicity.join.complete' : 'customer.media.index');
+        return $request->session()->has('family_invitation_url') ? redirect($request->session()->get('family_invitation_url')) : to_route($request->session()->has('publicity_join') ? 'publicity.join.complete' : 'customer.media.index');
     }
 }

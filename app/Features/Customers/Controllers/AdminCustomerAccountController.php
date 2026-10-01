@@ -59,10 +59,7 @@ class AdminCustomerAccountController extends Controller
         $orderId = Order::idFromDisplayNumber($term);
         $customers = User::query()->where('type', 'customer')->when($term !== '', function ($query) use ($term, $orderId): void {
             $query->where(function ($query) use ($term, $orderId): void {
-                $query->where('email', 'like', '%'.$term.'%')->orWhere('name', 'like', '%'.$term.'%');
-                if (ctype_digit($term)) {
-                    $query->orWhere('id', (int) $term);
-                }
+                $query->where('email', 'like', '%'.$term.'%')->orWhere('name', 'like', '%'.$term.'%')->orWhere('uuid', $term);
                 if ($orderId !== null) {
                     $query->orWhereHas('orders', fn ($query) => $query->whereKey($orderId));
                 }
@@ -91,10 +88,10 @@ class AdminCustomerAccountController extends Controller
         $order = $grants->grant($request->user(), $request->validated());
         $target = $request->validated('return_to');
         if (! $target || ! str_starts_with($target, '/admin/')) {
-            $target = route('admin.customers.show', $order->user_id);
+            $target = route('admin.customers.show', $order->user);
         }
 
-        return redirect($target)->with('status', 'Media added to account #'.$order->user_id.' at no cost.');
+        return redirect($target)->with('status', 'Media added to the customer account at no cost.');
     }
 
     public function revokeComplimentaryMedia(RevokeComplimentaryMediaRequest $request, User $customer, Order $order, ComplimentaryMediaGrants $grants): RedirectResponse

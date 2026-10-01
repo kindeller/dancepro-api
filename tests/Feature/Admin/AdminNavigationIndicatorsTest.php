@@ -57,13 +57,13 @@ class AdminNavigationIndicatorsTest extends TestCase
         }
         $this->actingAs($staff);
         $page = $this->get(route('admin.event-management.pending'))->assertOk();
-        foreach (['my_hub' => 3, 'exceptions' => 2, 'pending_events' => 2, 'hub_management' => 4, 'support_pending' => 2, 'follow_ups_due' => 2, 'customers' => 4, 'studio_messages' => 1] as $key => $count) {
-            $this->assertBadges($page, $key, $count, $key === 'pending_events' ? 2 : 1);
+        foreach (['my_hub' => 8, 'exceptions' => 2, 'pending_events' => 2, 'hub_management' => 12, 'follow_ups_due' => 2, 'customers' => 2, 'messages' => 3] as $key => $count) {
+            $this->assertBadges($page, $key, $count, in_array($key, ['pending_events', 'my_hub']) ? 2 : 1);
         }
         $this->assertSame(2, $page->viewData('items')->total());
         $page->assertDontSee('Cancelled item')->assertDontSee('Closed booking item')->assertDontSee('Already scheduled item');
         $this->assertBadges($page, 'pending_events', 2, 2);
-        $this->assertBadges($this->get(route('admin.media-support.index', ['status' => 'resolved']))->assertOk(), 'support_pending', 2, 2);
+        $this->assertBadges($this->get(route('admin.messages.index', ['channel' => 'customer', 'status' => 'resolved']))->assertOk(), 'messages', 3);
         $duePage = $this->get(route('admin.customers.follow-ups'))->assertOk();
         $this->assertSame(2, $duePage->viewData('notes')->total());
         $this->assertBadges($duePage, 'follow_ups_due', 2, 2);
@@ -78,7 +78,7 @@ class AdminNavigationIndicatorsTest extends TestCase
         foreach (['pending_events', 'support_pending', 'follow_ups_due', 'customers', 'studio_messages'] as $key) {
             $this->assertBadges($page, $key, 0);
         }
-        $this->assertBadges($page, 'hub_management', 2);
+        $this->assertBadges($page, 'hub_management', 10);
         $this->assertSame(0, $page->viewData('items')->total());
     }
 

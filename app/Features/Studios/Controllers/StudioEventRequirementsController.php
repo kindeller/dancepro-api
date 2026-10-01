@@ -15,8 +15,8 @@ class StudioEventRequirementsController extends Controller
     public function store(SaveStudioEventRequirementsRequest $request, Studio $studio, SchedulingEvent $schedulingEvent, StudioCommunicationHistory $history, SaveStudioEventRequirements $save): RedirectResponse
     {
         abort_unless($history->canView($request->user(), $studio) && $schedulingEvent->studio_id === $studio->id, 403);
-        $save->execute($schedulingEvent, $request->user(), $request->validated('requirements', []));
+        $save->execute($schedulingEvent, $request->user(), $request->validated('requirements', []), $request->validated('group', 'portrait'));
 
-        return back()->with('status', 'Portrait shoot requirements updated for '.$schedulingEvent->name.'.');
+        return back()->with('status', ($request->validated('group') === 'event_details' ? 'Event details confirmation' : 'Portrait shoot requirements').' updated for '.$schedulingEvent->name.'.');
     }
 }

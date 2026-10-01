@@ -75,7 +75,7 @@
                     <td class="visitor-name">
                         @if($visitor['user'])<a href="{{ route('admin.customers.show', $visitor['user']) }}"><strong>{{ $visitor['name'] }}</strong></a>@else<strong>{{ $visitor['name'] }}</strong>@endif
                         <br><span class="muted">{{ $visitor['email'] }}</span>
-                        @if($visitor['user'])<br><span class="muted">Account #{{ $visitor['user']->id }}</span>@endif
+                        @if($visitor['user'])<br><span class="muted">Account ID: {{ $visitor['user']->uuid }}</span>@endif
                     </td>
                     <td><span class="visitor-access">{{ $visitor['access'] }}</span></td>
                     <td>{{ $visitor['first_activity']?->format('j M Y, g:i a') ?? '—' }}</td>

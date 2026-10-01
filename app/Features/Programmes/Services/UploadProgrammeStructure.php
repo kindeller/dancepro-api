@@ -53,8 +53,10 @@ class UploadProgrammeStructure
                     $number = str_pad((string) (int) $node['folder_number'], 2, '0', STR_PAD_LEFT);
                     $numbers[] = (int) $number;
                     $title = $this->titles->clean($node['title']);
-                    if ($node['folder_number'] !== $number || $node['folder_title'] !== $title
-                        || $title === '' || strlen($number.' '.$title) > 220) {
+                    // Older prepared folders retain accents until explicitly renamed in the uploader.
+                    $acceptedTitles = [$title, $this->titles->clean($node['title'], stripAccents: false)];
+                    if ($node['folder_number'] !== $number || ! in_array($node['folder_title'], $acceptedTitles, true)
+                        || $title === '' || strlen($number.' '.$node['folder_title']) > 220) {
                         $this->fail('Concert folder names must use continuous numbers starting at 01 and cleaned titles.');
                     }
                 }

@@ -14,8 +14,9 @@ class SaveStudioEventRequirementsRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'group' => ['sometimes', 'required', 'in:portrait,event_details'],
             'requirements' => ['sometimes', 'array'],
-            'requirements.*' => ['in:portrait_space,portrait_dancers'],
+            'requirements.*' => ['in:portrait_space,portrait_dancers,event_details'],
         ];
     }
 }

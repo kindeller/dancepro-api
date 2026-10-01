@@ -5,7 +5,7 @@ namespace App\Features\Customers\Services;
 use App\Features\Concerts\Models\Concert;
 use App\Features\Customers\Models\CustomerConcertPhotoSelection;
 use App\Features\Customers\Models\CustomerMediaSelection;
-use App\Features\Customers\Models\CustomerStudio;
+use App\Features\Families\Services\FamilyGalleryAccess;
 use App\Features\Media\Services\MediaCommerceSettings;
 use App\Features\Media\Services\MediaPriceLists;
 use App\Features\Orders\Models\OrderItem;
@@ -63,14 +63,14 @@ class CustomerConcertPhotoCart
 
     public function forStudio(User $user, Studio $studio): array
     {
-        abort_unless($user->canAccessCustomer() && CustomerStudio::where('user_id', $user->id)
+        abort_unless($user->canAccessCustomer() && app(FamilyGalleryAccess::class)->studios($user)
             ->where('studio_id', $studio->id)->whereNotNull('access_verified_at')->exists(), 403);
         $selections = CustomerConcertPhotoSelection::where('user_id', $user->id)->where('studio_id', $studio->id)
             ->with('asset.collection', 'concert')->get()->filter(function (CustomerConcertPhotoSelection $selection): bool {
                 $asset = $selection->asset;
                 $collection = $asset?->collection;
 
-                return $selection->concert?->isPubliclyAvailable() && $asset?->status->value === 'available'
+                return $selection->concert?->isPhotoGalleryAvailable() && $asset?->status->value === 'available'
                     && $asset->is_visible && $collection?->status->value === 'published'
                     && in_array($collection->visibility->value, ['customer', 'public'], true)
                     && $collection->published_at !== null;

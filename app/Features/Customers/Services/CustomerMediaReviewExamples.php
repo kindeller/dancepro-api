@@ -3,7 +3,7 @@
 namespace App\Features\Customers\Services;
 
 use App\Features\Concerts\Models\Concert;
-use App\Features\Customers\Models\CustomerStudio;
+use App\Features\Families\Services\FamilyGalleryAccess;
 use App\Features\Programmes\Services\CompetitionCustomerPreview;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
@@ -64,7 +64,7 @@ class CustomerMediaReviewExamples
         }
 
         return ['event' => $event, 'kind' => 'competition', 'title' => $title ?? $event->name,
-            'thumbnail_url' => reset($items)['thumbnail_url'], 'can_browse' => true,
+            'thumbnail_url' => route('customer.competitions.image', ['schedulingEvent' => $event, 'photo' => array_key_first($items), 'size' => 'cover']), 'can_browse' => true,
             'is_preview' => true, 'items' => array_values($items)];
     }
 
@@ -72,7 +72,7 @@ class CustomerMediaReviewExamples
     {
         $concert = Concert::with('studio')->where('uuid', $example['event_uuid'] ?? '')->first();
         if (! $concert || ! $concert->isPubliclyAvailable()
-            || ! CustomerStudio::where('user_id', $user->id)->where('studio_id', $concert->studio_id)->whereNotNull('access_verified_at')->exists()) {
+            || ! app(FamilyGalleryAccess::class)->studios($user)->where('studio_id', $concert->studio_id)->whereNotNull('access_verified_at')->exists()) {
             return null;
         }
 

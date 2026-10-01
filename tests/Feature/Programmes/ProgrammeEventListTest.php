@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Programmes;
 
+use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Programmes\Models\Programme;
 use App\Features\Programmes\Models\ProgrammeRevision;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Studios\Models\Studio;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\AuthenticatesApiTokens;
@@ -49,6 +51,28 @@ class ProgrammeEventListTest extends TestCase
         $this->getJson('/api/staff/programme-events?from=2027-01-01')->assertOk()->assertJsonCount(0, 'data');
         $this->getJson('/api/staff/programme-events?per_page=101')->assertUnprocessable();
         $this->getJson('/api/staff/programme-events?from=invalid')->assertUnprocessable();
+    }
+
+    public function test_searches_partial_studio_names_and_concert_titles_without_including_drafts(): void
+    {
+        $staff = User::factory()->staff()->create();
+        $studio = Studio::factory()->create(['name' => 'Energy Dance Studio']);
+        $booking = ConcertBooking::create(['status' => 'approved', 'studio_id' => $studio->id, 'studio_name' => $studio->name, 'contact_name' => 'Director', 'contact_email' => 'director@example.test', 'contact_phone' => '0400000000']);
+        foreach (['Junior concert', 'Senior concert', 'Junior draft'] as $title) {
+            $programme = $this->programme('Legacy display name');
+            $programme->event->update(['studio_id' => $studio->id]);
+            $booking->items()->create(['item_type' => 'concert', 'title' => $title, 'event_date' => '2026-09-21', 'venue_name' => 'Theatre', 'venue_address' => 'Example Road', 'starts_at' => '18:00', 'finishes_at' => '20:00', 'scheduling_event_id' => $programme->scheduling_event_id]);
+            if ($title !== 'Junior draft') {
+                $this->revision($programme, $staff, 1, true);
+            }
+        }
+        $this->actingAsApiUser($staff, ['programmes:read']);
+        $this->getJson('/api/staff/programme-events?search=Ener')->assertOk()->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.studio_name', 'Energy Dance Studio');
+        $this->getJson('/api/staff/programme-events?search=Jun')->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.event_title', 'Junior concert');
+        $this->getJson('/api/staff/programme-events?search=Senior')->assertOk()->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.event_title', 'Senior concert');
     }
 
     public function test_requires_admin_and_explicit_programme_ability(): void

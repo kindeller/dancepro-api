@@ -13,10 +13,14 @@
     @if($venue?->parking_notes || $venue?->access_notes || $venue?->operational_notes)<details class="venue-details"><summary>Parking, access and venue information</summary>@if($venue->parking_notes)<p><strong>Parking:</strong> {{ $venue->parking_notes }}</p>@endif @if($venue->access_notes)<p><strong>Access:</strong> {{ $venue->access_notes }}</p>@endif @if($venue->operational_notes)<p><strong>Operational notes:</strong> {{ $venue->operational_notes }}</p>@endif</details>@endif
     @if($assignment->equipmentResponsibilities->isNotEmpty())
     <div class="responsibilities"><span class="detail-label">Equipment and media</span>
-        @foreach($assignment->equipmentResponsibilities as $responsibility)
+        @foreach($assignment->equipmentResponsibilities->whereNotIn('item_code', \App\Features\Scheduling\Support\AssignmentEquipmentItems::MEDIA_CODES) as $responsibility)
         @php($item = $equipmentItems[$responsibility->item_code] ?? ['•', ucfirst(str_replace('_', ' ', $responsibility->item_code))])
-        <div><strong>{{ $responsibility->is_bringing ? '➡️' : '' }}{{ $item[0] }}{{ $responsibility->is_taking ? '➡️' : '' }} {{ $item[1] }}</strong>@if($responsibility->other_notes)<span>{{ $responsibility->other_notes }}</span>@endif</div>
+        @php($kitName = str_replace(['Video ', 'Backdrop '], ['Video Kit ', 'Backdrop Kit '], $item[1]))
+        @php($instruction = $responsibility->is_bringing && $responsibility->is_taking ? 'Bring & Take ' : ($responsibility->is_bringing ? 'Bring ' : ($responsibility->is_taking ? 'Take ' : '')))
+        <div><strong>{{ $responsibility->is_bringing ? '➡️' : '' }}{{ $item[0] }}{{ $responsibility->is_taking ? '➡️' : '' }} {{ $instruction }}{{ $kitName }}</strong>@if($responsibility->other_notes)<span>{{ $responsibility->other_notes }}</span>@endif</div>
         @endforeach
+        @php($mediaSummary = \App\Features\Scheduling\Support\AssignmentEquipmentItems::mediaSummary($assignment->equipmentResponsibilities))
+        @if($mediaSummary)<div><strong>💾 {{ $mediaSummary['description'] }}</strong></div>@endif
     </div>
     @endif
     <div class="resource-actions" style="margin-top:11px"><a class="button secondary" href="{{ route('crew.assignments.show',$assignment) }}">Details</a>@unless($isCancelled)@if(!$shiftDate->lt(today()))<a class="button secondary" href="{{ $assignment->coverRequests->where('status','open')->isNotEmpty()?route('crew.availability.index',['view'=>'cover']):route('crew.cover.create',$assignment) }}">Cover</a>@else<span class="button secondary" aria-disabled="true" style="opacity:.45;cursor:not-allowed">Cover</span>@endif<a class="button secondary" href="{{ route('crew.help.index') }}">Handbook</a>@endunless</div>

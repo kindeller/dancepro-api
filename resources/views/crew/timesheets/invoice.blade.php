@@ -1,2 +1,4 @@
 @extends('layouts.crew',['title'=>$invoice->invoice_number ?: 'Draft invoice'])
-@section('content')<div class="page-heading"><div><span class="eyebrow">My invoice</span><h1>Invoice {{ $invoice->invoice_number ?: 'draft' }}</h1><span class="status-pill {{ $invoice->status === 'paid' ? 'done' : 'attention' }}">{{ $invoice->status === 'pending_payment' ? 'Pending payment' : ucfirst(str_replace('_',' ',$invoice->status)) }}</span></div><a class="button secondary" href="{{ route('crew.timesheets.index') }}">Back to timesheets</a></div>@include('components.invoice-details',['invoice'=>$invoice])@endsection
+@section('content')<div class="page-heading"><div>
+@include('crew._brand')
+<span class="eyebrow">My invoice</span><h1>Invoice {{ $invoice->invoice_number ?: 'draft' }}</h1><span class="status-pill {{ $invoice->status === 'paid' ? 'done' : 'attention' }}">{{ $invoice->status === 'pending_payment' ? 'Pending payment' : ucfirst(str_replace('_',' ',$invoice->status)) }}</span></div><a class="button secondary" href="{{ route('crew.timesheets.index') }}">Back to timesheets</a></div>@include('components.invoice-details',['invoice'=>$invoice])@endsection

@@ -14,7 +14,8 @@ class CreateConcertBooking
 
     public function execute(array $data, ?Studio $studio = null): ConcertBooking
     {
-        $data = collect($data)->except(['website', 'studio'])->all();
+        $data = collect($data)->except(['website', 'studio', 'draft_uuid', 'draft_version'])->all();
+        $data['items'] = collect($data['items'])->map(fn (array $item): array => collect($item)->except('venue_search')->all())->all();
         $fingerprint = $this->fingerprint([...$data, 'studio_uuid' => $studio?->uuid]);
 
         return DB::transaction(function () use ($data, $fingerprint, $studio): ConcertBooking {

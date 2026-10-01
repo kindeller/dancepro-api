@@ -5,6 +5,7 @@ namespace App\Features\Crew\Models;
 use App\Features\Scheduling\Models\CrewAvailabilityResponse;
 use App\Features\Scheduling\Models\SchedulingShiftAssignment;
 use App\Features\Training\Models\TrainingEnrolment;
+use App\Features\Website\Models\WebsiteBiography;
 use App\Models\User;
 use App\Shared\Models\HasPublicUuid;
 use Carbon\CarbonInterface;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['uuid', 'user_id', 'legal_name', 'preferred_name', 'phone', 'shirt_size', 'jacket_size', 'commencement_date', 'date_of_birth', 'address_line_1', 'address_line_2', 'suburb', 'state', 'postcode', 'emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone', 'abn', 'bank_account_name', 'bank_name', 'bank_bsb', 'bank_account_number', 'super_fund_name', 'super_member_number', 'dietary_requirements', 'medical_information', 'drivers_licence_number', 'working_with_children_number', 'working_with_children_expiry', 'first_aid_details', 'first_aid_expiry', 'owned_equipment', 'usual_travel_area', 'profile_photo_path', 'internal_notes', 'next_invoice_number'])]
+#[Fillable(['uuid', 'user_id', 'legal_name', 'preferred_name', 'biography', 'phone', 'shirt_size', 'jacket_size', 'commencement_date', 'date_of_birth', 'address_line_1', 'address_line_2', 'suburb', 'state', 'postcode', 'emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone', 'abn', 'bank_account_name', 'bank_name', 'bank_bsb', 'bank_account_number', 'super_fund_name', 'super_member_number', 'dietary_requirements', 'medical_information', 'drivers_licence_number', 'working_with_children_number', 'working_with_children_expiry', 'first_aid_details', 'first_aid_expiry', 'owned_equipment', 'usual_travel_area', 'profile_photo_path', 'internal_notes', 'next_invoice_number'])]
 class CrewProfile extends Model
 {
     /** @use HasFactory<CrewProfileFactory> */
@@ -26,6 +27,11 @@ class CrewProfile extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function websiteBiography()
+    {
+        return $this->hasOne(WebsiteBiography::class);
     }
 
     public function roles(): BelongsToMany
@@ -76,6 +82,11 @@ class CrewProfile extends Model
         $months = $this->monthsOfService($asOf);
 
         return $months === null ? null : intdiv($months, 12);
+    }
+
+    public function biographyDueDate(): ?CarbonInterface
+    {
+        return $this->commencement_date?->copy()->addWeeks(4);
     }
 
     public function monthsOfService(?CarbonInterface $asOf = null): ?int

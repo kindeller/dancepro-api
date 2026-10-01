@@ -2,9 +2,10 @@
 
 namespace App\Features\Customers\Services;
 
-use App\Features\Customers\Models\CustomerStudio;
 use App\Features\Customers\Support\CustomerDancerNameMatcher;
+use App\Features\Families\Services\FamilyGalleryAccess;
 use App\Features\Programmes\Models\CompetitionRoutineStudio;
+use App\Features\Programmes\Services\CompetitionFolderCovers;
 use App\Features\Programmes\Services\CompetitionGallery;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
@@ -19,8 +20,8 @@ class CustomerStudioRoutines
     public function forEvent(User $user, SchedulingEvent $event): array
     {
         $data = $this->gallery->browse($event, null);
-        $studios = CustomerStudio::where('user_id', $user->id)
-            ->whereNotNull('access_verified_at')->whereHas('studio', fn ($query) => $query->where('status', 'active'))
+        $studios = app(FamilyGalleryAccess::class)->studios($user)
+            ->where(fn ($query) => $query->whereNotNull('access_verified_at')->orWhereNotNull('membership_confirmed_at'))->whereHas('studio', fn ($query) => $query->where('status', 'active'))
             ->with('studio')->get()->pluck('studio')->sortBy('name')->values();
         $assignments = CompetitionRoutineStudio::where('scheduling_event_id', $event->id)->get()->keyBy('item_uuid');
         $customerStudioIds = $studios->pluck('id')->flip();
@@ -53,6 +54,8 @@ class CustomerStudioRoutines
                 return ['uuid' => $item['uuid'], 'label' => $item['label'], 'section' => $section['label'] ?? null,
                     'day' => $day['label'] ?? null, 'studio' => $match['studio']->name];
             })->values()->all();
+
+        $routines = app(CompetitionFolderCovers::class)->apply(array_map(fn (array $routine) => $routine + ['kind' => 'item'], $routines), $nodes, $event);
 
         return ['event' => $event, 'routines' => $routines, 'studios' => $studios,
             'title' => $data['presentation']['title']];

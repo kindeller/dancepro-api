@@ -3,12 +3,24 @@
 namespace App\Features\Scheduling\Services;
 
 use App\Features\Scheduling\Models\AssignmentEquipmentResponsibility;
+use App\Features\Scheduling\Models\SchedulingShift;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 class EquipmentScheduleDetails
 {
     private const ITEM_CODES = ['video_1', 'video_2', 'video_3', 'backdrop_1', 'backdrop_2'];
+
+    public function shiftCoverage(SchedulingShift $shift): array
+    {
+        $kits = $shift->assignments->flatMap(fn ($assignment) => $assignment->equipmentResponsibilities)
+            ->whereIn('item_code', self::ITEM_CODES);
+
+        return [
+            'setup' => $kits->contains('is_bringing', true),
+            'set_down' => $kits->contains('is_taking', true),
+        ];
+    }
 
     public function execute(): array
     {

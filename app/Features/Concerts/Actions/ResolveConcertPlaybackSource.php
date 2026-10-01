@@ -27,7 +27,8 @@ class ResolveConcertPlaybackSource
             );
         }
 
-        $progressiveKeys = array_values(array_unique([
+        // Legacy originals retain their exact recorded keys; never infer a V2 path for them.
+        $progressiveKeys = $disk === 's3_concerts_legacy' ? [$asset->storage_key] : array_values(array_unique([
             $this->paths->fallbackVideo($asset),
             $this->paths->canonicalOriginal($asset),
             $asset->storage_key,

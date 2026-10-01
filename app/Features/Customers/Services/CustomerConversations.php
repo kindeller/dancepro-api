@@ -74,7 +74,7 @@ class CustomerConversations
                 'body' => $input['message'], 'sent_at' => now(),
             ]);
             $this->attach($message, $input['attachment'] ?? null);
-            $thread->forceFill(['status' => $admin ? 'resolved' : 'pending', 'last_activity_at' => $message->sent_at,
+            $thread->forceFill(['status' => $admin ? ($thread->type === 'download_reactivation' ? $thread->status : 'resolved') : 'pending', 'last_activity_at' => $message->sent_at,
                 'latest_staff_message_at' => $admin ? $message->sent_at : $thread->latest_staff_message_at,
                 'customer_read_at' => $admin ? null : now(),
             ])->saveQuietly();

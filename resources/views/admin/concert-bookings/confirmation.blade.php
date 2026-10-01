@@ -4,7 +4,7 @@
 <div class="toolbar" style="margin:18px 0"><a class="button secondary" href="{{ route('admin.concert-bookings.show', $booking) }}">← Back to booking</a><a class="button secondary" href="{{ route('admin.concert-tracker.templates.index') }}">Email templates</a></div>
 @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<p role="alert" style="color:#b42331">{{ $errors->first() }}</p>@endif
-<div style="max-width:900px">
+<div style="width:100%;min-width:0">
     <h2>Booking confirmation</h2>
     <p>The booking is approved. Review the recipient and personalised template, then send the confirmation. Sending and delivery history are part of 1.1 Booking &amp; services.</p>
     @include('admin.tracking._email-action')

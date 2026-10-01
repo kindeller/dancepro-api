@@ -62,10 +62,12 @@ class ConcertDirectorWorkflowTest extends TestCase
         $this->assertSame('Corrections', app(ConcertTracker::class)->detail($event->fresh(), 'director_corrections')['status']['label']);
         $this->assertSame('overdue', app(ConcertTracker::class)->detail($event->fresh(), 'director_corrections')['status']['tone']);
         $emailUrl = route('admin.concert-tracker.tasks.email.send', [$event, 'director_corrections']);
-        $this->post($emailUrl, ['recipient_email' => $director->email])->assertSessionHasNoErrors();
+        $this->post($emailUrl, ['recipient_email' => $director->email, 'email_subject' => 'Your corrections are ready', 'email_body' => '**Title fixed** at 00:12.'])->assertSessionHasNoErrors();
         $delivery = ConcertTrackerEmailDelivery::latest('id')->firstOrFail();
         (new SendConcertTrackerEmail($delivery->id))->handle();
         $this->assertSame('sent', $delivery->fresh()->status);
+        $this->assertSame('Your corrections are ready', $delivery->subject);
+        $this->assertSame('**Title fixed** at 00:12.', $delivery->body);
         $this->assertSame('complete', app(ConcertTracker::class)->detail($event->fresh(), 'director_corrections')['status']['key']);
         $this->assertSame('Completed', app(ConcertTracker::class)->detail($event->fresh(), 'director_corrections')['status']['label']);
         $this->post($emailUrl, ['recipient_email' => $director->email])->assertSessionHasErrors('email');
@@ -79,6 +81,25 @@ class ConcertDirectorWorkflowTest extends TestCase
         $this->actingAs($outsider)->get(route('concerts.show', $concert))->assertOk()->assertDontSee('<video', false);
         $this->get(route('concerts.media.stream', [$concert, $file->asset]))->assertForbidden();
         $this->assertSame(1, $concert->mediaCollections()->where('status', 'published')->count());
+    }
+
+    public function test_approval_link_email_accepts_one_off_edits_and_preserves_the_template(): void
+    {
+        [$admin, $director, $event] = $this->fixture();
+        $data = app(ConcertTracker::class)->detail($event, 'approval_link_email');
+        $original = $data['template']->only('subject', 'body');
+        $this->actingAs($admin)->get(route('admin.concert-tracker.tasks.show', [$event, 'approval_link_email']))
+            ->assertOk()->assertSee('data-email-send-editor', false);
+        $this->post(route('admin.concert-tracker.tasks.email.send', [$event, 'approval_link_email']), [
+            'recipient_email' => $director->email, 'email_subject' => 'Ready for your review',
+            'email_body' => 'Please review **both items** using your account.',
+        ])->assertSessionHasNoErrors();
+        $delivery = ConcertTrackerEmailDelivery::latest('id')->firstOrFail();
+        (new SendConcertTrackerEmail($delivery->id))->handle();
+        $this->assertSame('sent', $delivery->fresh()->status);
+        $this->assertSame('Ready for your review', $delivery->subject);
+        $this->assertSame('Please review **both items** using your account.', $delivery->body);
+        $this->assertSame($original, $data['template']->fresh()->only('subject', 'body'));
     }
 
     public function test_new_feedback_invalidates_pending_correction_email_and_office_contacts_cannot_release(): void
@@ -101,7 +122,7 @@ class ConcertDirectorWorkflowTest extends TestCase
         $this->assertFalse($concert->fresh()->isPubliclyAvailable());
     }
 
-    public function test_photo_release_requires_upload_completion_and_announces_only_to_registered_accounts_once(): void
+    public function test_photo_release_requires_upload_completion_and_announces_to_customers_and_studio_once(): void
     {
         [$admin, $director, $event, $concert] = $this->fixture();
         $this->travelTo(now()->setDate(2026, 10, 10)->startOfDay());
@@ -116,7 +137,7 @@ class ConcertDirectorWorkflowTest extends TestCase
         $release = route('admin.concert-photo-releases.release', $group);
         $page = route('admin.concert-tracker.tasks.show', [$event, 'photo_release']);
         $this->actingAs($admin)->get($page)->assertOk()->assertSee('Gallery cannot be released yet')
-            ->assertSee('Not ready to release')->assertSee('all required photographers must confirm Finished upload');
+            ->assertSee('Not ready to release')->assertSee('all required photo roles must finish uploading');
         $this->from($page)->post($release)->assertRedirect($page)->assertSessionHasErrors('release');
         $this->mock(ConcertPhotoUploadStatus::class)->shouldReceive('forEvent')->andReturn(['key' => 'complete', 'label' => 'Complete', 'detail' => '', 'sourceUrl' => null, 'completedAt' => now(), 'photoRoles' => []]);
         $status = app(ConcertTracker::class)->detail($event->fresh(), 'photo_release')['status'];
@@ -128,16 +149,23 @@ class ConcertDirectorWorkflowTest extends TestCase
         $unregistered = User::factory()->customer()->create();
         CustomerStudio::create(['user_id' => $registered->id, 'studio_id' => $event->studio_id, 'access_verified_at' => now()]);
         $url = route('admin.concert-photo-releases.email', $group);
-        $this->get($url)->assertOk()->assertSee($registered->email)->assertDontSee($unregistered->email)->assertSee('VIEW GALLERY');
+        $this->get($url)->assertOk()->assertSee($registered->email)->assertSee('VIEW GALLERY')
+            ->assertViewHas('recipients', fn ($recipients) => $recipients->pluck('id')->all() === [$registered->id]);
         $send = route('admin.concert-photo-releases.email.send', $group);
-        $this->post($send, ['confirm_send' => true])->assertSessionHasNoErrors();
+        $templateBefore = app(ConcertTracker::class)->detail($event, 'photo_release')['template']->body;
+        $this->post($send, ['confirm_send' => true, 'email_subject' => 'Enjoy your photos', 'email_body' => 'Hi everyone, **your gallery is ready.**'])->assertSessionHasNoErrors();
         $this->post($send, ['confirm_send' => true])->assertSessionHasNoErrors();
         $deliveries = ConcertTrackerEmailDelivery::where('photo_release_group_id', $group->id)->get();
-        $this->assertCount(1, $deliveries);
-        $this->assertSame($registered->email, $deliveries->first()->recipient_email);
-        (new SendConcertTrackerEmail($deliveries->first()->id))->handle();
+        $this->assertCount(2, $deliveries);
+        $customerDelivery = $deliveries->firstWhere('recipient_email', $registered->email);
+        $this->assertSame('Enjoy your photos', $customerDelivery->subject);
+        $this->assertSame('Hi everyone, **your gallery is ready.**', $customerDelivery->body);
+        $this->assertSame($templateBefore, app(ConcertTracker::class)->detail($event, 'photo_release')['template']->body);
+        $this->assertTrue($deliveries->contains('recipient_email', $director->email));
+        $this->assertFalse($deliveries->contains('recipient_email', $unregistered->email));
+        (new SendConcertTrackerEmail($customerDelivery->id))->handle();
         $this->post($send, ['confirm_send' => true])->assertSessionHasNoErrors();
-        $this->assertSame(1, ConcertTrackerEmailDelivery::where('photo_release_group_id', $group->id)->count());
+        $this->assertSame(2, ConcertTrackerEmailDelivery::where('photo_release_group_id', $group->id)->count());
         $this->actingAs($registered)->post($send, ['confirm_send' => true])->assertForbidden();
     }
 
@@ -210,6 +238,7 @@ class ConcertDirectorWorkflowTest extends TestCase
         $waiting = $card();
         $this->assertNull($waiting['videoReview']['url']);
         $this->assertSame('Not ready', $waiting['videoReview']['status']);
+        $this->assertStringContainsString('Not yet ready for review.', $waiting['production']->firstWhere('label', 'Concert video released')['detail']);
         $this->assertNull($waiting['checklist']->firstWhere('key', 'video_review'));
         $this->assertNull($waiting['production']->firstWhere('label', 'Concert video released')['url']);
         $this->assertNull($waiting['production']->firstWhere('label', 'Concert video released')['loginCode']);
@@ -221,6 +250,7 @@ class ConcertDirectorWorkflowTest extends TestCase
         $ready = $card();
         $this->assertSame($reviewUrl, $ready['videoReview']['url']);
         $this->assertSame('Ready for review', $ready['videoReview']['status']);
+        $this->assertStringContainsString('Ready for your studio owner or director', $ready['production']->firstWhere('label', 'Concert video released')['detail']);
         $this->assertFalse($ready['checklist']->firstWhere('key', 'video_review')['complete']);
         $this->get($hubUrl)->assertOk()->assertSee('href="'.$reviewUrl.'"', false)->assertDontSee('href="'.$videoUrl.'"', false);
 
@@ -232,6 +262,7 @@ class ConcertDirectorWorkflowTest extends TestCase
         $this->assertTrue($released['checklist']->firstWhere('key', 'video_review')['complete']);
         $milestone = $released['production']->firstWhere('label', 'Concert video released');
         $this->assertSame('complete', $milestone['status']);
+        $this->assertStringContainsString('Your concert video is available.', $milestone['detail']);
         $this->assertSame($videoUrl, $milestone['url']);
         $this->assertNotEmpty($milestone['loginCode']['value']);
         $this->assertSame($milestone['loginCode']['value'], $trackerCode()['value']);
@@ -263,6 +294,7 @@ class ConcertDirectorWorkflowTest extends TestCase
         $reviews->feedback($event, $director, ['revision' => 0, 'batch_uuid' => $batch->uuid, 'feedback' => 'Correct the title.']);
         $this->assertNull($hub()['videoReview']['url']);
         $this->assertStringContainsString('corrections', $hub()['videoReview']['instruction']);
+        $this->assertStringContainsString('preparing the requested corrections', $hub()['production']->firstWhere('label', 'Concert video released')['detail']);
         $reviews->checks($event, $admin, ['revision' => 1, 'batch_uuid' => $batch->uuid, 'corrections_complete' => true, 'corrections_uploaded' => true]);
         $this->assertNull($hub()['videoReview']['url']);
         $this->actingAs($admin)->post(route('admin.concert-tracker.tasks.email.send', [$event, 'director_corrections']), ['recipient_email' => $director->email])->assertSessionHasNoErrors();

@@ -3,7 +3,7 @@
 @include('admin.tracking._task-bar', ['bar' => $trackerBar])
 @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<p role="alert" style="color:var(--danger)">{{ $errors->first() }}</p>@endif
-<section class="card card-pad" style="max-width:1000px">
+<section class="card card-pad" style="width:100%;min-width:0">
 <h2>Consistency comes first</h2>
 <p>Each studio is different, so concerts may be filmed, edited and organised differently. Every video within the same concert should follow the same template, guide and rules.</p>
 @if($status['key'] === 'not_required')

@@ -8,6 +8,8 @@
   reads text with positions, and uses local OCR for scanned pages.
 - An unchanged empty draft receives proposed rows automatically. Names, numbers,
   classes and source-page references are editable beside the PDF.
+  This includes authorised Studio Hub uploads, not only staff uploads. Studio
+  uploaders do not gain permission to edit or approve the staff running order.
 - Draft edits autosave after a short pause. Approve programme saves pending edits
   and creates the existing immutable confirmation; extraction never approves.
 - Failed/empty extraction leaves the PDF available and manual editing usable.
@@ -17,6 +19,18 @@
 
 See [ADR-0012](../decisions/ADR-0012-Local-Programme-Extraction.md).
 
+## September 29 extraction repair verification
+
+The full Sail suite passed: 1,075 tests, 11,396 assertions. This includes 12
+synthetic Python layout cases and the studio-upload regression proving that
+extraction fills the draft, staff can save corrections, customers cannot use
+staff editing endpoints, and extraction does not approve the programme.
+Pint and `git diff --check` passed. Desktop (1500 px) and mobile (390 px)
+browser checks loaded both repaired booking workspaces, verified all rows,
+edited a title and checked autosave feedback with intercepted saves. Local
+draft repairs used the normal extraction job with source/version/empty-draft
+guards; neither repair approved a programme or replaced manual edits.
+
 ## Sample benchmark
 
 All source files remain outside version control. These are observed parser outputs,
@@ -24,7 +38,11 @@ not a complete line-by-line accuracy audit:
 
 - S24: 33 numbered items, two acts; inspected title/class pairing and wrapped titles.
 - DPA J: 35 numbered items plus interval after OCR/background normalization.
-  Printed weekly class times stay as class details. OCR spelling still needs review.
+  Printed weekly class times stay as class details, including wrapped schedules.
+  Oversized footer dates are excluded before row grouping so the final routine
+  and finale remain separate. Constrained OCR time repairs handle `12pm-tpm`
+  and `10-1lam`; other OCR spelling still needs review. All 36 entries were
+  checked against the rendered source during the September 29 Energy repair.
 - SDA: 32 paired unnumbered title/class entries plus interval and presentations.
 - EDC June: category/entrant columns extracted; the conflicting 6.30am/pm session
   times are flagged without changing scheduling records.
@@ -32,7 +50,12 @@ not a complete line-by-line accuracy audit:
   day dates use the event year when the PDF omits it, with an explicit review note.
 - SNS: sections continue across page boundaries; award categories with no section
   number are excluded and reported, rather than assigned invented section numbers.
-- Narrative ballet, multi-panel concert layouts and full coverage of every supplied
+- HYPE: 39 items on page 3 (20 in Act 1, 19 in Act 2), read down each
+  side-by-side act. Wrapped class lists stay attached to their routine; the
+  numeric song title `5,6,7,8` stays a title. Covers, sponsors and cast lists
+  on pages 1, 2 and 4 are excluded. All 39 title/class pairs were checked
+  against the rendered source during the September 29 repair.
+- Narrative ballet, other multi-panel concert layouts and full coverage of every supplied
   programme are not yet established. Warnings require checking source pages.
 
 ## Verification

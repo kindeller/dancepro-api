@@ -23,10 +23,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminConcertCommunicationController extends Controller
 {
-    public function inbox(StudioCommunicationHistory $history): Response
+    public function inbox(StudioCommunicationHistory $history): RedirectResponse
     {
-        return response()->view('admin.tracking.studio-communication-inbox', $history->inbox())
-            ->header('Cache-Control', 'private, no-store');
+        return redirect()->route('admin.messages.index', ['channel' => 'studio']);
     }
 
     public function event(SchedulingEvent $schedulingEvent, ConcertTrackerCommunications $communications): Response
@@ -43,10 +42,9 @@ class AdminConcertCommunicationController extends Controller
             ->header('Cache-Control', 'private, no-store');
     }
 
-    public function studio(Studio $studio, StudioCommunicationHistory $history): Response
+    public function studio(Studio $studio, StudioCommunicationHistory $history): RedirectResponse
     {
-        return response()->view('admin.tracking.studio-communications', $history->adminPage($studio))
-            ->header('Cache-Control', 'private, no-store');
+        return redirect()->route('admin.messages.index', ['channel' => 'studio', 'thread' => $studio->uuid]);
     }
 
     public function reply(SendStudioConversationMessageRequest $request, Studio $studio, StudioCommunicationHistory $history): RedirectResponse

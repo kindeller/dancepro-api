@@ -24,7 +24,7 @@ class PhotoReleaseEmailController extends Controller
 
     public function send(SendPhotoReleaseEmailRequest $request, ConcertPhotoReleaseGroup $group, PhotoReleaseEmails $emails)
     {
-        $count = $emails->send($group, $request->user());
+        $count = $emails->send($group, $request->user(), $request->validated());
 
         return back()->with('status', $count.' release emails queued. Previously sent or pending recipients were skipped.');
     }

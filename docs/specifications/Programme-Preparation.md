@@ -194,8 +194,8 @@ and verification limits.
 
 ## Owner clarification: folder names and title cards
 
-Punctuation cleanup applies only to concert folder titles. Keep the original
+Punctuation and accent cleanup applies only to concert folder titles. Accented letters become their plain equivalents (for example `BREAKÍN` becomes `BREAKIN`), including decomposed accents from PDFs. Keep the original
 punctuation in editable display titles and video title cards. Derive a separate
 folder title: `/` becomes a space, other punctuation/symbols are removed, whitespace
-is collapsed and trimmed, and accented letters/numbers remain. Approved snapshots
+is collapsed and trimmed, and letters/numbers remain with accent marks removed. Approved snapshots
 provide `folder_title` plus `folder_number`; neither is an item identity.

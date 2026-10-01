@@ -20,6 +20,8 @@ class SendConcertTrackerEmailRequest extends FormRequest
             'recipient_name' => ['nullable', 'string', 'max:255'],
             'recipient_email' => ['required', 'email:rfc', 'max:255'],
             'scheduled_at' => ['nullable', 'date', 'after:now'],
+            'email_subject' => ['sometimes', 'required', 'string', 'max:200', 'not_regex:/[\r\n]/'],
+            'email_body' => ['sometimes', 'required', 'string', 'max:20000'],
         ];
     }
 }

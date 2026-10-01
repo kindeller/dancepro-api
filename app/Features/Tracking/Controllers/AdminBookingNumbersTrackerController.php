@@ -4,7 +4,7 @@ namespace App\Features\Tracking\Controllers;
 
 use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Tracking\Actions\SaveConcertTrackerTaskFields;
-use App\Features\Tracking\Requests\UpdateBookingTrackerBarRequest;
+use App\Features\Tracking\Requests\UpdateTaskTrackerBarRequest;
 use App\Features\Tracking\Services\BookingTrackerBar;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 class AdminBookingNumbersTrackerController extends Controller
 {
-    public function __invoke(UpdateBookingTrackerBarRequest $request, ConcertBooking $concertBooking, SaveConcertTrackerTaskFields $save, BookingTrackerBar $bar): JsonResponse|RedirectResponse
+    public function __invoke(UpdateTaskTrackerBarRequest $request, ConcertBooking $concertBooking, SaveConcertTrackerTaskFields $save, BookingTrackerBar $bar): JsonResponse|RedirectResponse
     {
         if ($request->validated('panel') === 'status') {
             throw ValidationException::withMessages(['status_override' => 'Confirm the family count and all concert seats to complete this task.']);

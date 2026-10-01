@@ -1,0 +1,643 @@
+{
+  "pages": {
+    "home": {
+      "eyebrow": "DancePro Photography & Video",
+      "heading": "Your performance. Yours to keep.",
+      "description": "Dance photography and videography in Perth, Western Australia.",
+      "body": "Since 2008, DancePro has combined a love of dance with professional photography and video. From costume portraits and concert performances to competitions and portfolio shoots, we help dancers, teachers and families keep the moments that matter.",
+      "sections": [
+        {
+          "title": "Concert photos",
+          "body": "Find your studio, explore its released event galleries and choose your favourite performance and dress rehearsal portraits. Register for your studio to hear when new galleries become available.",
+          "link_label": "Browse concert galleries",
+          "link_url": "/galleries?type=concert",
+          "visible": true
+        },
+        {
+          "title": "Competition photos & videos",
+          "body": "Find your competition and use its access code to browse routines. Choose individual photos, routine photos, videos or packages where available. Your purchases and order status stay together in My Media.",
+          "link_label": "Browse competitions",
+          "link_url": "/galleries?type=competition",
+          "visible": true
+        },
+        {
+          "title": "Watch your concert",
+          "body": "After your studio director releases the concert, add it using the video access code supplied by your studio. Watch online, download individual routines or use the multiple-file download manager.",
+          "link_label": "Open My Media",
+          "link_url": "/my/media",
+          "visible": true
+        },
+        {
+          "title": "Plan your next event",
+          "body": "Book concert photography, dress rehearsal portraits and videography through Studio Hub. Your quote, preparation tasks, invoices and video review stay together in your account.",
+          "link_label": "Explore our services",
+          "link_url": "/services",
+          "visible": true
+        },
+        {
+          "title": "Who are we?",
+          "body": "A Perth team of dancers, dance teachers, photographers and videographers, with an understanding of movement, technique and timing. We care about beautiful media and helpful customer service.",
+          "link_label": "Meet DancePro",
+          "link_url": "/about",
+          "visible": true
+        },
+        {
+          "title": "Need a hand?",
+          "body": "Find step-by-step help with access codes, ordering, downloads and studio bookings. My Messages keeps your enquiries and our replies in one place. We work part time; please allow 2–4 days for a response.",
+          "link_label": "Help & contact",
+          "link_url": "/help#contact",
+          "visible": true
+        }
+      ]
+    },
+    "about": {
+      "eyebrow": "About DancePro",
+      "heading": "Dance is at the heart of what we do.",
+      "description": "Photography, video and a shared understanding of performance.",
+      "body": "DancePro Photography & Video has been capturing Perth dancers since 2008. Our team brings together dance knowledge, technical skills and a love of the stage to create memories for performers and their families.",
+      "sections": [
+        {
+          "title": "Meet the director — David Mueller",
+          "body": "David graduated from John Curtin College of the Arts with a focus on Dance and Arts-media. He went on to complete a Bachelor of Arts (Dance) at the Western Australian Academy of Performing Arts (WAAPA), followed by a Graduate Diploma of Secondary Education in Dance and Media at Edith Cowan University.\n\nHis performance experience includes contemporary and corporate work across Australia, New Zealand, South Korea, the United States, Europe and the United Kingdom. He has taught at Perth secondary schools and private dance schools, including ATAR, General, Certificate II and Advanced Diploma dance programmes.\n\nDancePro began in 2008 when David brought his interests in dance and photography together, photographing concerts as a hobby. That grew into a photography and video service for schools, studios and competitions.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Meet the team",
+          "body": "Our local crew includes dancers, dance teachers, photographers, videographers and customer service staff. A love and knowledge of dance helps us guide portrait poses, recognise technique, anticipate movement and capture the right moment.\n\nCrew wear DancePro identification at events. Police clearances and Working with Children Checks form part of our crew requirements. Individual biographies are reviewed before they are published here.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Photographer — placeholder bio",
+          "body": "Sample biography awaiting a crew member’s details.\n\n[Name] joined DancePro in [year]. Their dance background includes [styles, training and experience]. They enjoy capturing [favourite performance moments] and bring [photography skills or personal strengths] to the team. Outside DancePro, [name] enjoys [interests or future plans].",
+          "link_label": "",
+          "link_url": "",
+          "visible": true,
+          "kind": "crew_placeholder"
+        },
+        {
+          "title": "Videographer — placeholder bio",
+          "body": "Sample biography awaiting a crew member’s details.\n\n[Name] combines an interest in dance with [video or production experience]. They love recording the energy of a live performance and helping families relive it. Their favourite part of working with DancePro is [personal detail], and they hope to [future goal].",
+          "link_label": "",
+          "link_url": "",
+          "visible": true,
+          "kind": "crew_placeholder"
+        },
+        {
+          "title": "Team leader — placeholder bio",
+          "body": "Sample biography awaiting a crew member’s details.\n\n[Name] began dancing at [age/place] and joined DancePro in [year]. They help the crew prepare for events and enjoy working with studios, dancers and families. Their strengths include [skills], and [personal detail] keeps them connected to the dance community.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true,
+          "kind": "crew_placeholder"
+        }
+      ]
+    },
+    "services": {
+      "eyebrow": "DancePro services",
+      "heading": "Media for every stage.",
+      "description": "Concerts, competitions, portraits and studio promotion.",
+      "body": "Explore our services below, including the practical details to help plan your event or photo shoot. Concert bookings use Studio Hub. For competitions and other shoots, contact us to discuss availability, your requirements and a current quote.",
+      "sections": [
+        {
+          "title": "Concert bookings",
+          "body": "Dress rehearsal costume portraits, performance photography and professionally filmed concert videos, with studio review before release to families.",
+          "link_label": "Concert details & requirements",
+          "link_url": "/book",
+          "visible": true
+        },
+        {
+          "title": "Competition media",
+          "body": "Photography, video and optional judges’ audio critiques. We work with organisers on venue setup, programmes, announcements and media delivery. Ask about sponsorship and prizes.",
+          "link_label": "Competition details",
+          "link_url": "/competition",
+          "visible": true
+        },
+        {
+          "title": "Portfolio shoots",
+          "body": "Individual dance portraits at outdoor locations or in a studio, planned around your styles, skills and goals.",
+          "link_label": "Portfolio details",
+          "link_url": "/portfolio",
+          "visible": true
+        },
+        {
+          "title": "Dance portfolio mini sessions",
+          "body": "Shorter sessions for dance poses, headshots, body shots and audition or casting portfolios.",
+          "link_label": "Mini-session preparation",
+          "link_url": "/pose",
+          "visible": true
+        },
+        {
+          "title": "Headshot mini sessions",
+          "body": "Refresh your audition headshots and body shots in a relaxed professional shoot.",
+          "link_label": "Headshot preparation",
+          "link_url": "/shootme",
+          "visible": true
+        },
+        {
+          "title": "Studio promo packages",
+          "body": "Behind-the-scenes class images, staff portraits and promotional content for your studio website and social media.",
+          "link_label": "Promo package details",
+          "link_url": "/promo",
+          "visible": true
+        },
+        {
+          "title": "Studio photo days",
+          "body": "Bring a professional portrait shoot to your dance studio for students, families, portfolios or publicity.",
+          "link_label": "Photo day details",
+          "link_url": "/studio",
+          "visible": true
+        },
+        {
+          "title": "Photo products",
+          "body": "Turn favourite digital images into prints, frames, gifts and keepsakes.",
+          "link_label": "Printing & photo products",
+          "link_url": "/shop",
+          "visible": true
+        }
+      ]
+    },
+    "book": {
+      "eyebrow": "Concert bookings",
+      "heading": "Your concert, captured.",
+      "description": "Photography and video for dance studios and schools.",
+      "body": "We provide dress rehearsal costume portraits, on-stage concert photography and concert videography. Book through Studio Hub, where your submitted details, quote, event timeline, preparation, invoices and video review stay together.",
+      "sections": [
+        {
+          "title": "Costume portraits",
+          "body": "Our portable background can be set up backstage or at a rehearsal venue for individual dancers, pairs and small groups. Photographers help guide poses and refine technique. Families choose whether to purchase; there is no obligation to buy.\n\nAllow a clear space of at least 8 × 10 metres, accessible power, a desk and a chair. We arrive one hour before the scheduled start to set up. Teachers or minders should bring dancers after their rehearsal. The background is for individuals and small groups, usually up to eight smaller dancers. Other photography on the portable background is not permitted.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Concert photography & seating",
+          "body": "We photograph the performance from the auditorium. Photography-only concerts allow one hour for arrival and setup. Reserve one or two central seats around stage eye level, often six to ten rows back. Depending on the auditorium rake, seats immediately in front may also need to remain empty.\n\nA larger concert may use a second photographer with an additional front-corner position, often near A1. Keep heads, lights and speakers out of the sightline. Photographers and videographers do not need to sit together. Contact us before allocating seats at an unfamiliar venue, then record the agreed seats for each concert in Studio Hub.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Photography minimum spend",
+          "body": "All amounts are AUD and include GST. Photography has a minimum combined customer spend of $800 for the first photography event and $600 for each additional photography event in the booking. Dress rehearsal portrait shoots and concerts count separately.\n\nOne concert: $800.\nTwo concerts: $1,400.\nOne portrait rehearsal and one concert: $1,400.\nOne portrait rehearsal and two concerts: $2,000.\n\nThe minimum is the total spent by dancers and families, rather than an upfront photography booking fee. If sales have not met the minimum 30 days after gallery release, we contact the studio to explore ways to reach it. If the shortfall remains after those options have been exhausted, the difference is invoiced to the studio. Your booking timeline and Invoices page show the minimum for your selected services.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Photos for families & studio principals",
+          "body": "Families purchase full-resolution digital images through the studio gallery. Check the gallery and Cart for current pricing and applicable discounts. Preview focus and image quality before choosing.\n\nEligible linked studio principals, owners and directors receive the configured principal photo price in their account (currently $1 per image), without the old separate coupon process. For approved studio promotion, credit DancePro Photography & Video, www.DancePro.com.au or @DanceProPhoto. Please avoid publishing large quantities in the first fortnight after your concert, as this can affect family sales. Confirm any other commercial use with us.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "How we film your concert",
+          "body": "Our usual production combines two cameras and wide and closer views, following the style and flow of each routine. Wide shots keep formations and dancers in context; suitable closer shots capture expression.\n\nAudio can combine the theatre sound feed with live audience sound. Stage microphones help capture tap, singing and musical theatre. Lighting, audio and staging conditions affect recording, so we work with the venue to prepare and test the setup.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Video seating, power & audio",
+          "body": "Allow 1½–2 hours before curtain up for concerts with videography. Confirm venue access and the setup/arrival window shown in your event timeline. Reserve five or six adjacent seats towards the back, in the same row, with space for two tripods, a desk and an operator.\n\nArrange accessible power and an XLR audio feed from the theatre sound desk, ready when the crew arrives. In halls or other non-theatre venues, a raised platform may be needed for a clear sightline. Discuss these arrangements with DancePro and the venue before the event.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Videography quote & family numbers",
+          "body": "All amounts are AUD and include GST. The quote is the greater of $1,500 per concert or $15 per unique performing family across the booking.\n\nOne concert: $1,500 up to 100 families, then $15 per family.\nTwo concerts: $3,000 up to 200 families, then $15 per family.\nThree concerts: $4,500 up to 300 families, then $15 per family.\nAdditional concerts follow the same rule.\n\nCount a family once across all concerts, including performing siblings and parents. Estimated numbers produce the initial quote; confirmed final numbers determine the invoice. Studios choose how to collect or subsidise the cost for their families. Any agreed school discount or adjustment appears on the invoice.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Booking, preparation & payment",
+          "body": "1. Choose Make booking in Studio Hub. Profile information is pre-filled where available.\n2. Review your event timeline and quote after submission. DancePro reviews the booking and sends confirmation.\n3. When requested, confirm final family numbers and reserved seats. The seats-and-families request gives ten days to respond.\n4. Upload the programme, opening videos, slideshows and other supplied clips through the relevant Studio Hub actions by their displayed due dates. These files help us prepare folders, video titles and the finished concert.\n5. Review the invoice in Studio Hub, download its PDF and pay through your account. Payment is due fourteen days after the invoice is sent; use the date shown on your invoice.\n\nKeep important booking updates in your account messages so the event details and preparation records can be kept current.",
+          "link_label": "Open Studio Hub",
+          "link_url": "/my/studio-hub",
+          "visible": true
+        },
+        {
+          "title": "Photo release & video review",
+          "body": "The estimated photo-gallery release is 48 hours after the final event in the booking. The estimated video-ready-for-approval date is two weeks after that final event. These are estimates; your timeline and messages show current progress.\n\nYour Review & release concert video action becomes available when the video is ready. Check all routines, titles, supplied clips, picture and audio. Submit corrections in the review page if needed. When the corrected version is ready, review it again and release the concert. Your video access code becomes available after studio release, ready for you to send privately to dancers and families.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Online access, downloads & family sharing",
+          "body": "Families sign in to their own DancePro account and add the released concert using the studio’s video access code. They can stream available routines, view the supplied programme and download individual videos or start multiple separate downloads. The concert download manager does not create a ZIP.\n\nAccess lasts until the expiry shown in the account. Save files before then, check each download and keep a backup on another drive. Casting, TV playback and saved-file compatibility depend on the device.\n\nWhere enabled, Family sharing lets a customer invite up to three email-verified recipients without handing over their account or studio code. Invitations expire after 14 days if unaccepted; accepted access lasts up to 30 days, bounded by the original concert expiry. One intended saved copy and three download requests per shared video allow for interrupted attempts.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "On the day & keeping families informed",
+          "body": "Before the show, announce the venue’s photography/video restrictions and explain where families can find DancePro media. Share gallery and video access codes privately, not on public social media.\n\nEnsure the agreed seating, power, sound feed, access and portrait space are available. Tell us about changes to running order, breaks, improvisations or supplied clips. Make sure all programmes, slideshows and opening videos are uploaded against the correct concert, using the deadlines in Studio Hub.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Working with DancePro",
+          "body": "Our dance-aware crew, preparation process, protected galleries and studio review help deliver consistent concert media. Digital delivery reduces the need for individual USB production, packaging and postage.\n\nAsk about fundraising vouchers, highlight reels, studio promotional shoots and any current booking benefits. Optional promotional work and physical copies must be confirmed in your booking rather than assumed from an older offer. Existing published galleries can be accessed while they remain available in your account.",
+          "link_label": "Make a concert booking",
+          "link_url": "/my/studio-hub",
+          "visible": true
+        }
+      ]
+    },
+    "competition": {
+      "eyebrow": "Competition media",
+      "heading": "Capture every stage of the competition.",
+      "description": "Photography, video and organiser support.",
+      "body": "We work with competition organisers, studios, teachers, dancers and families to provide a consistent media service across styles and events. Discuss your coverage, venue, judges’ critiques, sponsorship or prize requirements with us.",
+      "sections": [
+        {
+          "title": "Coverage & production",
+          "body": "Our typical competition video setup uses two cameras, mixed while routines are performed. A theatre audio feed is combined with live sound; stage microphones help capture singing, musical theatre and tap. Photography captures technique, expression and action.\n\nWe plan coverage of the scheduled routines and work with the organiser on unusual formats, improvisation sections and awards. Tell us about any changes so routines are matched to the correct event and performer.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Venue & crew preparation",
+          "body": "Arrange a central space towards the back of the auditorium equivalent to six seats, with clear sightlines, power and an XLR sound feed. Allow at least 1½ hours for setup and audio/lighting checks at an agreed time. For longer events, provide a foyer space for a table and TV presentation.\n\nOur crew wear event identification and require appropriate Working with Children Checks. Insurance and compliance documentation can be supplied to organisers on request. Build suitable meal and rest breaks into long competition days.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Programme & announcements",
+          "body": "Provide an editable digital programme at least one week before the event through your agreed DancePro contact. Explain improvisation sections, awards and any special coverage requirements. Send programme changes promptly.\n\nInclude media information in the programme and organiser communications. Announce the service at the start of sections and the venue’s restrictions on audience photography and video. Event QR codes can take families to the appropriate media access or registration page.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Ordering & delivery",
+          "body": "Open Media galleries, choose the competition and use the event access code supplied by the organiser or DancePro. In My Media, add competition access and link dancers to help find their routines.\n\nAvailable products may include individual photos, all photos from a routine, routine video and a photo/video package. The current event price list and Cart show prices and discounts; review the routine and product before payment.\n\nOrders and receipts appear in My Orders. Purchased media is delivered through My Purchases when ready. Processing items show their status, so there is no need to rely on a manually emailed transfer link. Check the access period shown and download a backup before expiry.",
+          "link_label": "Browse competition galleries",
+          "link_url": "/galleries?type=competition",
+          "visible": true
+        },
+        {
+          "title": "Licensing & publicity",
+          "body": "Customer purchases are for personal use unless another licence is agreed. Studio or organiser publicity needs the appropriate permission; where granted, credit DancePro Photography & Video, www.DancePro.com.au or @DanceProPhoto. Do not post access codes publicly. Contact us to agree commercial use, sponsorship and promotional arrangements.",
+          "link_label": "Enquire about competition coverage",
+          "link_url": "/help#contact",
+          "visible": true
+        }
+      ]
+    },
+    "portfolio": {
+      "eyebrow": "Portfolio photography",
+      "heading": "Show your talent and personality.",
+      "description": "Dance portraits for portfolios, auditions and personal milestones.",
+      "body": "A portfolio session is a chance to celebrate your dance journey, from students in training to professional performers. Shoots can be planned as a gift, with a friend, or around a specific audition or creative idea.",
+      "sections": [
+        {
+          "title": "Planning your shoot",
+          "body": "We choose outdoor locations around Perth to suit the dancer’s style, location and preferred images. Indoor studio options and backgrounds can be discussed when booking. Tell us about the genres you want to capture, your experience, outfit ideas and any audition requirements.\n\nLonger sessions and shared shoots may be available. Contact us for current dates, locations, package inclusions and pricing; an old seasonal calendar or package price does not reserve a current session.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Preparation & supervision",
+          "body": "Bring reference images and poses you love, a range of outfits, suitable footwear, water and hair/makeup touch-up supplies. Practise safely and arrive ready. Our photographer can suggest poses and refinements, while your preparation helps make the most of the session.\n\nA parent or adult guardian must remain with anyone under 18. They may be asked to assist with a light or reflector. Outdoor sessions may need rescheduling for unsafe weather.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Images, payment & usage",
+          "body": "Your agreed package sets the shoot duration, included edited images, selection process and any optional extra images. Editing and retouching are tailored to that package. High-resolution files can be saved, cropped and shared for personal use within the agreed licence.\n\nConfirm payment, cancellation and rescheduling terms when booking. Ask before using images for a business or other commercial purpose, and discuss any publicity consent. The separate online Portfolio gallery workflow is not yet available; we will confirm the selection and delivery arrangements for your shoot.",
+          "link_label": "Enquire about a portfolio shoot",
+          "link_url": "/help#contact",
+          "visible": true
+        }
+      ]
+    },
+    "pose": {
+      "eyebrow": "Dance mini sessions",
+      "heading": "Small session. Memorable images.",
+      "description": "Prepare for a relaxed professional photo shoot.",
+      "body": "Mini sessions can include dance poses, headshots, body shots and audition/casting images. Bring a friend and build confidence in a professional shoot environment.",
+      "sections": [
+        {
+          "title": "Session format",
+          "body": "Previous sessions have used around 20 minutes of camera time within a one-hour appointment, alternating dancers to allow outfit changes and preparation. The current announcement will confirm duration, age suitability, location, backgrounds, included images and price.\n\nContact us for the next dates rather than using an expired booking form. Headshot sessions primarily cover head and body portraits; tell us if you also need dance-action images.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "What to bring",
+          "body": "Research poses and audition requirements. Bring reference images, plenty of outfit choices including plain black, white and colour options, suitable shoes, hair/makeup supplies, water and a changing sack if you have one. Arrive early and prepared. Avoid shiny or shimmery makeup if it does not suit the lighting; check hair and makeup carefully, as mini sessions generally include light editing.\n\nAnyone under 18 must have a parent or adult guardian present throughout.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Choosing & receiving your images",
+          "body": "Your booking confirms the number of included images, extra-image prices, payment due date and the selection/editing process. Proof selection and final-image delivery will be explained for that shoot; the new Portfolio gallery workflow is still being prepared.\n\nConfirm cancellation, rescheduling and publicity permissions before payment. Personal-use images may be saved and shared under your licence; business promotion needs the appropriate permission.",
+          "link_label": "Ask about upcoming mini sessions",
+          "link_url": "/help#contact",
+          "visible": true
+        }
+      ]
+    },
+    "shootme": {
+      "eyebrow": "Headshot mini sessions",
+      "heading": "Refresh your audition portfolio.",
+      "description": "Prepare for a relaxed professional photo shoot.",
+      "body": "Mini sessions focus on headshots, body shots and audition/casting images.",
+      "sections": [
+        {
+          "title": "Session format",
+          "body": "Previous sessions have used around 20 minutes of camera time within a one-hour appointment, alternating dancers to allow outfit changes and preparation. The current announcement will confirm duration, age suitability, location, backgrounds, included images and price.\n\nContact us for the next dates rather than using an expired booking form. Headshot sessions primarily cover head and body portraits; tell us if you also need dance-action images.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "What to bring",
+          "body": "Research poses and audition requirements. Bring reference images, plenty of outfit choices including plain black, white and colour options, suitable shoes, hair/makeup supplies, water and a changing sack if you have one. Arrive early and prepared. Avoid shiny or shimmery makeup if it does not suit the lighting; check hair and makeup carefully, as mini sessions generally include light editing.\n\nAnyone under 18 must have a parent or adult guardian present throughout.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Choosing & receiving your images",
+          "body": "Your booking confirms the number of included images, extra-image prices, payment due date and the selection/editing process. Proof selection and final-image delivery will be explained for that shoot; the new Portfolio gallery workflow is still being prepared.\n\nConfirm cancellation, rescheduling and publicity permissions before payment. Personal-use images may be saved and shared under your licence; business promotion needs the appropriate permission.",
+          "link_label": "Ask about upcoming mini sessions",
+          "link_url": "/help#contact",
+          "visible": true
+        }
+      ]
+    },
+    "promo": {
+      "eyebrow": "Studio promotion",
+      "heading": "Show what makes your studio special.",
+      "description": "Photography and video for your website and social media.",
+      "body": "Create engaging images of students and staff in your own studio while giving dancers a fun, professional shoot experience. We discuss your brand, preferred look, locations and priorities before the shoot.",
+      "sections": [
+        {
+          "title": "Studio promo package",
+          "body": "The published package includes a two-hour shoot with a DancePro photographer, plus 30 minutes for setup and 15 minutes to pack down. It includes 25 edited, full-resolution images licensed for your studio’s publicity and promotion; extra images may be available to purchase.\n\nUse the session around your students’ availability and the images your studio needs. Confirm the current quote and inclusions with us before booking.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Ideas for your session",
+          "body": "Behind-the-scenes class photography shows the styles, atmosphere and people in your studio; allow around 1½ hours for this. Staff headshots can provide a consistent look across your website; allow around 30 minutes. Merchandise and uniform images can support your shop and social media; allow around 30 minutes, with backgrounds and equipment arranged with our crew.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Optional extras",
+          "body": "A day-in-the-life video can show your studio community, with a one-minute overview and shorter clips for your website, socials or concert. An extra hour can extend the shoot to three hours if you need class images, headshots and merchandise photos.\n\nWe confirm the brief, consent arrangements, selected-image process, delivery and promotional usage with you. Contact DancePro for availability and a quote.",
+          "link_label": "Enquire about studio promotion",
+          "link_url": "/help#contact",
+          "visible": true
+        }
+      ]
+    },
+    "studio": {
+      "eyebrow": "Studio photo days",
+      "heading": "A professional photo shoot in your studio.",
+      "description": "Portraits for your dancers, families and studio.",
+      "body": "Bring a portrait photography experience to your dance studio. Create portfolio images, update your school website, decorate your space or offer high-quality images to students and families.",
+      "sections": [
+        {
+          "title": "Plan your photo day",
+          "body": "Tell us about your dancers, group sizes, styles, backgrounds, available space and goals. We will discuss equipment, lighting, the running order, supervision and the time needed for setup. Photo days are generally offered during the concert off-season, subject to availability.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Images & enquiries",
+          "body": "Agree the package, pricing, image selection, editing and delivery before booking. Confirm whether images are for family use or studio promotion so the appropriate licence and permissions are included. Contact us to plan a date and receive a quote.",
+          "link_label": "Plan a studio photo day",
+          "link_url": "/help#contact",
+          "visible": true
+        }
+      ]
+    },
+    "shop": {
+      "eyebrow": "Photo products",
+      "heading": "Make more of your favourite images.",
+      "description": "Prints, frames, gifts and keepsakes.",
+      "body": "Digital images are easy to keep and share, and they can also become prints, framed photographs, gifts or displays. Download the highest-resolution purchased file before ordering a physical product.",
+      "sections": [
+        {
+          "title": "Choose a print-ready image",
+          "body": "Check focus and resolution at the size you intend to print. Screens are backlit, so a print can appear darker than the same image on a display. Cropping reduces the pixels available; follow your print supplier’s guidance and preview the crop carefully. Do not use a watermarked gallery preview for printing.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Frames, products & suppliers",
+          "body": "Our existing photo-products page contains product and supplier recommendations. Physical products and external supplier checkout are separate from your DancePro digital-media order. Check the supplier’s current prices, postage and terms before purchasing.",
+          "link_label": "Browse existing product recommendations",
+          "link_url": "https://www.dancepro.com.au/shop",
+          "visible": true
+        }
+      ]
+    },
+    "terms": {
+      "eyebrow": "DancePro information",
+      "heading": "Media use & purchase information.",
+      "description": "Access, downloads, personal use and getting help.",
+      "body": "Read the product description and any event-specific terms before purchasing. These general notes explain the media service and do not exclude rights available under Australian Consumer Law.",
+      "sections": [
+        {
+          "title": "Choosing your media",
+          "body": "We aim to capture each performer, but lighting, equipment, movement and sightlines affect coverage. Preview the correct routine, dancer, focus and image quality before ordering. Not every image is suitable for every print size. Gallery previews are watermarked; purchased files use the product resolution described. Apply applicable coupons before completing checkout and review the displayed total.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Personal use & commercial permission",
+          "body": "Unless a different licence is agreed, purchases are for personal use. You may save, crop, edit, print and share your own purchased images for non-commercial purposes. Business promotion, business websites and social media, or other income-generating uses require the appropriate permission. Prize or competition entries should follow their own requirements. Contact DancePro about commercial licensing and required attribution.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Protected access & family sharing",
+          "body": "Keep your account password and studio/event access codes private. Follow venue and organiser rules on audience recording. Do not publicly post access codes or family invitation links.\n\nUse the concert Family sharing feature where enabled for relatives outside your household: up to three recipients, email verification, a 14-day acceptance deadline and up to 30 days’ access after acceptance, bounded by the original concert expiry. Downloads, if allowed, provide three requests per shared video for one intended saved copy. The account holder can revoke a link, but already downloaded copies cannot be recalled.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Downloads, expiry & backups",
+          "body": "Read the availability and expiry shown in your account. Download while access is active and keep copies in more than one safe location. The concert manager requests individual files rather than one ZIP. Other products show their available download options. Large transfers need enough storage and a reliable connection. Saved-file playback, USB and TV compatibility depend on the device.\n\nIf access expires or media is missing, ask through My Messages. Reactivation depends on the retained media and your entitlement; it is not guaranteed indefinitely.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Problems, cancellations & refunds",
+          "body": "For a wrong, missing, faulty or inaccessible product, contact DancePro with the order number, event and details so we can investigate and provide an appropriate remedy. Change-of-mind requests and shoot cancellations are considered under the terms of the relevant purchase or booking. Nothing here limits applicable consumer guarantees or remedies under Australian Consumer Law.",
+          "link_label": "Contact DancePro",
+          "link_url": "/help#contact",
+          "visible": true
+        }
+      ]
+    },
+    "privacy": {
+      "eyebrow": "DancePro information",
+      "heading": "Privacy & your information.",
+      "description": "How information is used in the DancePro account and media service.",
+      "body": "DancePro Photography & Video respects the privacy of customers, website visitors, studios and crew. This notice describes the information used to provide the service. Contact info@dancepro.com.au with privacy questions or requests.",
+      "sections": [
+        {
+          "title": "Information we collect",
+          "body": "You may provide your name, email, phone, address, dancer and studio links, event details, orders, preferences, messages, attachments and feedback. Studios and organisers provide event and performer information needed to organise galleries and deliver media. Crew supply employment, availability and profile information for their work. Payment processors handle payment information; account records include payment references and status.\n\nThe service records access grants, relevant viewing and download requests, approximate playback progress, family invitations and related activity. A download request is not proof that a file finished saving. Technical and security records can include timestamps, IP addresses, device/browser information and failed access attempts.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Why we use it",
+          "body": "We use information to provide accounts, link customers to authorised media, process purchases and invoices, organise bookings and crew, deliver messages and service notifications, support customers, prevent misuse and improve the service. Family recipient email addresses support invitations and verification. Relevant activity helps us administer access and troubleshoot delivery.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Who can access information",
+          "body": "Access depends on account role and the work being performed. Staff, crew, studios and service providers receive information needed for their functions; private operational information is not automatically published on the website. Crew website biographies are separately reviewed and approved.\n\nHosting, email, payment and other service providers may process data, including outside Australia. Information may also be disclosed where needed to comply with legal obligations, protect rights or safety, or support a business transfer with appropriate confidentiality arrangements. External linked websites have their own privacy practices.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        },
+        {
+          "title": "Choices, access & correction",
+          "body": "Keep your profile details up to date and manage available email preferences in My Profile. Service messages needed for your orders or account are separate from optional marketing. Do not include passwords in messages.\n\nYou can ask DancePro to access, correct, export or delete personal information, or raise a privacy complaint. Some records may need to be retained for legal, financial, security or service reasons. We may need to verify your identity before actioning a request. Contact us through My Messages or info@dancepro.com.au.",
+          "link_label": "Contact us about privacy",
+          "link_url": "/help#contact",
+          "visible": true
+        },
+        {
+          "title": "Cookies, security & retention",
+          "body": "Cookies and related browser storage support sign-in, security and preferences. Blocking them may affect account functions. The service applies access controls and other safeguards, but no internet transmission or storage system can be guaranteed risk-free.\n\nInformation is retained according to operational and legal requirements. Media availability and download expiry are shown separately in your account. Keep your own backups. This notice may be updated as services change; the current version is available here.",
+          "link_label": "",
+          "link_url": "",
+          "visible": true
+        }
+      ]
+    }
+  },
+  "help": [
+    {
+      "category": "Shopping",
+      "title": "How do I order concert and portrait photos?",
+      "summary": "Use your studio gallery and the current Cart.",
+      "body": "Open Media galleries → Concerts and choose your studio. Use its gallery access code when asked. Sign in to save access, or add and verify your studio through My Profile. Open the event and routine or portrait group, view the images and save favourites or add the available photo product to your Cart. Check the crop, focus and product resolution before paying.\n\nPurchased photos appear in My Media → My Purchases when ready. My Orders contains order status and receipts. Gallery registration can notify you when a new studio event is released; registration alone does not unlock protected media.",
+      "keywords": null,
+      "sort_order": 120
+    },
+    {
+      "category": "Shopping",
+      "title": "How do I order competition photos, videos or packages?",
+      "summary": "Find the event, unlock it and choose the right routine.",
+      "body": "Open Media galleries → Competitions, select the event and enter the event access code. In My Media, use Add competition media; linking dancers in My Profile helps find routines. Choose the correct performer and routine, then select individual photos, routine photos, video or a package where offered. Improvisation/group coverage follows the item described in the gallery.\n\nReview the live prices, inclusions and Cart before payment. Only available products can be purchased. If you need to change a completed order or discuss an upgrade, send its order number through My Messages rather than purchasing again.",
+      "keywords": null,
+      "sort_order": 120
+    },
+    {
+      "category": "Orders",
+      "title": "My order has not arrived — what should I check?",
+      "summary": "The account shows current delivery status without relying on a transfer email.",
+      "body": "Sign in with the account used at checkout. Open My Media → My Orders for payment and order status, then My Purchases for ready files. Pending media is still being processed; an email or account notification may arrive when it becomes ready. Check My Messages and your spam folder, but use the account as the place to check delivery.\n\nIf you cannot find a paid order, or it appears ready but cannot be opened, send DancePro the order number, event, purchase email and error details. Do not send card details or passwords. Avoid buying the same media again while the issue is investigated.",
+      "keywords": null,
+      "sort_order": 120
+    },
+    {
+      "category": "Gallery access",
+      "title": "Where do I get the studio or event access code?",
+      "summary": "Ask the studio or event organiser and keep codes private.",
+      "body": "Competition access details may be supplied on the programme, venue flyers, event QR material or by the organiser. Studio photo-gallery access is supplied by your studio. The concert video access code is separate and is sent to families by the studio after the director releases the video.\n\nDancePro does not publicly distribute protected studio video codes. Check the event/year and ask your studio if one is missing. Never post access codes or your account password publicly.",
+      "keywords": null,
+      "sort_order": 120
+    },
+    {
+      "category": "Concert videos",
+      "title": "How do I watch and save my concert?",
+      "summary": "Studio release comes first; then add the concert to your account.",
+      "body": "After the studio director releases the concert, use the video access code supplied by your studio to add it in My Media. Open the concert and play available routines. Download individual videos or use the multiple-file manager; allow multiple downloads if the browser asks. Each file downloads separately, not as a concert ZIP.\n\nThe manager counts requests, so also check your browser to confirm completed files. Pause stops new requests rather than cancelling transfers already started. Save files before the expiry shown and keep a backup. Streaming, casting and saved-file playback depend on the device and connection.",
+      "keywords": null,
+      "sort_order": 120
+    },
+    {
+      "category": "Downloads",
+      "title": "Can I download on my phone or tablet?",
+      "summary": "Check storage, the browser downloads list and your device’s file tools.",
+      "body": "Large media files need a reliable connection and enough free storage. A computer is often easier for many files. On a phone or tablet, look in the browser downloads list or Files/Downloads app. Use the device’s Share or Save video/image option where supported to copy a compatible file to Photos or the camera roll.\n\nConcert videos download as separate files. If a different product offers a ZIP, extract it in a compatible file manager before opening its contents. File sizes, formats and available save options vary by device. Keep another backup; the browser does not guarantee that a request finished downloading.",
+      "keywords": null,
+      "sort_order": 120
+    },
+    {
+      "category": "Downloads",
+      "title": "My video has no sound or will not play",
+      "summary": "Start with volume, a complete file and a compatible player.",
+      "body": "Check both the player mute/volume setting and device output, including Bluetooth headphones. For a downloaded file, confirm the transfer finished and try playing it from local storage rather than a USB. An up-to-date compatible media player may help. USBs and video formats are not supported by every TV.\n\nIf the same routine fails in the online player or a complete local file, send the event, routine, device/browser and error to DancePro through My Messages. Do not assume every audio problem means the recording is broken.",
+      "keywords": null,
+      "sort_order": 120
+    },
+    {
+      "category": "Photos",
+      "title": "Can I print, crop or share my purchased images?",
+      "summary": "Use the full-resolution file and your licence.",
+      "body": "Full-resolution purchased photos are suitable for personal saving, editing, cropping, printing and sharing, subject to the licence. Check the available pixel dimensions and focus for the intended print size; cropping reduces resolution and prints can look darker than a backlit screen. Never print or copy a watermarked preview.\n\nBusiness advertising, studio publicity and other commercial use require the appropriate permission. Eligible studio principals have their account price and agreed attribution requirements. Ask DancePro before using media outside personal use.",
+      "keywords": null,
+      "sort_order": 120
+    },
+    {
+      "category": "Orders",
+      "title": "Can I request a refund or correction?",
+      "summary": "Contact us with the order and problem so we can investigate.",
+      "body": "Choose the correct event, dancer, routine and product, and check photo focus before paying. If a product is wrong, missing, faulty or inaccessible, contact DancePro with your order number and details. We will investigate and provide the appropriate remedy. Change-of-mind and booking cancellation requests depend on the relevant terms. Your applicable Australian Consumer Law rights are not excluded.",
+      "keywords": null,
+      "sort_order": 120
+    },
+    {
+      "category": "Studio Hub",
+      "title": "How are photo minimum spends and video quotes calculated?",
+      "summary": "Your booking timeline and Invoices page show your figures.",
+      "body": "Photography minimum spend is $800 for the first photography event and $600 for each additional event. Dress rehearsal portraits and concerts are separate events. We review any shortfall 30 days after gallery release and work with the studio before invoicing an unresolved difference.\n\nThe video quote is the greater of $1,500 per concert or $15 per unique performing family across the booking. Count siblings and performing parents together, once across all concerts. These amounts are AUD including GST. Final family numbers and any agreed discounts or adjustments determine the invoice.",
+      "keywords": null,
+      "sort_order": 120
+    },
+    {
+      "category": "Studio Hub",
+      "title": "How do I send programmes, seat numbers and slideshows?",
+      "summary": "Use Your actions in Studio Hub for each relevant concert.",
+      "body": "Confirm the final family total and reserve seats for each concert when requested. The seats-and-families email gives ten days to respond. Upload the programme and all opening videos, slideshows or supplied clips using the event actions and due dates shown in Studio Hub. The programme helps prepare video titles and gallery folders.\n\nTell DancePro about replacements or late changes. Invoices can be viewed, downloaded as a PDF and paid in the Invoices tab. Photo release is estimated 48 hours after the final event; video approval is estimated two weeks after it. Review the actual timeline for current progress.",
+      "keywords": null,
+      "sort_order": 120
+    },
+    {
+      "category": "Account & privacy",
+      "title": "How do I manage messages, email preferences and privacy?",
+      "summary": "Use your profile and My Messages.",
+      "body": "My Messages brings account notifications and conversations together. Use New message for an enquiry; Advanced options are optional when extra order or event context helps. Update contact details and available email preferences in My Profile. Essential service messages may still be needed for your orders and account.\n\nFor information access, correction, export, deletion or a privacy complaint, contact DancePro through My Messages or info@dancepro.com.au. We may need to verify identity and retain some records for legal or service requirements. The Privacy page explains the information used, including approximate viewing/download activity and family invitations.",
+      "keywords": null,
+      "sort_order": 120
+    }
+  ]
+}

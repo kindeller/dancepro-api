@@ -15,6 +15,10 @@ struct DanceProUploaderApp: App {
             ConcertVideoUploadView(eventUuid: review.local.manifest.programme.eventUuid,
               eventName: review.local.manifest.programme.eventName, close: { showConcertVideos = false },
               upload: { await model.uploadConcertVideos($0) }, finish: { await model.finishConcertVideos($0) })
+          } else if review.local.manifest.isVideoPreparation {
+            ConcertVideoPreparationView(review: review, close: { model.review = nil },
+              refreshRoles: { await model.refreshPhotographers(review) },
+              upload: { showConcertVideos = true })
           } else if review.local.manifest.programme.eventType == "competition",
              review.photographerSelection?.selected?.isVideo == true {
             CompetitionVideoUploadView(review: review, close: { model.review = nil },
@@ -22,10 +26,11 @@ struct DanceProUploaderApp: App {
               upload: { video, role in await model.uploadVideos(video, roleUuid: role) })
           } else {
             VStack(spacing: 0) {
-            if review.local.manifest.programme.eventType == "concert" {
+            if review.isConcert && !review.isPortraitSession {
               HStack {
                 Spacer()
                 Button("Upload Edited Concert Videos…", systemImage: "video.badge.plus") { showConcertVideos = true }
+                  .disabled(review.busy || !review.roleConfirmed)
               }.padding(.horizontal, 20).padding(.top, 10)
             }
             PhotoReviewView(
@@ -92,29 +97,42 @@ struct ContentView: View {
             if let programme = model.programme {
               VStack(alignment: .leading, spacing: 10) {
                 Text(programme.eventName).font(.title.bold())
-                Text("Approved version \(programme.version) · \(model.folders.count) folders")
+                Text(programme.isPortraitSession ? "Dress Rehearsal Portraits" : "Approved version \(programme.version)")
                   .foregroundStyle(.secondary)
                 Text(
-                  programme.sourceUrl == nil
+                  programme.isPortraitSession ? "One portrait photo folder. No programme or video titles needed." : programme.sourceUrl == nil
                     ? "Programme data will be saved. No PDF attached."
                     : "Programme PDF and data will be saved for offline use.")
+                if programme.eventType == "concert" {
+                  Picker("Your role for this concert", selection: $model.preparationRoleID) {
+                    Text("Choose your role…").tag(String?.none)
+                    ForEach(model.preparationRoles?.photographers ?? []) { role in
+                      Text(role.roleName).tag(Optional(role.id))
+                    }
+                  }.disabled(model.busy)
+                  if let role = model.preparationRole {
+                    Text(programme.isPortraitSession ? "Copy your photos into the portrait folder, then click Upload." : role.isVideo
+                      ? "Videographer: saves the programme and ready video titles. No photo folders are created."
+                      : "Photographer: creates the photo folders and saves the programme. Video titles are not downloaded.")
+                      .font(.callout).foregroundStyle(.secondary)
+                  } else {
+                    Text("Choose a role before preparing this concert.").foregroundStyle(.secondary)
+                  }
+                }
                 Button("Prepare Event…", systemImage: "folder.badge.plus") {
                   Task { await model.prepare() }
                 }
-                .buttonStyle(.borderedProminent).controlSize(.large).disabled(model.busy)
-                Text(
-                  "Choose a destination, then the app creates the folders and saves the programme. Existing media is kept."
-                ).font(.caption).foregroundStyle(.secondary)
-                if programme.eventType == "concert" {
-                  Button("Download Video Titles…", systemImage: "arrow.down.doc") {
-                    Task { await model.downloadVideoTitles(programme) }
-                  }.disabled(model.busy || model.session == nil)
+                .buttonStyle(.borderedProminent).controlSize(.large).disabled(!model.canPrepare)
+                Text("Choose a destination to save this role’s files. Existing prepared photos are kept.")
+                  .font(.caption).foregroundStyle(.secondary)
+                if programme.eventType != "concert" || model.preparationRole?.isVideo == false {
+                  Divider()
+                  ForEach(model.folders) { folder in
+                    Text(folder.relativePath).textSelection(.enabled).font(
+                      .system(.body, design: .monospaced))
+                  }
                 }
-                Divider()
-                ForEach(model.folders) { folder in
-                  Text(folder.relativePath).textSelection(.enabled).font(
-                    .system(.body, design: .monospaced))
-                }
+
               }
             } else if let selected = model.selected, !selected.preparationReady {
               ContentUnavailableView(
@@ -143,7 +161,8 @@ struct ContentView: View {
             }
             ForEach(model.locals) { local in
               VStack(alignment: .leading, spacing: 8) {
-                Text(local.manifest.programme.eventName).font(.headline)
+                Text(local.manifest.programme.eventName + (local.manifest.isVideoPreparation ? " · Video" : "")).font(.headline)
+                Text(local.url.path).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 Text(
                   "Version \(local.manifest.programme.version) · \(local.manifest.folders.count) folders · \(local.manifest.preparedAt.formatted(date: .abbreviated, time: .shortened))"
                 ).font(.caption).foregroundStyle(.secondary)
@@ -221,13 +240,15 @@ struct ContentView: View {
     VStack(alignment: .leading, spacing: 12) {
       Text("Approved events").font(.title2.bold())
       HStack {
-        TextField("Search events", text: $model.search).onSubmit { Task { await model.refresh() } }
+        TextField("Search studios or events", text: $model.search)
+          .onChange(of: model.search) { model.searchEvents() }
+          .onSubmit { model.searchEvents() }
         Button {
           Task { await model.refresh() }
         } label: {
           Image(systemName: "arrow.clockwise")
-        }.help("Refresh events")
-      }.disabled(model.busy)
+        }.help("Refresh events").disabled(model.busy)
+      }
       Toggle("Include past events", isOn: $model.includePast).onChange(of: model.includePast) {
         Task { await model.refresh() }
       }.disabled(model.busy)
@@ -238,8 +259,13 @@ struct ContentView: View {
               Task { await model.select(event) }
             } label: {
               VStack(alignment: .leading, spacing: 5) {
-                Text(event.name).font(.headline)
-                Text("\(event.eventDate ?? "Date to be confirmed") · \(event.itemCount) items")
+                let heading = event.studioName ?? event.name
+                let title = event.eventTitle ?? event.name
+                Text(heading).font(.headline)
+                if title != heading {
+                  Text(title).font(.subheadline)
+                }
+                Text("\(event.eventDate ?? "Date to be confirmed") · " + (event.captureMode == "dress_rehearsal" ? "Portrait photos" : "\(event.itemCount) items"))
                   .font(.caption)
                 if !event.preparationReady {
                   Text("Needs programme reapproval").font(.caption).foregroundStyle(.orange)

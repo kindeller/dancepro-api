@@ -42,7 +42,7 @@ class CustomerMessagesTest extends TestCase
         Storage::disk('local')->assertExists($attachment->attachment['path']);
         $this->get(route('customer.messages.attachment', $attachment))->assertOk()->assertDownload('example.jpg');
         $this->assertSame(0, app(CustomerInbox::class)->counts($customer)['total']);
-        $this->actingAs($admin)->get(route('admin.media-support.conversation', $thread))->assertOk()->assertSee('Can you help?');
+        $this->actingAs($admin)->get(route('admin.messages.index', ['channel' => 'customer', 'thread' => $thread->uuid]))->assertOk()->assertSee('Can you help?');
         $this->post(route('admin.media-support.reply', $thread), ['message' => 'Of course.'])->assertRedirect()->assertSessionHasNoErrors();
         Notification::assertSentTo($customer, CustomerConversationReply::class);
         $this->assertSame(1, app(CustomerInbox::class)->counts($customer)['conversations']);
@@ -81,6 +81,31 @@ class CustomerMessagesTest extends TestCase
         $this->assertSame(0, app(CustomerInbox::class)->counts($customer)['total']);
         $this->actingAs($this->customer())->post(route('customer.messages.read', $notification))->assertNotFound();
         $this->get(route('customer.messages.index'))->assertDontSee('Your receipt');
+    }
+
+    public function test_notification_read_requests_return_current_badges_and_preserve_ownership_and_read_time(): void
+    {
+        $customer = $this->customer();
+        $notification = CustomerInboxNotification::create(['user_id' => $customer->id, 'source_key' => 'fixture:read',
+            'subject' => 'Welcome', 'body' => 'Account setup details', 'occurred_at' => now()]);
+        $other = CustomerInboxNotification::create(['user_id' => $this->customer()->id, 'source_key' => 'fixture:other',
+            'subject' => 'Private', 'body' => 'Private details', 'occurred_at' => now()]);
+        $this->actingAs($customer)->get(route('customer.messages.index'))->assertOk()
+            ->assertSee('data-notification-read', false)->assertSee('notification-read-'.$notification->uuid)
+            ->assertDontSee('notification-read-'.$other->uuid);
+        $this->assertNull($notification->fresh()->read_at);
+        $url = route('customer.messages.read', $notification);
+        $this->postJson($url)->assertOk()->assertJsonPath('success', true)
+            ->assertJsonPath('data.counts.notifications', 0)->assertJsonPath('data.counts.total', 0)
+            ->assertHeader('Cache-Control', 'no-store, private');
+        $readAt = $notification->fresh()->read_at;
+        $this->assertNotNull($readAt);
+        $this->travel(1)->minutes();
+        $this->postJson($url)->assertOk()->assertJsonPath('data.counts.total', 0);
+        $this->assertTrue($readAt->equalTo($notification->fresh()->read_at));
+        $this->postJson(route('customer.messages.read', $other))->assertNotFound();
+        $this->assertNull($other->fresh()->read_at);
+        $this->get(route('customer.messages.index'))->assertOk()->assertDontSee('form="notification-read-'.$notification->uuid.'"', false);
     }
 
     public function test_personal_emails_and_legacy_support_responses_have_one_conversation_each(): void

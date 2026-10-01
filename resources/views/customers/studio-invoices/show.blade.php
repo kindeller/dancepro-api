@@ -5,9 +5,10 @@
 @include('studio-invoices._styles')
 @include('customers.studios._header')
 @include('customers.studios._tabs', ['tab' => 'invoices'])
-<section class="section"><div class="container" style="max-width:1000px"><div class="studio-billing-actions"><a class="button secondary" href="{{ route('customer.studio-invoices.pdf',[$studio,$invoice]) }}">Download PDF</a></div>
+<section class="section"><div class="container"><div class="studio-billing-actions"><a class="button secondary" href="{{ route('customer.studio-invoices.pdf',[$studio,$invoice]) }}">Download PDF</a></div>
 @if(session('status'))<p class="studio-billing-notice" role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<div class="studio-billing-notice" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
+<p class="meta"><a href="{{ route('customer.media.help') }}#article-guide-studio-invoice-guide">Help with studio invoices and payments</a></p>
 @include('studio-invoices._details')
 @if($invoice->status==='issued' && $invoice->balanceCents()>0)
 @if($invoice->hasPendingPayment())<form method="POST" action="{{ route('customer.studio-invoices.reconcile',[$studio,$invoice]) }}">@csrf<p class="studio-billing-notice">Your payment is being verified. Please do not pay again.</p><button class="button">Check payment status</button></form>

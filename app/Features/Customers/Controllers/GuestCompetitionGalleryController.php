@@ -58,7 +58,7 @@ class GuestCompetitionGalleryController extends Controller
         $request->session()->put('checkout.discount_code', $request->validated('discount_code'));
         $request->session()->put('url.intended', route('customer.competitions.cart', $schedulingEvent));
 
-        return to_route($request->query('account') === 'login' ? 'customer.login' : 'customer.register');
+        return to_route($request->query('account') === 'login' ? 'login' : 'customer.register');
     }
 
     public function image(GuestCompetitionGalleryRequest $request, SchedulingEvent $schedulingEvent, string $photo, CompetitionCustomerPreview $gallery): StreamedResponse

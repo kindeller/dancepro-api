@@ -28,13 +28,13 @@ class CustomerCreditTest extends TestCase
             'customer_lookup' => 'credit-customer@example.test',
         ]))->assertOk()
             ->assertSee('Customer account credit')
-            ->assertSee('Account #'.$customer->id)
+            ->assertSee('Account ID: '.$customer->uuid)
             ->assertSee('credit-customer@example.test');
 
         $this->get(route('admin.media-settings.index', [
             'tab' => 'discounts',
-            'customer_lookup' => (string) $customer->id,
-        ]))->assertOk()->assertSee('Account #'.$customer->id);
+            'customer_lookup' => $customer->uuid,
+        ]))->assertOk()->assertSee('Account ID: '.$customer->uuid);
 
         $this->post(route('admin.media-settings.customer-credits.store'), [
             'user_id' => $customer->id,

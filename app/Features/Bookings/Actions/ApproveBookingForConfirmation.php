@@ -17,7 +17,7 @@ class ApproveBookingForConfirmation
     {
         return DB::transaction(function () use ($booking, $staff, $input): string {
             $booking = ConcertBooking::query()->lockForUpdate()->findOrFail($booking->id);
-            if (! in_array($booking->status->value, ['pending', 'approved'], true)) {
+            if (! in_array($booking->status->value, ['pending', 'received', 'partial_approval', 'approved'], true)) {
                 throw ValidationException::withMessages(['status_override' => 'Only an active booking can be approved.']);
             }
             $studio = filled($input['studio_uuid'] ?? null) ? Studio::where('uuid', $input['studio_uuid'])->firstOrFail() : null;

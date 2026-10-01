@@ -1,7 +1,8 @@
 @extends('layouts.crew', ['title' => 'My Crew'])
 
 @section('content')
-<div class="page-heading"><div><div class="crew-hub-brand"><img src="{{ asset('images/brand/dancepro-icon-blue.png') }}" alt=""><span>CREW HUB</span></div><h1>My Crew</h1><p class="muted">Crew, competition and studio contacts in one place.</p></div></div>
+<div class="page-heading"><div>@include('crew._brand')
+<h1>My Crew</h1><p class="muted">Crew, competition and studio contacts in one place.</p></div></div>
 
 <nav class="filter-tabs main-shift-menu" aria-label="Contact directory">
     <a class="{{ $directory === 'crew' ? 'active' : '' }}" href="{{ route('crew.directory.index',['view'=>'crew']) }}">Crew</a>

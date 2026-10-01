@@ -22,10 +22,13 @@ main .tracker-bar{top:var(--editing-header-height,0px);--ink:#141719}
 @endif
 
 @section('content')
+@if($editingLayout === 'layouts.crew')
+@include('crew._brand')
+@endif
 @include('admin.tracking._task-bar', ['bar' => $trackerBar])
 @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<p role="alert">{{ $errors->first() }}</p>@endif
-<section class="card card-pad" style="max-width:1000px;padding:24px">
+<section class="card card-pad" style="width:100%;min-width:0;padding:24px">
     <h2>Concert editing</h2>
     <p>{{ $event->name }} · {{ $event->event_date?->format('j M Y') }}</p>
     @if($status['sourceDriven'])

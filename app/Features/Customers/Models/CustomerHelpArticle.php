@@ -13,6 +13,6 @@ class CustomerHelpArticle extends Model
 
     protected function casts(): array
     {
-        return ['is_published' => 'boolean', 'sort_order' => 'integer'];
+        return ['draft' => 'array', 'is_published' => 'boolean', 'sort_order' => 'integer'];
     }
 }

@@ -1,7 +1,8 @@
 @extends('layouts.crew')
 
 @section('content')
-<div class="page-heading"><div><div class="crew-hub-brand"><img src="{{ asset('images/brand/dancepro-icon-blue.png') }}" alt=""><span>CREW HUB</span></div><h1>My Chat</h1><p class="muted">Event updates and conversations with your crew.</p></div></div>
+<div class="page-heading"><div>@include('crew._brand')
+<h1>My Chat</h1><p class="muted">Event updates and conversations with your crew.</p></div></div>
 
 <div class="chat-shell {{ $selectedChat ? 'has-selection' : '' }}">
     <aside class="chat-sidebar">
@@ -56,7 +57,7 @@
                 @forelse($messages as $message)
                     <div data-message-uuid="{{ $message->uuid }}" @if($message->author_user_id !== auth()->id()) data-reactable tabindex="0" aria-label="Message from {{ $message->author->name }}. Hold to react." @endif class="chat-bubble {{ $message->author_user_id === auth()->id() ? 'mine' : '' }} {{ ($message->message_type ?? null) === 'announcement' ? 'announcement' : '' }}">
                         <strong>{{ $message->author->name }}{{ ($message->message_type ?? null) === 'announcement' ? ' · IMPORTANT UPDATE' : '' }}</strong>
-                        @if(filled($message->body))<p>{{ $message->body }}</p>@endif
+                        @if(filled($message->body))<div>{!! app(\App\Features\Tracking\Services\EmailContentFormatter::class)->html($message->body) !!}</div>@endif
                         @if(filled($message->attachment_path))
                             @php($attachmentUrl = $message->attachmentUrl())
                             @if(Str::startsWith((string) $message->attachment_mime, 'image/'))

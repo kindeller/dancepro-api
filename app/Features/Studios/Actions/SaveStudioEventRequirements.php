@@ -11,19 +11,26 @@ use Illuminate\Validation\ValidationException;
 
 class SaveStudioEventRequirements
 {
-    private const REQUIREMENTS = ['portrait_space', 'portrait_dancers'];
+    private const REQUIREMENTS = [
+        'portrait' => ['portrait_space', 'portrait_dancers'],
+        'event_details' => ['event_details'],
+    ];
 
-    public function execute(SchedulingEvent $event, User $user, array $completed): void
+    public function execute(SchedulingEvent $event, User $user, array $completed, string $group = 'portrait'): void
     {
         $event->loadMissing('concertBookingItem');
-        if ($event->concertBookingItem?->item_type !== ConcertBookingItemType::DressRehearsal) {
+        if ($group === 'portrait' && $event->concertBookingItem?->item_type !== ConcertBookingItemType::DressRehearsal) {
             throw ValidationException::withMessages(['requirements' => 'Portrait shoot requirements apply only to dress rehearsal portrait events.']);
         }
 
-        $completed = array_values(array_intersect(self::REQUIREMENTS, $completed));
-        DB::transaction(function () use ($event, $user, $completed): void {
+        $requirements = self::REQUIREMENTS[$group] ?? throw ValidationException::withMessages(['group' => 'Unknown requirement group.']);
+        if (array_diff($completed, $requirements)) {
+            throw ValidationException::withMessages(['requirements' => 'Choose requirements from the selected group.']);
+        }
+        $completed = array_values(array_intersect($requirements, $completed));
+        DB::transaction(function () use ($event, $user, $completed, $requirements): void {
             StudioEventAcknowledgement::query()->where('scheduling_event_id', $event->id)
-                ->whereIn('requirement', array_diff(self::REQUIREMENTS, $completed))->delete();
+                ->whereIn('requirement', array_diff($requirements, $completed))->delete();
             foreach ($completed as $requirement) {
                 StudioEventAcknowledgement::updateOrCreate(
                     ['scheduling_event_id' => $event->id, 'requirement' => $requirement],

@@ -14,7 +14,7 @@ class StudioInvoicePayment extends Model
 
     protected function casts(): array
     {
-        return ['is_test' => 'boolean', 'amount_cents' => 'integer', 'paid_at' => 'datetime', 'reversed_at' => 'datetime'];
+        return ['receipt' => 'array', 'is_test' => 'boolean', 'amount_cents' => 'integer', 'paid_at' => 'datetime', 'reversed_at' => 'datetime'];
     }
 
     public function invoice(): BelongsTo

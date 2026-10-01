@@ -7,10 +7,14 @@
     $wwccMissing = blank($crewProfile->working_with_children_number) || $crewProfile->working_with_children_expiry === null;
     $wwccExpiring = $crewProfile->working_with_children_expiry?->between(today(), today()->addDays(60)) ?? false;
     $wwccExpired = $crewProfile->working_with_children_expiry?->isPast() ?? false;
+    $biographyDue = $crewProfile->biographyDueDate();
+    $biographyComplete = filled($crewProfile->biography);
+    $biographyOverdue = ! $biographyComplete && $biographyDue?->lt(today());
 @endphp
 
 <div class="page-heading">
-    <div><div class="crew-hub-brand"><img src="{{ asset('images/brand/dancepro-icon-blue.png') }}" alt=""><span>CREW HUB</span></div><h1>My Profile</h1><p class="muted">Keep your contact, payment and safety information current.</p></div>
+    <div>@include('crew._brand')
+<h1>My Profile</h1><p class="muted">Keep your contact, payment and safety information current.</p></div>
     <div class="profile-account-actions">
         <button type="button" class="button secondary" id="open-password-dialog">Change password</button>
         <form method="POST" action="{{ route('logout') }}">@csrf<button type="submit" class="button secondary">Sign out</button></form>
@@ -49,6 +53,8 @@
 
 <form method="POST" action="{{ route('crew.profile.update') }}">@csrf @method('PUT')
     <section class="card profile-section"><h2>Contact and clothing</h2><div class="profile-grid">
+        <label>First name<input name="first_name" value="{{ old('first_name', $crewProfile->user->first_name) }}" required maxlength="255" autocomplete="given-name"></label>
+        <label>Last name<input name="last_name" value="{{ old('last_name', $crewProfile->user->last_name) }}" maxlength="255" autocomplete="family-name"></label>
         <label>Preferred name<input name="preferred_name" value="{{ old('preferred_name', $crewProfile->preferred_name) }}" required></label>
         <label>Legal name<input name="legal_name" value="{{ old('legal_name', $crewProfile->legal_name) }}"></label>
         <label>Email<input type="email" name="email" value="{{ old('email', $crewProfile->user->email) }}" required></label>
@@ -56,6 +62,34 @@
         <label>Shirt size<input name="shirt_size" value="{{ old('shirt_size', $crewProfile->shirt_size) }}"></label>
         <label>Jacket size<input name="jacket_size" value="{{ old('jacket_size', $crewProfile->jacket_size) }}"></label>
     </div></section>
+
+    <section class="card profile-section" aria-labelledby="biography-heading">
+        <h2 id="biography-heading">Biography</h2>
+        <p class="biography-status {{ $biographyComplete ? 'is-complete' : ($biographyOverdue ? 'is-overdue' : '') }}">
+            @if($biographyComplete)<strong>Biography complete</strong> · @endif
+            @if($biographyDue)
+                {{ $biographyOverdue ? 'Overdue' : 'Due' }} {{ $biographyDue->format('j M Y') }} · Four weeks after your start date ({{ $crewProfile->commencement_date->format('j M Y') }}).
+            @else
+                Due date awaiting your start date. Please ask an administrator to update your commencement date.
+            @endif
+        </p>
+        <details class="biography-guidance">
+            <summary>About your biography &amp; guiding questions</summary>
+            <p>All crew have a short biography featured on the DancePro website. Take a little time to write something about yourself. Use these questions to help guide you:</p>
+            <ol>
+                <li>When did you join DancePro?</li>
+                <li>When and where did you start dancing? What is your dance history?</li>
+                <li>What is your photography and videography experience?</li>
+                <li>Why are you passionate about photography and videography?</li>
+                <li>What skills, personality traits or qualities make you a great fit for this role?</li>
+                <li>What do you love about working with DancePro? Why is it important to you?</li>
+                <li>Do you have any other related experience?</li>
+                <li>What are your plans for the future?</li>
+            </ol>
+        </details>
+        <label>Your biography<textarea name="biography" rows="7" maxlength="5000">{{ old('biography', $crewProfile->biography) }}</textarea></label>
+        <p class="muted">Save your biography with the rest of your profile below. DancePro will review it before publishing it on the website; any later changes also need approval.</p>
+    </section>
 
     <section class="card profile-section"><h2>Personal and emergency details</h2><div class="profile-grid">
         <label>Date of birth<input type="date" name="date_of_birth" value="{{ old('date_of_birth', $crewProfile->date_of_birth) }}"></label>
@@ -105,6 +139,12 @@
 
 @push('styles')
 <style>
+    .biography-guidance { margin-bottom:16px; }
+    .biography-status { color:#087da8; }
+    .biography-status.is-overdue { color:#b42318; }
+    .biography-status.is-complete { color:#167447; }
+    .biography-guidance summary { cursor:pointer;font-weight:700; }
+    .biography-guidance li { margin:6px 0; }
     .profile-account-actions { display:flex; align-items:center; gap:8px; }
     .profile-account-actions form { margin:0; }
     .account-dialog { width:min(92vw,480px); max-width:none; padding:22px; border:0; border-radius:10px; box-shadow:0 20px 60px rgba(0,0,0,.28); }

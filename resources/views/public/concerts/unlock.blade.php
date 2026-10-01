@@ -1,10 +1,9 @@
-@extends('layouts.public')
+@extends('layouts.public', ['title' => $concert->name])
 
 @section('content')
+<section class="hero"><div class="container">@include('customers._heading', ['headingImageUrl' => $concert->studio->logoUrl(), 'eyebrow' => 'Protected concert', 'heading' => $concert->name, 'description' => 'Use the access details supplied by your studio to view your concert media.'])</div></section>
 <div class="card unlock">
-    @if($concert->coverImageForDisplay())<img src="{{ $concert->coverImageForDisplay() }}" alt="{{ $concert->name }} cover" style="width:100%;max-height:280px;object-fit:contain;border-radius:8px;margin-bottom:16px">@endif
-    <div class="eyebrow">Protected concert</div><h2>{{ $concert->name }}</h2>
-    @if($concert->concert_code_group_id)<p class="muted">Have a concert video code? Sign in to your DancePro account and add it in My Media.</p><p><a class="button secondary" href="{{ auth()->check() ? route('customer.media.index') : route('customer.login') }}">{{ auth()->check() ? 'Open My Media' : 'Customer sign in' }}</a></p>@endif
+    @if($concert->concert_code_group_id)<p class="muted">Have a concert video code? Sign in to your DancePro account and add it in My Media.</p><p><a class="button secondary" href="{{ auth()->check() ? route('customer.media.index') : route('login') }}">{{ auth()->check() ? 'Open My Media' : 'Sign in' }}</a></p>@endif
     @if($concert->access_password_hash)<p class="muted">You can also enter the student name and individual concert access code supplied by your studio.</p>
     @if($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
     <form method="POST" action="{{ route('concerts.unlock', $concert) }}">@csrf

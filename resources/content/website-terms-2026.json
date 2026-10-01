@@ -1,0 +1,232 @@
+{
+  "terms-purchases": {
+    "eyebrow": "Terms · Purchases & refunds",
+    "heading": "Purchases & refunds",
+    "description": "Choosing your media, checking your order and getting a problem resolved.",
+    "body": "",
+    "sections": [
+      {
+        "title": "Before you buy",
+        "body": "Check the event, performer, selected photos, product description and total before paying. Open the large preview to check focus and framing. Stage lighting, movement and camera sightlines affect the available coverage. Screen colour and brightness can differ from printed results; suitability for printing depends on the image and print size.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Your order and delivery",
+        "body": "Your account records your orders and eligible purchased media. A package can include media that is still being prepared; its readiness and download availability are shown separately. A saved cart or favourite does not reserve media or freeze its price. Review the final order before completing payment.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Change of mind",
+        "body": "Choose digital media carefully. DancePro does not generally provide change-of-mind refunds for correctly supplied digital products. This does not prevent a remedy for a faulty, incorrectly supplied or misdescribed product, or otherwise limit your rights under Australian Consumer Law.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "When something is wrong",
+        "body": "Contact DancePro through My Messages or info@dancepro.com.au with your order number, event, filename and a description of the problem. Keep any error message. We will assess the issue and arrange the remedy required by Australian Consumer Law, which may include repair, replacement or refund depending on the circumstances. Viewing a preview or downloading a file does not waive those rights. You do not have to accept account credit instead of a refund when a refund is required by law.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      }
+    ]
+  },
+  "terms-discounts": {
+    "eyebrow": "Terms · Discounts & credits",
+    "heading": "Discount Terms & Conditions",
+    "description": "How codes, bulk discounts and account credit apply to your order.",
+    "body": "",
+    "sections": [
+      {
+        "title": "Enter your code before payment",
+        "body": "Enter a discount code in the cart before proceeding to checkout and check that it appears in the order review. Codes are not applied retrospectively to completed purchases. If an advertised code does not work as expected, contact DancePro before paying.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Code validity and usage",
+        "body": "One code can be applied to an order. A code must be active and within its validity dates, and may have an overall or per-customer usage limit. A percentage code reduces the selected purchase total by its percentage; a fixed-value code is capped at that total. Any unused part of a fixed-value code is not automatically saved as account credit. Check the conditions supplied with the offer.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Concerts and competitions are separate discount groups",
+        "body": "Eligible concert photos from the same studio count together, including photos from different concerts and years in the same purchase. Each other studio has a separate total. Each competition event has its own eligible total. Competition purchases do not contribute to a concert discount, and separate competition events do not combine for bulk discounts. Previous purchases are not added to a new order to reach a threshold.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "How discounts combine",
+        "body": "When you select several carts, the discount code is applied once across the selected order and allocated between its carts. The code reduces each eligible cart total before its bulk-discount threshold and amount are calculated. A code can therefore move a cart below a bulk threshold. Available bulk tiers are shown below; the final order review shows the applied savings. Special studio pricing does not qualify for bulk discounts.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Account credit",
+        "body": "Available account credit can be selected at checkout and is applied after discounts. It does not increase the eligible spend used for a bulk threshold. Only the credit needed for that order is used; any remaining balance stays on the account. Review the amount to pay before confirming.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Changes and corrections",
+        "body": "The prices and offers shown for a new order may change. A completed order is not retrospectively repriced because a later promotion becomes available. These discount conditions do not exclude Australian Consumer Law rights, including remedies for misleading pricing or incorrectly supplied purchases.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      }
+    ]
+  },
+  "terms-downloads": {
+    "eyebrow": "Terms · Downloads & access",
+    "heading": "Downloads & access",
+    "description": "Release dates, access windows, saving files and keeping your media safe.",
+    "body": "",
+    "sections": [
+      {
+        "title": "Access and release",
+        "body": "Studio and event codes protect galleries. Use only access you are authorised to hold, and do not publish codes or account passwords. Adding a studio gives access to its eligible concert photo galleries; competitions require their event access code. Concert video access follows its separate entitlement and studio release process.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Readiness and expiry",
+        "body": "Follow the availability and expiry displayed for each product in My Media. Photo and video parts of a package can become available at different times. A concert can have different streaming and download windows. Save the files you want before their download deadline; online access is not an indefinite backup service.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Saving several files",
+        "body": "Concert video downloads are individual files. The download manager requests those files in sequence rather than creating one large ZIP. Your browser may ask you to allow multiple downloads. Allow sufficient device storage and a reliable connection, and check that each file finishes saving. Other products show their own available download options.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Playback, backups and expired access",
+        "body": "Compatibility with phones, televisions, USB devices and media players depends on the device and file format. Keep your own backups in more than one safe place. Contact DancePro if a file is missing, faulty or inaccessible. Reactivating expired access depends on the entitlement and retained media, and is not guaranteed indefinitely; this does not limit remedies required by law.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      }
+    ]
+  },
+  "terms-family": {
+    "eyebrow": "Terms · Family sharing",
+    "heading": "Family accounts & sharing",
+    "description": "Understand the difference between your family account and a concert sharing invitation.",
+    "body": "",
+    "sections": [
+      {
+        "title": "Your family account",
+        "body": "The family manager can add and remove members and set the permissions available in My Family. A dancer-only profile without account access is used for competition searches and is managed by the parent or account manager. A member who needs account access must have a unique invitation email and accept the invitation using the required verified account.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Permissions and shared purchases",
+        "body": "Accepted members can use their own galleries, favourites and cart. Purchasing and viewing or downloading shared media depend on their assigned permissions. Eligible existing and future family purchases are shared automatically, subject to the original release, expiry and access rules. Orders, payment details, account credit and Studio Hub permissions are not shared. Joining a family does not transfer ownership of another member’s purchases.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Leaving or changing access",
+        "body": "The family manager can change permissions or remove a member. Members can leave through My Family and keep their own purchases, while access obtained only through the family ends. Accounts can belong to one family at a time. Removing access cannot recall files already downloaded. Do not share another person’s private information or media publicly.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Concert invitations for relatives",
+        "body": "Where enabled, concert Family sharing lets an account holder invite up to three recipients per concert without sharing the account password. A recipient verifies their email. Invitations must be accepted within 14 days, with access lasting up to 30 days after acceptance and never beyond the original concert availability. The invitation displays the actual limits.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Shared-video downloads and revocation",
+        "body": "Where a concert invitation allows downloading, it is intended for one saved copy per video; up to three download requests allow for mistakes or retries. A request is counted when a download link is issued, not when the device confirms a complete file. Renewing access does not reset that allowance. The sender can revoke the invitation, but cannot recall saved copies. Use these invitations privately, not as public distribution links.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      }
+    ]
+  },
+  "terms-licences": {
+    "eyebrow": "Terms · Media licences",
+    "heading": "Media licences & permitted use",
+    "description": "Personal purchases, studio promotion and protecting performers.",
+    "body": "",
+    "sections": [
+      {
+        "title": "Personal media",
+        "body": "Unless a different licence is agreed, a customer purchase provides personal, non-commercial use of the supplied media. You may save and back up your purchased files, and crop, edit, print or share purchased photos for personal purposes. Buying a file does not transfer copyright or authorise resale, sublicensing or public distribution of a gallery or concert.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Business and studio use",
+        "body": "Business websites, business social media, advertising and other promotional or income-generating uses require the appropriate permission. Studio and organiser permissions may be set out separately in their booking or licence agreement. Where DancePro grants promotional use with attribution, follow that agreement; credit may identify DancePro Photography & Video, www.dancepro.com.au or @DanceProPhoto. Contact us before using media commercially if your permission is unclear.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Previews, performers and venue rules",
+        "body": "Gallery watermarks identify previews; they are not a substitute for purchasing a licensed file. Do not remove watermarks or reuse unpaid previews as purchased media. Respect the privacy of other performers, especially children. Keep gallery codes private and follow the venue and organiser’s rules about audience photography and video recording. Raise a privacy or safety concern with DancePro promptly.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      }
+    ]
+  },
+  "terms-bookings": {
+    "eyebrow": "Terms · Bookings & events",
+    "heading": "Bookings & event conditions",
+    "description": "Quotes, studio responsibilities, changes and event-specific agreements.",
+    "body": "",
+    "sections": [
+      {
+        "title": "Submitting and confirming a booking",
+        "body": "Submitting a studio booking sends it to DancePro for review; it does not confirm every requested date. A received booking may still be awaiting scheduling. Check the approval status for each event in Studio Hub, including where only part of a booking is approved. The applicable quote, minimum spend, rate and invoice set out your financial arrangements.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Studio event information",
+        "body": "Check the date, venue, arrival or setup time, start and finish times for each event. Request changes as soon as you find an error. Provide the reserved-seat details, family numbers where required, programmes and supplied videos or slideshows through the relevant Studio Hub actions by their displayed due dates. Requirements vary by event; dress rehearsal photography does not require a concert programme.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Changes, cancellations and photo shoots",
+        "body": "Contact DancePro promptly if an event or shoot needs to change. Cancellation, rescheduling, deposits, included images and payment deadlines follow the specific booking or quote supplied to you. Different services and promotions may have different conditions; a cancellation schedule from an older photo-shoot offer does not automatically apply to a concert booking. Nothing in a booking condition removes a remedy required by Australian Consumer Law.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      },
+      {
+        "title": "Review and release",
+        "body": "Where studio review is required, the studio checks the concert video and submits corrections or authorises release through Studio Hub. Families can access released media only when the relevant release and access requirements are met. Use the provided studio communication tools to give families the correct account and media instructions.",
+        "visible": true,
+        "link_label": "",
+        "link_url": ""
+      }
+    ]
+  }
+}

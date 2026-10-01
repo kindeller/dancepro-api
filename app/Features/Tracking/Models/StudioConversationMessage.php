@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['uuid', 'studio_id', 'scheduling_event_id', 'sender_user_id', 'direction', 'channel', 'sender_name', 'sender_email', 'recipient_email', 'subject', 'body', 'sent_at', 'staff_read_at', 'studio_read_at'])]
+#[Fillable(['photo_release_group_id', 'uuid', 'studio_id', 'scheduling_event_id', 'sender_user_id', 'direction', 'channel', 'sender_name', 'sender_email', 'recipient_email', 'subject', 'body', 'sent_at', 'staff_read_at', 'studio_read_at'])]
 class StudioConversationMessage extends Model
 {
     use HasPublicUuid;

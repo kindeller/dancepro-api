@@ -1,9 +1,9 @@
-@extends('layouts.public', ['title' => $concert->name.' photos', 'footerLabel' => 'Concert photos'])
+@extends('layouts.public', ['title' => $concert->photoGalleryTitle().' photos', 'footerLabel' => 'Concert photos'])
 
 @php
     $headerConcertRoutes = $concertRoutes ?? ['show' => 'customer.concerts.photos.show'];
     $headerConcertHomeUrl = $concertHomeUrl ?? route('customer.media.index');
-    $headerParentUrl = $selected
+    $headerParentUrl = $selected && ! ($flatPortraitGallery ?? false)
         ? route($headerConcertRoutes['show'], array_filter(['concert' => $concert, 'group' => $selectedGroup?->uuid])).'#gallery-content'
         : $headerConcertHomeUrl;
 @endphp
@@ -11,8 +11,6 @@
 
 @push('styles')
 <style>
-    .concert-intro { padding:34px 0; }
-    .concert-intro h1 { margin-bottom:8px; font-size:clamp(32px,5vw,54px); }
     .concert-tabs { display:flex; width:100%; max-width:100%; align-items:flex-end; overflow-x:auto; margin:0 0 28px; border-bottom:2px solid #cddbe1; }
     .concert-tabs a { flex:0 0 auto; padding:11px 20px; border-radius:9px 9px 0 0; color:#38505d; font-weight:800; text-decoration:none; }
     .concert-tabs a[aria-current="page"] { margin-bottom:-2px; border:2px solid #cddbe1; border-bottom-color:#fff; background:#fff; color:#087eae; }
@@ -20,14 +18,7 @@
     .concert-selection-links { display:flex; flex:0 0 auto; gap:7px; margin-left:auto; padding-left:18px; }
     .concert-tabs .concert-selection-links a { display:inline-flex; align-items:center; gap:8px; margin:0 0 5px; padding:9px 13px; border:1px solid #bfd0d8; border-radius:9px; background:#fff; }
     .concert-selection-links svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-    .concert-folders,.concert-photos { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,240px)); gap:16px; align-items:start; }
-    .concert-folder { display:flex; min-width:0; overflow:hidden; flex-direction:column; padding:0; text-decoration:none; }
-    .concert-folder-cover { display:block; width:100%; aspect-ratio:4/3; object-fit:cover; background:#10202c; }
-    .concert-folder-placeholder { display:grid; width:100%; aspect-ratio:4/3; place-items:center; background:#10202c; color:#8ddcff; font-size:38px; }
-    .concert-folder-copy { display:flex; min-height:132px; flex:1; flex-direction:column; padding:16px 18px; }
-    .concert-folder-copy strong { display:block; font-size:18px; line-height:1.3; }
-    .concert-folder-meta { display:block; margin-top:7px; color:var(--muted); font-size:14px; font-weight:700; }
-    .concert-folder-action { display:block; margin-top:auto; padding-top:16px; color:#0879a7; font-weight:850; }
+    .concert-photos { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,240px)); gap:16px; align-items:start; }
     .concert-products { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,270px)); gap:14px; margin:4px 0 30px; }
     .concert-product { display:flex; min-height:220px; flex-direction:column; align-items:center; padding:22px 18px 17px; text-align:center; }
     .concert-product-symbol { display:grid; width:52px; height:52px; margin-bottom:13px; place-items:center; border-radius:15px; background:#e5f6fd; color:#087bab; }
@@ -103,19 +94,28 @@
         'percent' => (int) $commerceSettings->get("bulk_{$tier}_percent"),
     ])->filter(fn (array $tier) => $tier['percent'] > 0);
 @endphp
-<section class="hero concert-intro"><div class="container"><div class="eyebrow">Concert photos</div><h1>{{ $concert->name }}</h1>@if($concert->event_date)<p class="lead">{{ $concert->event_date->format('j M Y') }}</p>@endif</div></section>
+<section class="hero"><div class="container">@include('customers._heading', ['headingImageUrl' => $concert->studio->logoUrl(), 'eyebrow' => 'Concert photos', 'heading' => $concert->photoGalleryTitle(), 'description' => ($flatPortraitGallery ? 'Browse your dress rehearsal portraits.' : 'Browse your concert photos.').($concert->event_date ? ' · '.$concert->event_date->format('j M Y') : '')])</div></section>
 <section class="section" id="gallery-content"><div class="container">
-    <nav class="concert-tabs" aria-label="Concert gallery"><a href="{{ route($concertRoutes['show'], $concert) }}" aria-current="page">Albums</a><span class="concert-selection-links"><a href="{{ $favouritesUrl }}" data-favourites-tab><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 8.5c0 5-8.8 11-8.8 11s-8.8-6-8.8-11a4.6 4.6 0 0 1 8.8-1.8 4.6 4.6 0 0 1 8.8 1.8Z"/></svg>Favourites @if($displayFavouriteCount)<span class="concert-tab-count">{{ $displayFavouriteCount }}</span>@endif</a><a href="{{ $cartUrl }}" data-cart-tab><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 11h11.5l2-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>Cart @if($displayCartCount)<span class="concert-tab-count">{{ $displayCartCount }}</span>@endif</a></span></nav>
+    <nav class="concert-tabs" aria-label="Concert gallery"><a href="{{ route($concertRoutes['show'], $concert) }}" aria-current="page">{{ $flatPortraitGallery ? 'Photos' : 'Albums' }}</a><span class="concert-selection-links"><a href="{{ $favouritesUrl }}" data-favourites-tab><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 8.5c0 5-8.8 11-8.8 11s-8.8-6-8.8-11a4.6 4.6 0 0 1 8.8-1.8 4.6 4.6 0 0 1 8.8 1.8Z"/></svg>Favourites @if($displayFavouriteCount)<span class="concert-tab-count">{{ $displayFavouriteCount }}</span>@endif</a><a href="{{ $cartUrl }}" data-cart-tab><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2l2.1 11h11.5l2-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>Cart @if($displayCartCount)<span class="concert-tab-count">{{ $displayCartCount }}</span>@endif</a></span></nav>
+    @php
+        $breadcrumbConcert = $selected?->concert ?? $concert;
+        $galleryBreadcrumbs = [
+            ['label' => $concert->studio->name, 'url' => route($usesAccountSelections ? 'customer.profile.studio' : 'guest-galleries.studios.show', $concert->studio)],
+            ['label' => $breadcrumbConcert->name, 'url' => route($concertRoutes['show'], $breadcrumbConcert).'#gallery-content'],
+        ];
+        if ($selected && !$flatPortraitGallery) $galleryBreadcrumbs[] = ['label' => $selected->name];
+    @endphp
+    <x-gallery-breadcrumbs :items="$galleryBreadcrumbs" />
     @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
     @if($errors->any())<p class="error" role="alert">{{ $errors->first() }}</p>@endif
     @if($selected)
-        <p><a href="{{ route($concertRoutes['show'], array_filter(['concert' => $concert, 'group' => $selectedGroup?->uuid])).'#gallery-content' }}">← {{ $selectedGroup?->name ?? 'All albums' }}</a></p><h2>{{ $selected->name }}</h2>
+        @if(!$flatPortraitGallery)<h2>{{ $selected->name }}</h2>@endif
         @if($photos->isNotEmpty())
         <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden"><symbol id="concert-photo-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m4 18 5-5 3 3 3-4 5 5"/></symbol><symbol id="concert-cart-icon" viewBox="0 0 24 24"><path d="M3 4h2l2.1 11h11.5l2-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></symbol><symbol id="concert-heart-icon" viewBox="0 0 24 24"><path d="M20.8 8.5c0 5-8.8 11-8.8 11s-8.8-6-8.8-11a4.6 4.6 0 0 1 8.8-1.8 4.6 4.6 0 0 1 8.8 1.8Z"/></symbol></svg>
         <div class="concert-products">
             <article class="card concert-product"><span class="concert-product-symbol"><svg viewBox="0 0 24 24"><use href="#concert-photo-icon"/></svg></span><h3>Individual photos</h3><p class="concert-product-price">{{ $priceText }} <span style="font-size:14px">each</span></p><p class="concert-product-note">Choose one photo or select several</p><div class="concert-product-actions"><button class="concert-icon-button" type="button" data-start-selection="add" data-tooltip="Add to cart · {{ $priceText }} each" aria-label="Choose photos to add to cart"><svg><use href="#concert-cart-icon"/></svg></button><button class="concert-icon-button" type="button" data-start-selection="favourite" data-tooltip="Add to favourites" aria-label="Choose photos to add to favourites"><svg><use href="#concert-heart-icon"/></svg></button></div></article>
-            @if($bulkDiscountTiers->isNotEmpty())
-                <article class="card concert-product"><span class="concert-product-symbol" aria-hidden="true" style="font-size:25px;font-weight:850">%</span><h3>Bulk photo discounts</h3><ul class="concert-discount-tiers">@foreach($bulkDiscountTiers as $tier)<li><span>Spend ${{ number_format($tier['threshold'] / 100, 0) }}</span><strong>Save {{ $tier['percent'] }}%</strong></li>@endforeach</ul><p class="concert-product-note">Applied automatically to eligible photos from this event. $1 studio principal images are excluded.</p></article>
+            @if(empty($shopping['principalPrice']) && $bulkDiscountTiers->isNotEmpty())
+                <article class="card concert-product"><span class="concert-product-symbol" aria-hidden="true" style="font-size:25px;font-weight:850">%</span><h3>Bulk photo discounts</h3><ul class="concert-discount-tiers">@foreach($bulkDiscountTiers as $tier)<li><span>Spend ${{ number_format($tier['threshold'] / 100, 0) }}</span><strong>Save {{ $tier['percent'] }}%</strong></li>@endforeach</ul><p class="concert-product-note">Applied automatically to eligible photos from this event.</p></article>
             @endif
         </div>
         <div class="concert-selection-bar" id="concert-selection-bar" hidden><strong id="concert-selection-count">0 photos selected on this page</strong><button class="button" type="button" id="concert-selection-submit">Add selected to cart</button><button type="button" id="concert-selection-cancel">Cancel</button></div>
@@ -140,10 +140,11 @@
         @else<div class="empty"><p>No photos are available in this album yet.</p></div>@endif
     @elseif($selectedGroup)
         <p><a href="{{ route($concertRoutes['show'], $concert).'#gallery-content' }}">← All concert albums</a></p><h2>{{ $selectedGroup->name }}</h2>
-        @if($collections->isNotEmpty())<div class="concert-folders">@foreach($collections as $album)@php($albumCover=$album->galleryFolderCoverAsset())<a class="card concert-folder" href="{{ route($concertRoutes['show'], ['concert'=>$concert,'group'=>$selectedGroup->uuid,'folder'=>$album->uuid]).'#gallery-content' }}">@if($albumCover)<img class="concert-folder-cover" src="{{ route($concertRoutes['image'], ['concert'=>$concert,'asset'=>$albumCover->uuid,'size'=>'thumbnail']) }}" alt="">@else<span class="concert-folder-placeholder" aria-hidden="true">▣</span>@endif<span class="concert-folder-copy"><strong>{{ $album->name }}</strong><span class="concert-folder-meta">Item</span>@if($selectedGroup->collections->pluck('concert_id')->unique()->count()>1)<span class="concert-folder-meta">{{ $album->concert->name }}</span>@endif<span class="concert-folder-action">View item →</span></span></a>@endforeach</div>@else<div class="empty"><p>Concert photos are being prepared.</p></div>@endif
+        @include('customers.concerts._album-cards')
     @else
-        <h2>Concert albums</h2>@php($ungrouped=$collections->filter(fn($album)=>$album->concertPhotoReleaseGroups->isEmpty()))
-        @if($groups->isNotEmpty()||$ungrouped->isNotEmpty())<div class="concert-folders">@foreach($groups as $group)@php($groupCover=$group->galleryFolderCoverAsset())<a class="card concert-folder" href="{{ route($concertRoutes['show'], ['concert'=>$concert,'group'=>$group->uuid]).'#gallery-content' }}">@if($groupCover)<img class="concert-folder-cover" src="{{ route($concertRoutes['image'], ['concert'=>$concert,'asset'=>$groupCover->uuid,'size'=>'thumbnail']) }}" alt="">@else<span class="concert-folder-placeholder" aria-hidden="true">▣</span>@endif<span class="concert-folder-copy"><strong>{{ $group->name }}</strong><span class="concert-folder-meta">Event · {{ $group->collections->count() }} {{ Str::plural('item',$group->collections->count()) }}</span><span class="concert-folder-action">View event →</span></span></a>@endforeach @foreach($ungrouped as $album)@php($albumCover=$album->galleryFolderCoverAsset())<a class="card concert-folder" href="{{ route($concertRoutes['show'], ['concert'=>$concert,'folder'=>$album->uuid]).'#gallery-content' }}">@if($albumCover)<img class="concert-folder-cover" src="{{ route($concertRoutes['image'], ['concert'=>$concert,'asset'=>$albumCover->uuid,'size'=>'thumbnail']) }}" alt="">@else<span class="concert-folder-placeholder" aria-hidden="true">▣</span>@endif<span class="concert-folder-copy"><strong>{{ $album->name }}</strong><span class="concert-folder-meta">Item</span><span class="concert-folder-action">View item →</span></span></a>@endforeach</div>@else<div class="empty"><p>Concert photos are being prepared.</p></div>@endif
+        <h2>Concert albums</h2>
+        @include('customers.concerts._album-cards')
+
     @endif
 </div></section>
 @endsection
@@ -167,7 +168,12 @@
     document.getElementById('concert-selection-cancel')?.addEventListener('click',()=>{mode=null;bar.hidden=true;grid.classList.remove('is-selecting');tiles.forEach(tile=>tile.classList.remove('is-picked'))});
     commit?.addEventListener('click',async()=>{const picked=tiles.filter(tile=>tile.classList.contains('is-picked'));commit.disabled=true;try{for(const tile of picked){const form=tile.querySelector(`[data-kind="${mode==='favourite'?'favourite':'cart'}"]`);form.elements.action.value=mode==='favourite'?'favourite':'add';await submit(form)}notice(`${picked.length} photo${picked.length===1?'':'s'} updated.`);document.getElementById('concert-selection-cancel').click()}catch(error){notice(error.message);commit.disabled=false}});
     const image=document.getElementById('concert-viewer-image'),openViewer=()=>{const tile=tiles[current];image.src=tile.dataset.preview;viewer.querySelectorAll('[data-preview-form]').forEach(form=>{form.elements.asset_uuid.value=tile.dataset.asset;setButton(form,form.dataset.kind==='cart'?tile.dataset.cart==='true':tile.dataset.favourite==='true');form.querySelector('button').disabled=form.dataset.kind==='cart'&&tile.dataset.owned==='true'});viewer.querySelector('[data-previous]').disabled=current===0;viewer.querySelector('[data-next]').disabled=current===tiles.length-1;if(!viewer.open)viewer.showModal()};
-    viewer?.querySelector('[data-close]')?.addEventListener('click',()=>viewer.close());viewer?.querySelector('[data-previous]')?.addEventListener('click',()=>{if(current>0){current--;openViewer()}});viewer?.querySelector('[data-next]')?.addEventListener('click',()=>{if(current<tiles.length-1){current++;openViewer()}});viewer?.addEventListener('click',event=>{if(event.target===viewer)viewer.close()});viewer?.addEventListener('close',()=>image.removeAttribute('src'));
+    viewer?.querySelector('[data-close]')?.addEventListener('click',()=>viewer.close());viewer?.querySelector('[data-previous]')?.addEventListener('click',()=>{if(current>0){current--;openViewer()}});viewer?.querySelector('[data-next]')?.addEventListener('click',()=>{if(current<tiles.length-1){current++;openViewer()}});viewer?.addEventListener('click',event=>{if(event.target===viewer)viewer.close()});viewer?.addEventListener('close',()=>{image.removeAttribute('src');tiles[current]?.querySelector('.concert-photo')?.focus({preventScroll:true})});
+    viewer?.addEventListener('keydown',event=>{
+        if(event.ctrlKey||event.metaKey||event.altKey||event.shiftKey||event.target.closest('input,textarea,select,[contenteditable="true"]'))return;
+        if(event.key==='ArrowLeft'){event.preventDefault();if(current>0){current--;openViewer()}}
+        if(event.key==='ArrowRight'){event.preventDefault();if(current<tiles.length-1){current++;openViewer()}}
+    });
 })();
 </script>
 @endpush

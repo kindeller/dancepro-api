@@ -5,13 +5,14 @@ namespace App\Features\Bookings\Actions;
 use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Studios\Actions\SaveStudio;
 use App\Features\Studios\Models\Studio;
+use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 class CreateStudioFromBooking
 {
     public function __construct(private readonly SaveStudio $saveStudio) {}
 
-    public function execute(ConcertBooking $booking, array $data): Studio
+    public function execute(ConcertBooking $booking, array $data, ?User $actor = null): Studio
     {
         $existingStudio = Studio::query()
             ->whereRaw('lower(trim(name)) = ?', [mb_strtolower(trim($data['name']))])
@@ -23,6 +24,6 @@ class CreateStudioFromBooking
             ]);
         }
 
-        return $this->saveStudio->execute($data);
+        return $this->saveStudio->execute($data, actor: $actor);
     }
 }

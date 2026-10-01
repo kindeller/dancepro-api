@@ -366,7 +366,7 @@ class ProgrammePreparationTest extends TestCase
         $this->assertSame($title, $programme->draftNodes()[0]['title']);
         $this->getJson($this->url($event, '/snapshot'))
             ->assertJsonPath('data.nodes.0.title', $title)
-            ->assertJsonPath('data.nodes.0.folder_title', 'VaVa Voom Thats What I Like Live Café')
+            ->assertJsonPath('data.nodes.0.folder_title', 'VaVa Voom Thats What I Like Live Cafe')
             ->assertJsonPath('data.nodes.0.folder_number', '01');
         $competition = $this->event();
         $this->start($competition);

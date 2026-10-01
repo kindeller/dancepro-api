@@ -4,6 +4,10 @@ namespace App\Features\Bookings\Services;
 
 class ConcertBookingQuote
 {
+    public const VIDEO_CONCERT_RATE_CENTS = 150000;
+
+    public const VIDEO_FAMILY_RATE_CENTS = 1500;
+
     public function calculate(array $details): array
     {
         $items = collect($details['items']);
@@ -21,7 +25,7 @@ class ConcertBookingQuote
             'families' => $families,
             'families_confirmed' => isset($details['final_family_count']),
             'video_quote_cents' => $videoConcerts > 0 && $families > 0
-                ? max($videoConcerts * 150000, $families * 1500) : null,
+                ? max($videoConcerts * self::VIDEO_CONCERT_RATE_CENTS, $families * self::VIDEO_FAMILY_RATE_CENTS) : null,
             'gst_note' => 'All amounts are in AUD and include GST.',
         ];
     }

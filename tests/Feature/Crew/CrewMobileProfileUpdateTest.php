@@ -23,8 +23,10 @@ class CrewMobileProfileUpdateTest extends TestCase
         ]);
 
         $this->withHeader('Idempotency-Key', (string) Str::uuid())
-            ->putJson('/api/v1/profile', $this->profilePayload())
+            ->putJson('/api/v1/profile', $this->profilePayload() + ['first_name' => 'Morgan', 'last_name' => 'Vale'])
             ->assertOk()
+            ->assertJsonPath('data.profile.first_name', 'Morgan')
+            ->assertJsonPath('data.profile.last_name', 'Vale')
             ->assertJsonPath('data.profile.preferred_name', 'Morgan')
             ->assertJsonPath('data.profile.address.suburb', 'Perth')
             ->assertJsonPath('data.profile.shirt_size', 'M')
@@ -37,7 +39,7 @@ class CrewMobileProfileUpdateTest extends TestCase
             ->assertJsonPath('data.onboarding_complete', true)
             ->assertJsonPath('data.onboarding_missing', []);
 
-        $this->assertSame('Morgan', $user->refresh()->name);
+        $this->assertSame('Morgan Vale', $user->refresh()->name);
         $this->assertNotNull($user->onboarding_completed_at);
         $this->assertSame('Perth', $profile->refresh()->suburb);
         $this->assertDatabaseHas('crew_vehicles', ['id' => $vehicle->id]);

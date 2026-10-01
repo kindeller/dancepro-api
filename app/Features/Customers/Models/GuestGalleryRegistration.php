@@ -21,6 +21,11 @@ class GuestGalleryRegistration extends Model
         return $this->belongsTo(SchedulingEvent::class, 'scheduling_event_id');
     }
 
+    public function studioSubscription(): BelongsTo
+    {
+        return $this->belongsTo(GuestStudioSubscription::class, 'guest_studio_subscription_id');
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

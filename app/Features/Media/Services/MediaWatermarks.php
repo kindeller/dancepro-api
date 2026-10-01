@@ -97,6 +97,15 @@ class MediaWatermarks
         });
     }
 
+    public function galleryCover(): array
+    {
+        $path = resource_path('images/watermarks/gallery-cover.png');
+        abort_unless(is_file($path), 503, 'Gallery cover artwork is unavailable.');
+
+        return ['mode' => 'image', 'path' => $path, 'text' => null, 'width_ratio' => 0.82,
+            'fingerprint' => 'gallery-cover-v1:'.hash_file('sha256', $path)];
+    }
+
     public function competition(?SchedulingEvent $event): array
     {
         $watermark = $event ? CompetitionGallerySetting::where('scheduling_event_id', $event->id)

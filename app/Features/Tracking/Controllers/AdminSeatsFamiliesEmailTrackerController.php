@@ -4,7 +4,7 @@ namespace App\Features\Tracking\Controllers;
 
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Tracking\Actions\SaveConcertTrackerTaskFields;
-use App\Features\Tracking\Requests\UpdateBookingTrackerBarRequest;
+use App\Features\Tracking\Requests\UpdateTaskTrackerBarRequest;
 use App\Features\Tracking\Services\BookingTrackerBar;
 use App\Features\Tracking\Services\ConcertTracker;
 use App\Features\Tracking\Support\ConcertTrackerTaskCatalog;
@@ -14,7 +14,7 @@ use Illuminate\Http\RedirectResponse;
 
 class AdminSeatsFamiliesEmailTrackerController extends Controller
 {
-    public function __invoke(UpdateBookingTrackerBarRequest $request, SchedulingEvent $schedulingEvent, SaveConcertTrackerTaskFields $save, ConcertTracker $tracker, BookingTrackerBar $bar, string $taskKey = 'final_numbers_email'): JsonResponse|RedirectResponse
+    public function __invoke(UpdateTaskTrackerBarRequest $request, SchedulingEvent $schedulingEvent, SaveConcertTrackerTaskFields $save, ConcertTracker $tracker, BookingTrackerBar $bar, string $taskKey = 'final_numbers_email'): JsonResponse|RedirectResponse
     {
         abort_unless($schedulingEvent->event_type->value === 'concert', 404);
         abort_unless(in_array($taskKey, ConcertTrackerTaskCatalog::GUARDED_EMAIL_TASKS, true), 404);

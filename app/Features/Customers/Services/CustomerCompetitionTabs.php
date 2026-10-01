@@ -4,7 +4,7 @@ namespace App\Features\Customers\Services;
 
 use App\Features\Customers\Models\CustomerConcertPhotoSelection;
 use App\Features\Customers\Models\CustomerMediaSelection;
-use App\Features\Customers\Models\CustomerStudio;
+use App\Features\Families\Services\FamilyGalleryAccess;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
 
@@ -12,7 +12,7 @@ class CustomerCompetitionTabs
 {
     public function forEvent(User $user, SchedulingEvent $event): array
     {
-        $studioLogoUrl = CustomerStudio::query()->where('user_id', $user->id)
+        $studioLogoUrl = app(FamilyGalleryAccess::class)->studios($user)
             ->whereNotNull('access_verified_at')
             ->whereHas('studio', fn ($query) => $query->where('status', 'active')->whereNotNull('logo_path'))
             ->with('studio')->get()->pluck('studio')->sortBy('name')->first()?->logoUrl();

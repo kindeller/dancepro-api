@@ -33,6 +33,16 @@ class BookingInvoiceSource
             throw ValidationException::withMessages(['invoice' => 'Confirm final family numbers before creating the video invoice.']);
         }
 
-        return ['description' => "Concert videography · {$quote['video_concerts']} concerts · {$quote['families']} unique performing families", 'quantity' => 1, 'unit_cents' => $quote['video_quote_cents']];
+        $familyRate = $quote['families'] * ConcertBookingQuote::VIDEO_FAMILY_RATE_CENTS
+            > $quote['video_concerts'] * ConcertBookingQuote::VIDEO_CONCERT_RATE_CENTS;
+        $concerts = $quote['video_concerts'].' '.($quote['video_concerts'] === 1 ? 'concert' : 'concerts');
+
+        return [
+            'description' => $familyRate
+                ? "Concert Video - Online Delivery - Family Rate ({$concerts})"
+                : 'Concert Video - Online Delivery - Flat Rate (per concert)',
+            'quantity' => $familyRate ? $quote['families'] : $quote['video_concerts'],
+            'unit_cents' => $familyRate ? ConcertBookingQuote::VIDEO_FAMILY_RATE_CENTS : ConcertBookingQuote::VIDEO_CONCERT_RATE_CENTS,
+        ];
     }
 }

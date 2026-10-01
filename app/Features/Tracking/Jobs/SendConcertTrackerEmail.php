@@ -10,8 +10,10 @@ use App\Features\Tracking\Mail\ConcertTrackerMessage;
 use App\Features\Tracking\Models\ConcertTrackerEmailDelivery;
 use App\Features\Tracking\Services\ConcertEmailRehearsal;
 use App\Features\Tracking\Services\PhotoReleaseEmails;
+use App\Features\Tracking\Services\PhotoReleaseMessageContent;
 use App\Features\Tracking\Services\TrackerEmailContext;
 use App\Features\Tracking\Support\ConcertTrackerTaskCatalog;
+use App\Features\Tracking\Support\SeatsFamiliesEmailContent;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -66,16 +68,27 @@ class SendConcertTrackerEmail implements ShouldQueue
 
         try {
             $delivery->update(['is_simulated' => $simulated, 'status' => 'queued', 'queued_at' => $delivery->queued_at ?? now()]);
+            $releaseAction = $delivery->photo_release_group_id ? app(PhotoReleaseMessageContent::class)->action($delivery) : null;
             Mail::to($delivery->recipient_email, $delivery->recipient_name)
                 ->send(new ConcertTrackerMessage(
                     $delivery->subject,
                     $delivery->body,
                     route('concert-tracker.email-open', $delivery),
-                    $delivery->studio_invoice_id ? route('customer.studio-invoices.show', [$delivery->event->studio, StudioInvoice::findOrFail($delivery->studio_invoice_id)]) : ($delivery->event?->studio ? route($delivery->photo_release_group_id ? 'customer.profile.studio' : 'customer.studio-communications.index', $delivery->event->studio) : route('customer.media.index')),
+                    $releaseAction[0] ?? (in_array($delivery->task->task_key, ['final_numbers_email', 'concert_week_email', 'post_concert_email'], true) ? SeatsFamiliesEmailContent::url($delivery->event) : ($delivery->studio_invoice_id ? route('customer.studio-invoices.show', [$delivery->event->studio, StudioInvoice::findOrFail($delivery->studio_invoice_id)]) : ($delivery->event?->studio ? route($delivery->photo_release_group_id ? 'customer.profile.studio' : 'customer.studio-communications.index', $delivery->event->studio) : route('customer.media.index')))),
                     $delivery->created_by_user_id,
+                    $releaseAction[1] ?? (in_array($delivery->task->task_key, ['final_numbers_email', 'concert_week_email', 'post_concert_email'], true) ? 'Open Concert events' : 'Log into your DancePro account'),
+                    $releaseAction[2] ?? match ($delivery->task->task_key) {
+                        'final_numbers_email' => 'Confirm event details, family numbers and reserved seats under Your actions.',
+                        'concert_week_email' => 'Check each event and upload programmes, videos and slideshows under Your actions.',
+                        'post_concert_email' => 'Check outstanding uploads and follow photo and video progress for each event.',
+                        default => 'View event details, messages and replies in one place.',
+                    },
                 ));
             DB::transaction(function () use ($delivery): void {
                 $delivery->update(['status' => 'sent', 'sent_at' => now(), 'failure_message' => null, 'failed_at' => null]);
+                if ($delivery->photo_release_group_id) {
+                    app(PhotoReleaseMessageContent::class)->sent($delivery);
+                }
                 app(SetSeatsFamiliesDeadline::class)->execute($delivery);
                 app(InvoiceTrackerWorkflow::class)->sent($delivery);
                 $task = $delivery->task;
@@ -83,7 +96,7 @@ class SendConcertTrackerEmail implements ShouldQueue
                 if (in_array($task->task_key, ['slideshow_received', 'invoice_sent', 'payment_received', 'photo_release'], true)) {
                     return;
                 }
-                $before = $task->only(['status', 'status_override', 'completed_by_user_id', 'completed_at']);
+                $before = $task->only(['status', 'status_override', 'assignee_user_id', 'completed_by_user_id', 'completed_at']);
                 $task->update([
                     'status' => 'complete',
                     'status_override' => in_array($task->task_key, ConcertTrackerTaskCatalog::GUARDED_EMAIL_TASKS, true) ? null : $task->status_override,
@@ -95,7 +108,7 @@ class SendConcertTrackerEmail implements ShouldQueue
                     'user_id' => $delivery->created_by_user_id,
                     'action' => 'email_sent',
                     'before' => json_encode($before, JSON_THROW_ON_ERROR),
-                    'after' => json_encode($task->only(['status', 'status_override', 'completed_by_user_id', 'completed_at']), JSON_THROW_ON_ERROR),
+                    'after' => json_encode($task->only(['status', 'status_override', 'assignee_user_id', 'completed_by_user_id', 'completed_at']), JSON_THROW_ON_ERROR),
                     'created_at' => now(),
                 ]);
             });

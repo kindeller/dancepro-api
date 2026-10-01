@@ -51,6 +51,9 @@ class CustomerMediaEmail extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         $message = (new MailMessage)->subject($this->subject);
+        if ($notifiable instanceof User) {
+            $message->greeting('Hi '.$notifiable->emailGreetingName().',');
+        }
         foreach (preg_split('/\R{2,}/', trim($this->body)) ?: [] as $paragraph) {
             $message->line($paragraph);
         }

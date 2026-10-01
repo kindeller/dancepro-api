@@ -27,7 +27,7 @@ class MediaCommerceSettings
         'ready_email_body' => 'Your media is ready in My Media. Sign in to view it.',
         'expiry_email_subject' => 'Your DancePro downloads expire soon',
         'expiry_email_body' => 'Sign in to My Media to download your purchase before it expires.',
-        'help_content' => "Need help with your media? Contact DancePro and include your event name and order number.\n\nPurchased media and download links will appear in My Media when delivery is enabled.",
+        'help_content' => 'Find your galleries, manage your account and make the most of your photos and videos. Browse a topic or search below.',
     ];
 
     public function all(): array

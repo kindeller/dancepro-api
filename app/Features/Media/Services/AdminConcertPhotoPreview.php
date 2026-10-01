@@ -2,6 +2,7 @@
 
 namespace App\Features\Media\Services;
 
+use App\Features\Customers\Services\ConcertPhotoPreview;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +23,13 @@ class AdminConcertPhotoPreview
             && $asset->status->value === 'available',
             404,
         );
+
+        if ($size === 'cover') {
+            $key = app(ConcertPhotoPreview::class)->key($asset, 'cover');
+
+            return Storage::disk('local')->response($key, $asset->uuid.'-cover.jpg',
+                ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'private, no-store'], 'inline');
+        }
 
         $useThumbnail = $size === 'thumbnail'
             && $asset->thumbnail_storage_disk

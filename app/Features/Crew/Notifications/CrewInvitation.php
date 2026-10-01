@@ -27,7 +27,7 @@ class CrewInvitation extends Notification
 
         return (new MailMessage)
             ->subject('Welcome to DancePro Crew')
-            ->greeting("Hi {$notifiable->name},")
+            ->greeting('Hi '.$notifiable->emailGreetingName().',')
             ->line('You have been invited to the DancePro Crew Hub.')
             ->line('Use this secure link to choose your password, sign in and complete your crew profile.')
             ->action('Set up my DancePro account', $url)

@@ -7,7 +7,9 @@ use App\Features\Customers\Services\CustomerCompetitionAccess;
 use App\Features\Customers\Services\CustomerMediaArchives;
 use App\Features\Customers\Services\CustomerMediaReviewExamples;
 use App\Features\Customers\Services\CustomerPurchasedMedia;
+use App\Features\Media\Services\StoredGalleryCover;
 use App\Features\Orders\Actions\RecordPurchasedMediaDownload;
+use App\Features\Orders\Services\AuthorizePurchasedMediaDownload;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
@@ -38,9 +40,14 @@ class CustomerMediaLibraryController extends Controller
     {
         $album = $purchases->albumForUser($request->user(), $kind, $event);
         if ($kind === 'competition') {
-            abort_unless($access->allows($request->user(), $album['event']), 403);
+            abort_unless(collect($purchases->forUser($request->user())['photos'])->contains(fn ($card) => $card['event']->uuid === $event && $card['can_browse']), 403);
         }
         $media = $album['assets']->firstWhere('uuid', $asset);
+        abort_unless($media, 404);
+        if ($request->validated('size') === 'cover') {
+            return app(StoredGalleryCover::class)->response(
+                $media->storage_disk, $media->storage_key, (string) $media->updated_at);
+        }
         abort_unless($media && $media->thumbnail_storage_disk && $media->thumbnail_storage_key, 404);
         $disk = Storage::disk($media->thumbnail_storage_disk);
         abort_unless($disk->exists($media->thumbnail_storage_key), 404);
@@ -54,6 +61,11 @@ class CustomerMediaLibraryController extends Controller
         $album = $purchases->albumForUser($request->user(), $kind, $event, $request->validated('routine'));
         $assets = $album['assets'];
         abort_if($assets->count() < 2, 404);
+        foreach ($assets as $asset) {
+            if ($entitlement = $album['entitlementByAsset']->get($asset->id)) {
+                app(AuthorizePurchasedMediaDownload::class)->execute($request->user(), $entitlement, $asset);
+            }
+        }
         $archiveTitle = $album['selectedFolder']['title'] ?? $album['title'];
         $archive = $archives->archive($request->user(), $kind, $event, $archiveTitle, $assets);
         foreach ($assets as $asset) {

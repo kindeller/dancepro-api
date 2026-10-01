@@ -1,7 +1,8 @@
 @extends('layouts.crew', ['title' => $trainingCourse->title])
 
 @section('content')
-<div class="page-heading"><div><div class="crew-hub-brand"><img src="{{ asset('images/brand/dancepro-icon-blue.png') }}" alt=""><span>CREW HUB</span></div><h1>{{ $trainingCourse->title }}</h1><p class="muted">{{ $trainingCourse->description }}</p></div><a class="button secondary" href="{{ route('crew.training.index') }}">Back to My Training</a></div>
+<div class="page-heading"><div>@include('crew._brand')
+<h1>{{ $trainingCourse->title }}</h1><p class="muted">{{ $trainingCourse->description }}</p></div><a class="button secondary" href="{{ route('crew.training.index') }}">Back to My Training</a></div>
 @if($enrolment->status === 'completed')<div class="notice" style="margin:16px 0">✓ Completed {{ $enrolment->completed_at->format('j F Y, g:i a') }}. This record remains in your training history.</div>@endif
 
 @foreach($trainingCourse->sections as $section)

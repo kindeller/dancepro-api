@@ -34,7 +34,7 @@ struct ConcertEditorView: View {
         }.buttonStyle(.borderedProminent).disabled(model.busy)
       }
       Text(
-        "Pause capture and copying before saving. Folder numbers follow this order; titles keep punctuation. Cancel discards edits. Saved combinations have no one-click undo."
+        "Pause capture and copying before saving. Folder numbers follow this order. Saving removes accents from folder names; programme titles keep their original spelling and punctuation. Cancel discards edits. Saved combinations have no one-click undo."
       )
       .font(.callout).foregroundStyle(.secondary)
       List {

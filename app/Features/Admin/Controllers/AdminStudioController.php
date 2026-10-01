@@ -67,7 +67,7 @@ class AdminStudioController extends Controller
 
     public function store(SaveStudioRequest $request, SaveStudio $saveStudio): RedirectResponse
     {
-        $studio = $saveStudio->execute($request->validated());
+        $studio = $saveStudio->execute($request->validated(), actor: $request->user());
 
         return redirect()->route('admin.studios.edit', $studio)->with('status', 'Studio created.');
     }
@@ -76,7 +76,7 @@ class AdminStudioController extends Controller
     {
         Gate::authorize('manageStudios');
 
-        $studio->load(['contacts', 'accountAccesses.user', 'concerts' => fn ($query) => $query
+        $studio->load(['contacts.user', 'accountAccesses.user', 'concerts' => fn ($query) => $query
             ->withCount('mediaCollections')
             ->orderByDesc('event_date')
             ->orderBy('name')]);
@@ -102,7 +102,7 @@ class AdminStudioController extends Controller
 
     public function update(SaveStudioRequest $request, Studio $studio, SaveStudio $saveStudio): RedirectResponse
     {
-        $saveStudio->execute($request->validated(), $studio);
+        $saveStudio->execute($request->validated(), $studio, $request->user());
 
         return back()->with('status', 'Studio updated.');
     }

@@ -15,24 +15,21 @@
 @include('admin.media._photo-gallery-tabs')
 <p class="muted">Uploaded photos from both photographers appear together. Customer access requires gallery readiness. Video upload status and HOLD are managed separately.</p>
 @if($stale)<p class="card card-pad">These photos use an earlier programme. Reconciliation is needed before customer release.</p>@endif
-<nav aria-label="Gallery folders" class="toolbar" style="margin-bottom:20px">
-    <a href="{{ route('admin.competition-gallery.show', $event) }}">{{ $eventCode }}</a>
-    @foreach($breadcrumbs as $crumb)
-        <span aria-hidden="true">/</span>
-        @if($loop->last)<strong aria-current="page">{{ $crumb['label'] }}</strong>
-        @else<a href="{{ route('admin.competition-gallery.show', ['schedulingEvent' => $event, 'folder' => $crumb['uuid']]) }}">{{ $crumb['label'] }}</a>@endif
-    @endforeach
-</nav>
+@php
+        $galleryBreadcrumbs = [['label' => $event->name, 'url' => route('admin.competition-gallery.show', $event).'#gallery-content']];
+        foreach ($breadcrumbs as $crumb) $galleryBreadcrumbs[] = ['label' => $crumb['label'], 'url' => route('admin.competition-gallery.show', ['schedulingEvent' => $event, 'folder' => $crumb['uuid']]).'#gallery-content'];
+    @endphp
+    <x-gallery-breadcrumbs :items="$galleryBreadcrumbs" />
 @if($selectedSection && isset($sectionReadiness[$selectedSection]))
     @include('admin.programmes._section-readiness', ['readiness' => $sectionReadiness[$selectedSection]])
 @endif
 @if($children)
     <div class="backend-gallery-grid">
         @foreach($children as $child)
-            <div class="card backend-gallery-card">
+            <div class="card backend-gallery-card gallery-navigation-card">
                 <div class="media-grant-target">
                     <a class="backend-gallery-card-media" href="{{ route('admin.competition-gallery.show', ['schedulingEvent' => $event, 'folder' => $child['uuid']]) }}" aria-label="Open {{ $child['label'] }}">
-                        @if($child['cover_uuid'] ?? null)<img src="{{ route('admin.competition-gallery.image', ['schedulingEvent' => $event, 'photo' => $child['cover_uuid'], 'size' => 'thumbnail']) }}" alt="" loading="lazy">@else<span class="backend-gallery-card-placeholder" aria-hidden="true">▱</span>@endif
+                        @if($child['cover_uuid'] ?? null)<img src="{{ route('admin.competition-gallery.image', ['schedulingEvent' => $event, 'photo' => $child['cover_uuid'], 'size' => 'cover']) }}" alt="" loading="lazy">@else<span class="backend-gallery-card-placeholder" aria-hidden="true">▱</span>@endif
                     </a>
                     @if($child['kind'] === 'item')<x-admin.media-grant-button source-kind="competition_item" :event-uuid="$event->uuid" :source-uuid="$child['uuid']" :label="'Add all photos from '.$child['label'].' to a customer account'" :aria-label="'Add '.$child['label'].' to an account'" />@endif
                 </div>
@@ -44,6 +41,7 @@
                         <div class="backend-gallery-card-meta">{{ ucfirst($child['kind']) }}</div>
                     @endif
                 </a>
+                <div class="gallery-nav-footer"><a class="gallery-nav-action" href="{{ route('admin.competition-gallery.show', ['schedulingEvent' => $event, 'folder' => $child['uuid']]) }}">View {{ $child['kind'] === 'item' ? 'routine' : strtolower($child['kind']) }} <span aria-hidden="true">→</span></a></div>
             </div>
         @endforeach
     </div>
@@ -65,7 +63,7 @@
             @foreach($photos as $photo)
                 <figure class="card" style="position:relative;margin:0;overflow:hidden">
                     <div class="media-grant-target">
-                        <a href="{{ route('admin.competition-gallery.image', ['schedulingEvent' => $event, 'photo' => $photo->uuid]) }}" target="_blank" rel="noopener" aria-label="Open preview of {{ $photo->file_name }}">
+                        <a href="{{ route('admin.competition-gallery.image', ['schedulingEvent' => $event, 'photo' => $photo->uuid]) }}" data-gallery-preview target="_blank" rel="noopener" aria-label="Open preview of {{ $photo->file_name }}">
                             <img src="{{ route('admin.competition-gallery.image', ['schedulingEvent' => $event, 'photo' => $photo->uuid, 'size' => 'thumbnail']) }}" alt="{{ $photo->file_name }}" loading="lazy" style="display:block;width:100%;height:auto">
                         </a>
                         <x-admin.media-grant-button source-kind="competition_photo" :event-uuid="$event->uuid" :source-uuid="$photo->uuid" :label="'Add '.$photo->file_name.' to a customer account'" :aria-label="'Add '.$photo->file_name.' to an account'" />
@@ -90,5 +88,6 @@
 @else
     <p class="card card-pad">{{ $selected ? 'No competitors in this folder yet.' : 'Confirm a competition programme to create the gallery folders.' }}</p>
 @endif
+<x-gallery-photo-viewer />
 @include('admin.customers._grant-dialog')
 @endsection

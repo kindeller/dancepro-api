@@ -47,6 +47,11 @@ class CustomerMessagesController extends Controller
     {
         $inbox->read($notification, $request->user());
 
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Notification marked as read.',
+                'data' => ['counts' => $inbox->counts($request->user())]])->header('Cache-Control', 'private, no-store');
+        }
+
         return back()->with('status', 'Notification marked as read.');
     }
 

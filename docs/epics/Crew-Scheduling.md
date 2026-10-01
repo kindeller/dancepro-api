@@ -8,6 +8,8 @@ collaborative, trust-based working culture.
 
 ## Current Status
 
+Admin Event Availability includes pending concert/DR portrait bookings in the same chronological, paginated spreadsheet as scheduled shifts. Pending rows link to booking review, show requested times and venue, and remain closed to crew responses and bulk roster/availability actions. Approval replaces the preview with a draft scheduled shift; requesting crew availability remains separate. Studio, search, event-type and Pending approval filters are supported, including the tracker 2.1 studio snapshot.
+
 The Crew Hub also includes a tabbed **My Crew** contact directory. Active crew
 members can see crew names and phone numbers and open a private My Chat
 conversation. Competition entries show the event organiser and phone number.

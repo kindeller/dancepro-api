@@ -5,6 +5,7 @@
 <section class="section"><div class="container">
     @if(session('status'))<div class="card card-body message-notice" role="status">{{ session('status') }}</div>@endif
     @if($errors->any())<div class="card card-body message-notice" role="alert">{{ $errors->first() }}</div>@endif
+    <p class="meta"><a href="{{ route('customer.media.help') }}#article-guide-messages-guide">How notifications, conversations and email preferences work</a></p>
     @if($messageTab === 'new')
         <div class="card card-body"><h2>New message</h2><p class="meta">Send us a question. Your message and our replies will stay together in Conversations.</p>@include('customers.messages._form')</div>
     @elseif($messageTab === 'conversations')
@@ -14,14 +15,19 @@
         @empty<div class="card inbox-empty"><h2>No conversations yet</h2><p>Send us a message whenever you need help with your account, events or orders.</p><a class="button" href="{{ route('customer.messages.index', ['tab' => 'new']) }}">New message</a></div>@endforelse</div>
         {{ $conversations->links() }}
     @else
+        <p class="message-notice" data-notification-feedback role="status" hidden></p>
         <div class="inbox-list">@forelse($notifications as $notification)
-            <article class="card card-body inbox-row {{ !$notification->read_at ? 'unread' : '' }}"><div class="inbox-meta"><span>{{ $notification->occurred_at->format('j M Y, g:i a') }}</span>@if(!$notification->read_at)<strong>Unread</strong>@endif</div><h2>{{ $notification->subject }}</h2><div class="inbox-body">{{ $notification->body }}</div>
+            <details class="card inbox-row notification-row {{ !$notification->read_at ? 'unread' : '' }}">
+                <summary class="notification-summary"><time datetime="{{ $notification->occurred_at->toIso8601String() }}"><span>{{ $notification->occurred_at->format('j M Y') }}</span> <span>{{ $notification->occurred_at->format('g:i a') }}</span></time><span class="notification-status {{ !$notification->read_at ? 'is-unread' : '' }}" aria-live="polite">{{ $notification->read_at ? 'Read' : 'Unread' }}</span><span class="notification-heading">{{ $notification->subject }}</span>@if(!$notification->read_at)<button class="button secondary notification-read" type="submit" form="notification-read-{{ $notification->uuid }}" data-notification-read>Mark as read</button>@endif<span class="notification-toggle" aria-hidden="true">⌄</span></summary>
+                <div class="notification-details"><div class="inbox-body">{{ $notification->body }}</div>
                 @if($notification->email_status)<p class="message-hint">Email: {{ match($notification->email_status) { 'sent' => 'sent', 'queued' => 'queued', 'failed' => 'delivery failed — this update is available here', 'suppressed' => 'not sent', 'simulated' => 'saved to test inbox', default => $notification->email_status } }}@if($notification->email_sent_at) · {{ $notification->email_sent_at->format('j M Y, g:i a') }}@endif</p>@endif
-                <div class="inbox-actions">@if($notification->action_url)<a class="button secondary" href="{{ $notification->action_url }}">{{ $notification->action_label ?: 'View details' }}</a>@endif @if(!$notification->read_at)<form method="post" action="{{ route('customer.messages.read', $notification) }}">@csrf<button class="button secondary">Mark as read</button></form>@endif</div>
-            </article>
+                <div class="inbox-actions">@if($notification->action_url)<a class="button secondary" href="{{ $notification->action_url }}">{{ $notification->action_label ?: 'View details' }}</a>@endif @if(!$notification->read_at)<form id="notification-read-{{ $notification->uuid }}" method="post" action="{{ route('customer.messages.read', $notification) }}" data-notification-read-form hidden>@csrf</form>@endif</div>
+                </div>
+            </details>
         @empty<div class="card inbox-empty"><h2>You’re up to date</h2><p>Your order confirmations, gallery announcements and media updates will appear here.</p></div>@endforelse</div>
         {{ $notifications->links() }}
     @endif
 </div></section>
 @include('customers._tab-scroll')
+@include('customers.messages._notification-read')
 @endsection

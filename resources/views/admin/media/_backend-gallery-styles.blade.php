@@ -16,12 +16,6 @@
         text-decoration: none;
     }
 
-    .backend-gallery-card:hover {
-        border-color: var(--brand);
-        text-decoration: none;
-        transform: translateY(-1px);
-    }
-
     .backend-gallery-card-media {
         display: grid;
         width: 100%;

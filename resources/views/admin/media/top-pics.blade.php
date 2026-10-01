@@ -10,15 +10,12 @@
 <a href="{{ route('admin.top-pics.index', ['type' => $value]) }}" @if($type === $value) aria-current="page" @endif>{{ $label }}</a>
 @endforeach
 </nav>
-<div class="backend-gallery-grid">
+@if($type === 'concert')
+@include('admin.media._concert-studio-browser', ['topPicsOnly' => true, 'indexRoute' => 'admin.top-pics.index', 'eventRoute' => 'admin.top-pics.show'])
+@else
+<div class="gallery-navigation-grid">
 @forelse($events as $event)
-<a class="card backend-gallery-card" href="{{ route('admin.top-pics.show', $event) }}">
-    <div class="backend-gallery-card-media"><img src="{{ route($type === 'competition' ? 'admin.competition-gallery.image' : 'admin.concert-photo-gallery.image', ['schedulingEvent' => $event, 'photo' => $event->cover_uuid, 'size' => 'thumbnail']) }}" alt="" loading="lazy"></div>
-    <div class="backend-gallery-card-body"><strong class="backend-gallery-card-title">{{ $event->name }}</strong>
-        @if($type === 'concert')<div class="backend-gallery-card-meta">{{ $event->studio?->name }}</div>@endif
-        <div class="backend-gallery-card-meta">{{ $event->event_date?->format('j M Y') }} · {{ $event->top_pic_count }} Top {{ $event->top_pic_count == 1 ? 'Pic' : 'Pics' }}</div>
-    </div>
-</a>
+<x-gallery-navigation-card :title="$event->name" :image="route('admin.competition-gallery.image', ['schedulingEvent' => $event, 'photo' => $event->cover_uuid, 'size' => 'cover'])" :subtitle="$event->event_date?->format('j M Y').' · '.$event->top_pic_count.' Top '.Str::plural('Pic', $event->top_pic_count)" :href="route('admin.top-pics.show', $event)" action="View Top Pics" />
 @empty
 <section class="card card-pad"><h2>No Top Pics yet</h2><p>Star photos in the uploader and upload them to see each {{ $type }} here.</p></section>
 @endforelse
@@ -28,4 +25,5 @@
 <span>Page {{ $events->currentPage() }} of {{ $events->lastPage() }}</span>
 @if($events->nextPageUrl())<a class="button secondary" href="{{ $events->nextPageUrl() }}">Next</a>@endif
 </nav>
+@endif
 @endsection

@@ -21,6 +21,7 @@ class AdminBrandingMediaTest extends TestCase
     {
         parent::setUp();
         Storage::fake('s3_concerts');
+        Storage::fake('local');
         $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
         $this->assertNotFalse($key);
         $this->assertTrue(openssl_pkey_export($key, $privateKey));
@@ -87,14 +88,14 @@ class AdminBrandingMediaTest extends TestCase
         $programKey = "concerts/{$concert->uuid}/documents/program.pdf";
         Storage::disk('s3_concerts')->assertExists($coverKey);
         Storage::disk('s3_concerts')->assertExists($programKey);
-        $cover = $this->get(route('concerts.cover', $concert))->assertRedirectContains('https://media.dancepro.test/'.$coverKey);
+        $cover = $this->get(route('concerts.cover', $concert))->assertOk()->assertHeader('Content-Type', 'image/jpeg');
         $program = $this->get(route('concerts.program', $concert))->assertRedirectContains('https://media.dancepro.test/'.$programKey);
-        $this->assertStringContainsString('v='.$concert->cover_image_revision, $cover->headers->get('Location'));
+        $this->assertNotSame(Storage::disk('s3_concerts')->get($coverKey), $cover->streamedContent());
         $this->assertStringContainsString('v='.$concert->program_revision, $program->headers->get('Location'));
 
         auth()->logout();
         $this->get(route('concerts.program', $concert))->assertForbidden();
-        $this->get(route('concerts.cover', $concert))->assertRedirectContains('https://media.dancepro.test/'.$coverKey);
+        $this->get(route('concerts.cover', $concert))->assertOk()->assertHeader('Content-Type', 'image/jpeg');
 
         $this->actingAs(User::factory()->staff()->create());
         $digest = $this->get(route('admin.branding.concerts.program.confirm-delete', $concert))
@@ -170,9 +171,6 @@ class AdminBrandingMediaTest extends TestCase
 
     private function image(string $name): UploadedFile
     {
-        return UploadedFile::fake()->createWithContent(
-            $name,
-            base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/dNsAAAAASUVORK5CYII='),
-        );
+        return UploadedFile::fake()->image($name, 600, 400);
     }
 }

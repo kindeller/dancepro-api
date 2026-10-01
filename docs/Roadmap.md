@@ -40,6 +40,7 @@ it does not prevent isolated local foundation work.
 - Inspection: [Stage 1 implementation map](milestones/Integrated-Media-Stage-1-Inspection.md).
 - Publicity TV pilot: [Fire OS slideshows and screen pairing](milestones/Publicity-TV-Slideshows.md).
 - Active customer web milestone: [Customer web gallery](milestones/Customer-Web-Gallery.md).
+- Portfolio galleries: **started, deferred**. Third gallery type is reserved and hidden while empty; see the Portfolio entry in the customer web milestone. Full workflow remains for a later request.
 - Customer access and shared API foundation: [Customer access and mobile API](milestones/Customer-Access-and-Mobile-API.md).
 - Uploader milestone: [Mac uploader concert edits and local queue](milestones/Mac-Uploader-Concert-Edits-and-Queue.md).
 - Move Photos: [local reassignment](milestones/Mac-Uploader-Move-Photos.md).
@@ -100,8 +101,8 @@ it does not prevent isolated local foundation work.
   missing-detail prompts. Concert video lookup uses the selected year and registered
   studios; concert photo links open those studios’ galleries. My Profile now supports
   contact details, editable/removable dancers with programme-name aliases, studio
-  removal and saved email preferences. Family permissions and device-specific
-  saving remain pending. My Dancers now suggests ready competition
+  removal and saved email preferences. My Family now supports verified invitations,
+  eligible purchase sharing and account permissions; device-specific saving remains pending. My Dancers now suggests ready competition
   routines from saved names and aliases while Whole Event remains available.
   My Studios’ Routines now uses explicit admin studio assignments on competitor
   albums and only suggests ready sections to registered customers who saved that
@@ -197,3 +198,45 @@ implementing milestone rather than asking all questions upfront. Early needs:
 recorder source; programme samples have now been inspected. Later
 needs include customer mobile technology, mixed-media expiry, accounting,
 archive costs, HOLD interaction, deadlines and the permission matrix.
+
+Admin messaging now uses a single Message Centre for customers, studios and crew email, backed by the existing conversation records and delivery services. Crew Hub chat remains separate, with a link from the Message Centre. Five navy quick-access icons expose Availability, Tracker, My Hub, My Media and Messages. Sidebar shortcuts are grouped under Hub management and Media management. See the Customer Web Gallery milestone for verification.
+
+
+Concert delivery follow-up (28 September 2026): local uploader-to-director-release
+and customer-download integration is verified in the customer web gallery
+milestone. Existing legacy object references are preserved. Concerts retain the
+multiple-file download manager rather than ZIPs. Live catalogue mapping and
+production storage/delivery verification remain rollout prerequisites.
+
+Concert family invitations are implemented locally (28 September 2026), including
+email verification, limited-time viewing, three download requests per shared video,
+revocation, studio controls and approximate activity. The customer-web milestone
+records verification and the remaining live media/email rollout checks. This does
+not complete the separate family cart/payment-permissions scope.
+
+Website Management is implemented locally (28 September 2026): structured page
+editing with draft previews and publishing, scheduling-event visibility, approved
+crew biography snapshots, and shared public/customer Help articles. Home, About
+and Services share the Media navigation; role-specific hubs occupy a second row.
+See the website handbook and Customer Web Gallery milestone. Public content and
+images need owner review before rollout; the current live website is unchanged.
+
+Website content refresh (28 September 2026): fuller existing-site details are now
+adapted to current booking, quotes, approvals and account delivery. Homepage
+events use an automatic six-month window with manual hide overrides; competitions
+show dates/venues and concerts show deduplicated studio logos. About includes
+editable placeholder biographies. Missing event/studio artwork remains a content
+review item; Portfolio gallery automation remains deferred.
+
+Public website visual design (28 September 2026): curated real concert/competition
+photography, responsive WebP assets, photographic headings, editorial service
+layouts and accessible motion. Media branding images remain in Media interfaces.
+The existing page editor, published text and automatic event rules are retained.
+
+- Homepage account access: guest sign-in/registration actions, signed-in Media
+  shortcuts, three setup steps, concert/competition imagery and a smaller organiser
+  section. Public website photo assignments now avoid reuse and match each service.
+
+### Customer families (29 September 2026)
+
+Implemented the web My Family profile, dancer-to-account upgrades, explicit verified invitations, per-member media/purchase permissions and automatic eligible-purchase sharing. Individual carts, orders and payment details remain private. Native family management screens, multiple-family membership and manager transfer are future follow-ups. See [Customer family accounts](decisions/Customer-Family-Accounts.md).

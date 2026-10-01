@@ -2,6 +2,7 @@
 
 namespace App\Features\Programmes\Actions;
 
+use App\Features\Media\Services\ConcertPhotoGallerySetup;
 use App\Features\Programmes\Models\ProgrammePhotoContribution;
 use App\Features\Programmes\Models\ProgrammePhotoFile;
 use App\Features\Programmes\Services\UploadAudit;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 
 class ReservePhotoFiles
 {
-    public function __construct(private readonly RegisterPhotoContributions $register) {}
+    public function __construct(private readonly RegisterPhotoContributions $register, private readonly ConcertPhotoGallerySetup $galleries) {}
 
     public function execute(SchedulingEvent $event, User $user, array $input): array
     {
@@ -46,6 +47,11 @@ class ReservePhotoFiles
                 // A changed favourite is metadata, not a different file version.
                 if ($file->status === 'reserved' && $file->is_top_pic !== (bool) $photo['is_top_pic']) {
                     $file->update(['is_top_pic' => $photo['is_top_pic']]);
+                }
+                // A resumed upload may already be verified, so the client will not
+                // send its bytes again. Repair any missing private album entry here.
+                if ($file->status === 'verified') {
+                    $this->galleries->syncVerifiedPhoto($event, $file);
                 }
                 $files[] = [
                     'uuid' => $file->uuid, 'photo_uuid' => $file->client_photo_uuid,

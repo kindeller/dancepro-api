@@ -6,6 +6,8 @@ use App\Features\Concerts\Models\Concert;
 use App\Features\Customers\Models\GuestGalleryAccess;
 use App\Features\Programmes\Models\CompetitionGallerySetting;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Studios\Models\Studio;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -27,9 +29,27 @@ class GuestGalleryAccessManager
     public function unlockConcert(Request $request, Concert $concert, string $email, string $code): GuestGalleryAccess
     {
         abort_unless($this->catalogue->concertIsReleased($concert), 404);
-        $this->verifyCode($concert->studio->gallery_code_hash, $code);
+        if (! $concert->studio->matchesPhotoAccessCode($code)) {
+            throw ValidationException::withMessages(['login_code' => 'The studio code is incorrect. Please check and try again.']);
+        }
 
         return $this->create($request, 'concert', $email, concert: $concert);
+    }
+
+    public function unlockStudio(Request $request, Studio $studio, string $email, string $code): GuestGalleryAccess
+    {
+        $concert = $this->catalogue->concerts($studio)->firstWhere('released', true)['concert'] ?? null;
+        abort_unless($concert, 404);
+
+        return $this->unlockConcert($request, $concert, $email, $code);
+    }
+
+    public function studioAccess(Request $request, Studio $studio): ?GuestGalleryAccess
+    {
+        return GuestGalleryAccess::whereIn('uuid', $request->session()->get('guest_gallery_accesses', []))
+            ->where('gallery_type', 'concert')->where('expires_at', '>', now())
+            ->whereHas('concert', fn ($query) => $query->where('studio_id', $studio->id))
+            ->orderByDesc('expires_at')->first();
     }
 
     public function competition(Request $request, SchedulingEvent $event): GuestGalleryAccess
@@ -39,14 +59,21 @@ class GuestGalleryAccessManager
 
     public function concert(Request $request, Concert $concert): GuestGalleryAccess
     {
-        return $this->find($request, 'concert', null, $concert->id);
+        $grant = $this->studioAccess($request, $concert->studio);
+        abort_unless($grant, 403, 'Enter your email and studio access code to view these galleries.');
+        abort_unless($this->catalogue->concertIsReleased($concert), 404);
+
+        // Retain event-specific shopping records while sharing studio authorisation.
+        // Browsing another event must not extend the code's original expiry.
+        return $this->create($request, 'concert', $grant->email, concert: $concert, expiresAt: $grant->expires_at);
     }
 
-    private function create(Request $request, string $type, string $email, ?SchedulingEvent $event = null, ?Concert $concert = null): GuestGalleryAccess
+    private function create(Request $request, string $type, string $email, ?SchedulingEvent $event = null, ?Concert $concert = null, ?CarbonInterface $expiresAt = null): GuestGalleryAccess
     {
         $email = mb_strtolower(trim($email));
         $emailHash = hash('sha256', $email);
-        $access = DB::transaction(function () use ($type, $event, $concert, $email, $emailHash): GuestGalleryAccess {
+        $expiresAt ??= now()->addDays(30);
+        $access = DB::transaction(function () use ($type, $event, $concert, $email, $emailHash, $expiresAt): GuestGalleryAccess {
             $access = GuestGalleryAccess::query()->where('gallery_type', $type)->where('email_hash', $emailHash)
                 ->when($event, fn ($query) => $query->where('scheduling_event_id', $event->id))
                 ->when($concert, fn ($query) => $query->where('concert_id', $concert->id))
@@ -54,11 +81,11 @@ class GuestGalleryAccessManager
             if (! $access) {
                 $access = GuestGalleryAccess::create([
                     'gallery_type' => $type, 'scheduling_event_id' => $event?->id, 'concert_id' => $concert?->id,
-                    'email_hash' => $emailHash, 'email' => $email, 'expires_at' => now()->addDays(30),
+                    'email_hash' => $emailHash, 'email' => $email, 'expires_at' => $expiresAt,
                     'last_used_at' => now(),
                 ]);
             }
-            $access->update(['email' => $email, 'expires_at' => now()->addDays(30), 'last_used_at' => now()]);
+            $access->update(['email' => $email, 'expires_at' => $expiresAt, 'last_used_at' => now()]);
 
             return $access;
         });

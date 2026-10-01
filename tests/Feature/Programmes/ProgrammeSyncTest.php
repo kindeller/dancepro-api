@@ -53,6 +53,19 @@ class ProgrammeSyncTest extends TestCase
         $this->assertSame("It's Ballet / Jazz!", ProgrammeUploadPlan::first()->snapshot['nodes'][0]['title']);
     }
 
+    public function test_accepts_legacy_and_accent_free_folders_without_changing_display_titles(): void
+    {
+        [$event, , $revision, $body] = $this->fixture();
+        $body['nodes'][0]['title'] = "BREAKI\u{0301}N DISHES";
+        $body['nodes'][0]['folder_title'] = $body['nodes'][0]['title'];
+        $first = $this->postJson($this->url($event), $body)->assertOk()->json('data.uuid');
+        $body['base_plan_uuid'] = $first;
+        $body['nodes'][0]['folder_title'] = 'BREAKIN DISHES';
+        $this->postJson($this->url($event), $body)->assertOk();
+        $this->assertSame($body['nodes'][0]['title'], ProgrammeUploadPlan::latest('id')->first()->snapshot['nodes'][0]['title']);
+        $this->assertSame('Dance 1', $revision->fresh()->snapshot['nodes'][0]['title']);
+    }
+
     public function test_split_and_combine_preserve_original_ids_in_separate_immutable_plans(): void
     {
         [$event, , , $body] = $this->fixture();

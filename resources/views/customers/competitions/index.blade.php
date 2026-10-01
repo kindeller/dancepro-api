@@ -1,7 +1,7 @@
 @extends('layouts.public', ['title' => 'My Competitions', 'footerLabel' => 'Competition media'])
 
 @section('content')
-<section class="hero"><div class="container"><div class="eyebrow">DancePro Media</div><h1>My Competitions</h1><p class="lead">Choose your event and enter its login code.</p></div></section>
+<section class="hero"><div class="container">@include('customers._heading', ['eyebrow' => 'DancePro Media', 'heading' => 'My Competitions', 'description' => 'Choose your event and enter its login code.'])</div></section>
 <section class="section"><div class="container">
     <p><a href="{{ route('customer.media.index') }}">← My Media</a></p>
     <form method="POST" action="{{ route('customer.competitions.store') }}" class="card card-body" style="margin-bottom:28px;max-width:520px">
@@ -21,14 +21,12 @@
         <button class="button">Add competition</button>
     </form>
     @if($registrations->isNotEmpty())
-        <div class="grid">
+        <div class="gallery-navigation-grid">
             @foreach($registrations as $registration)
                 @php($event = $registration->event)
-                <a class="card card-body" style="text-decoration:none" href="{{ route('customer.competitions.show', $event) }}">
-                    @if($event->crewLogoUrl())<img src="{{ $event->crewLogoUrl() }}" alt="{{ $presentation[$event->uuid]['title'] }} logo" style="width:auto;height:auto;max-width:100%;max-height:160px;margin:0 auto 18px">@endif
-                    <h3>{{ $presentation[$event->uuid]['title'] }}</h3>
-                    <div class="meta">{{ $event->eventCode() }} · {{ $event->event_date?->format('j M Y') }}</div>
-                </a>
+                <x-gallery-navigation-card :title="$presentation[$event->uuid]['title']" :image="$event->crewLogoUrl()" :logo="true"
+                    :subtitle="$event->event_date?->format('j M Y') ?? 'Date to be confirmed'"
+                    :href="route('customer.competitions.show', $event)" action="View event" />
             @endforeach
         </div>
     @else<div class="empty"><h2>Your competitions will appear here</h2><p>Select your event above and use the login code supplied for that event.</p></div>@endif

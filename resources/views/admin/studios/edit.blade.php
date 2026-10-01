@@ -13,17 +13,6 @@
     @include('admin.studios._form', ['submitLabel' => 'Save studio'])
 </form>
 <section class="card card-pad" style="margin-top:24px">
-    <h2>Customer gallery code</h2>
-    <p class="muted">{{ $studio->gallery_code_hash ? 'A gallery code is set for this studio.' : 'Set a gallery code so customers can add this studio to My Profile.' }} This is separate from the studio’s internal code and concert video codes.</p>
-    <form method="POST" action="{{ route('admin.studios.gallery-code.update', $studio) }}">@csrf
-        <input type="hidden" name="version" value="{{ $studio->gallery_code_version }}">
-        <label>New gallery code<input type="password" name="gallery_code" minlength="3" maxlength="64" required autocomplete="new-password"></label>
-        @error('gallery_code')<p role="alert">{{ $message }}</p>@enderror
-        <p class="muted">Use 3–64 letters, numbers or hyphens. Codes are not case-sensitive. Newly saved codes are encrypted and shown to authorised studio managers in Studio Hub. Re-enter an older code once to make it displayable. Changing the code keeps studios already verified by customers.</p>
-        <div class="actions"><button>Save gallery code</button></div>
-    </form>
-</section>
-<section class="card card-pad" style="margin-top:24px">
     <h2>Studio account access</h2><p class="muted">Invite owners, directors and office contacts to the studio communication history. Access activates only for a verified DancePro account using the invited email.</p>
     <form method="POST" action="{{ route('admin.studios.account-access.store', $studio) }}" class="grid two-col">@csrf
         <label>Email<input type="email" name="email" required maxlength="255" value="{{ old('email') }}"></label>

@@ -10,6 +10,7 @@ use App\Features\Programmes\Services\PhotoUploadProgress;
 use App\Features\Programmes\Services\ProgrammeUploadRoles;
 use App\Features\Programmes\Services\SharedConcertProgramme;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use Illuminate\Support\Carbon;
 
 class ConcertPhotoUploadStatus
 {
@@ -40,11 +41,13 @@ class ConcertPhotoUploadStatus
         })->values();
         $complete = $roles->isNotEmpty() && $roles->every(fn ($role) => $role['state'] === 'complete');
 
+        $finishedAt = $complete ? $people->pluck('completed_at')->filter()->max() : null;
+
         return [
             'key' => $complete ? 'complete' : ($roles->contains('state', 'uploading') ? 'in_progress' : 'waiting'),
             'label' => $complete ? 'Complete' : ($roles->contains('state', 'uploading') ? 'Uploading' : 'Waiting'),
-            'detail' => $roles->isEmpty() ? 'No photo roles configured.' : ($complete ? 'Every photo role has confirmed Finished upload.' : 'Waiting for every photo role to confirm Finished upload.'),
-            'sourceUrl' => route('admin.photo-uploads.show', $event), 'completedAt' => null, 'activity' => null,
+            'detail' => $roles->isEmpty() ? 'No photo roles configured.' : ($complete ? 'Every photo role has completed uploading.' : 'Waiting for the uploader to record completion for every photo role.'),
+            'sourceUrl' => route('admin.photo-uploads.show', $event), 'completedAt' => $finishedAt ? Carbon::parse($finishedAt) : null, 'activity' => null,
             'photoRoles' => $roles->all(),
         ];
     }

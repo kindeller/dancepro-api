@@ -40,7 +40,7 @@ class CustomerMobileApiTest extends TestCase
         $this->withoutHeader('Authorization');
         Auth::forgetGuards();
         Auth::shouldUse('web');
-        $this->get($verify)->assertRedirect(route('customer.login'));
+        $this->get($verify)->assertRedirect(route('login'));
         Auth::forgetGuards();
         $this->withToken($token)->getJson(route('api.v1.customer.auth.me'))->assertOk()->assertJsonPath('data.email_verified', true);
         $this->withToken($token)->getJson(route('api.v1.customer.media'))->assertOk()->assertJsonStructure(['data' => ['events', 'recommendations', 'purchases']]);

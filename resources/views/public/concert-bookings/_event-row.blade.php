@@ -1,12 +1,21 @@
-<div class="booking-item" style="border-top:1px solid var(--line);padding-top:18px;margin-top:18px">
+<div class="booking-item">
     <div class="grid booking-event-heading">
         <input type="hidden" name="items[{{ $index }}][event_type_definition_id]" value="{{ data_get($row, 'event_type_definition_id') }}">
         <label>Event details<select class="event-type-select" name="items[{{ $index }}][item_type]" required><option value="concert" @selected(data_get($row, 'item_type') === 'concert')>Concert</option><option value="dress_rehearsal" @selected(data_get($row, 'item_type') === 'dress_rehearsal')>DR Portrait</option></select></label>
         <label>Event title<input name="items[{{ $index }}][title]" value="{{ data_get($row, 'title') }}" placeholder="e.g. Junior Concert"></label>
     </div>
     @php($selectedVenue = data_get($row, 'venue_uuid'))
-    <label>Venue<select name="items[{{ $index }}][venue_uuid]" class="venue-select" required><option value="">Select a venue</option><option value="other" @selected($selectedVenue === 'other')>Other venue</option>@foreach($venues as $venue)<option value="{{ $venue->uuid }}" data-address="{{ collect([$venue->address_line_1, $venue->address_line_2, trim(collect([$venue->suburb, $venue->state, $venue->postcode])->filter()->join(' '))])->filter()->join(', ') }}" @selected($selectedVenue === $venue->uuid)>{{ $venue->name }}</option>@endforeach</select></label>
-    <div class="selected-venue-address muted" style="margin-top:-8px"></div>
+    @php($venueRecord = $venues->firstWhere('uuid', $selectedVenue))
+    <div class="venue-picker">
+        <div class="venue-search-field">
+            <label for="venue-search-{{ $index }}">Venue</label>
+            <input type="hidden" name="items[{{ $index }}][venue_uuid]" class="venue-value" value="{{ $selectedVenue }}">
+            <input id="venue-search-{{ $index }}" class="venue-search" name="items[{{ $index }}][venue_search]" type="text" value="{{ $venueRecord?->name ?? data_get($row, 'venue_search') }}" placeholder="Start typing a venue name" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="venue-results-{{ $index }}" aria-describedby="venue-address-{{ $index }}" @required($selectedVenue !== 'other')>
+            <div id="venue-results-{{ $index }}" class="venue-results" role="listbox" aria-label="Matching venues" hidden></div>
+        </div>
+        <button class="button secondary other-venue-button" type="button" aria-pressed="{{ $selectedVenue === 'other' ? 'true' : 'false' }}">Other venue</button>
+    </div>
+    <div id="venue-address-{{ $index }}" class="selected-venue-address muted" aria-live="polite"></div>
     <div class="other-venue-fields grid booking-two-columns" @if($selectedVenue !== 'other') hidden @endif>
         <label>Other venue name<input name="items[{{ $index }}][venue_name]" value="{{ data_get($row, 'venue_name') }}"></label>
         <label>Other venue address<input name="items[{{ $index }}][venue_address]" value="{{ data_get($row, 'venue_address') }}"></label>

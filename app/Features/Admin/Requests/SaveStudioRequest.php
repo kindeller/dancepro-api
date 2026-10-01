@@ -7,6 +7,7 @@ use App\Features\Studios\Support\StudioStatus;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class SaveStudioRequest extends FormRequest
 {
@@ -24,6 +25,8 @@ class SaveStudioRequest extends FormRequest
                     ->unique()
                     ->implode(', '),
                 'phone' => trim((string) ($contact['phone'] ?? '')) ?: null,
+                'account_uuid' => $contact['account_uuid'] ?? null,
+                'access_role' => $contact['access_role'] ?? null,
             ] : [])
             ->filter(fn (array $contact): bool => collect($contact)->filter()->isNotEmpty())
             ->values()
@@ -63,7 +66,20 @@ class SaveStudioRequest extends FormRequest
                 }
             }],
             'contacts.*.phone' => ['nullable', 'string', 'max:50'],
+            'contacts.*.account_uuid' => ['nullable', 'uuid', 'distinct', Rule::exists('users', 'uuid')->where('type', 'customer')->where('is_active', true)->whereNull('deleted_at')->whereNull('merged_into_user_id')],
+            'contacts.*.access_role' => ['nullable', Rule::in(['owner', 'director', 'office_contact'])],
             'notes' => ['nullable', 'string', 'max:5000'],
         ];
+    }
+
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            foreach ($this->input('contacts', []) as $index => $contact) {
+                if (! empty($contact['access_role']) && empty($contact['account_uuid'])) {
+                    $validator->errors()->add("contacts.{$index}.account_uuid", 'Select a customer account before choosing Studio Hub access.');
+                }
+            }
+        }];
     }
 }

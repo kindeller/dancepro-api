@@ -24,7 +24,7 @@ class ConcertBookingItem extends Model
     public function scopeAwaitingApproval(Builder $query): Builder
     {
         return $query->where('approval_status', 'pending')->whereNull('scheduling_event_id')->whereNull('cancelled_at')
-            ->whereHas('booking', fn (Builder $booking) => $booking->whereIn('status', [ConcertBookingStatus::Pending, ConcertBookingStatus::Approved]));
+            ->whereHas('booking', fn (Builder $booking) => $booking->whereIn('status', [ConcertBookingStatus::Pending, ConcertBookingStatus::Received, ConcertBookingStatus::PartialApproval, ConcertBookingStatus::Approved]));
     }
 
     public function booking(): BelongsTo

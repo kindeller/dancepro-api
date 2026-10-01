@@ -1,5 +1,6 @@
 @extends('layouts.crew', ['title' => 'My Tasks'])
 @section('content')
+@include('crew._brand')
 <h1>My Tasks</h1>
 <p>Concert edits assigned to you. Open an event to update progress or mark editing complete.</p>
 @forelse($events as $event)

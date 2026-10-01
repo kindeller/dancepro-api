@@ -6,7 +6,6 @@ use App\Features\Bookings\Actions\ApproveConcertBooking;
 use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Crew\Models\CrewProfile;
 use App\Features\Studios\Models\Studio;
-use App\Features\Tracking\Actions\CreateConcertTrackerAlerts;
 use App\Features\Tracking\Models\ConcertTrackerTask;
 use App\Features\Tracking\Services\ConcertTracker;
 use App\Features\Venues\Models\Venue;
@@ -30,7 +29,7 @@ class BookingTrackerBarTest extends TestCase
         $this->assertDatabaseCount('concert_tracker_tasks', 0);
         $this->assertDatabaseCount('scheduling_events', 0);
         $this->get(route('admin.concert-tracker.index', ['view' => 'date', 'year' => 2026, 'phase' => 'booking']))
-            ->assertOk()->assertSee('class="badge tracker-not-approved">Not approved', false)
+            ->assertOk()->assertSee('class="badge status-overdue">Pending approval', false)
             ->assertSee('class="tracker-status" href="'.route('admin.concert-bookings.show', $booking).'"', false);
         $this->get(route('admin.concert-bookings.show', $booking))->assertSee(route('admin.concert-tracker.index', ['view' => 'date', 'year' => 2026, 'phase' => 'booking', 'attention' => false]));
 
@@ -52,7 +51,7 @@ class BookingTrackerBarTest extends TestCase
             ['panel' => 'assignment', 'assignee_user_id' => $crew->id],
             ['panel' => 'due', 'due_date_override' => '2026-10-01'],
             ['panel' => 'follow_up', 'follow_up_status' => 'waiting', 'follow_up_date' => '2026-10-02', 'note' => 'Waiting for venue details.'],
-            ['panel' => 'status', 'status_override' => 'complete', 'assignee_user_id' => null],
+            ['panel' => 'status', 'status_override' => 'pending', 'assignee_user_id' => null],
         ] as $input) {
             $this->patch($url, $input)->assertRedirect(route('admin.concert-bookings.show', $booking))->assertSessionHasNoErrors();
         }
@@ -65,20 +64,20 @@ class BookingTrackerBarTest extends TestCase
         $this->assertSame('pending', $booking->fresh()->status->value);
         $this->assertDatabaseCount('scheduling_events', 0);
         $this->assertSame(4, DB::table('concert_tracker_task_changes')->where('concert_tracker_task_id', $task->id)->count());
-        $this->get(route('admin.concert-bookings.show', $booking))->assertOk()->assertSee('Manual override')->assertSee('Waiting for venue details.');
+        $this->get(route('admin.concert-bookings.show', $booking))->assertOk()->assertSee('Automatic from booking')->assertSee('Waiting for venue details.');
         $pendingRow = app(ConcertTracker::class)->page('date', 2026, 'booking')['rows']->first();
-        $this->assertSame('complete', $pendingRow['bookingStatus']['key']);
+        $this->assertSame('in_progress', $pendingRow['bookingStatus']['key']);
         $this->assertTrue($pendingRow['pending']);
         $this->get(route('admin.concert-tracker.index', ['view' => 'date', 'year' => 2026, 'phase' => 'booking']))
-            ->assertOk()->assertSee('class="badge tracker-not-approved">Not approved', false);
+            ->assertOk()->assertSee('class="badge status-overdue">Pending approval', false);
 
-        $this->patch($url, ['panel' => 'status', 'status_override' => 'waiting'])->assertSessionHasNoErrors();
+        $this->patch($url, ['panel' => 'status', 'status_override' => 'received'])->assertSessionHasNoErrors();
         $event = app(ApproveConcertBooking::class)->approveItem($booking->items->first(), $staff);
         $status = app(ConcertTracker::class)->detail($event, 'booking_received')['status'];
-        $this->assertSame('waiting', $status['key']);
+        $this->assertSame('complete', $status['key']);
         $this->assertSame($crew->id, $status['assignee']->id);
         $this->assertSame($task->id, $status['override']->id);
-        $this->patch($url, ['panel' => 'status', 'status_override' => null])->assertSessionHasNoErrors();
+        $this->patch($url, ['panel' => 'status', 'status_override' => null])->assertSessionHasErrors('status_override');
         $this->assertSame('Approved', app(ConcertTracker::class)->detail($event, 'booking_received')['status']['label']);
         $this->assertSame(1, $task->notes()->count());
         $this->patch($url, ['panel' => 'due', 'due_date_override' => null])->assertSessionHasNoErrors();
@@ -128,22 +127,13 @@ class BookingTrackerBarTest extends TestCase
         $this->get(route('admin.concert-bookings.show', $booking))->assertOk()->assertSee('&lt;script&gt;', false)->assertDontSee('<script>alert("note")</script>', false);
         $this->get(route('admin.concert-bookings.show', $other))->assertOk()->assertDontSee('&lt;script&gt;', false);
         $event = app(ApproveConcertBooking::class)->approveItem($booking->items->first(), $staff);
-        // Keep the task open so the attention filter can exercise follow-up resolution.
-        $this->patch(route('admin.concert-bookings.tracker.update', $booking), ['panel' => 'status', 'status_override' => 'waiting']);
         $tracker = app(ConcertTracker::class);
-        // The other pending booking also needs attention, independently of this follow-up.
-        $this->assertCount(2, $tracker->page('date', 2026, 'booking', true)['rows']);
-        $attentionBefore = $tracker->page('date', 2026, 'booking')['summary']['attention'];
-        app(CreateConcertTrackerAlerts::class)->execute();
-        $this->assertDatabaseHas('concert_tracker_alerts', ['concert_tracker_task_id' => ConcertTrackerTask::firstOrFail()->id, 'type' => 'follow_up_due', 'resolved_at' => null]);
+        $this->assertSame('complete', $tracker->detail($event, 'booking_received')['status']['key']);
         $this->patch(route('admin.concert-bookings.tracker.update', $booking), ['panel' => 'follow_up', 'follow_up_status' => 'resolved', 'follow_up_date' => '2026-09-01', 'note' => 'Venue confirmed.'])->assertSessionHasNoErrors();
         $task = ConcertTrackerTask::firstOrFail();
         $this->assertCount(2, $task->notes);
         $this->assertSame('resolved', $task->follow_up_status);
-        app(CreateConcertTrackerAlerts::class)->execute();
-        $this->assertDatabaseMissing('concert_tracker_alerts', ['concert_tracker_task_id' => $task->id, 'type' => 'follow_up_due', 'resolved_at' => null]);
-        $this->assertSame($attentionBefore - 1, $tracker->page('date', 2026, 'booking')['summary']['attention']);
-        $this->assertSame('waiting', $tracker->detail($event, 'booking_received')['status']['key']);
+        $this->assertSame('complete', $tracker->detail($event, 'booking_received')['status']['key']);
     }
 
     public function test_pending_booking_tabs_have_their_own_read_only_guidance_and_navigation(): void

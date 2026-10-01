@@ -13,6 +13,8 @@ class CrewMobileProfileResource extends JsonResource
         return [
             'id' => $this->uuid,
             'preferred_name' => $this->preferred_name,
+            'first_name' => $this->user->first_name,
+            'last_name' => $this->user->last_name,
             'legal_name' => $this->legal_name,
             'email' => $this->user->email,
             'phone' => $this->phone,

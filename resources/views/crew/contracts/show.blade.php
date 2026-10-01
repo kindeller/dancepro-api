@@ -1,7 +1,9 @@
 @extends('layouts.crew', ['title' => $crewContract->name])
 
 @section('content')
-<div class="page-heading"><div><p class="eyebrow">Crew contract</p><h1>{{ $crewContract->name }}</h1><p class="muted">Version {{ $crewContract->version }}@if($crewContract->effective_from) · effective {{ $crewContract->effective_from->format('j M Y') }}@endif</p></div><a class="button secondary" href="{{ route('crew.profile.edit') }}">Back to profile</a></div>
+<div class="page-heading"><div>
+@include('crew._brand')
+<p class="eyebrow">Crew contract</p><h1>{{ $crewContract->name }}</h1><p class="muted">Version {{ $crewContract->version }}@if($crewContract->effective_from) · effective {{ $crewContract->effective_from->format('j M Y') }}@endif</p></div><a class="button secondary" href="{{ route('crew.profile.edit') }}">Back to profile</a></div>
 
 <section class="card profile-section contract-document">{!! $crewContract->content !!}</section>
 

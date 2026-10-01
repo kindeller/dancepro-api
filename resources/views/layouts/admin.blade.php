@@ -103,6 +103,18 @@
             text-align: left;
         }
 
+        .nav-shortcut-icon {
+            width: 26px;
+            height: 26px;
+            flex-shrink: 0;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+
+        .nav-shortcut .nav-notification {
+            margin-left: 0;
+        }
+
         .nav a[aria-current="page"],
         .nav a:hover,
         .nav summary:hover,
@@ -696,15 +708,17 @@
                 padding: 18px;
             }
         }
+        .admin-shortcuts{display:flex;gap:12px;align-items:center;flex-shrink:0}.admin-shortcut{position:relative;display:flex;flex-direction:column;align-items:center;text-decoration:none;color:var(--muted);gap:5px;font-size:10px;font-weight:700;white-space:nowrap}.admin-shortcut-art{display:grid;place-items:center;width:44px;height:44px;background:#021b44;border-radius:10px;border:1px solid #17375d}.admin-shortcut-art img{width:100%;height:100%;object-fit:contain;border-radius:9px}.admin-shortcut-art svg{width:28px;height:28px;stroke:white;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.admin-shortcut:hover .admin-shortcut-art,.admin-shortcut[aria-current=page] .admin-shortcut-art{outline:2px solid #00a2d4;outline-offset:2px}.admin-shortcut .nav-notification{position:absolute;left:-6px;top:-6px;min-width:19px;box-shadow:0 0 0 2px white}.admin-shortcut:focus-visible{outline:2px solid #00a2d4;outline-offset:4px;border-radius:8px}@media(max-width:1100px){.topbar{flex-wrap:wrap}.admin-shortcuts{margin-left:auto}}@media(max-width:550px){.admin-shortcuts{width:100%;justify-content:space-between;margin-top:8px;gap:8px}.admin-shortcut-art{width:40px;height:40px}.admin-shortcut{font-size:9px}}
     </style>
     @stack('styles')
+    <link rel="stylesheet" href="{{ asset('css/gallery-cards.css') }}">
 </head>
 <body>
     @include('layouts.partials.local-account-switcher')
     <div class="shell">
         <aside class="sidebar">
-            <a class="brand" href="https://www.dancepro.com.au/">
-                <img class="brand-mark" src="{{ asset('images/brand/dancepro-icon-blue-official.png') }}" alt="">
+            <a class="brand" href="{{ route('website.home') }}">
+                <img class="brand-mark" src="{{ asset('images/brand/dancepro-admin-icon.png') }}" alt="">
                 <span>DancePro Admin</span>
             </a>
 
@@ -713,18 +727,23 @@
             </button>
 
             <nav class="nav" id="admin-navigation" aria-label="Admin navigation">
-                @if(auth()->user()?->crewProfile)
-                    <a href="{{ route('crew.availability.index') }}">@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['my_hub'], 'key' => 'my_hub', 'label' => 'shift actions needing your response'])My Hub</a>
-                @endif
-                @php($hubManagementActive = request()->routeIs('admin.hub.*', 'admin.exceptions.*', 'admin.studios.*', 'admin.competition-contacts.*', 'admin.crew.*', 'admin.crew-roles.*', 'admin.crew-contracts.*', 'admin.crew-management.*', 'admin.scheduling-events.*', 'admin.event-management.*', 'admin.event-types.*', 'admin.venues.*', 'admin.operations.*', 'admin.payments.*', 'admin.timesheets.*', 'admin.concert-bookings.*', 'admin.concert-booking-events.*'))
+                @php($hubManagementActive = request()->routeIs('admin.hub.*', 'admin.exceptions.*', 'admin.studios.*', 'admin.studio-requests.*', 'admin.competition-contacts.*', 'admin.crew.*', 'admin.crew-roles.*', 'admin.crew-contracts.*', 'admin.crew-management.*', 'admin.scheduling-events.*', 'admin.event-management.*', 'admin.event-types.*', 'admin.venues.*', 'admin.operations.*', 'admin.payments.*', 'admin.timesheets.*', 'admin.concert-bookings.*', 'admin.concert-booking-events.*'))
                 <details class="nav-group {{ $hubManagementActive ? 'active' : '' }}" @if($hubManagementActive) open @endif>
                     <summary>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['hub_management'], 'key' => 'hub_management', 'label' => 'items needing attention'])Hub management</summary>
                     <div class="nav-submenu">
+                @if(auth()->user()?->crewProfile)
+                    <a class="nav-shortcut" href="{{ route('crew.availability.index') }}">
+                        @include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['my_hub'], 'key' => 'my_hub', 'label' => 'shift actions needing your response'])
+                        <img class="nav-shortcut-icon" src="{{ asset('images/brand/dancepro-crew-hub-icon.png') }}" width="26" height="26" alt="" aria-hidden="true">
+                        <span>My Hub</span>
+                    </a>
+                @endif
+
                         @can('manageScheduling')
                             <a href="{{ route('admin.hub.dashboard') }}" @if(request()->routeIs('admin.hub.*')) aria-current="page" @endif>Hub dashboard</a>
                         @endcan
                         @can('manageStudios')
-                            <a href="{{ route('admin.studios.index') }}" @if(request()->routeIs('admin.studios.*', 'admin.competition-contacts.*')) aria-current="page" @endif>Contacts</a>
+                            <a href="{{ route('admin.studios.index') }}" @if(request()->routeIs('admin.studios.*', 'admin.studio-requests.*', 'admin.competition-contacts.*')) aria-current="page" @endif>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['studio_requests'] ?? 0, 'key' => 'studio_requests', 'label' => 'Studio requests awaiting review'])Contacts</a>
                         @endcan
                         @can('manageCrew')
                             <a href="{{ route('admin.crew.index') }}" @if(request()->routeIs('admin.crew.*', 'admin.crew-roles.*', 'admin.crew-contracts.*', 'admin.crew-management.*')) aria-current="page" @endif>Crew management</a>
@@ -737,15 +756,21 @@
                         @endcan
                     </div>
                 </details>
+                @php($competitionPhotosActive = request()->routeIs('admin.competition-gallery.*') || (request()->routeIs('admin.photo-uploads.*') && request()->route('schedulingEvent')?->event_type->value === 'competition'))
+                @php($mediaActive = request()->routeIs('admin.dashboard', 'admin.concert-tracker.*', 'admin.publicity.*', 'admin.top-pics.*', 'admin.concerts.*', 'admin.concert-photo-gallery.*', 'admin.competition.objects.*', 'admin.competition-gallery.*', 'admin.competition-videos.*', 'admin.download-links.*', 'admin.media-settings.*') || $competitionPhotosActive)
+                <details class="nav-group {{ $mediaActive ? 'active' : '' }}" @if($mediaActive) open @endif>
+                    <summary>@include('layouts.partials.notification-badge', ['count'=>$concertTrackerAttentionCount + $adminNavigationIndicators['my_media'], 'key'=>'media_management', 'label'=>'media and tracker items needing attention'])Media management</summary>
+                    <div class="nav-submenu">
+                @if(auth()->user()?->canAccessCustomer())
+                    <a class="nav-shortcut" href="{{ route('customer.media.index') }}">@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['customers'], 'key' => 'customers', 'label' => 'customer actions needing attention'])
+                        <img class="nav-shortcut-icon" src="{{ asset('images/brand/dancepro-media-icon.png') }}" width="26" height="26" alt="" aria-hidden="true">
+                        <span>My Media</span>
+                    </a>
+                @endif
                 @can('manageScheduling')
                     <a href="{{ route('admin.concert-tracker.index', ['year' => $concertTrackerNotificationYear]) }}" @if(request()->routeIs('admin.concert-tracker.*')) aria-current="page" @endif>@if($concertTrackerAttentionCount)<span class="nav-notification" title="Tasks and pending events needing attention in {{ $concertTrackerNotificationYear }}">{{ $concertTrackerAttentionCount }}</span>@endif Concert tracker</a>
-                    <a href="{{ route('admin.concert-tracker.studio-communications.index') }}" @if(request()->routeIs('admin.concert-tracker.studio-communications.*')) aria-current="page" @endif>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['studio_messages'], 'key' => 'studio_messages', 'label' => 'unread studio messages']) Studio messages</a>
                 @endcan
-                @php($competitionPhotosActive = request()->routeIs('admin.competition-gallery.*') || (request()->routeIs('admin.photo-uploads.*') && request()->route('schedulingEvent')?->event_type->value === 'competition'))
-                @php($mediaActive = request()->routeIs('admin.dashboard', 'admin.publicity.*', 'admin.top-pics.*', 'admin.concerts.*', 'admin.concert-photo-gallery.*', 'admin.competition.objects.*', 'admin.competition-gallery.*', 'admin.competition-videos.*', 'admin.download-links.*', 'admin.media-settings.*') || $competitionPhotosActive)
-                <details class="nav-group {{ $mediaActive ? 'active' : '' }}" @if($mediaActive) open @endif>
-                    <summary>Media</summary>
-                    <div class="nav-submenu">
+
                         <a href="{{ route('admin.dashboard') }}" @if(request()->routeIs('admin.dashboard')) aria-current="page" @endif>Media dashboard</a>
                         @can('manageConcerts')
                             <a href="{{ route('admin.concerts.index') }}" @if(request()->routeIs('admin.concerts.*')) aria-current="page" @endif>Concert media</a>
@@ -759,6 +784,15 @@
                         <a href="{{ route('admin.media-settings.index') }}" @if(request()->routeIs('admin.media-settings.*')) aria-current="page" @endif>Gallery settings</a>
                     </div>
                 </details>
+                @can('manageWebsite')
+                @php($websiteActive = request()->routeIs('admin.website.*'))
+                <details class="nav-group {{ $websiteActive ? 'active' : '' }}" @if($websiteActive) open @endif><summary>@include('layouts.partials.notification-badge', ['count'=>$adminNavigationIndicators['website_management'], 'key'=>'website_management', 'label'=>'website items needing review'])Website Management</summary><div class="nav-submenu">
+                    <a href="{{ route('admin.website.pages.index') }}" @if(request()->routeIs('admin.website.pages.*')) aria-current="page" @endif>Pages</a>
+                    <a href="{{ route('admin.website.events.index') }}" @if(request()->routeIs('admin.website.events.*')) aria-current="page" @endif>Events</a>
+                    <a href="{{ route('admin.website.bios.index') }}" @if(request()->routeIs('admin.website.bios.*')) aria-current="page" @endif>@include('layouts.partials.notification-badge', ['count'=>$adminNavigationIndicators['website_bios'], 'key'=>'website_bios', 'label'=>'crew biographies needing review'])Crew bios</a>
+                    <a href="{{ route('admin.website.help.index') }}" @if(request()->routeIs('admin.website.help.*')) aria-current="page" @endif>Help &amp; FAQ</a>
+                </div></details>
+                @endcan
                 @php($salesActive = request()->routeIs('admin.orders.*', 'admin.media-sales.*', 'admin.studio-invoices.*'))
                 <details class="nav-group {{ $salesActive ? 'active' : '' }}" @if($salesActive) open @endif><summary>Sales &amp; reports</summary><div class="nav-submenu">
                     <a href="{{ route('admin.orders.index') }}" @if(request()->routeIs('admin.orders.*')) aria-current="page" @endif>Orders &amp; refunds</a>
@@ -766,10 +800,9 @@
                     <a href="{{ route('admin.media-sales.index') }}" @if(request()->routeIs('admin.media-sales.*')) aria-current="page" @endif>Sales reports</a>
                 </div></details>
                 @php($customersActive = request()->routeIs('admin.customers.*', 'admin.media-support.*'))
-                <details class="nav-group {{ $customersActive ? 'active' : '' }}" @if($customersActive) open @endif><summary>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['customers'], 'key' => 'customers', 'label' => 'customer actions needing attention'])Customers</summary><div class="nav-submenu">
+                <details class="nav-group {{ $customersActive ? 'active' : '' }}" @if($customersActive) open @endif><summary>Customers</summary><div class="nav-submenu">
                     <a href="{{ route('admin.customers.index') }}" @if(request()->routeIs('admin.customers.*') && !request()->routeIs('admin.customers.follow-ups')) aria-current="page" @endif>Customer accounts</a>
                     <a href="{{ route('admin.customers.follow-ups') }}" @if(request()->routeIs('admin.customers.follow-ups')) aria-current="page" @endif>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['follow_ups_due'], 'key' => 'follow_ups_due', 'label' => 'customer follow-ups due now'])Customer follow-ups</a>
-                    <a href="{{ route('admin.media-support.index') }}" @if(request()->routeIs('admin.media-support.*')) aria-current="page" @endif>@include('layouts.partials.notification-badge', ['count' => $adminNavigationIndicators['support_pending'], 'key' => 'support_pending', 'label' => 'pending customer support requests'])Customer support</a>
                 </div></details>
                 @if(config('security.two_factor.enabled'))<a href="{{ route('account.security') }}">Account security</a>@endif
                 <form method="POST" action="{{ route('logout') }}">
@@ -787,7 +820,7 @@
                         <div class="muted">{{ $subheading }}</div>
                     @endisset
                 </div>
-                <div class="muted">{{ auth()->user()?->name }}</div>
+                @include('layouts.partials.admin-shortcuts')
             </header>
 
             <div class="content">
@@ -888,5 +921,6 @@
         })();
     </script>
     @stack('scripts')
+    @include('admin.tracking._return-position')
 </body>
 </html>

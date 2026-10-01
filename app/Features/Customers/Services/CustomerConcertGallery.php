@@ -3,10 +3,11 @@
 namespace App\Features\Customers\Services;
 
 use App\Features\Concerts\Models\Concert;
-use App\Features\Customers\Models\CustomerStudio;
+use App\Features\Families\Services\FamilyGalleryAccess;
 use App\Features\Media\Models\ConcertPhotoReleaseGroup;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Models\MediaCollection;
+use App\Features\Media\Services\AdminTopPics;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -15,8 +16,8 @@ class CustomerConcertGallery
 {
     public function allows(User $user, Concert $concert): bool
     {
-        return $user->canAccessCustomer() && $concert->isPubliclyAvailable()
-            && CustomerStudio::where('user_id', $user->id)->where('studio_id', $concert->studio_id)
+        return $user->canAccessCustomer() && $concert->isPhotoGalleryAvailable()
+            && app(FamilyGalleryAccess::class)->studios($user)->where('studio_id', $concert->studio_id)
                 ->whereNotNull('access_verified_at')->exists();
     }
 
@@ -34,24 +35,36 @@ class CustomerConcertGallery
 
     public function browseReleased(Concert $concert, ?string $folder, ?string $group = null): array
     {
-        abort_unless($concert->isPubliclyAvailable(), 404);
+        abort_unless($concert->isPhotoGalleryAvailable(), 404);
         $groups = $this->releaseGroups($concert)->get();
         $selectedGroup = $group ? $groups->firstWhere('uuid', $group) : null;
         abort_if($group && ! $selectedGroup, 404);
         $collections = $selectedGroup
             ? $selectedGroup->collections->sortBy([['sort_order', 'asc'], ['id', 'asc']])->values()
-            : $this->availableCollections($concert, $groups);
+            : $this->collections($concert)->with('coverAsset', 'concertPhotoReleaseGroups', 'concert')->get();
         $selected = $folder ? $collections->firstWhere('uuid', $folder) : null;
         if ($folder && ! $selected && ! $selectedGroup) {
             $selected = $this->availableCollections($concert, $groups)->firstWhere('uuid', $folder);
             $selectedGroup = $selected?->concertPhotoReleaseGroups->first();
             $collections = $selectedGroup?->collections?->sortBy([['sort_order', 'asc'], ['id', 'asc']])->values() ?? $collections;
         }
+        $collections->loadCount(['assets as visible_photo_count' => fn ($query) => $query
+            ->where('media_type', 'photo')->where('status', 'available')->where('is_visible', true)]);
         abort_if($folder && ! $selected, 404);
+        $flatPortraitGallery = $concert->isDressRehearsal() && (! $selected || $selected->concert_id === $concert->id);
+        if ($flatPortraitGallery && ! $folder) {
+            // Skip release-group and album navigation for this one-folder session.
+            $portraits = $collections->where('concert_id', $concert->id);
+            if ($portraits->count() === 1) {
+                $selected = $portraits->first();
+            } else {
+                $flatPortraitGallery = false;
+            }
+        }
         $photos = $selected ? $selected->assets()->where('media_type', 'photo')->where('status', 'available')
             ->where('is_visible', true)->orderBy('sort_order')->orderBy('id')->paginate(48)->withQueryString() : null;
 
-        return compact('concert', 'groups', 'selectedGroup', 'collections', 'selected', 'photos');
+        return compact('concert', 'groups', 'selectedGroup', 'collections', 'selected', 'photos', 'flatPortraitGallery');
     }
 
     public function image(User $user, Concert $concert, string $assetUuid, string $size, ConcertPhotoPreview $preview): StreamedResponse
@@ -63,7 +76,7 @@ class CustomerConcertGallery
 
     public function imageReleased(Concert $concert, string $assetUuid, string $size, ConcertPhotoPreview $preview): StreamedResponse
     {
-        abort_unless($concert->isPubliclyAvailable(), 404);
+        abort_unless($concert->isPhotoGalleryAvailable(), 404);
         $asset = $this->assetForReleasedConcert($concert, $assetUuid);
         $key = $preview->key($asset, $size);
 
@@ -82,19 +95,30 @@ class CustomerConcertGallery
 
     public function parentCoverAsset(Concert $concert, ?ConcertPhotoReleaseGroup $requestedGroup = null): ?MediaAsset
     {
-        $groups = $this->releaseGroups($concert)->get();
-        $group = $requestedGroup ? $groups->firstWhere('id', $requestedGroup->id) : $groups->first();
-        abort_if($requestedGroup && ! $group, 404);
+        abort_if($requestedGroup && ! $this->releaseGroups($concert)->whereKey($requestedGroup->id)->exists(), 404);
 
-        return $group?->galleryFolderCoverAsset();
+        // Release groups batch announcements; event cards must keep their own cover.
+        $collections = $this->collections($concert)
+            ->when($requestedGroup, fn ($query) => $query->whereHas('concertPhotoReleaseGroups',
+                fn ($groups) => $groups->whereKey($requestedGroup->id)))->pluck('id');
+        $assets = MediaAsset::query()->whereIn('media_collection_id', $collections)
+            ->where('media_type', 'photo')->where('status', 'available')->where('is_visible', true)
+            ->where('metadata->is_top_pic', true);
+        $eventId = $concert->bookingItem?->scheduling_event_id;
+        $coverUuid = $eventId ? app(AdminTopPics::class)->counts()
+            ->where('galleries.scheduling_event_id', $eventId)->first()?->cover_uuid : null;
+
+        // Respect the same chosen Top Pic (or automatic default) used by admin.
+        return ($coverUuid ? (clone $assets)->where('metadata->programme_photo_file_uuid', $coverUuid)->first() : null)
+            ?? $assets->orderBy('metadata->programme_photo_file_uuid')->orderBy('id')->first();
     }
 
     public function publicCover(Concert $concert, ConcertPhotoReleaseGroup $group, ConcertPhotoPreview $preview): StreamedResponse
     {
-        abort_unless($concert->isPubliclyAvailable(), 404);
+        abort_unless($concert->isPhotoGalleryAvailable(), 404);
         $asset = $this->parentCoverAsset($concert, $group);
         abort_unless($asset, 404);
-        $key = $preview->key($asset, 'thumbnail');
+        $key = $preview->key($asset, 'cover');
 
         return Storage::disk('local')->response($key, $group->uuid.'-cover.jpg', [
             'Content-Type' => 'image/jpeg', 'Cache-Control' => 'public, max-age=300',

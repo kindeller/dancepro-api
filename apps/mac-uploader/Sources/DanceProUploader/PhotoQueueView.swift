@@ -14,17 +14,17 @@ struct PhotoQueueView: View {
         Button("Done") { dismiss() }
       }
       Picker("Progress", selection: $showServer) {
-        Text("This Mac · \(model.queuedPhotos.count) queued").tag(false)
+        Text(model.isConcert ? "This Mac · \(model.uploadListPhotos.count) to upload" : "This Mac · \(model.queuedPhotos.count) queued").tag(false)
         Text("Server · Event roles").tag(true)
       }.pickerStyle(.segmented)
       if showServer {
         serverProgress
       } else {
       Text(
-        "Saved on this Mac, including when offline. Press Upload in the bottom bar to start. New or changed photos need another Ready action. Uploaded photos remain private until release."
+        model.isConcert ? "Press Upload to send all current unuploaded concert photos. New or changed photos need another Upload click. Uploaded photos remain private until release." : "Saved on this Mac, including when offline. Press Upload in the bottom bar to start. New or changed photos need another Ready action. Uploaded photos remain private until release."
       )
       .font(.callout).foregroundStyle(.secondary)
-      List(model.queuedPhotos) { photo in
+      List(model.uploadListPhotos) { photo in
         HStack {
           VStack(alignment: .leading) {
             Text(photo.name)
@@ -32,14 +32,14 @@ struct PhotoQueueView: View {
               .font(.caption).foregroundStyle(.secondary)
           }
           Spacer()
-          Button("Remove from Queue") { Task { await model.unqueue([photo.id]) } }
-            .disabled(model.busy)
+          if !model.isConcert { Button("Remove from Queue") { Task { await model.unqueue([photo.id]) } }
+            .disabled(model.busy) }
         }
       }
-      Button("Clear Queue") {
+      if !model.isConcert { Button("Clear Queue") {
         let ids = model.queuedIDs
         Task { await model.unqueue(ids) }
-      }.disabled(model.queuedIDs.isEmpty || model.busy)
+      }.disabled(model.queuedIDs.isEmpty || model.busy) }
       if let error = model.error { Text(error).foregroundStyle(.red) }
       }
     }.padding(20).frame(width: 700, height: 540)

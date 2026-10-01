@@ -3,6 +3,7 @@
 namespace App\Features\Concerts\Models;
 
 use App\Features\Bookings\Models\ConcertBookingItem;
+use App\Features\Bookings\Support\ConcertBookingItemType;
 use App\Features\Concerts\Support\ConcertStatus;
 use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Media\Models\MediaCollection;
@@ -42,6 +43,16 @@ class Concert extends Model
     public function bookingItem(): BelongsTo
     {
         return $this->belongsTo(ConcertBookingItem::class, 'concert_booking_item_id');
+    }
+
+    public function isDressRehearsal(): bool
+    {
+        return $this->bookingItem?->item_type === ConcertBookingItemType::DressRehearsal;
+    }
+
+    public function photoGalleryTitle(): string
+    {
+        return $this->isDressRehearsal() ? 'Dress Rehearsal Portraits' : $this->name;
     }
 
     public function mediaCollections(): HasMany
@@ -94,6 +105,22 @@ class Concert extends Model
             && ($this->available_until === null || $this->available_until->isFuture());
     }
 
+    public function isPhotoGalleryAvailable(): bool
+    {
+        if ($this->isPubliclyAvailable()) {
+            return true;
+        }
+
+        // Native photos can be explicitly released while the concert video is still a draft.
+        // This never grants video playback, which keeps using isPubliclyAvailable().
+        return $this->status === ConcertStatus::Draft
+            && $this->bookingItem?->approval_status === 'approved'
+            && $this->bookingItem->cancelled_at === null
+            && $this->bookingItem->schedulingEvent?->cancelled_at === null
+            && $this->mediaCollections()->where('media_type', 'photo')->where('status', 'published')
+                ->whereIn('visibility', ['customer', 'public'])->whereNotNull('published_at')->exists();
+    }
+
     public function requiresPassword(): bool
     {
         return $this->access_password_hash !== null || $this->concert_code_group_id !== null;
@@ -116,6 +143,10 @@ class Concert extends Model
 
     public function passwordMatches(string $password): bool
     {
+        if ($this->concert_code_group_id !== null) {
+            return $this->codeGroup?->downloadEndsAt()?->isFuture() && $this->codeGroup->matches($password);
+        }
+
         return $this->access_password_hash !== null && Hash::check($password, $this->access_password_hash);
     }
 

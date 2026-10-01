@@ -120,7 +120,7 @@ class BookingChangeWorkflowTest extends TestCase
         $payload['contact_email'] = 'corrected@example.test';
         app(UpdateConcertBooking::class)->execute($booking, $payload, $staff);
         $automation = app(ConcertTrackerAutomation::class);
-        $candidate = $automation->candidatesForYear(2026)->first(fn ($row) => $row['event']->id === $event->id);
+        $candidate = $automation->candidatesForYear(2026)->first(fn ($row) => $row['task']->id === $delivery->concert_tracker_task_id);
         $this->assertTrue($candidate['needs_review']);
         $automation->scheduleAutomatic();
         $this->assertSame(1, ConcertTrackerEmailDelivery::where('concert_tracker_task_id', $delivery->concert_tracker_task_id)->count());

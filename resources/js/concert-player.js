@@ -23,6 +23,8 @@ if (player && items.length > 0) {
 
     function useProgressiveSource(url, autoplay) {
         destroyHls();
+        // Signed MP4 URLs carry their own authorisation; S3 does not need cookies.
+        player.removeAttribute('crossorigin');
         activeFallbackUrl = null;
         fallbackInProgress = true;
         player.src = url;
@@ -36,6 +38,7 @@ if (player && items.length > 0) {
 
     async function useHlsSource(source, autoplay, request) {
         destroyHls();
+        player.setAttribute('crossorigin', 'use-credentials');
         activeFallbackUrl = source.fallback_url;
         fallbackInProgress = false;
         playerStatus.textContent = 'Adaptive streaming';
@@ -156,61 +159,68 @@ if (player && items.length > 0) {
 
     selectItem(items[0], false);
 
+}
+
+// Downloads remain available after the streaming window ends, without a player.
+const downloadItems = [...document.querySelectorAll('[data-concert-download]')];
+const startButton = document.querySelector('#download-all');
+if (startButton && downloadItems.length > 0) {
     let downloadIndex = 0;
     let downloadTimer;
-    let downloadsPaused = false;
+    let running = false;
     const downloadStatus = document.querySelector('#download-status');
-    const startButton = document.querySelector('#download-all');
     const pauseButton = document.querySelector('#download-pause');
 
     function updateDownloadStatus(message) {
-        downloadStatus.textContent = message ?? `${downloadIndex} of ${items.length} downloads started.`;
+        downloadStatus.textContent = message ?? `${downloadIndex} of ${downloadItems.length} downloads requested.`;
     }
 
     function runDownloads() {
-        if (downloadsPaused || downloadIndex >= items.length) {
-            if (downloadIndex >= items.length) {
-                updateDownloadStatus('All downloads have been sent to your browser.');
-                pauseButton.disabled = true;
-            }
-
-            return;
-        }
+        if (!running) return;
 
         const link = document.createElement('a');
-        link.href = items[downloadIndex].dataset.download;
+        link.href = downloadItems[downloadIndex].dataset.concertDownload;
+        document.body.append(link);
         link.click();
+        link.remove();
         downloadIndex++;
         updateDownloadStatus();
-        downloadTimer = setTimeout(runDownloads, 900);
+
+        if (downloadIndex === downloadItems.length) {
+            running = false;
+            pauseButton.disabled = true;
+            updateDownloadStatus('All downloads have been requested. Check your browser’s downloads for progress or blocked files.');
+        } else {
+            downloadTimer = setTimeout(runDownloads, 900);
+        }
     }
 
     startButton.addEventListener('click', () => {
-        if (downloadIndex === 0 && !confirm('Your browser may ask permission to download multiple files. Continue?')) {
-            return;
-        }
-
-        downloadsPaused = false;
+        if (running || downloadIndex > 0) return;
+        if (!confirm('Your browser may ask permission to download multiple files. Continue?')) return;
+        running = true;
+        startButton.disabled = true;
         pauseButton.disabled = false;
         pauseButton.textContent = 'Pause';
         runDownloads();
     });
     pauseButton.addEventListener('click', () => {
-        downloadsPaused = !downloadsPaused;
+        running = !running;
         clearTimeout(downloadTimer);
-        pauseButton.textContent = downloadsPaused ? 'Resume' : 'Pause';
-        updateDownloadStatus(downloadsPaused ? `Paused after ${downloadIndex} of ${items.length} downloads.` : null);
-
-        if (!downloadsPaused) {
+        pauseButton.textContent = running ? 'Pause' : 'Resume';
+        if (running) {
             runDownloads();
+        } else {
+            updateDownloadStatus(`Paused after ${downloadIndex} of ${downloadItems.length} download requests.`);
         }
     });
     document.querySelector('#download-reset').addEventListener('click', () => {
         clearTimeout(downloadTimer);
         downloadIndex = 0;
-        downloadsPaused = false;
+        running = false;
+        startButton.disabled = false;
         pauseButton.disabled = true;
         pauseButton.textContent = 'Pause';
-        updateDownloadStatus(`Ready to download ${items.length} originals.`);
+        updateDownloadStatus(`Ready to download ${downloadItems.length} originals. Resetting does not cancel files already downloading.`);
     });
 }

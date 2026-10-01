@@ -74,6 +74,40 @@ class LayoutExtractionTest(unittest.TestCase):
         page += words(30,70,'Our cast and sponsors made this show possible')
         self.assertEqual([],self.parse([(1,600,800,page,False)],False)['nodes'])
 
+    def test_side_by_side_acts_keep_order_classes_and_wrapped_lines(self):
+        page = words(170,20,'ACT 1') + words(650,20,'ACT 2')
+        page += words(30,60,'Opening') + words(210,60,'Senior Contemporary')
+        page += words(30,90,'5,6,7,8') + words(210,90,'Bopper Jazz')
+        page += words(30,120,'Story Time') + words(210,120,'Advanced Ballet')
+        page += words(210,138,'Senior Ballet') + words(210,156,'Pointe')
+        page += words(30,190,'Goodnight') + words(210,190,'Elite Acro')
+        page += words(510,60,'Curtain Up') + words(710,60,'Senior Jazz')
+        page += words(510,100,'New Day') + words(710,100,'Junior Hip Hop')
+        page += words(710,118,'Senior Hip Hop')
+        page += words(510,160,'Magic') + words(710,160,'FINALE')
+        page += words(710,178,'PRESENTING ALL PERFORMERS')
+        result = self.parse([(1,1000,800,page,False)],False)
+        items = [n for n in result['nodes'] if n['kind']=='item']
+        self.assertEqual(['Opening','5,6,7,8','Story Time','Goodnight','Curtain Up','New Day','Magic'],[n['title'] for n in items])
+        self.assertEqual(['Senior Contemporary','Bopper Jazz','Advanced Ballet Senior Ballet Pointe','Elite Acro','Senior Jazz','Junior Hip Hop Senior Hip Hop','FINALE PRESENTING ALL PERFORMERS'],[n['class_name'] for n in items])
+        self.assertEqual(['ACT 1','ACT 2'],[n['title'] for n in result['nodes'] if n['kind']=='group'])
+        self.assertNotEqual(items[0]['parent_uuid'],items[4]['parent_uuid'])
+        self.assertEqual('finale',items[-1]['item_kind'])
+        self.assertEqual([1],result['pages'])
+        self.assertFalse(any('No running-order' in issue for issue in result['issues']))
+
+    def test_side_by_side_numbered_acts_preserve_printed_number_resets(self):
+        page = words(170,20,'ACT 1') + words(650,20,'ACT 2')
+        page += words(30,60,'1. First Dance') + words(250,60,'Senior Jazz')
+        page += words(30,100,'2. Last Dance') + words(250,100,'Junior Ballet')
+        page += words(510,60,'1. Another Dance') + words(750,60,'Open Jazz')
+        page += words(510,100,'2. Closing') + words(750,100,'Everyone')
+        result = self.parse([(1,1000,800,page,False)],False)
+        items = [n for n in result['nodes'] if n['kind']=='item']
+        self.assertEqual(['First Dance','Last Dance','Another Dance','Closing'],[n['title'] for n in items])
+        self.assertEqual(['1','2','1','2'],[n['number'] for n in items])
+        self.assertEqual(['Senior Jazz','Junior Ballet','Open Jazz','Everyone'],[n['class_name'] for n in items])
+
     def test_compact_concert_rows_split_trailing_class_names(self):
         page=words(30,20,'1. OPENING NUMBER')
         page+=words(30,50,"2. LET'S GET CRAZY PETITE ACRO 1 (FRI)")
@@ -96,6 +130,21 @@ class LayoutExtractionTest(unittest.TestCase):
         result=self.parse(pages)
         self.assertEqual(['2026-09-04','2026-09-11'],[n['date'] for n in result['nodes'] if n['kind']=='day'])
         self.assertTrue(any('event year' in i for i in result['issues']))
+
+    def test_concert_inline_schedules_keep_wrapped_text_and_ignore_oversized_footer_dates(self):
+        page = words(30,40,'1. Junior Jazz - Saturday 12pm-tpm')
+        page += words(30,80,'2. Ballet Story - PPID Wednesday') + words(360,80,'5-6pm Pre &')
+        page += words(45,100,'Grade 3 Wednesday 4-5pm')
+        page += words(30,740,'3. Acro - Saturday 10-1lam')
+        page += words(30,770,'4. Finale - Everyone')
+        page += [(400,730,425,780,'06'), (435,730,460,780,'12'), (470,730,560,780,'2025')]
+        page += words(426,765,'.') + words(461,765,'.')
+        result = self.parse([(1,600,800,page,True)],False)
+        items = [n for n in result['nodes'] if n['kind']=='item']
+        self.assertEqual(['Junior Jazz','Ballet Story','Acro','Finale'],[n['title'] for n in items])
+        self.assertEqual(['Saturday 12pm-1pm','PPID Wednesday 5-6pm Pre & Grade 3 Wednesday 4-5pm','Saturday 10-11am','Everyone'],[n['class_name'] for n in items])
+        self.assertEqual(['1','2','3','4'],[n['number'] for n in items])
+        self.assertEqual('finale',items[-1]['item_kind'])
 
     def test_conflicting_session_times_are_reported(self):
         first=words(35,20,'26 June 2026 Session 1 - 6.30pm')

@@ -18,7 +18,7 @@ class PublicityJoinController extends Controller
         $request->session()->put('publicity_join', ['event' => $schedulingEvent->uuid, 'name' => $schedulingEvent->name, 'version' => $request->validated('version')]);
         $request->session()->put('url.intended', route('publicity.join.complete'));
 
-        return to_route($request->user() ? 'publicity.join.complete' : 'customer.login')
+        return to_route($request->user() ? 'publicity.join.complete' : 'login')
             ->with('status', 'Sign in to add '.$schedulingEvent->name.' to your media.');
     }
 
@@ -28,7 +28,7 @@ class PublicityJoinController extends Controller
         $request->session()->put('publicity_join', ['studio' => $studio->uuid, 'name' => $studio->name, 'version' => $request->validated('version')]);
         $request->session()->put('url.intended', route('publicity.join.complete'));
 
-        return to_route($request->user() ? 'publicity.join.complete' : 'customer.login')
+        return to_route($request->user() ? 'publicity.join.complete' : 'login')
             ->with('status', 'Sign in or create an account to add '.$studio->name.' photo galleries to your media.');
     }
 

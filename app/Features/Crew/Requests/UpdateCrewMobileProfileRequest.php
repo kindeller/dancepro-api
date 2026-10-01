@@ -2,6 +2,7 @@
 
 namespace App\Features\Crew\Requests;
 
+use App\Shared\Support\AccountName;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -13,9 +14,19 @@ class UpdateCrewMobileProfileRequest extends FormRequest
         return $this->user()?->canAccessCrew() ?? false;
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('first_name') || $this->has('last_name')) {
+            $this->merge(AccountName::input($this->only(['first_name', 'last_name'])));
+        }
+    }
+
     public function rules(): array
     {
         return [
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'first_name' => [Rule::requiredIf($this->has('first_name') || $this->has('last_name')), 'string', 'max:255'],
+            'last_name' => ['nullable', 'string', 'max:255'],
             'preferred_name' => ['required', 'string', 'max:255'],
             'legal_name' => ['nullable', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->user()?->id)],

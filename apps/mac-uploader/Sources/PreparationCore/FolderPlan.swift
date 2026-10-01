@@ -40,7 +40,7 @@ public struct FolderPlan: Sendable {
             "This concert needs to be approved again in Programme preparation before its folders can be downloaded."
           )
         }
-        path = try Self.component(number + " " + title)
+        path = try Self.component(programme.isPortraitSession ? title : number + " " + title)
       } else if programme.eventType == "competition" {
         guard let parent = item.parentUuid, let section = byID[parent], section.kind == "section",
           let dayID = section.parentUuid, let day = byID[dayID], day.kind == "day",
@@ -89,15 +89,20 @@ public struct FolderPlan: Sendable {
       }
     }
     folders = output
-    var label = Self.clean(programme.eventCode ?? programme.eventName)
+    var label = Self.clean(programme.eventCode ?? programme.eventName, stripAccents: false)
     while label.utf8.count > 120 { label.removeLast() }
     rootName = programme.eventType == "competition" ? (label.isEmpty ? "Event" : label) :
       (label.isEmpty ? "Event" : label) + " - v\(programme.version) - "
       + String(programme.revisionUuid.prefix(8))
   }
 
-  public static func clean(_ text: String) -> String {
-    text.replacingOccurrences(of: "/", with: " ")
+  public static func clean(_ text: String, stripAccents: Bool = true) -> String {
+    let title = stripAccents
+      ? text.decomposedStringWithCanonicalMapping
+        .replacingOccurrences(of: "\\p{M}+", with: "", options: .regularExpression)
+        .precomposedStringWithCanonicalMapping
+      : text
+    return title.replacingOccurrences(of: "/", with: " ")
       .replacingOccurrences(of: "[^\\p{L}\\p{M}\\p{N}\\s]", with: "", options: .regularExpression)
       .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
       .trimmingCharacters(in: .whitespacesAndNewlines)

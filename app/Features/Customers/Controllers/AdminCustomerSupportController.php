@@ -8,21 +8,12 @@ use App\Features\Customers\Requests\ResolveCustomerSupportRequest as ResolveRequ
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 
 class AdminCustomerSupportController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request): RedirectResponse
     {
-        $status = in_array($request->query('status'), ['pending', 'approved', 'declined', 'resolved'], true)
-            ? $request->query('status')
-            : 'pending';
-        $requests = CustomerSupportRequest::query()->where('status', $status)
-            ->with(['user', 'order', 'entitlement.orderItem', 'decidedBy'])
-            ->orderByDesc('requested_at')->paginate(50)->withQueryString();
-
-        return response()->view('admin.media.support', compact('requests', 'status'))
-            ->header('Cache-Control', 'private, no-store');
+        return redirect()->route('admin.messages.index', ['channel' => 'customer', 'status' => in_array($request->query('status'), ['pending', 'approved', 'declined', 'resolved']) ? $request->query('status') : 'pending']);
     }
 
     public function resolve(ResolveRequest $request, CustomerSupportRequest $supportRequest, ResolveCustomerSupportRequest $resolve): RedirectResponse

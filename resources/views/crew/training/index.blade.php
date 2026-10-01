@@ -1,7 +1,8 @@
 @extends('layouts.crew', ['title' => 'My Training'])
 
 @section('content')
-<div class="page-heading"><div><div class="crew-hub-brand"><img src="{{ asset('images/brand/dancepro-icon-blue.png') }}" alt=""><span>CREW HUB</span></div><h1>My Training</h1><p class="muted">Required learning, quick updates and completed courses.</p></div></div>
+<div class="page-heading"><div>@include('crew._brand')
+<h1>My Training</h1><p class="muted">Required learning, quick updates and completed courses.</p></div></div>
 <section><div class="resource-grid">
     @forelse($courses as $course)
         @php($enrolment=$course->enrolments->first())

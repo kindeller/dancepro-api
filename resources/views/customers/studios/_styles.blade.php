@@ -1,5 +1,6 @@
 @push('styles')
 <style>
+    .hub-tabs .inbox-badge { margin-left:0;margin-right:7px; }
     .hub-hero-grid { display:grid;grid-template-columns:minmax(0,1fr);gap:24px; }
     .hub-identity { display:flex;align-items:center;gap:24px;min-width:0; }
     .hub-studio-logo { width:clamp(100px,11vw,150px);height:clamp(82px,9vw,120px);flex:0 0 auto;border-radius:10px;background:#fff;object-fit:contain;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.2); }
@@ -12,6 +13,12 @@
     .hub-stat span { color:#d9e8ee;font-size:12px;font-weight:750; }
     .hub-intro { display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,.5fr);gap:20px;margin-bottom:26px; }
     .hub-card { overflow:visible; }
+    .hub-card.has-overdue-actions { border-color:#c83748; }
+    .hub-action-badges { display:flex;flex-wrap:wrap;gap:6px;margin-top:10px; }
+    .hub-overdue-summary { margin:8px 0 0;color:#a5202c;font-size:14px;overflow-wrap:anywhere; }
+    .hub-stat.has-overdue-actions { border-color:#ffafba;background:#6c182a; }
+    .hub-stat.has-overdue-actions:hover,.hub-stat.has-overdue-actions:focus-visible { background:#822038; }
+    .hub-stat .hub-stat-overdue { display:block;margin-top:5px;color:#fff;font-weight:850; }
     .hub-card-header { display:grid;grid-template-columns:minmax(0,1fr) auto 34px;gap:20px;align-items:center;padding:20px 22px;cursor:pointer;list-style:none; }
     .hub-card-header::-webkit-details-marker { display:none; }
     .hub-card-header h2 { margin:3px 0 5px;font-size:26px; }
@@ -38,15 +45,19 @@
     .hub-actions { display:flex;flex-wrap:wrap;gap:10px;margin-top:16px; }
     .checklist { display:grid;gap:10px;margin:20px 0; }
     .check-item { display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:12px;align-items:start;border:1px solid var(--line);border-radius:10px;padding:14px;background:#fff; }
+    .form-save-feedback { display:block;padding:10px 14px;margin:12px 0;border:1px solid #a4d9bb;border-radius:8px;background:#dff6e9;color:#167246;font-weight:750; }
+    .form-save-feedback.error { border-color:#f0bdc1;background:#ffe1e5;color:#bd2035; }
     .check-icon { display:grid;width:30px;height:30px;place-items:center;border-radius:50%;background:#edf2f4;color:#65757d;font-weight:900; }
-    .check-item.complete .check-icon { background:#dff6e9;color:#167246; }
+    .check-icon.outstanding { background:#fff3cd;color:#856000; }
+    .check-icon.overdue { background:#ffe1e5;color:#bd2035; }
+    .check-icon.complete, .check-item.complete .check-icon { background:#dff6e9;color:#167246; }
     .check-item.overdue { border-color:#f0bdc1;background:#fffafa; }
     .check-item p { margin:3px 0 0;color:var(--muted);font-size:13px; }
     .hub-review-action { margin:0;align-items:center; }
     .hub-review-action h3 { margin:0;font-size:18px; }
     .hub-review-action.unavailable { background:#f2f4f5;color:var(--muted); }
     .hub-review-action.ready { border-color:#81cbe3;background:#f2fbfe; }
-    .hub-review-action.ready .check-icon { background:#e0f4fc;color:#075d7e; }
+    .hub-review-action.ready .check-icon { background:#fff3cd;color:#856000; }
     .hub-progress-meta { display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px 14px;max-width:300px; }
     .hub-login-code { display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:6px 10px;border:1px solid #c5e7f4;border-radius:8px;background:#eaf6fa;color:#075d7e;font-size:12px;font-weight:750; }
     .hub-login-code > span { white-space:nowrap; }

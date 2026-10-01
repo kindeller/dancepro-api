@@ -1,0 +1,29 @@
+{
+    "eyebrow": "Your DancePro account",
+    "heading": "Your performance. Yours to keep.",
+    "description": "Your photos, videos and performance memories—all in your DancePro account.",
+    "body": "One account for your studios, events, purchases and messages.",
+    "sections": [
+        {
+            "title": "Create your account",
+            "body": "Sign up once, or sign in if you already have a DancePro account.",
+            "link_label": "",
+            "link_url": "",
+            "visible": true
+        },
+        {
+            "title": "Add your studio or event",
+            "body": "Add your dance studio or competition in My Media. Use the access code supplied by your studio or event where required.",
+            "link_label": "",
+            "link_url": "",
+            "visible": true
+        },
+        {
+            "title": "Access your photos & videos",
+            "body": "Browse released galleries, purchase your favourites and watch or download the videos available in your account.",
+            "link_label": "",
+            "link_url": "",
+            "visible": true
+        }
+    ]
+}

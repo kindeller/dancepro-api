@@ -5,6 +5,7 @@ namespace Tests\Feature\Orders;
 use App\Features\Concerts\Models\Concert;
 use App\Features\Customers\Models\CustomerConcertPhotoSelection;
 use App\Features\Customers\Models\CustomerMediaSelection;
+use App\Features\Customers\Models\CustomerStudio;
 use App\Features\Customers\Services\CompetitionOrderCatalogue;
 use App\Features\Customers\Services\CustomerAccountMediaSelections;
 use App\Features\Customers\Services\CustomerCompetitionAccess;
@@ -18,6 +19,7 @@ use App\Features\Media\Support\MediaType;
 use App\Features\Orders\Services\PrepareCustomerOrder;
 use App\Features\Orders\Support\OrderStatus;
 use App\Features\Payments\Services\CustomerCredits;
+use App\Features\Payments\Services\ValidatePayableOrder;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Studios\Models\Studio;
 use App\Models\User;
@@ -247,5 +249,76 @@ class PrepareCustomerOrderTest extends TestCase
         $order->update(['status' => OrderStatus::Paid, 'paid_at' => now()]);
         $this->assertModelMissing($firstSelection);
         $this->assertModelMissing($secondSelection);
+    }
+
+    public function test_studio_cart_combines_concerts_without_discounting_competitions_or_other_studios(): void
+    {
+        $user = User::factory()->customer()->create();
+        $first = Concert::factory()->published()->create(['name' => 'Junior concert']);
+        $second = Concert::factory()->published()->create(['name' => 'Senior concert', 'studio_id' => $first->studio_id]);
+        $other = Concert::factory()->published()->create(['name' => 'Other studio concert']);
+        foreach ([$first, $other] as $concert) {
+            CustomerStudio::create([
+                'user_id' => $user->id, 'studio_id' => $concert->studio_id, 'access_verified_at' => now(),
+            ]);
+        }
+        foreach ([$first, $second, $other] as $concert) {
+            $collection = MediaCollection::factory()->create([
+                'concert_id' => $concert->id, 'competition_id' => null, 'media_type' => MediaType::Photo,
+                'status' => 'published', 'visibility' => 'customer', 'published_at' => now(),
+            ]);
+            foreach (range(1, 6) as $index) {
+                $asset = MediaAsset::factory()->create(['media_collection_id' => $collection->id,
+                    'media_type' => MediaType::Photo, 'status' => 'available', 'is_visible' => true]);
+                CustomerConcertPhotoSelection::create(['user_id' => $user->id, 'studio_id' => $concert->studio_id,
+                    'concert_id' => $concert->id, 'media_asset_id' => $asset->id, 'in_cart' => true]);
+            }
+        }
+        $competition = SchedulingEvent::create(['name' => 'Competition', 'event_type' => 'competition', 'event_date' => now()->addDay()]);
+        $item = (string) Str::uuid();
+        $selection = CustomerMediaSelection::create(['user_id' => $user->id, 'scheduling_event_id' => $competition->id,
+            'selection_key' => 'routine_photos:'.$item, 'product' => 'routine_photos', 'item_uuid' => $item, 'in_cart' => true]);
+        $collection = MediaCollection::factory()->forCompetition($competition->id)->create(['media_type' => MediaType::Photo]);
+        $photo = MediaAsset::factory()->create(['media_collection_id' => $collection->id, 'media_type' => MediaType::Photo]);
+        $this->mock(CustomerCompetitionCart::class)->shouldReceive('forEvent')->andReturn([
+            'selections' => collect([$selection]), 'selectionDetails' => [], 'lineAmounts' => [$selection->id => 4500],
+            'subtotal' => 4500, 'discount' => 0, 'total' => 4500, 'discount_percent' => 0,
+        ]);
+        $this->mock(CustomerCompetitionAccess::class)->shouldReceive('allows')->andReturn(true);
+        $this->mock(CompetitionOrderCatalogue::class)->shouldReceive('readyRoutine')
+            ->andReturn(['collection' => $collection, 'assets' => collect([$photo])]);
+        $data = app(CustomerAccountMediaSelections::class)->forUser($user, 'cart');
+        $studio = $data['groups']->firstWhere('studio.id', $first->studio_id);
+        $this->assertCount(3, $data['groups']);
+        $this->assertCount(2, $studio['events']);
+        $this->assertSame(12000, $studio['subtotal']);
+        $this->assertSame(600, $studio['discount']);
+        $this->assertSame(11400, $studio['total']);
+        $this->assertSame(0, $data['groups']->firstWhere('studio.id', $other->studio_id)['discount']);
+        $keys = ['concert:'.$first->studio->uuid, 'competition:'.$competition->uuid];
+        $order = app(PrepareCustomerOrder::class)->accountCart($user, $keys);
+        $this->assertSame(16500, $order->subtotal_amount);
+        $this->assertSame(15900, $order->total_amount);
+        $this->assertSame(600, $order->metadata['bulk_discount_amount']);
+        $this->assertSame(11400, $order->items->where('metadata.event_kind', 'concert')->sum('total_price_amount'));
+        $this->assertSame(4500, $order->items->where('metadata.event_kind', 'competition')->sum('total_price_amount'));
+        $this->assertSame(5700, $order->items->where('metadata.concert_uuid', $first->uuid)->sum('total_price_amount'));
+        app(ValidatePayableOrder::class)->execute($order);
+
+        MediaDiscountCode::create(['code' => 'STUDIO20', 'discount_type' => 'fixed', 'amount' => 2000, 'enabled' => true]);
+        $discounted = app(PrepareCustomerOrder::class)->accountCart($user, $keys, 'STUDIO20');
+        foreach ($discounted->metadata['cart_groups'] as $group) {
+            $items = $discounted->items->where('metadata.event_kind', $group['kind']);
+            $this->assertSame($group['total'], $items->sum('total_price_amount'));
+            $eligible = max(0, $group['bulk_eligible_subtotal'] - $group['discount_code_amount']);
+            $this->assertSame($group['kind'] === 'concert' ? intdiv($eligible * 5, 100) : 0, $group['bulk_discount_amount']);
+        }
+        $this->assertSame($discounted->total_amount, $discounted->items->sum('total_price_amount'));
+        $this->assertSame($discounted->tax_amount, $discounted->items->sum('tax_amount'));
+        app(ValidatePayableOrder::class)->execute($discounted);
+        $discounted->update(['status' => OrderStatus::Paid, 'paid_at' => now()]);
+        $this->assertSame(0, CustomerConcertPhotoSelection::where('studio_id', $first->studio_id)->count());
+        $this->assertSame(6, CustomerConcertPhotoSelection::where('studio_id', $other->studio_id)->count());
+        $this->assertModelMissing($selection);
     }
 }

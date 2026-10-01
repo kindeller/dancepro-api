@@ -259,6 +259,7 @@ class BookingDeliveryConnectionsTest extends TestCase
     public function test_hub_handles_missing_legacy_and_changed_codes_without_showing_old_values(): void
     {
         [$booking, $studio, $staff, $customer] = $this->fixture();
+        $studio->forceFill(['code' => null])->save();
         app(ApproveConcertBooking::class)->execute($booking, $staff, null);
         $url = route('customer.studio-communications.index', $studio);
         $this->actingAs($customer)->get($url)->assertOk()->assertDontSee('Photo gallery login code:')->assertDontSee('Concert video login code:');
@@ -282,14 +283,14 @@ class BookingDeliveryConnectionsTest extends TestCase
         $other = Studio::factory()->create();
         $url = route('customer.studio-invoices.index', $studio);
         $response = $this->actingAs($customer)->get($url)->assertOk()->assertHeader('Cache-Control', 'no-store, private')
-            ->assertSee('Studio Hub sections')->assertSee('Quotes &amp; minimum spends', false)
+            ->assertSee('Studio Hub sections')->assertSee('Quote estimates &amp; minimum spends', false)
             ->assertSee('$1,400.00')->assertSee('$3,750.00')->assertSee('250 confirmed families.')
             ->assertDontSee('Rehearsal event 1')->assertSee('Rehearsal event 2')->assertSee('No invoices yet');
         $this->assertCount(1, $response->viewData('estimates'));
         $this->assertSame($current['quote'], $response->viewData('estimates')->first()['receipt']['quote']);
         $this->get(route('customer.studio-invoices.index', $other))->assertForbidden();
         $booking->update(['status' => 'cancelled']);
-        $this->get($url)->assertOk()->assertDontSee('Quotes &amp; minimum spends', false);
+        $this->get($url)->assertOk()->assertDontSee('Quote estimates &amp; minimum spends', false);
     }
 
     public function test_hub_action_due_dates_have_red_overdue_styling_only_after_the_deadline(): void

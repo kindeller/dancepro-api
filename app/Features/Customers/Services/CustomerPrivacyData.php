@@ -2,9 +2,13 @@
 
 namespace App\Features\Customers\Services;
 
+use App\Features\Concerts\Models\ConcertFamilyShare;
 use App\Features\Customers\Models\CustomerSupportMessage;
 use App\Features\Customers\Models\GuestGalleryAccess;
 use App\Features\Customers\Models\GuestGalleryRegistration;
+use App\Features\Customers\Models\GuestStudioSubscription;
+use App\Features\Families\Models\CustomerFamily;
+use App\Features\Families\Models\CustomerFamilyMember;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -29,6 +33,8 @@ class CustomerPrivacyData
             $data[$table] = DB::table($table)->where('user_id', $customer->id)->get()
                 ->map(fn ($row) => collect((array) $row)->except(['session_identifier', 'storage_key', 'storage_disk', 'fingerprint', 'deduplication_key'])->all())->all();
         }
+        $data['family_membership'] = CustomerFamilyMember::where('user_id', $customer->id)->get()->toArray();
+        $data['managed_family'] = CustomerFamily::where('manager_user_id', $customer->id)->with('members')->get()->toArray();
         $data['customer_support_messages'] = CustomerSupportMessage::whereHas('conversation', fn ($query) => $query->where('user_id', $customer->id))->get()->map(fn ($message) => ['uuid' => $message->uuid, 'direction' => $message->direction, 'body' => $message->body, 'sent_at' => $message->sent_at, 'attachment_name' => data_get($message->attachment, 'name')])->all();
         $hash = hash('sha256', mb_strtolower(trim($customer->email)));
         $accesses = GuestGalleryAccess::where('email_hash', $hash)->get();
@@ -36,6 +42,13 @@ class CustomerPrivacyData
         $data['guest_gallery_selections'] = DB::table('guest_gallery_selections')->whereIn('guest_gallery_access_id', $accesses->pluck('id'))->get()->toArray();
         $data['gallery_registrations'] = GuestGalleryRegistration::where('user_id', $customer->id)->orWhere('email_hash', $hash)->get()
             ->map(fn ($registration) => $registration->makeVisible('email')->toArray())->all();
+        $data['studio_gallery_subscriptions'] = GuestStudioSubscription::where('user_id', $customer->id)->orWhere('email_hash', $hash)->get()
+            ->map(fn ($subscription) => $subscription->makeVisible('email')->toArray())->all();
+        $data['concert_family_shares'] = ConcertFamilyShare::where('user_id', $customer->id)
+            ->orWhere('recipient_hash', $hash)->with('videos')->get()->map(fn ($share) => [
+                'uuid' => $share->uuid, 'recipient_name' => $share->recipient_name, 'recipient_email' => $share->recipient_email,
+                'accepted_at' => $share->accepted_at, 'expires_at' => $share->expires_at, 'revoked_at' => $share->revoked_at,
+                'link_count' => $share->link_count, 'activity' => $share->videos->map(fn ($video) => $video->only(['download_requests', 'playback_starts', 'last_position_seconds', 'last_played_at', 'playback_completed_at']))])->all();
         $data['in_app_notifications'] = DB::table('notifications')->where('notifiable_type', $customer->getMorphClass())->where('notifiable_id', $customer->id)->get()->toArray();
 
         return $data;
@@ -44,6 +57,12 @@ class CustomerPrivacyData
     /** Redact account/contact records, preserving order amounts and media identities. */
     public function redact(User $customer, string $anonymousEmail): void
     {
+        CustomerFamily::where('manager_user_id', $customer->id)->delete();
+        CustomerFamilyMember::where('user_id', $customer->id)->orWhere('email', $customer->email)->delete();
+        ConcertFamilyShare::where('user_id', $customer->id)
+            ->orWhere('recipient_hash', hash('sha256', mb_strtolower(trim($customer->email))))
+            ->update(['recipient_name' => '[redacted]', 'recipient_email' => $anonymousEmail, 'contact_redacted_at' => now(),
+                'revoked_at' => now(), 'code_hash' => null, 'challenge_session_hash' => null, 'verified_session_hash' => null]);
         DB::table('customer_inbox_notifications')->where('user_id', $customer->id)->update(['subject' => '[redacted]', 'body' => '[redacted]', 'action_url' => null]);
         $messages = CustomerSupportMessage::whereHas('conversation', fn ($query) => $query->where('user_id', $customer->id))->get();
         foreach ($messages as $message) {
@@ -70,6 +89,9 @@ class CustomerPrivacyData
         foreach ($accesses as $access) {
             $access->update(['email' => $anonymousEmail, 'email_hash' => hash('sha256', $anonymousEmail), 'expires_at' => now()]);
         }
+        GuestStudioSubscription::where('user_id', $customer->id)->orWhere('email_hash', $hash)->get()->each(
+            fn ($subscription) => $subscription->update(['email' => $anonymousEmail, 'email_hash' => hash('sha256', $anonymousEmail), 'unsubscribed_at' => now()])
+        );
         GuestGalleryRegistration::where('user_id', $customer->id)->orWhere('email_hash', $hash)->get()->each(
             fn ($registration) => $registration->update(['email' => $anonymousEmail, 'email_hash' => hash('sha256', $anonymousEmail), 'unsubscribed_at' => now()])
         );

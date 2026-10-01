@@ -14,6 +14,7 @@ use App\Features\Media\Support\MediaUploadKind;
 use App\Features\Media\Support\MediaUploadStatus;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -28,6 +29,7 @@ class LocalMediaDevelopmentTest extends TestCase
         $this->app->detectEnvironment(fn (): string => 'local');
         config()->set('filesystems.disks.s3_concerts.driver', 'local');
         Storage::fake('s3_concerts');
+        Storage::fake('local');
     }
 
     public function test_local_playback_and_branding_do_not_require_or_redirect_to_cloudfront(): void
@@ -57,7 +59,8 @@ class LocalMediaDevelopmentTest extends TestCase
         $this->get(route('concerts.media.download', [$concert, $asset]))->assertOk();
 
         $coverKey = "concerts/{$concert->uuid}/cover";
-        Storage::disk('s3_concerts')->put($coverKey, 'local-cover');
+        $cover = UploadedFile::fake()->image('cover.jpg', 600, 400);
+        Storage::disk('s3_concerts')->put($coverKey, file_get_contents($cover->getRealPath()));
         $concert->update(['cover_image_storage_key' => $coverKey]);
         $this->assertStringContainsString('no-store', $this->get(route('concerts.cover', $concert))->assertOk()->headers->get('Cache-Control'));
         $this->withHeader('Range', 'bytes=0-4')->get($playback->json('data.url'))->assertStatus(206);

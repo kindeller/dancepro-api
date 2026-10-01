@@ -42,7 +42,7 @@ class ConcertCloudFrontSigner
         return $this->signedFileUrl($source->key);
     }
 
-    public function signedFileUrl(string $key, ?string $downloadName = null, ?string $revision = null): string
+    public function signedFileUrl(string $key, ?string $downloadName = null, ?string $revision = null, ?\DateTimeInterface $expiresAt = null): string
     {
         if (! $this->isConfigured()) {
             throw new RuntimeException('Signed CloudFront concert delivery is not configured.');
@@ -67,20 +67,20 @@ class ConcertCloudFrontSigner
             (string) $this->privateKey(),
         ))->getSignedUrl(
             $url,
-            now()->addMinutes((int) config('concerts.playback.signed_url_ttl_minutes', 15))->getTimestamp(),
+            ($expiresAt ?? now()->addMinutes((int) config('concerts.playback.signed_url_ttl_minutes', 15)))->getTimestamp(),
         );
     }
 
     /**
      * @return list<Cookie>
      */
-    public function cookiesFor(ConcertPlaybackSource $source): array
+    public function cookiesFor(ConcertPlaybackSource $source, ?\DateTimeInterface $expiresAt = null): array
     {
         if (! $this->canSignCookies()) {
             throw new RuntimeException('Concert CloudFront signing is not configured.');
         }
 
-        $expiresAt = now()->addMinutes((int) config('concerts.playback.signed_url_ttl_minutes', 15))->getTimestamp();
+        $expiresAt = ($expiresAt ?? now()->addMinutes((int) config('concerts.playback.signed_url_ttl_minutes', 15)))->getTimestamp();
         $policy = json_encode([
             'Statement' => [[
                 'Resource' => $this->urlFor($source->assetPrefix).'/*',

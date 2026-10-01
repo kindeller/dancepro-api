@@ -23,7 +23,7 @@ class CustomerSupportRequestUpdated extends Notification implements ShouldQueue
     {
         $request = $this->supportRequest;
         $message = (new MailMessage)->subject('DancePro media help request updated')
-            ->greeting('Hi '.$notifiable->name.',');
+            ->greeting('Hi '.$notifiable->emailGreetingName().',');
 
         if ($request->status === 'approved') {
             $message->line('Your media download access has been restored.')

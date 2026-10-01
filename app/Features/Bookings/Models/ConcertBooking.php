@@ -38,6 +38,11 @@ class ConcertBooking extends Model
         return $this->hasMany(ConcertBookingRevision::class)->latest('id');
     }
 
+    public function statusNotifications(): HasMany
+    {
+        return $this->hasMany(BookingStatusNotification::class)->latest('id');
+    }
+
     public function familyCountConfirmedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'family_count_confirmed_by');
@@ -60,6 +65,7 @@ class ConcertBooking extends Model
             'concert_inclusions' => 'array',
             'accepted_requirements' => 'array',
             'submission_snapshot' => 'array',
+            'submission_acknowledgement' => 'array',
             'reviewed_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];

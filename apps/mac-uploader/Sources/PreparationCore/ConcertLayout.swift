@@ -68,6 +68,7 @@ public enum ConcertLayout {
   }
 
   public static func load(root: URL, base: PreparedEvent) throws -> PreparedEvent {
+    if base.isVideoPreparation { return base }
     if base.programme.eventType == "competition" { return try CompetitionFolders.discover(root: root, base: base).manifest }
     if FileManager.default.fileExists(
       atPath: root.appendingPathComponent("layout-change.json").path)
@@ -190,7 +191,14 @@ public enum ConcertLayout {
     else {
       throw PreparationError.invalid("Combined item identities cannot be reused as new items.")
     }
-    let normalized = try normalized(programme)
+    var normalized = try normalized(programme)
+    // Previously saved working programmes remain readable until an explicit save
+    // safely renames their folders through the existing journalled transition.
+    for index in normalized.nodes.indices where normalized.nodes[index].isActiveItem {
+      if programme.nodes[index].folderTitle == FolderPlan.clean(programme.nodes[index].title, stripAccents: false) {
+        normalized.nodes[index].folderTitle = programme.nodes[index].folderTitle
+      }
+    }
     guard
       try ProgrammeCoding.encoder().encode(normalized)
         == ProgrammeCoding.encoder().encode(programme)

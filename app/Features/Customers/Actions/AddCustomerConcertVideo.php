@@ -6,7 +6,7 @@ use App\Features\Concerts\Models\Concert;
 use App\Features\Concerts\Models\ConcertAccessGrant;
 use App\Features\Concerts\Models\ConcertCodeGroup;
 use App\Features\Concerts\Support\ConcertAccessGrantStatus;
-use App\Features\Customers\Models\CustomerStudio;
+use App\Features\Families\Services\FamilyGalleryAccess;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -16,7 +16,7 @@ class AddCustomerConcertVideo
     public function execute(User $user, string $code, int $year): int
     {
         abort_unless($user->canAccessCustomer(), 403);
-        $studios = CustomerStudio::where('user_id', $user->id)
+        $studios = app(FamilyGalleryAccess::class)->studios($user)
             ->whereNotNull('access_verified_at')->whereHas('studio', fn ($query) => $query->where('status', 'active'))->pluck('studio_id');
         if ($studios->isEmpty()) {
             throw ValidationException::withMessages(['concert_code' => 'Add your studio in My Profile first.']);

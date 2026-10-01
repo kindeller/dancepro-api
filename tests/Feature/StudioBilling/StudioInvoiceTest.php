@@ -5,12 +5,18 @@ namespace Tests\Feature\StudioBilling;
 use App\Features\Bookings\Actions\ApproveConcertBooking;
 use App\Features\Bookings\Actions\CreateConcertBooking;
 use App\Features\Bookings\Models\ConcertBooking;
+use App\Features\Customers\Models\CustomerAccountEmail;
+use App\Features\Customers\Models\CustomerInboxNotification;
+use App\Features\Customers\Services\CustomerInboxSources;
 use App\Features\Scheduling\Models\EventTypeDefinition;
+use App\Features\StudioBilling\Jobs\SendStudioPaymentReceipt;
+use App\Features\StudioBilling\Mail\StudioPaymentReceived;
 use App\Features\StudioBilling\Models\StudioBillingSetting;
 use App\Features\StudioBilling\Models\StudioInvoice;
 use App\Features\StudioBilling\Models\StudioInvoicePayment;
 use App\Features\StudioBilling\Services\StudioInvoiceGateway;
 use App\Features\StudioBilling\Services\StudioInvoices;
+use App\Features\StudioBilling\Services\StudioPaymentReceipts;
 use App\Features\Studios\Models\Studio;
 use App\Features\Studios\Models\StudioAccountAccess;
 use App\Features\Tracking\Jobs\SendConcertTrackerEmail;
@@ -24,6 +30,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class StudioInvoiceTest extends TestCase
@@ -54,6 +61,129 @@ class StudioInvoiceTest extends TestCase
         $this->get(route('customer.studio-invoices.show', [$studio, $invoice]))->assertOk()->assertSee('Paid')->assertDontSee('id="invoice-payment"', false);
     }
 
+    public function test_invoice_badge_and_receipts_follow_confirmed_payments_without_duplicates(): void
+    {
+        [$booking, $studio, $staff, $customer] = $this->fixture();
+        Mail::fake();
+        $invoice = $this->issued($booking, $staff);
+        $index = route('customer.studio-invoices.index', $studio);
+        $show = route('customer.studio-invoices.show', [$studio, $invoice]);
+        $this->actingAs($customer)->get($index)->assertSee('data-unpaid-invoices', false)->assertDontSee('✓ Invoice paid');
+        $input = ['idempotency_key' => (string) Str::uuid(), 'amount' => '1000.00', 'reference' => 'Bank transfer', 'paid_at' => today()->toDateString()];
+        app(StudioInvoices::class)->recordPayment($invoice, $staff, $input);
+        app(StudioInvoices::class)->recordPayment($invoice, $staff, $input);
+        $payment = $invoice->payments()->sole();
+        $this->assertFalse($payment->receipt['paid_in_full']);
+        $this->assertStringContainsString('$2,000.00 AUD', $payment->receipt['body']);
+        $this->assertSame($customer->email, $payment->receipt['recipient']);
+        Queue::assertPushed(SendStudioPaymentReceipt::class, 1);
+        $this->get($index)->assertSee('data-unpaid-invoices', false);
+        $receipts = app(StudioPaymentReceipts::class);
+        $receipts->send($payment->id);
+        $receipts->send($payment->id);
+        Mail::assertSent(StudioPaymentReceived::class, 1);
+        $html = (new StudioPaymentReceived($payment->fresh()->receipt))->render();
+        $this->assertStringContainsString('View invoice &amp; payment history', $html);
+        $this->assertStringContainsString('DancePro Photography', $html);
+        $this->assertDatabaseMissing('customer_inbox_notifications', ['user_id' => $customer->id, 'subject' => $payment->receipt['subject']]);
+        $this->assertDatabaseMissing('customer_account_emails', ['subject' => $payment->receipt['subject']]);
+        $this->assertDatabaseHas('studio_conversation_messages', ['studio_id' => $studio->id, 'channel' => 'payment_receipt', 'subject' => $payment->receipt['subject']]);
+        app(StudioInvoices::class)->recordPayment($invoice, $staff, array_replace($input, ['idempotency_key' => (string) Str::uuid(), 'amount' => '2000.00']));
+        $finalPayment = $invoice->payments()->latest('id')->first();
+        $this->assertTrue($finalPayment->receipt['paid_in_full']);
+        $this->get($index)->assertDontSee('data-unpaid-invoices', false)->assertSee('✓ Invoice paid');
+        $this->get($show)->assertSee('✓ Invoice paid')->assertSee('Paid in full')->assertDontSee('Direct transfer (preferred)');
+        $this->assertStringContainsString('Invoice paid in full', (new StudioPaymentReceived($finalPayment->receipt))->render());
+        app(StudioInvoices::class)->reverse($invoice, $finalPayment, $staff, 'Wrong allocation');
+        $this->get($index)->assertSee('data-unpaid-invoices', false)->assertDontSee('✓ Invoice paid');
+        $receipts->send($finalPayment->id);
+        Mail::assertSent(StudioPaymentReceived::class, 1);
+        $this->assertSame('cancelled', $finalPayment->fresh()->receipt['status']);
+    }
+
+    public function test_old_studio_payment_emails_cannot_reappear_in_the_personal_inbox(): void
+    {
+        $customer = User::factory()->customer()->create();
+        $email = CustomerAccountEmail::create([
+            'user_id' => $customer->id, 'recipient_email' => $customer->email,
+            'subject' => 'Payment received', 'body' => 'Invoice paid.', 'status' => 'sent',
+            'metadata' => ['kind' => 'studio_payment_received'],
+        ]);
+        $this->assertDatabaseMissing('customer_inbox_notifications', ['source_key' => 'account:'.$email->id]);
+        CustomerInboxNotification::create([
+            'user_id' => $customer->id, 'source_key' => 'account:'.$email->id,
+            'subject' => 'Payment received', 'body' => 'Invoice paid.', 'occurred_at' => now(),
+        ]);
+        app(CustomerInboxSources::class)->sync($email);
+        $this->assertDatabaseMissing('customer_inbox_notifications', ['source_key' => 'account:'.$email->id]);
+        $this->assertDatabaseHas('customer_account_emails', ['id' => $email->id]);
+    }
+
+    public function test_receipt_mail_failure_preserves_payment_and_can_be_retried(): void
+    {
+        [$booking, $studio, $staff] = $this->fixture();
+        $invoice = $this->issued($booking, $staff);
+        app(StudioInvoices::class)->recordPayment($invoice, $staff, ['idempotency_key' => (string) Str::uuid(), 'amount' => '3000', 'reference' => 'Transfer', 'paid_at' => today()->toDateString()]);
+        $payment = $invoice->payments()->sole();
+        $mailer = Mail::getFacadeRoot();
+        Mail::shouldReceive('to')->once()->andThrow(new \RuntimeException('Mail unavailable'));
+        try {
+            app(StudioPaymentReceipts::class)->send($payment->id);
+            $this->fail('Expected transport failure');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Mail unavailable', $exception->getMessage());
+        }
+        $this->assertSame(0, $invoice->fresh()->balanceCents());
+        $this->assertSame('failed', $payment->fresh()->receipt['status']);
+        Mail::swap($mailer);
+        Mail::fake();
+        app(StudioPaymentReceipts::class)->send($payment->id);
+        Mail::assertSent(StudioPaymentReceived::class, 1);
+        $this->assertSame('sent', $payment->fresh()->receipt['status']);
+    }
+
+    #[DataProvider('videoRates')]
+    public function test_video_invoice_shows_rate_quantity_and_correct_total(int $concerts, int $families, string $rate, int $quantity, int $unit, int $total): void
+    {
+        [$booking, , $staff] = $this->fixture();
+        if ($concerts === 1) {
+            $booking->items()->latest('id')->first()->update(['cancelled_at' => now()]);
+        }
+        // Portrait sessions do not count towards video charges.
+        $portrait = $booking->items()->whereNull('cancelled_at')->first()->replicate();
+        $portrait->fill(['uuid' => (string) Str::uuid(), 'item_type' => 'dress_rehearsal', 'title' => 'Portraits'])->save();
+        $booking->update(['final_family_count' => $families]);
+        $service = app(StudioInvoices::class);
+        $invoice = $service->create($booking, $staff, true, 'video');
+        $line = $invoice->lines[0];
+        $this->assertStringContainsString($rate.' Rate', $line['description']);
+        $this->assertSame($quantity, $line['quantity']);
+        $this->assertSame($unit, $line['unit_cents']);
+        $this->assertSame($total, $invoice->total_cents);
+        $this->assertSame((int) round($total / 11), $invoice->gst_cents);
+        if ($rate === 'Family') {
+            $this->assertStringContainsString($concerts.' '.($concerts === 1 ? 'concert)' : 'concerts)'), $line['description']);
+            $this->assertStringNotContainsString('per unique family', $line['description']);
+        }
+        $this->actingAs($staff)->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'invoice']))
+            ->assertOk()->assertSee($line['description'])
+            ->assertSee('value="'.$quantity.'"', false)->assertSee(number_format($total / 100, 2));
+        $service->refresh($invoice, $staff);
+        $this->assertEquals($line, $invoice->fresh()->lines[0]);
+        $this->assertSame($total, $invoice->fresh()->total_cents);
+    }
+
+    public static function videoRates(): array
+    {
+        return [
+            'one concert flat rate' => [1, 80, 'Flat', 1, 150000, 150000],
+            'two concerts flat rate' => [2, 80, 'Flat', 2, 150000, 300000],
+            'equal totals use flat rate' => [2, 200, 'Flat', 2, 150000, 300000],
+            '584 unique families across concerts' => [2, 584, 'Family', 584, 1500, 876000],
+            '151 families' => [1, 151, 'Family', 151, 1500, 226500],
+        ];
+    }
+
     public function test_other_studios_customers_and_revoked_directors_cannot_access_invoice_or_pay(): void
     {
         [$booking,$studio,$staff,$customer] = $this->fixture();
@@ -79,6 +209,8 @@ class StudioInvoiceTest extends TestCase
         $this->actingAs($staff)->post(route('admin.studio-invoices.issue', $invoice))->assertSessionHasErrors('invoice');
         $this->post(route('admin.studio-invoices.refresh', $invoice))->assertSessionHasNoErrors();
         $this->assertSame(375000, $invoice->fresh()->total_cents);
+        $this->assertSame(250, $invoice->fresh()->lines[0]['quantity']);
+        $this->assertSame(1500, $invoice->fresh()->lines[0]['unit_cents']);
         $this->post(route('admin.studio-invoices.issue', $invoice))->assertSessionHasNoErrors();
         $this->patch(route('admin.studio-invoices.update', $invoice), ['lines' => [['description' => 'Tamper', 'quantity' => 1, 'unit_amount' => '1']], 'due_date' => '2026-11-01'])->assertSessionHasErrors('invoice');
         $booking->update(['final_family_count' => 500]);
@@ -114,14 +246,17 @@ class StudioInvoiceTest extends TestCase
         $data = ['idempotency_key' => (string) Str::uuid(), 'balance_cents' => 300000, 'nonce' => 'test-nonce'];
         $this->actingAs($customer)->post(route('customer.studio-invoices.pay', [$studio, $invoice]), $data)->assertSessionHasNoErrors();
         $this->assertSame('unknown', $invoice->payments()->sole()->status);
+        $this->assertNull($invoice->payments()->sole()->receipt);
         $this->post(route('customer.studio-invoices.pay', [$studio, $invoice]), array_merge($data, ['idempotency_key' => (string) Str::uuid()]))->assertSessionHasErrors('invoice');
         $this->post(route('customer.studio-invoices.reconcile', [$studio, $invoice]))->assertSessionHasNoErrors();
         $this->assertSame(300000, $invoice->fresh()->balanceCents());
+        $this->assertNull($invoice->payments()->sole()->receipt);
         $gateway2 = \Mockery::mock(StudioInvoiceGateway::class);
         $gateway2->shouldReceive('reconcile')->once()->andReturn(['status' => 'succeeded', 'transaction' => 'tx1', 'message' => 'Settled']);
         $this->app->instance(StudioInvoiceGateway::class, $gateway2);
         $this->post(route('customer.studio-invoices.reconcile', [$studio, $invoice]))->assertSessionHasNoErrors();
         $this->assertSame(0, $invoice->fresh()->balanceCents());
+        $this->assertTrue($invoice->payments()->sole()->receipt['paid_in_full']);
     }
 
     public function test_fake_gateway_never_pays_live_invoice_and_amount_is_server_validated(): void
@@ -261,9 +396,11 @@ class StudioInvoiceTest extends TestCase
         $this->assertNull($invoice->fresh()->sent_at);
         $this->get(route('admin.studio-invoices.pdf', $invoice))->assertOk()->assertHeader('Content-Type', 'application/pdf');
         $emailUrl = route('admin.concert-tracker.tasks.email.send', [$event, 'invoice_sent']);
-        $payload = ['recipient_email' => $customer->email, 'studio_invoice_uuid' => $invoice->uuid];
+        $this->get(route('admin.studio-invoices.email', $invoice))->assertOk()->assertSee('data-email-send-editor', false);
+        $payload = ['recipient_email' => $customer->email, 'studio_invoice_uuid' => $invoice->uuid, 'email_subject' => 'Your discounted invoice'];
         $this->post($emailUrl, $payload)->assertSessionHasNoErrors();
         $delivery = ConcertTrackerEmailDelivery::latest('id')->firstOrFail();
+        $this->assertSame('Your discounted invoice', $delivery->subject);
         $this->assertStringContainsString(route('customer.studio-invoices.show', [$studio, $invoice]), $delivery->body);
         $this->assertSame('Not invoiced', $tracker->detail($event->fresh(), 'invoice_sent')['status']['label']);
         (new SendConcertTrackerEmail($delivery->id))->handle();
@@ -388,7 +525,7 @@ class StudioInvoiceTest extends TestCase
                 ->assertSee('Studio hub summary')->assertSee('actions remaining');
             $doc = new \DOMDocument;
             @$doc->loadHTML($response->getContent());
-            $links = (new \DOMXPath($doc))->query('//a[@class="hub-stat"]');
+            $links = (new \DOMXPath($doc))->query('//a[contains(concat(" ",normalize-space(@class)," ")," hub-stat ")]');
             $this->assertCount(3, $links);
             $this->assertSame([$eventsUrl.'#events', $actionsUrl.'#events', $messagesUrl.'#messages'], array_map(fn ($link) => $link->getAttribute('href'), iterator_to_array($links)));
             $this->assertNull($message->fresh()->studio_read_at);

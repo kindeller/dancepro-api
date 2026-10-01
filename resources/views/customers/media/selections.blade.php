@@ -41,10 +41,18 @@
     .selection-icon.bin { border-color:#e6b5bb; background:#fff3f4; color:#ad1d2c; }
     .event-selection-more { display:flex; justify-content:flex-end; padding:0 14px 14px; }
     .event-selection-more button { border:0; background:transparent; color:#0879a7; font:inherit; font-weight:800; cursor:pointer; }
-    .event-selection-totals { padding:14px 18px; border-top:1px solid var(--line); background:#f7fafb; }
+    .event-selection-totals { color:var(--ink); padding:14px 18px; border-top:1px solid var(--line); background:#f7fafb; }
     .event-selection-totals p { display:flex; justify-content:space-between; gap:15px; margin:4px 0; }
+    .studio-cart-explanation { margin:0; padding:14px 18px; background:#eaf7fc; color:#215064; font-size:14px; }
+    .studio-cart-event + .studio-cart-event { border-top:2px solid var(--line); }
+    .studio-cart-event-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:20px 18px 0; }
+    .studio-cart-event-heading h3 { margin:0; font-size:17px; }
+    .studio-cart-event-heading p { margin:3px 0 0; font-size:13px; color:var(--muted); }
+    .studio-cart-event-heading a { font-size:14px; font-weight:800; color:#0879a7; text-decoration:none; white-space:nowrap; }
+    @media(max-width:600px) { .event-selection-head { flex-wrap:wrap; } .event-selection-choice { margin-left:0; } .studio-cart-event-heading { align-items:flex-start; } }
     .account-selection-total { max-width:620px; margin-left:auto; padding:20px; }
     .account-selection-total p { display:flex; justify-content:space-between; gap:16px; margin:7px 0; }
+    .account-selection-total [hidden] { display:none !important; }
     .account-selection-total .total { margin-top:12px; padding-top:12px; border-top:1px solid var(--line); font-size:21px; font-weight:850; }
     .account-checkout-form { display:grid; gap:15px; margin-top:20px; padding-top:18px; border-top:1px solid var(--line); }
     .account-checkout-form label { margin:0; }
@@ -65,6 +73,15 @@
     .account-favourite-preview-actions .selection-icon.heart { background:#385fbe; }
     .account-favourite-preview-actions .selection-icon.cart.is-selected { background:#078bc4; }
     @media(max-width:600px) { .account-selection-nav { align-items:stretch; flex-direction:column; } .account-selection-links { width:100%; margin-left:0; } .account-selection-links a { flex:1; } .event-selection-item { align-items:flex-start; flex-wrap:wrap; } .event-selection-actions { margin-left:113px; } .event-selection-items.is-favourites { grid-template-columns:repeat(2,minmax(0,1fr)); } .event-selection-items.is-favourites .event-selection-actions { margin-left:0; } }
+    @media(max-width:600px) {
+        .studio-cart-event .event-selection-item { display:grid; grid-template-columns:80px minmax(0,1fr) 34px; align-items:start; gap:10px; }
+        .studio-cart-event .event-selection-thumb { width:80px; height:60px; }
+        .studio-cart-event .event-selection-actions { margin-left:0; }
+        .studio-cart-event .selection-icon { width:34px; height:34px; }
+        .studio-cart-event .event-selection-copy { width:100%; }
+        .studio-cart-event .event-selection-copy strong { overflow-wrap:anywhere; }
+        .studio-cart-event .event-selection-copy .cart-photo-filename { width:100%; }
+    }
     @media(prefers-reduced-motion:reduce) { .account-selection-nav a { transition:none; } .account-selection-nav a:hover,.account-selection-nav a:focus-visible { transform:none; } }
 </style>
 @endpush
@@ -79,44 +96,35 @@
         <section class="card event-selection-group" @if($mode === 'cart')data-cart-group data-subtotal="{{ $group['subtotal'] }}" data-discount="{{ $group['discount'] }}" data-total="{{ $group['total'] }}"@endif>
             <header class="event-selection-head">
                 @if($group['logo'])<img class="event-selection-logo" src="{{ $group['logo'] }}" alt="">@endif
-                <div><h2>{{ $group['title'] }}</h2><p>{{ ucfirst($group['kind']) }} @if($group['date']) · {{ $group['date']->format('j M Y') }} @endif</p></div>
-                @if($mode === 'cart')<label class="event-selection-choice"><input type="checkbox" name="cart_groups[]" form="account-cart-checkout" checked data-include-cart value="{{ $group['kind'] }}:{{ $group['event']->uuid }}"><span>Include in purchase</span></label>@endif
+                <div><h2>{{ $group['title'] }}</h2>
+                    @unless(isset($group['events']))
+                        <p>{{ ucfirst($group['kind']) }} @if($group['date']) · {{ $group['date']->format('j M Y') }} @endif</p>
+                    @endunless
+                </div>
+                @if($mode === 'cart')<label class="event-selection-choice"><input type="checkbox" name="cart_groups[]" form="account-cart-checkout" checked data-include-cart value="{{ $group['kind'] }}:{{ isset($group['events']) ? $group['studio']->uuid : $group['event']->uuid }}"><span>Include in purchase</span></label>@endif
             </header>
-            <div class="event-selection-items {{ $mode === 'favourites' ? 'is-favourites' : '' }}" data-event-items>
-                @foreach($group['selections'] as $selection)
-                    @if($group['kind'] === 'competition')
-                        @php($detail = $group['details'][$selection->id])
-                        @php($canPreviewFavourite = $mode === 'favourites' && $selection->product === 'photo' && $selection->photo_uuid)
-                        <article class="event-selection-item" data-selection-item>
-                            <a href="{{ $canPreviewFavourite ? route('customer.competitions.image', ['schedulingEvent' => $group['event'], 'photo' => $selection->photo_uuid]) : $detail['view_url'] }}" @if($canPreviewFavourite)class="favourite-preview-trigger" data-favourite-preview data-preview-src="{{ route('customer.competitions.image', ['schedulingEvent' => $group['event'], 'photo' => $selection->photo_uuid]) }}"@endif>@if($detail['thumbnail_url'])<img class="event-selection-thumb" src="{{ $detail['thumbnail_url'] }}" alt="" loading="lazy">@else<span class="event-selection-thumb"></span>@endif</a>
-                            <div class="event-selection-copy"><span>{{ $detail['section'] }}</span><strong>{{ $detail['competitor'] }}</strong><span>{{ match($selection->product) { 'photo' => 'Individual photo', 'routine_photos' => 'All routine photos', 'routine_video' => 'Routine video', default => 'Routine package' } }} @if($selection->in_cart) · ${{ number_format(($group['lineAmounts'][$selection->id] ?? 0) / 100, 2) }} @endif</span></div>
-                            <div class="event-selection-actions">
-                                @if($mode === 'favourites')<form method="post" action="{{ route('customer.competitions.selections.store', $group['event']) }}">@csrf<input type="hidden" name="item_uuid" value="{{ $selection->item_uuid }}"><input type="hidden" name="photo_uuid" value="{{ $selection->photo_uuid }}"><input type="hidden" name="product" value="{{ $selection->product }}"><input type="hidden" name="action" value="{{ $selection->in_cart ? 'remove' : 'add' }}"><button class="selection-icon cart {{ $selection->in_cart ? 'is-selected' : '' }}" title="{{ $selection->in_cart ? 'Remove from cart' : 'Add to cart' }}" aria-label="{{ $selection->in_cart ? 'Remove from cart' : 'Add to cart' }}"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.1 11h11.5l2-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></button></form>@endif
-                                <form method="post" action="{{ route('customer.competitions.selections.store', $group['event']) }}">@csrf<input type="hidden" name="item_uuid" value="{{ $selection->item_uuid }}"><input type="hidden" name="photo_uuid" value="{{ $selection->photo_uuid }}"><input type="hidden" name="product" value="{{ $selection->product }}"><input type="hidden" name="action" value="{{ $mode === 'favourites' ? 'unfavourite' : 'remove' }}"><button class="selection-icon {{ $mode === 'favourites' ? 'heart' : 'bin' }}" aria-label="Remove from {{ $mode }}"><svg viewBox="0 0 24 24">@if($mode === 'favourites')<path d="M20.8 8.5c0 5-8.8 11-8.8 11s-8.8-6-8.8-11a4.6 4.6 0 0 1 8.8-1.8 4.6 4.6 0 0 1 8.8 1.8Z"/>@else<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v6m4-6v6"/>@endif</svg></button></form>
-                            </div>
-                        </article>
+            @if(isset($group['events']))
+                <p class="studio-cart-explanation">@if(!$group['principalPrice'])Photos from these events count together towards your bulk discount.
                     @else
-                        @php($asset = $selection->asset)
-                        <article class="event-selection-item" data-selection-item>
-                            <a href="{{ $mode === 'favourites' ? route('customer.concerts.photos.image', ['concert' => $selection->concert, 'asset' => $asset]) : route('customer.concerts.photos.show', ['concert' => $selection->concert, 'asset' => $asset->uuid]) }}" @if($mode === 'favourites')class="favourite-preview-trigger" data-favourite-preview data-preview-src="{{ route('customer.concerts.photos.image', ['concert' => $selection->concert, 'asset' => $asset]) }}"@endif><img class="event-selection-thumb" src="{{ route('customer.concerts.photos.image', ['concert' => $selection->concert, 'asset' => $asset]) }}" alt="" loading="lazy"></a>
-                            <div class="event-selection-copy"><strong>{{ $asset->collection->name }}</strong><span>Individual concert photo @if($selection->in_cart) · ${{ number_format(($group['lineAmounts'][$selection->id] ?? 0) / 100, 2) }} @endif</span></div>
-                            <div class="event-selection-actions">
-                                @if($mode === 'favourites')<form method="post" action="{{ route('customer.concerts.photos.selections.store', $selection->concert) }}">@csrf<input type="hidden" name="asset_uuid" value="{{ $asset->uuid }}"><input type="hidden" name="action" value="{{ $selection->in_cart ? 'remove' : 'add' }}"><button class="selection-icon cart {{ $selection->in_cart ? 'is-selected' : '' }}" title="{{ $selection->in_cart ? 'Remove from cart' : 'Add to cart' }}" aria-label="{{ $selection->in_cart ? 'Remove from cart' : 'Add to cart' }}"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.1 11h11.5l2-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></button></form>@endif
-                                <form method="post" action="{{ route('customer.concerts.photos.selections.store', $selection->concert) }}">@csrf<input type="hidden" name="asset_uuid" value="{{ $asset->uuid }}"><input type="hidden" name="action" value="{{ $mode === 'favourites' ? 'unfavourite' : 'remove' }}"><button class="selection-icon {{ $mode === 'favourites' ? 'heart' : 'bin' }}" aria-label="Remove from {{ $mode }}"><svg viewBox="0 0 24 24">@if($mode === 'favourites')<path d="M20.8 8.5c0 5-8.8 11-8.8 11s-8.8-6-8.8-11a4.6 4.6 0 0 1 8.8-1.8 4.6 4.6 0 0 1 8.8 1.8Z"/>@else<path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v6m4-6v6"/>@endif</svg></button></form>
-                            </div>
-                        </article>
-                    @endif
+                    All concert photos from this studio are included in one purchase.
+                    @endif</p>
+                @foreach($group['events'] as $eventGroup)
+                    <section class="studio-cart-event" aria-label="{{ $eventGroup['title'] }}">
+                        <header class="studio-cart-event-heading"><div><h3>{{ $eventGroup['title'] }}</h3>@if($eventGroup['date'])<p>{{ $eventGroup['date']->format('j M Y') }}</p>@endif</div><a href="{{ route('customer.concerts.photos.show', $eventGroup['event']) }}">View gallery →</a></header>
+                        @include('customers.media._selection-items', ['group' => $eventGroup])
+                    </section>
                 @endforeach
-            </div>
-            @if($group['selections']->count() > 4)<div class="event-selection-more"><button type="button" data-view-more aria-expanded="false">View more ↓</button></div>@endif
-            @if($mode === 'cart')<footer class="event-selection-totals"><p><span>Event subtotal</span><strong>${{ number_format($group['subtotal'] / 100, 2) }}</strong></p>@if($group['discount'] > 0)<p><span>Event bulk discount ({{ $group['discount_percent'] }}%)</span><strong>−${{ number_format($group['discount'] / 100, 2) }}</strong></p>@endif<p><span>Event total</span><strong>${{ number_format($group['total'] / 100, 2) }}</strong></p></footer>@endif
+            @else
+                @include('customers.media._selection-items')
+            @endif
+            @if($mode === 'cart')<footer class="event-selection-totals"><p><span>{{ isset($group['events']) ? 'Studio subtotal' : 'Event subtotal' }}</span><strong>${{ number_format($group['subtotal'] / 100, 2) }}</strong></p>@if($group['discount'] > 0)<p><span>{{ isset($group['events']) ? 'Studio bulk discount' : 'Event bulk discount' }} ({{ $group['discount_percent'] }}%)</span><strong>−${{ number_format($group['discount'] / 100, 2) }}</strong></p>@endif<p><span>{{ isset($group['events']) ? 'Studio total' : 'Event total' }}</span><strong>${{ number_format($group['total'] / 100, 2) }}</strong></p></footer>@endif
         </section>
     @empty
         <div class="empty"><p>{{ $mode === 'cart' ? 'Your cart is empty.' : 'Your favourites are empty.' }}</p><a href="{{ route('customer.media.index') }}">Browse My Media</a></div>
     @endforelse
-    @if($mode === 'cart' && $groups->isNotEmpty())<aside class="card account-selection-total"><p><span>Selected subtotal</span><strong data-selected-subtotal>${{ number_format($subtotal / 100, 2) }}</strong></p><p><span>Selected event discounts</span><strong data-selected-discount>−${{ number_format($discount / 100, 2) }}</strong></p><p class="total"><span>Selected total</span><strong data-selected-total>${{ number_format($total / 100, 2) }}</strong></p><p class="meta" data-selected-summary>All {{ $groups->count() }} event carts selected. Untick an event above to save that cart for later.</p><p class="meta">Each event keeps its own pricing and bulk discount. A discount code and account credit are applied when the order is reviewed.</p>
+    @if($mode === 'cart' && $groups->isNotEmpty())<aside class="card account-selection-total"><p><span>Selected subtotal</span><strong data-selected-subtotal>${{ number_format($subtotal / 100, 2) }}</strong></p><p data-selected-discount-row @if($discount <= 0) hidden @endif><span>Selected discounts</span><strong data-selected-discount>−${{ number_format($discount / 100, 2) }}</strong></p><p class="total"><span>Selected total</span><strong data-selected-total>${{ number_format($total / 100, 2) }}</strong></p><p class="meta" data-selected-summary>All {{ $groups->count() }} carts selected. Untick a cart above to save that cart for later.</p><p class="meta">Concert photos are grouped by studio. Each competition is calculated separately. A discount code and account credit are applied when the order is reviewed.</p>
         <form id="account-cart-checkout" class="account-checkout-form" method="post" action="{{ route('customer.checkout.account-cart') }}">@csrf
-            <label>Discount code<input name="discount_code" value="{{ old('discount_code') }}" maxlength="32" autocomplete="off"><span class="meta">Optional. Codes apply once across the selected event carts.</span></label>
+            <label>Discount code<input name="discount_code" value="{{ old('discount_code') }}" maxlength="32" autocomplete="off"><a class="meta" href="{{ route('website.detail', ['websiteSlug' => 'terms', 'tab' => 'discounts']) }}#website-content">Discount Terms &amp; Conditions</a></label>
             @if($creditBalance > 0)<label class="account-credit-choice"><input type="checkbox" name="use_account_credit" value="1" @checked(old('use_account_credit'))><span>Use my ${{ number_format($creditBalance / 100, 2) }} account credit<span class="meta">Applied after discounts. GST is calculated on the remaining paid amount.</span></span></label>@endif
             <button class="button" type="submit" data-account-checkout>Proceed to checkout</button>
         </form>
@@ -124,6 +132,7 @@
     @if($mode === 'favourites' && $groups->isNotEmpty())
         <dialog class="account-favourite-preview" data-favourite-preview-dialog aria-label="Favourite photo preview"><div class="account-favourite-preview-inner"><div class="account-favourite-preview-bar"><strong>Photo preview</strong><button type="button" data-preview-close>Close ✕</button></div><div class="account-favourite-preview-frame"><img data-preview-image alt="Favourite photo preview"><div class="account-favourite-preview-actions"><button class="selection-icon heart" type="button" data-preview-favourite aria-label="Remove from favourites"><svg viewBox="0 0 24 24"><path d="M20.8 8.5c0 5-8.8 11-8.8 11s-8.8-6-8.8-11a4.6 4.6 0 0 1 8.8-1.8 4.6 4.6 0 0 1 8.8 1.8Z"/></svg></button><button class="selection-icon cart" type="button" data-preview-cart aria-label="Add to cart"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.1 11h11.5l2-8H6"/><circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg></button></div></div></div></dialog>
     @endif
+@if($mode === 'cart')<x-gallery-photo-viewer />@endif
 </div></section>
 @endsection
 
@@ -166,11 +175,12 @@ const updateSelectedCartTotal = () => {
     const selected = cartGroups.filter(group => group.querySelector('[data-include-cart]').checked);
     const sum = key => selected.reduce((total, group) => total + Number(group.dataset[key] || 0), 0);
     document.querySelector('[data-selected-subtotal]').textContent = money(sum('subtotal'));
+    document.querySelector('[data-selected-discount-row]').hidden = sum('discount') <= 0;
     document.querySelector('[data-selected-discount]').textContent = `−${money(sum('discount'))}`;
     document.querySelector('[data-selected-total]').textContent = money(sum('total'));
     document.querySelector('[data-selected-summary]').textContent = selected.length
-        ? `${selected.length} of ${cartGroups.length} event carts selected. Unselected carts remain saved for later.`
-        : 'No event carts selected. Your media remains saved for later.';
+        ? `${selected.length} of ${cartGroups.length} carts selected. Unselected carts remain saved for later.`
+        : 'No carts selected. Your media remains saved for later.';
     document.querySelector('[data-account-checkout]').disabled = selected.length === 0;
 };
 cartGroups.forEach(group => {

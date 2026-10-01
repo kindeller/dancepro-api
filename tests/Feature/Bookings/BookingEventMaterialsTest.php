@@ -4,6 +4,10 @@ namespace Tests\Feature\Bookings;
 
 use App\Features\Bookings\Actions\ApproveConcertBooking;
 use App\Features\Bookings\Models\ConcertBooking;
+use App\Features\Bookings\Services\BookingSeatsAndFamilies;
+use App\Features\Crew\Models\CrewRole;
+use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Studios\Models\ConcertEventRoleSeats;
 use App\Features\Studios\Models\Studio;
 use App\Features\Studios\Models\StudioEventFile;
 use App\Features\Tracking\Jobs\SendConcertTrackerEmail;
@@ -114,7 +118,8 @@ class BookingEventMaterialsTest extends TestCase
         $this->assertSame('needs_conversion', $programme->status);
         $this->assertSame($programme->storage_key, $item->fresh()->programme_path);
         $this->assertSame($programme->storage_key, $event->fresh()->programme_path);
-        $this->get(route('admin.concert-bookings.show', $booking))->assertOk()->assertSee('converted.mp4');
+        $this->get(route('admin.concert-bookings.show', $booking))->assertOk()->assertDontSee('Programmes &amp; slideshows', false)->assertDontSee('converted.mp4');
+        $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'studio-media']))->assertOk()->assertSee('converted.mp4');
         $this->get(route('admin.concert-bookings.show', [$booking, 'tab' => 'seats-families']))->assertOk()->assertSee('Row A: 1, 2');
         $this->post($url, ['kind' => 'programme', 'files' => [UploadedFile::fake()->createWithContent('converted.pdf', "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF")]])->assertSessionHasNoErrors();
         $this->assertFalse($programme->fresh()->is_current);
@@ -178,6 +183,7 @@ class BookingEventMaterialsTest extends TestCase
         $secondItem->save();
         $second = app(ApproveConcertBooking::class)->approveItem($secondItem, $staff);
         $this->actingAs($staff);
+        $this->travelTo(Carbon::parse('2026-10-21 10:00:00'));
         foreach (['final_numbers_email', 'concert_week_email', 'post_concert_email'] as $key) {
             $page = route('admin.concert-tracker.tasks.show', [$event, $key]);
             $send = route('admin.concert-tracker.tasks.email.send', [$event, $key]);
@@ -187,9 +193,7 @@ class BookingEventMaterialsTest extends TestCase
             $this->patchJson($update, ['panel' => 'status', 'status_override' => 'approved'])->assertOk()->assertSee('Approved');
             $task = app(ConcertTracker::class)->detail($event, $key)['task'];
             $this->assertSame($key === 'final_numbers_email' ? 'booking' : 'event', $task->scope_type);
-            if ($key !== 'final_numbers_email') {
-                $this->assertSame('not_started', app(ConcertTracker::class)->detail($second, $key)['status']['key']);
-            }
+            $this->assertSame('complete', app(ConcertTracker::class)->detail($second, $key)['status']['key']);
             $this->from($page)->post($send, $input)->assertSessionHasNoErrors();
             $delivery = $task->deliveries()->sole();
             $this->post($send, $input)->assertSessionHasErrors('email');
@@ -241,11 +245,33 @@ class BookingEventMaterialsTest extends TestCase
         $this->assertSame('complete', $complete['key']);
         $this->assertSame('95 families', $complete['label']);
         $this->assertContains('P1: N23', $complete['seatSummary']);
+        $this->assertContains('V: M1-5', $complete['seatSummary']);
+        $this->assertSame($staff->name.' · '.now()->format('j M Y'), $complete['activity']);
         $this->assertStringContainsString($staff->name, $complete['activity']);
         $this->assertSame('not_required', $status($events[2])['key']);
         $this->assertSame($anchor, $complete['detailUrl']);
+        $laterUser = User::factory()->staff()->create(['name' => 'Latest Editor']);
+        $booking->update(['family_count_confirmed_by' => $laterUser->id, 'family_count_confirmed_at' => now()->addDay()]);
+        $this->assertSame('Latest Editor · '.now()->addDay()->format('j M Y'), $status($events[0])['activity']);
+        $events[0]->roleSeats()->firstOrFail()->update(['submitted_by_user_id' => $staff->id, 'submitted_at' => now()->addDays(2)]);
+        $this->assertSame($staff->name.' · '.now()->addDays(2)->format('j M Y'), $status($events[0])['activity']);
+
         $this->get($anchor)->assertOk()->assertSee('Total final families')->assertSee('Row N: 23');
         $this->get(route('admin.concert-tracker.index', ['year' => 2026, 'view' => 'studio', 'phase' => 'booking']))->assertOk()->assertSee('P1: N23')->assertSee('95 families');
+    }
+
+    public function test_seat_summary_compacts_runs_without_hiding_gaps_or_other_rows(): void
+    {
+        $event = new SchedulingEvent;
+        $allocation = new ConcertEventRoleSeats(['seats' => [
+            ['row' => 'J', 'seat' => '20'], ['row' => 'J', 'seat' => '16'], ['row' => 'J', 'seat' => '18'],
+            ['row' => 'J', 'seat' => '17'], ['row' => 'J', 'seat' => '19'], ['row' => 'J', 'seat' => '23'],
+            ['row' => 'K', 'seat' => '1'], ['row' => 'K', 'seat' => '3'], ['row' => 'K', 'seat' => '3'],
+            ['row' => 'L', 'seat' => '4A'],
+        ]]);
+        $allocation->setRelation('crewRole', new CrewRole(['code' => 'concert-videographer']));
+        $event->setRelation('roleSeats', collect([$allocation]));
+        $this->assertSame(['V: J16-20, J23, K1, K3, L4A'], app(BookingSeatsAndFamilies::class)->summary($event)->all());
     }
 
     public function test_booking_task_tabs_have_separate_bars_and_independent_numbers_controls(): void
@@ -254,7 +280,7 @@ class BookingEventMaterialsTest extends TestCase
         app(ApproveConcertBooking::class)->approveItem($booking->items->first(), $staff);
         $bookingPage = route('admin.concert-bookings.show', $booking);
         $numbersPage = route('admin.concert-bookings.show', [$booking, 'tab' => 'seats-families']);
-        $this->actingAs($staff)->get($bookingPage)->assertOk()->assertSee('Back to tracker')->assertSee('booking-task-tabs')->assertDontSee('Event availability')->assertDontSee('Pending events')->assertSee('booking-edit-form')->assertDontSee('name="final_family_count"', false);
+        $this->actingAs($staff)->get($bookingPage)->assertOk()->assertSee('Back to tracker')->assertSee('booking-task-tabs')->assertDontSee('aria-label="Event management sections"', false)->assertDontSee('Pending events')->assertSee('booking-edit-form')->assertDontSee('name="final_family_count"', false);
         $this->get($numbersPage)->assertOk()->assertSee('Tracker task controls')->assertSee('80 families (quoted)')->assertSee('name="final_family_count"', false)->assertDontSee('name="studio_name"', false)->assertDontSee('Save booking changes');
         $update = route('admin.concert-bookings.numbers-tracker.update', $booking);
         $this->patchJson($update, ['panel' => 'assignment', 'assignee_user_id' => $staff->id])->assertOk();

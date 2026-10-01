@@ -20,8 +20,8 @@ class ConcertTrackerAutomation
     private const RULES = [
         'confirmation_information_email' => ['label' => 'Booking confirmation', 'basis' => 'approved'],
         'final_numbers_email' => ['label' => 'Seats & families email', 'basis' => 'booking_first'],
-        'concert_week_email' => ['label' => 'Concert Week requirements', 'basis' => 'event'],
-        'post_concert_email' => ['label' => 'Post-concert information', 'basis' => 'event'],
+        'concert_week_email' => ['label' => 'Concert Week requirements', 'basis' => 'concert_group'],
+        'post_concert_email' => ['label' => 'Post-concert information', 'basis' => 'concert_group_last'],
     ];
 
     public function __construct(
@@ -113,6 +113,9 @@ class ConcertTrackerAutomation
 
     private function forEvent(SchedulingEvent $event): Collection
     {
+        if ($event->concertBookingItem?->cancelled_at) {
+            return collect();
+        }
         $storedRules = ConcertTrackerAutomationRule::query()->get()->keyBy('task_key');
 
         return collect(self::RULES)->map(function (array $definitionRule, string $taskKey) use ($event, $storedRules): ?array {
@@ -145,7 +148,11 @@ class ConcertTrackerAutomation
 
     private function plannedAt(SchedulingEvent $event, array $definition, ConcertTrackerAutomationRule $rule): Carbon
     {
-        if ($definition['basis'] === 'approved') {
+        if ($definition['basis'] === 'concert_group') {
+            $date = Carbon::parse(app(ConcertEventGroups::class)->firstEventDate($event));
+        } elseif ($definition['basis'] === 'concert_group_last') {
+            $date = Carbon::parse(app(ConcertEventGroups::class)->lastEventDate($event));
+        } elseif ($definition['basis'] === 'approved') {
             $approved = $event->concertBookingItem?->booking?->reviewed_at;
             $date = $approved ? Carbon::parse($approved) : now();
         } else {

@@ -250,7 +250,7 @@ class CustomerMediaTest extends TestCase
         $url = route('customer.media.recommendations.thumbnail', ['schedulingEvent' => $event,
             'item' => '00000000-0000-4000-8000-000000000001', 'photo' => '00000000-0000-4000-8000-000000000002']);
 
-        $this->get($url)->assertRedirect(route('customer.login'));
+        $this->get($url)->assertRedirect(route('login'));
         $this->actingAs(User::factory()->customer()->create())->get($url)->assertNotFound();
     }
 
@@ -312,8 +312,8 @@ class CustomerMediaTest extends TestCase
 
     public function test_customer_access_routes_allow_active_crew_but_reject_inactive_accounts(): void
     {
-        $this->get(route('customer.media.index'))->assertRedirect(route('customer.login'));
-        $this->add()->assertRedirect(route('customer.login'));
+        $this->get(route('customer.media.index'))->assertRedirect(route('login'));
+        $this->add()->assertRedirect(route('login'));
         $this->actingAs(User::factory()->crew()->create())->get(route('customer.media.index'))->assertOk();
         $this->add()->assertSessionHasErrors('concert_code');
         $this->actingAs(User::factory()->customer()->inactive()->create())->get(route('customer.media.index'))->assertForbidden();

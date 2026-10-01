@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
 #[Fillable(['uuid', 'name', 'is_school', 'code', 'slug', 'status', 'description', 'cover_image_url', 'cover_image_storage_key', 'cover_image_revision', 'cover_image_mime_type', 'logo_path', 'brand_color', 'contact_name', 'contact_email', 'contact_phone', 'legacy_id', 'notes'])]
@@ -21,6 +22,24 @@ class Studio extends Model
     use HasFactory, HasPublicUuid, SoftDeletes;
 
     protected $hidden = ['gallery_code_hash', 'gallery_code_encrypted'];
+
+    /** Studio code is the shared membership and concert-photo code. */
+    public function matchesPhotoAccessCode(string $code): bool
+    {
+        if (filled($this->code)) {
+            return hash_equals(mb_strtoupper(trim($this->code)), mb_strtoupper(trim($code)));
+        }
+
+        // Preserve hash-only legacy studios until an administrator sets their Studio code.
+        return $this->gallery_code_hash && Hash::check(mb_strtoupper(trim($code)), $this->gallery_code_hash);
+    }
+
+    public function photoAccessFingerprint(): ?string
+    {
+        $source = filled($this->code) ? mb_strtoupper(trim($this->code)) : $this->gallery_code_hash;
+
+        return $source ? hash('sha256', $source) : null;
+    }
 
     public function concerts(): HasMany
     {
@@ -59,7 +78,7 @@ class Studio extends Model
 
     protected function casts(): array
     {
-        return ['is_school' => 'boolean', 'status' => StudioStatus::class, 'gallery_code_version' => 'integer', 'gallery_code_encrypted' => 'encrypted'];
+        return ['family_sharing_enabled' => 'boolean', 'family_downloads_enabled' => 'boolean', 'is_school' => 'boolean', 'status' => StudioStatus::class, 'gallery_code_version' => 'integer', 'gallery_code_encrypted' => 'encrypted'];
     }
 
     protected static function newFactory(): StudioFactory

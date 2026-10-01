@@ -2,8 +2,11 @@
 
 namespace App\Features\Customers\Controllers;
 
+use App\Features\Bookings\Services\StudioBookingDrafts;
+use App\Features\Bookings\Services\StudioBookingPlans;
 use App\Features\Customers\Requests\CustomerCompetitionsRequest;
 use App\Features\Customers\Services\StudioCommunicationHistory;
+use App\Features\Customers\Services\StudioMessageReads;
 use App\Features\Studios\Models\Studio;
 use App\Features\Studios\Models\StudioAccountAccess;
 use App\Features\Tracking\Models\StudioConversationAttachment;
@@ -27,13 +30,15 @@ class CustomerStudioCommunicationController extends Controller
             ->first();
 
         return $access
-            ? to_route('customer.studio-communications.index', $access->studio)
+            ? to_route('customer.studio-communications.index', $request->query('tab') === 'messages' ? [$access->studio, 'tab' => 'messages'] : $access->studio)
             : to_route('customer.profile.edit')->with('status', 'No studio management access is linked to this account yet.');
     }
 
-    public function __invoke(CustomerCompetitionsRequest $request, Studio $studio, StudioCommunicationHistory $history): Response
+    public function __invoke(CustomerCompetitionsRequest $request, Studio $studio, StudioCommunicationHistory $history, StudioBookingPlans $plans): Response
     {
         return response()->view('customers.studios.communications', $history->forUser($request->user(), $studio) + [
+            'latestBooking' => $plans->latestForStudio($request->user(), $studio),
+            'bookingDraft' => app(StudioBookingDrafts::class)->find($request->user(), $studio),
             'tab' => $request->validated('tab') === 'messages' ? 'messages' : 'events',
         ])
             ->header('Cache-Control', 'private, no-store');
@@ -44,6 +49,15 @@ class CustomerStudioCommunicationController extends Controller
         $history->reply($request->user(), $studio, $request->validated());
 
         return back()->with('status', 'Your reply has been added to the conversation.');
+    }
+
+    public function read(CustomerCompetitionsRequest $request, Studio $studio, string $source, string $message, StudioMessageReads $reads)
+    {
+        $counts = $reads->read($request->user(), $studio, $source, $message);
+
+        return $request->expectsJson()
+            ? response()->json(['success' => true, 'message' => 'Message marked as read.', 'data' => ['counts' => $counts]])->header('Cache-Control', 'private, no-store')
+            : back()->with('status', 'Message marked as read.');
     }
 
     public function attachment(CustomerCompetitionsRequest $request, Studio $studio, StudioConversationAttachment $attachment, StudioCommunicationHistory $history): StreamedResponse

@@ -7,6 +7,7 @@ use App\Features\Customers\Services\CustomerAccountMediaSelections;
 use App\Features\Customers\Services\CustomerCompetitionAccess;
 use App\Features\Customers\Services\CustomerCompetitionCart;
 use App\Features\Customers\Services\CustomerConcertPhotoCart;
+use App\Features\Families\Services\FamilyAccess;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Models\MediaCollection;
 use App\Features\Media\Services\MediaCommerceSettings;
@@ -47,7 +48,7 @@ class PrepareCustomerOrder
                 ->values();
 
             if ($requested->isEmpty() || $groups->count() !== $requested->count()) {
-                throw ValidationException::withMessages(['cart_groups' => 'Select at least one current event cart to continue.']);
+                throw ValidationException::withMessages(['cart_groups' => 'Select at least one current cart to continue.']);
             }
 
             $components = [];
@@ -60,11 +61,16 @@ class PrepareCustomerOrder
                     $groupComponents = $this->competitionComponents($event, $group['selections'], $group['lineAmounts']);
                 } else {
                     $groupComponents = $this->concertComponents($group['selections'], $group['lineAmounts']);
+                    foreach ($groupComponents as &$component) {
+                        $component['metadata']['cart_group_key'] = $this->groupKey($group);
+                    }
+                    unset($component);
                 }
                 $components = [...$components, ...$groupComponents];
                 $snapshots[] = [
                     'kind' => $kind,
-                    'source_uuid' => $event->uuid,
+                    'source_uuid' => ($group['scope'] ?? null) === 'studio' ? $group['studio']->uuid : $event->uuid,
+                    'scope' => $group['scope'] ?? 'event',
                     'selection_ids' => $group['selections']->pluck('id')->map(fn ($id): int => (int) $id)->sort()->values()->all(),
                     'subtotal' => (int) $group['subtotal'],
                     'bulk_eligible_subtotal' => (int) $group['bulk_eligible_subtotal'],
@@ -194,12 +200,13 @@ class PrepareCustomerOrder
 
     private function lockCustomer(User $user): void
     {
+        app(FamilyAccess::class)->requirePurchasing($user);
         User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
     }
 
     private function groupKey(array $group): string
     {
-        return $group['kind'].':'.$group['event']->uuid;
+        return $group['kind'].':'.(($group['scope'] ?? null) === 'studio' ? $group['studio']->uuid : $group['event']->uuid);
     }
 
     private function competitionComponents(SchedulingEvent $event, Collection $selections, array $lineAmounts): array
@@ -351,13 +358,15 @@ class PrepareCustomerOrder
         }
         $lastByEvent = [];
         foreach ($components as $index => $component) {
-            $key = data_get($component, 'metadata.event_kind').':'.data_get($component, 'metadata.event_uuid');
+            $key = data_get($component, 'metadata.cart_group_key')
+                ?? data_get($component, 'metadata.event_kind').':'.data_get($component, 'metadata.event_uuid');
             $lastByEvent[$key] = $index;
         }
         foreach ($components as $index => $component) {
             $amount = $index === $last ? $remaining
                 : ($subtotal === 0 ? 0 : intdiv($component['unit_price_amount'] * $quote['total'], $subtotal));
-            $key = data_get($component, 'metadata.event_kind').':'.data_get($component, 'metadata.event_uuid');
+            $key = data_get($component, 'metadata.cart_group_key')
+                ?? data_get($component, 'metadata.event_kind').':'.data_get($component, 'metadata.event_uuid');
             if (isset($eventBudgets[$key])) {
                 $budget = &$eventBudgets[$key];
                 $amount = $lastByEvent[$key] === $index ? $budget['remaining']

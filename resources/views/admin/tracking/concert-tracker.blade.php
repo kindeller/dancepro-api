@@ -4,6 +4,8 @@
     'subheading' => 'Concert bookings, preparation and delivery',
 ])
 
+@include('admin.tracking._phase-styles')
+
 @push('styles')
 <style>
     .tracker-controls { display:flex; align-items:center; justify-content:flex-end; gap:14px; flex-wrap:wrap; margin-bottom:18px; }
@@ -34,6 +36,7 @@
     .tracker-status { display:block; min-width:118px; color:var(--ink); text-decoration:none; border-radius:7px; padding:5px; margin:-5px; font-size:12px; }
     .tracker-status:hover { background:var(--soft); text-decoration:none; }
     .tracker-status .badge { margin-bottom:2px; }
+    .badge.status-complete { background:#dcfce7; color:#147a52; }
     .badge.status-roster { background:var(--soft); color:var(--brand-strong); }
     .badge.status-waiting { background:#e8eef4; color:#536574; }
     .badge.status-ready { background:#dff3ff; color:#087eae; }
@@ -51,28 +54,28 @@
     .tracker-heading-tooltip[aria-hidden="false"] { opacity:1; transform:translateY(0); }
     .tracker-heading-tooltip strong { display:block; margin-bottom:4px; color:#86dcff; font-size:12px; letter-spacing:.03em; }
     .compact-all th.tracker-task-heading .muted { display:none; }
-    .compact-all th.phase-booking { background:#e7f4fb; color:#096f98; border-bottom:4px solid #33a9d6; }
-    .compact-all th.phase-preparation { background:#fff4d9; color:#855d00; border-bottom:4px solid #e8ad24; }
-    .compact-all th.phase-editing { background:#f1eafb; color:#6a3c96; border-bottom:4px solid #9b6bcc; }
-    .compact-all th.phase-completion { background:#e5f5ec; color:#176a42; border-bottom:4px solid #42a875; }
-    .tracker-table:not(.compact-all) th.phase-booking { background:#e7f4fb; color:#096f98; border-bottom:4px solid #33a9d6; }
-    .tracker-table:not(.compact-all) th.phase-preparation { background:#fff4d9; color:#855d00; border-bottom:4px solid #e8ad24; }
-    .tracker-table:not(.compact-all) th.phase-editing { background:#f1eafb; color:#6a3c96; border-bottom:4px solid #9b6bcc; }
-    .tracker-table:not(.compact-all) th.phase-completion { background:#e5f5ec; color:#176a42; border-bottom:4px solid #42a875; }
+    .compact-all th.phase-booking { background:#e7f4fb; color:#096f98; border-bottom:4px solid var(--tracker-booking); }
+    .compact-all th.phase-preparation { background:#fff4d9; color:#855d00; border-bottom:4px solid var(--tracker-preparation); }
+    .compact-all th.phase-editing { background:#f1eafb; color:#6a3c96; border-bottom:4px solid var(--tracker-editing); }
+    .compact-all th.phase-completion { background:#e5f5ec; color:#176a42; border-bottom:4px solid var(--tracker-completion); }
+    .tracker-table:not(.compact-all) th.phase-booking { background:#e7f4fb; color:#096f98; border-bottom:4px solid var(--tracker-booking); }
+    .tracker-table:not(.compact-all) th.phase-preparation { background:#fff4d9; color:#855d00; border-bottom:4px solid var(--tracker-preparation); }
+    .tracker-table:not(.compact-all) th.phase-editing { background:#f1eafb; color:#6a3c96; border-bottom:4px solid var(--tracker-editing); }
+    .tracker-table:not(.compact-all) th.phase-completion { background:#e5f5ec; color:#176a42; border-bottom:4px solid var(--tracker-completion); }
     .tracker-section-heading { border-top:4px solid var(--brand-strong); }
-    .tracker-section-heading.phase-booking { border-top-color:#33a9d6; background:#f5fbfe; }
-    .tracker-section-heading.phase-preparation { border-top-color:#e8ad24; background:#fffbf2; }
-    .tracker-section-heading.phase-editing { border-top-color:#9b6bcc; background:#faf7fd; }
-    .tracker-section-heading.phase-completion { border-top-color:#42a875; background:#f5fbf8; }
+    .tracker-section-heading.phase-booking { border-top-color:var(--tracker-booking); background:#f5fbfe; }
+    .tracker-section-heading.phase-preparation { border-top-color:var(--tracker-preparation); background:#fffbf2; }
+    .tracker-section-heading.phase-editing { border-top-color:var(--tracker-editing); background:#faf7fd; }
+    .tracker-section-heading.phase-completion { border-top-color:var(--tracker-completion); background:#f5fbf8; }
     .tracker-phase-key { display:flex; gap:6px; flex-wrap:wrap; align-items:center; margin-top:12px; color:var(--muted); font-size:12px; font-weight:750; }
     .tracker-phase-key a { display:inline-flex; gap:6px; align-items:center; padding:5px 9px; border:1px solid var(--line); border-radius:6px; text-decoration:none; background:#fff; }
     .tracker-phase-key a[aria-current="page"] { border-color:var(--brand-strong); color:var(--ink); box-shadow:inset 0 -2px var(--brand-strong); }
     .tracker-phase-key a:hover,.tracker-phase-key a:focus-visible { outline:2px solid var(--brand-strong); outline-offset:1px; }
     .tracker-phase-key i { width:10px; height:10px; border-radius:3px; }
-    .tracker-phase-key .booking { background:#33a9d6; }
-    .tracker-phase-key .preparation { background:#e8ad24; }
-    .tracker-phase-key .editing { background:#9b6bcc; }
-    .tracker-phase-key .completion { background:#42a875; }
+    .tracker-phase-key .booking { background:var(--tracker-booking); }
+    .tracker-phase-key .preparation { background:var(--tracker-preparation); }
+    .tracker-phase-key .editing { background:var(--tracker-editing); }
+    .tracker-phase-key .completion { background:var(--tracker-completion); }
     .compact-all + * { scroll-margin-top:10px; }
     .compact-all td { width:96px; min-width:96px; max-width:96px; padding:6px; vertical-align:top; }
     .compact-all .tracker-event { width:180px; min-width:180px; max-width:180px; }
@@ -152,7 +155,7 @@
                         @include('admin.tracking._event-column', ['row' => $row])
                     </td>
                     @if($definitions->contains('key', 'booking_received'))
-                        <td><a class="tracker-status" href="{{ route('admin.concert-bookings.show', $item->booking) }}"><span class="badge tracker-not-approved">Not approved</span><small>{{ $row['bookingTask']?->status_override !== null ? 'Manual tracker: '.$row['bookingStatus']['label'] : 'Review booking & services' }}</small>@if($row['bookingTask']?->due_date_override)<span @class(['tracker-task-meta', 'tracker-due-overdue' => $row['bookingTask']->due_date_override->isBefore(today()) && !in_array($row['bookingStatus']['key'], ['complete', 'not_required'], true)])>Due {{ $row['bookingTask']->due_date_override->format('j M') }}</span>@endif</a></td>
+                        <td><a class="tracker-status" href="{{ route('admin.concert-bookings.show', $item->booking) }}"><span class="badge status-{{ $row['bookingStatus']['tone'] }}">{{ $row['bookingStatus']['label'] }}</span>@if($row['bookingTask']?->due_date_override)<span @class(['tracker-task-meta', 'tracker-due-overdue' => $row['bookingTask']->due_date_override->isBefore(today()) && !in_array($row['bookingStatus']['key'], ['complete', 'not_required'], true)])>Due {{ $row['bookingTask']->due_date_override->format('j M') }}</span>@endif</a></td>
                     @endif
                     <td colspan="{{ $definitions->count() - ($definitions->contains('key', 'booking_received') ? 1 : 0) }}">
                         <p class="muted tracker-pending-note">Awaiting confirmation. Event tasks become available when this event is approved.</p>

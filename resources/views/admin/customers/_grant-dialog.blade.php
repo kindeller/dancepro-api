@@ -68,7 +68,7 @@ const showGrantCustomerResults = customers => {
         option.className = 'grant-customer-result';
         option.setAttribute('role', 'option');
         option.dataset.email = customer.email;
-        [['grant-customer-result-id', `ID #${customer.id}`], ['grant-customer-result-name', customer.name], ['grant-customer-result-email', customer.email]].forEach(([className, value]) => {
+        [['grant-customer-result-id', `Account ID: ${customer.uuid}`], ['grant-customer-result-name', customer.name], ['grant-customer-result-email', customer.email]].forEach(([className, value]) => {
             const part = document.createElement('span'); part.className = className; part.textContent = value; option.append(part);
         });
         grantCustomerResults.append(option);

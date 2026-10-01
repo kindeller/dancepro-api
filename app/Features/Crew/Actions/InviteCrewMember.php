@@ -22,7 +22,8 @@ class InviteCrewMember
 
         $crewProfile = DB::transaction(function () use ($data): CrewProfile {
             $user = User::query()->create([
-                'name' => $data['preferred_name'],
+                'name' => $data['name'] ?? $data['preferred_name'],
+                ...array_intersect_key($data, array_flip(['first_name', 'last_name'])),
                 'email' => $data['email'],
                 'password' => Str::random(48),
                 'type' => UserType::Crew->value,

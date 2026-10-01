@@ -10,6 +10,8 @@ use App\Features\Customers\Support\UserType;
 use App\Features\Orders\Models\Order;
 use App\Features\Payments\Models\CustomerCreditTransaction;
 use App\Features\Studios\Models\StudioAccountAccess;
+use App\Shared\Models\HasPublicUuid;
+use App\Shared\Support\AccountName;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -22,12 +24,43 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'email_verified_at', 'password', 'is_active', 'is_admin', 'type', 'account_status', 'paused_at', 'cancelled_at', 'anonymized_at', 'account_status_reason', 'account_status_changed_by_user_id', 'merged_into_user_id', 'last_login_at', 'last_seen_at', 'invitation_sent_at', 'onboarding_completed_at'])]
-#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
+#[Fillable(['name', 'first_name', 'last_name', 'email', 'email_verified_at', 'password', 'is_active', 'is_admin', 'type', 'account_status', 'paused_at', 'cancelled_at', 'anonymized_at', 'account_status_reason', 'account_status_changed_by_user_id', 'merged_into_user_id', 'last_login_at', 'last_seen_at', 'invitation_sent_at', 'onboarding_completed_at'])]
+#[Hidden(['password', 'pending_email', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, HasPublicUuid, Notifiable, SoftDeletes;
+
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            if ($user->exists && $user->isDirty('email')) {
+                $user->pending_email = null;
+                $user->pending_email_requested_at = null;
+            }
+            if ($user->isDirty('first_name') || $user->isDirty('last_name')) {
+                $user->first_name = trim((string) $user->first_name);
+                $user->last_name = trim((string) $user->last_name) ?: null;
+                $user->name = trim($user->first_name.' '.($user->last_name ?? ''));
+            } elseif ($user->isDirty('name')) {
+                foreach (AccountName::split((string) $user->name) as $field => $value) {
+                    $user->{$field} = $value;
+                }
+            }
+        });
+    }
+
+    public function emailGreetingName(): string
+    {
+        return $this->first_name ?: AccountName::split((string) $this->name)['first_name'];
+    }
+
+    public function resolveRouteBindingQuery($query, $value, $field = null)
+    {
+        // Older account links remain valid; new links use the same UUID format
+        // as studios, events and conversations. Database relations still use id.
+        return parent::resolveRouteBindingQuery($query, $value, $field ?? (ctype_digit((string) $value) ? 'id' : 'uuid'));
+    }
 
     public function homeRouteName(): string
     {
@@ -101,6 +134,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'pending_email_requested_at' => 'datetime',
             'invitation_sent_at' => 'datetime',
             'onboarding_completed_at' => 'datetime',
             'is_active' => 'boolean',

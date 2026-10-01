@@ -4,6 +4,7 @@ namespace App\Features\Customers\Services;
 
 use App\Features\Concerts\Models\Concert;
 use App\Features\Concerts\Models\ConcertAccessGrant;
+use App\Features\Families\Services\FamilyGalleryAccess;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -28,7 +29,7 @@ class CustomerConcertAccess
 
     public function grants(User $user): Builder
     {
-        return ConcertAccessGrant::where('user_id', $user->id)
+        return ConcertAccessGrant::whereIn('user_id', app(FamilyGalleryAccess::class)->ownerIds($user))
             ->whereIn('status', ['active', 'claimed'])->whereNull('revoked_at')
             ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()));
     }

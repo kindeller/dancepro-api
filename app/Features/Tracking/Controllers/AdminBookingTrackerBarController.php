@@ -2,7 +2,7 @@
 
 namespace App\Features\Tracking\Controllers;
 
-use App\Features\Bookings\Actions\ApproveBookingForConfirmation;
+use App\Features\Bookings\Actions\ChangeBookingStatus;
 use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Tracking\Actions\SaveConcertTrackerTaskFields;
 use App\Features\Tracking\Requests\UpdateBookingTrackerBarRequest;
@@ -13,14 +13,14 @@ use Illuminate\Http\RedirectResponse;
 
 class AdminBookingTrackerBarController extends Controller
 {
-    public function __invoke(UpdateBookingTrackerBarRequest $request, ConcertBooking $concertBooking, SaveConcertTrackerTaskFields $save, BookingTrackerBar $bar, ApproveBookingForConfirmation $approve): RedirectResponse|JsonResponse
+    public function __invoke(UpdateBookingTrackerBarRequest $request, ConcertBooking $concertBooking, SaveConcertTrackerTaskFields $save, BookingTrackerBar $bar, ChangeBookingStatus $change): RedirectResponse|JsonResponse
     {
-        if ($request->validated('panel') === 'status' && $request->validated('status_override') === 'approved') {
-            $url = $approve->execute($concertBooking, $request->user(), $request->safe()->only('studio_uuid'));
+        if ($request->validated('panel') === 'status') {
+            $url = $change->execute($concertBooking, $request->user(), $request->validated());
 
             return $request->expectsJson()
-                ? response()->json(['success' => true, 'message' => 'Booking approved.', 'data' => ['redirect' => $url]])
-                : redirect()->to($url)->with('status', 'Booking approved. Review the confirmation template and send when ready.');
+                ? response()->json(['success' => true, 'message' => 'Booking status updated.', 'data' => ['redirect' => $url]])
+                : redirect()->to($url)->with('status', 'Booking status updated. Review the notification before sending.');
         }
 
         $save->execute('booking', $concertBooking->id, 'booking_received', $request->user(), $request->safe()->except(['panel', 'studio_uuid']));

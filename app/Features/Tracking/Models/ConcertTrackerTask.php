@@ -14,6 +14,15 @@ class ConcertTrackerTask extends Model
 {
     use HasPublicUuid;
 
+    protected static function booted(): void
+    {
+        static::saving(function (self $task): void {
+            if ($task->completed_at && $task->completed_by_user_id && ! $task->assignee_user_id) {
+                $task->assignee_user_id = $task->completed_by_user_id;
+            }
+        });
+    }
+
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assignee_user_id');

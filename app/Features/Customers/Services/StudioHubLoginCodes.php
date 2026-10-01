@@ -12,6 +12,10 @@ class StudioHubLoginCodes
 {
     public function photo(Studio $studio): ?array
     {
+        if (filled($studio->code)) {
+            return ['label' => 'Photo gallery login code', 'value' => mb_strtoupper(trim($studio->code))];
+        }
+
         return $this->code($studio, 'gallery_code_hash', 'gallery_code_encrypted', 'Photo gallery login code');
     }
 

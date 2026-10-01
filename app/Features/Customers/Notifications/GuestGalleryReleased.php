@@ -21,11 +21,22 @@ class GuestGalleryReleased extends Notification implements ShouldQueue
         return $notifiable instanceof User ? ['mail', 'database'] : ['mail'];
     }
 
+    public function shouldSend(object $notifiable, string $channel): bool
+    {
+        $registration = $this->registration->fresh();
+
+        return $registration && ! $registration->unsubscribed_at
+            && ! $registration->event?->concertBookingItem?->concert?->mediaCollections()->whereHas('concertPhotoReleaseGroups', fn ($groups) => $groups->whereNotNull('released_at'))->exists()
+            && (! $registration->guest_studio_subscription_id || ($registration->studioSubscription && ! $registration->studioSubscription->unsubscribed_at));
+    }
+
     public function toMail(object $notifiable): MailMessage
     {
         $event = $this->registration->event;
         $open = URL::temporarySignedRoute('guest-galleries.notifications.open', now()->addMonths(3), ['registration' => $this->registration]);
-        $unsubscribe = URL::temporarySignedRoute('guest-galleries.notifications.unsubscribe', now()->addMonths(3), ['registration' => $this->registration]);
+        $unsubscribe = $this->registration->guest_studio_subscription_id
+            ? URL::temporarySignedRoute('guest-galleries.studios.unsubscribe', now()->addMonths(3), ['subscription' => $this->registration->studioSubscription])
+            : URL::temporarySignedRoute('guest-galleries.notifications.unsubscribe', now()->addMonths(3), ['registration' => $this->registration]);
 
         return (new MailMessage)
             ->subject($event->name.' media is now available')

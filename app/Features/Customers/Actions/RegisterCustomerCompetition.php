@@ -3,7 +3,7 @@
 namespace App\Features\Customers\Actions;
 
 use App\Features\Customers\Models\CustomerCompetitionRegistration;
-use App\Features\Customers\Models\CustomerDancer;
+use App\Features\Families\Services\FamilyAccess;
 use App\Features\Programmes\Models\CompetitionGallerySetting;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
@@ -16,7 +16,7 @@ class RegisterCustomerCompetition
     public function execute(User $user, string $eventUuid, string $loginCode): SchedulingEvent
     {
         abort_unless($user->canAccessCustomer(), 403);
-        if (! CustomerDancer::where('user_id', $user->id)->exists()) {
+        if (app(FamilyAccess::class)->dancers($user)->isEmpty()) {
             throw ValidationException::withMessages(['login_code' => 'Add a dancer in My Profile first.']);
         }
 

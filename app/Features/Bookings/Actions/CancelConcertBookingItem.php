@@ -98,6 +98,12 @@ class CancelConcertBookingItem
                 ]);
             }
 
+            if ($booking->items()->where('approval_status', 'pending')->exists()) {
+                $booking->update(['status' => $booking->items()->where('approval_status', 'approved')->exists()
+                    ? ConcertBookingStatus::PartialApproval
+                    : ($booking->status === ConcertBookingStatus::Received ? ConcertBookingStatus::Received : ConcertBookingStatus::Pending)]);
+            }
+
             $booking->revisions()->create(['user_id' => $user->id, 'before' => $before, 'after' => $snapshots->forBooking($booking->refresh()), 'reason' => 'Booking event cancelled. Reconfirm final family numbers if concert videography remains booked.']);
 
             return $item->refresh();

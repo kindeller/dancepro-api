@@ -12,6 +12,7 @@ class CustomerMobileAccount
 
         return [
             'name' => $user->name, 'email' => $user->email,
+            'first_name' => $user->first_name, 'last_name' => $user->last_name,
             'email_verified' => $user->hasVerifiedEmail(),
             'policy_accepted' => $profile?->terms_accepted_at !== null && $profile?->privacy_accepted_at !== null
                 && $profile?->policy_version === config('customer.policy_version'),

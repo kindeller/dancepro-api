@@ -4,8 +4,8 @@ namespace App\Features\Customers\Services;
 
 use App\Features\Customers\Models\CustomerAccountEmail;
 use App\Features\Customers\Models\CustomerInboxNotification;
-use App\Features\Customers\Models\CustomerStudio;
 use App\Features\Customers\Models\CustomerSupportRequest;
+use App\Features\Families\Services\FamilyGalleryAccess;
 use App\Features\Media\Models\ConcertPhotoReleaseGroup;
 use App\Features\Payments\Models\CustomerMediaNotification;
 use App\Features\Tracking\Models\ConcertTrackerEmailDelivery;
@@ -30,12 +30,18 @@ class CustomerInboxSources
                 data_get($source->metadata, 'action_url', $source->order ? route('customer.checkout.show', $source->order) : route('customer.media.index')),
                 data_get($source->metadata, 'action_label', 'View details'), $source->status, $source->sent_at, $source->queued_at);
         } elseif ($source instanceof CustomerAccountEmail) {
+            if (data_get($source->metadata, 'kind') === 'studio_payment_received') {
+                // Studio finance belongs in Studio messages, not the personal inbox.
+                CustomerInboxNotification::where('source_key', 'account:'.$source->id)->delete();
+
+                return;
+            }
             if (! $this->availableAccount($source->user_id)) {
                 return;
             }
             if (data_get($source->metadata, 'kind')) {
                 $this->record($source->user_id, 'account:'.$source->id, $source->subject, $source->body,
-                    route('customer.media.index'), 'Open My Media', $source->status, $source->sent_at, $source->queued_at);
+                    data_get($source->metadata, 'action_url', route('customer.media.index')), data_get($source->metadata, 'action_label', 'Open My Media'), $source->status, $source->sent_at, $source->queued_at);
             } else {
                 CustomerSupportRequest::firstOrCreate(['customer_account_email_id' => $source->id], [
                     'user_id' => $source->user_id, 'type' => 'general', 'subject' => $source->subject,
@@ -51,6 +57,9 @@ class CustomerInboxSources
                 data_get($source->data, 'title', 'DancePro update'), data_get($source->data, 'body', 'You have a new update.'),
                 data_get($source->data, 'url'), 'View details', null, null, $source->created_at, $source->read_at);
         } elseif ($source instanceof ConcertTrackerEmailDelivery && $source->photo_release_group_id) {
+            if (data_get($source->workflow_context, 'photo_release_audience', 'customer') !== 'customer') {
+                return;
+            }
             // Only gallery announcements belong in personal inboxes. Booking and
             // production correspondence remains in the authorised Studio Hub.
             if (! in_array($source->status, ['sent', 'simulated'], true)) {
@@ -58,10 +67,7 @@ class CustomerInboxSources
             }
             $studioId = ConcertPhotoReleaseGroup::whereKey($source->photo_release_group_id)->value('studio_id');
             $sentAt = $source->sent_at ?? $source->queued_at;
-            $user = $studioId && $sentAt ? User::whereNotNull('email_verified_at')
-                ->where('created_at', '<=', $sentAt)->where('email_verified_at', '<=', $sentAt)
-                ->whereIn('id', CustomerStudio::where('studio_id', $studioId)->whereNotNull('access_verified_at')
-                    ->where('access_verified_at', '<=', $sentAt)->select('user_id'))
+            $user = $studioId && $sentAt ? app(FamilyGalleryAccess::class)->studioViewers($studioId, $sentAt)
                 ->whereRaw('lower(email) = ?', [mb_strtolower($source->recipient_email)])->first() : null;
             if ($user) {
                 $this->record($user->id, 'photo-release:'.$source->id, $source->subject, $source->body,

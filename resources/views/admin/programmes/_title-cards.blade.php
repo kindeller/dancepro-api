@@ -1,6 +1,6 @@
 @push('styles')
 <style>
-    .title-card-page { display:grid; gap:20px; max-width:1400px; }
+    .title-card-page { display:grid; gap:20px; width:100%; min-width:0; }
     .title-card-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; }
     .title-card-workspace { display:grid; grid-template-columns:minmax(300px,380px) minmax(540px,1fr); gap:22px; align-items:start; }
     .title-card-controls { display:grid; gap:15px; }
@@ -24,19 +24,7 @@
 
 <div class="title-card-page">
     <div class="title-card-toolbar"><a class="button secondary" href="{{ route('admin.programmes.show', $event) }}">← Programme preparation</a><span class="badge">4K UHD · 3840 × 2160 JPEG</span></div>
-    @if(session('status'))<div class="notice" role="status">{{ session('status') }}</div>@endif
-    @if($errors->any())<div class="error-list" role="alert">{{ $errors->first() }}</div>@endif
 
-    @if(!($trackerBar['status']['sourceDriven'] ?? true))
-        <div class="card card-pad title-card-toolbar">
-            <div><strong>2.3 Video titles</strong><p class="muted">{{ $trackerBar['status']['key'] === 'complete' ? $trackerBar['status']['detail'] : 'Check the titles, then publish their JPEG package for download in the uploader app.' }}</p></div>
-            <div>
-                <button type="button" data-title-card-publish @disabled(!$titleRevision || $items->isEmpty() || $trackerBar['status']['key'] === 'complete')>{{ $trackerBar['status']['key'] === 'complete' ? '✓ Video titles ready' : 'Video titles ready' }}</button>
-                @unless($titleRevision)<p role="status">Titles cannot be published until the programme is confirmed.</p>@endunless
-                @if($items->isEmpty())<p role="status">There are no programme items to publish. Add and confirm the working programme first.</p>@endif
-            </div>
-        </div>
-    @endif
     <section class="card card-pad">
         <div class="title-card-workspace">
             <form method="post" action="{{ route('admin.concert-title-cards.update', $event) }}" class="title-card-controls" data-title-card-form>@csrf @method('PATCH')
@@ -56,7 +44,18 @@
                     @endforeach
                 </div>
                 <div class="title-card-note"><strong>Typeface: Atlanta</strong><br>Uses Atlanta when installed on this computer, otherwise Arial. Published titles match this preview.</div>
-                <div class="title-card-actions"><button type="submit">Save template</button></div>
+                <div class="title-card-actions">
+                    <button type="submit">Save template</button>
+                    @if(!($trackerBar['status']['sourceDriven'] ?? true))
+                        <button type="button" data-title-card-publish @disabled(!$titleRevision || $items->isEmpty() || $trackerBar['status']['key'] === 'complete')>{{ $trackerBar['status']['key'] === 'complete' ? '✓ Video titles ready' : 'Video titles ready' }}</button>
+                    @endif
+                </div>
+                @if(session('status'))<div class="notice" role="status" data-title-card-save-feedback>{{ session('status') }}</div>@endif
+                @if($errors->any())<div class="error-list" role="alert">{{ $errors->first() }}</div>@endif
+                @if(!($trackerBar['status']['sourceDriven'] ?? true))
+                    @unless($titleRevision)<p role="status">Titles cannot be published until the programme is confirmed.</p>@endunless
+                    @if($items->isEmpty())<p role="status">There are no programme items to publish. Add and confirm the working programme first.</p>@endif
+                @endif
                 <div class="title-card-actions"><button type="button" class="secondary" data-title-card-download @disabled($items->isEmpty())>Download this JPEG</button><button type="button" class="secondary" data-title-card-download-all @disabled($items->isEmpty())>Download all as ZIP</button></div>
                 <div class="muted" data-title-card-download-status role="status" aria-live="polite"></div>
             </form>
@@ -111,6 +110,28 @@
     const logoBackground=image=>{try{const probe=document.createElement('canvas'),size=64;probe.width=size;probe.height=size;const probeContext=probe.getContext('2d',{willReadFrequently:true});probeContext.drawImage(image,0,0,size,size);const pixels=probeContext.getImageData(0,0,size,size).data,samples=[];for(let index=0;index<size;index++){for(const [x,y] of [[index,0],[index,size-1],[0,index],[size-1,index]]){const offset=(y*size+x)*4;if(pixels[offset+3]>=192)samples.push([pixels[offset],pixels[offset+1],pixels[offset+2]]);}}if(samples.length<size*2)return null;const median=channel=>samples.map(sample=>sample[channel]).sort((a,b)=>a-b)[Math.floor(samples.length/2)];return `#${[median(0),median(1),median(2)].map(value=>value.toString(16).padStart(2,'0')).join('')}`;}catch(_){return null;}};
     const loadLogo=()=>new Promise(resolve=>{const url=data.logos[logoSelect?.value];logoImage=null;logoFailed=false;if(!url){render();resolve();return;}const image=new Image();image.onload=()=>{logoImage=image;const detected=logoBackground(image);if(detected)colours.logo_band_color.value=detected;render();resolve();};image.onerror=()=>{logoFailed=true;render();resolve();};image.src=url;});
     const selectItem=index=>{if(!itemSelect||!data.items[index])return;itemSelect.value=String(index);render();};
+    const positionKey='dancepro.video-titles.position';
+    const pageKey=location.pathname+location.search;
+    const rememberPosition=(index=Number(itemSelect?.value||0))=>{
+        try { sessionStorage.setItem(positionKey,JSON.stringify({page:pageKey,y:window.scrollY,index,at:Date.now()})); }
+        catch(_) { /* Saving remains available when browser storage is blocked. */ }
+    };
+    form.addEventListener('submit',()=>rememberPosition());
+    try {
+        const saved=JSON.parse(sessionStorage.getItem(positionKey)||'null');
+        sessionStorage.removeItem(positionKey);
+        if(saved?.page===pageKey && Date.now()-saved.at<30000 && Number.isFinite(saved.y)) {
+            selectItem(saved.index);
+            let interrupted=false;
+            const restore=()=>{if(!interrupted)window.scrollTo({top:saved.y,behavior:'instant'});};
+            restore();
+            window.addEventListener('load',restore,{once:true});
+            for(const event of ['wheel','touchstart','pointerdown','keydown']) {
+                window.addEventListener(event,()=>{interrupted=true;},{once:true,passive:true});
+            }
+        }
+    } catch(_) { /* Ignore missing or unavailable browser storage. */ }
+    form.addEventListener('input',()=>form.querySelector('[data-title-card-save-feedback]')?.remove(),{once:true});
     const safeName=item=>`${String(item.number).padStart(2,'0')} ${item.title}`.replace(/[^a-z0-9 -]/gi,'').trim()||'title-card';
     const saveBlob=(blob,name)=>{const link=document.createElement('a');link.download=name;link.href=URL.createObjectURL(blob);document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(link.href),1000);};
     const jpegBlob=()=>new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.96));
@@ -132,7 +153,7 @@
         const button=event.currentTarget, original=Number(itemSelect?.value||0);
         button.disabled=true;
         const payload=new FormData(form);
-        const controls=[...form.querySelectorAll('input,select,button')].map(control=>[control,control.disabled]);
+        const controls=[...form.querySelectorAll('input,select,button')].filter(control=>control!==button).map(control=>[control,control.disabled]);
         controls.forEach(([control])=>control.disabled=true);
         updateNavigation();
         try {
@@ -155,6 +176,7 @@
             const response=await fetch(data.publishUrl,{method:'POST',headers:{Accept:'application/json'},body:payload});
             const result=await response.json();
             if(!response.ok)throw Error(Object.values(result.errors??{}).flat().join(' ')||result.message||'Publishing failed. Please try again.');
+            rememberPosition(original);
             window.location.reload();
         } catch(error) { downloadStatus.textContent=error.message; button.disabled=false; }
         finally {publishing=false;controls.forEach(([control,disabled])=>control.disabled=disabled);selectItem(original);}

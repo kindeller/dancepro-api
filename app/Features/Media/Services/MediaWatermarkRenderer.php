@@ -6,12 +6,28 @@ use GdImage;
 
 class MediaWatermarkRenderer
 {
+    /** Crop before branding so the centred logo remains visible in every 3:2 cover. */
+    public function coverCanvas(GdImage $image): GdImage
+    {
+        $width = imagesx($image);
+        $height = imagesy($image);
+        $cropWidth = min($width, (int) floor($height * 1.5));
+        $cropHeight = min($height, (int) floor($width / 1.5));
+        $cover = imagecrop($image, ['x' => (int) (($width - $cropWidth) / 2),
+            'y' => (int) (($height - $cropHeight) / 2), 'width' => max(1, $cropWidth), 'height' => max(1, $cropHeight)]);
+        abort_unless($cover instanceof GdImage, 503, 'Gallery cover cannot be prepared.');
+
+        return $cover;
+    }
+
     public function apply(GdImage $image, array $watermark): void
     {
         if ($watermark['mode'] === 'image') {
             $mark = @imagecreatefrompng($watermark['path']);
             abort_unless($mark instanceof GdImage, 503, 'Watermark artwork cannot be decoded.');
-            $scale = min(imagesx($image), imagesy($image)) / max(imagesx($mark), imagesy($mark));
+            $scale = isset($watermark['width_ratio'])
+                ? min(imagesx($image) * $watermark['width_ratio'] / imagesx($mark), imagesy($image) * 0.8 / imagesy($mark))
+                : min(imagesx($image), imagesy($image)) / max(imagesx($mark), imagesy($mark));
             $width = max(1, (int) round(imagesx($mark) * $scale));
             $height = max(1, (int) round(imagesy($mark) * $scale));
             imagealphablending($image, true);

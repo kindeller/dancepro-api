@@ -3,6 +3,7 @@
 namespace App\Features\Customers\Services;
 
 use App\Features\Concerts\Models\Concert;
+use App\Features\Families\Services\FamilyAccess;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Orders\Models\OrderItem;
 use App\Features\Orders\Models\OrderMediaAssetDownload;
@@ -50,14 +51,16 @@ class CustomerPurchasedMedia
                 $key = $kind.':'.$event->id;
                 $result[$type][$key] ??= ['event' => $event, 'kind' => $kind,
                     'title' => $kind === 'concert' ? $event->name : $titles[$event->uuid]['title'],
-                    'can_browse' => $kind === 'concert' || $this->competitionAccess->allows($user, $event),
+                    'can_browse' => $kind === 'concert' || $this->competitionAccess->allows($user, $event)
+                        || ($item->order && app(FamilyAccess::class)->canViewSharedOrder($user, $item->order)
+                            && $item->mediaEntitlements->contains(fn ($entitlement) => $entitlement->ready_at && ! $entitlement->revoked_at)),
                     'thumbnail_url' => null, 'is_preview' => false];
                 if ($result[$type][$key]['thumbnail_url'] === null) {
                     $photo = $this->assetsForItem($item)->first(fn (MediaAsset $asset) => $asset->media_type->value === 'photo'
                         && $asset->thumbnail_storage_disk && $asset->thumbnail_storage_key);
                     if ($photo) {
                         $result[$type][$key]['thumbnail_url'] = route('customer.media.library.thumbnail',
-                            ['kind' => $kind, 'event' => $event->uuid, 'asset' => $photo->uuid]);
+                            ['kind' => $kind, 'event' => $event->uuid, 'asset' => $photo->uuid, 'size' => 'cover']);
                     }
                 }
             }
@@ -145,9 +148,11 @@ class CustomerPurchasedMedia
 
     private function paidItems(User $user): Collection
     {
-        return OrderItem::query()->whereHas('order', fn ($query) => $query->where('user_id', $user->id)
+        return OrderItem::query()->whereHas('order', fn ($query) => $query->whereIn('user_id', app(FamilyAccess::class)->purchaseOwnerIds($user))
             ->whereIn('status', [OrderStatus::Paid->value, OrderStatus::Fulfilled->value])->whereNotNull('paid_at'))
-            ->with('mediaCollection.assets', 'mediaAsset.collection', 'mediaEntitlements.assets')->get();
+            ->where(fn ($query) => $query->whereHas('order', fn ($order) => $order->where('user_id', $user->id))
+                ->orWhereHas('mediaEntitlements', fn ($entitlements) => $entitlements->whereNotNull('ready_at')->whereNull('revoked_at')))
+            ->with('order', 'mediaCollection.assets', 'mediaAsset.collection', 'mediaEntitlements.assets')->get();
     }
 
     private function assetsForItem(OrderItem $item): Collection

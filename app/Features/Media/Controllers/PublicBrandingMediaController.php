@@ -6,6 +6,7 @@ use App\Features\Admin\Actions\ManageBrandingMedia;
 use App\Features\Concerts\Models\Concert;
 use App\Features\Concerts\Services\ConcertAccessSession;
 use App\Features\Concerts\Services\ConcertCloudFrontSigner;
+use App\Features\Media\Services\StoredGalleryCover;
 use App\Features\Studios\Models\Studio;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -16,18 +17,22 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicBrandingMediaController extends Controller
 {
-    public function studioCover(Studio $studio, ManageBrandingMedia $media, ConcertCloudFrontSigner $cloudFront): RedirectResponse|StreamedResponse
+    public function studioCover(Studio $studio, ManageBrandingMedia $media, StoredGalleryCover $covers): StreamedResponse
     {
-        return $this->serve($studio->cover_image_storage_key, $studio->cover_image_revision, $studio->cover_image_mime_type, $media->key($studio, 'cover'), $media, $cloudFront);
+        abort_unless($studio->cover_image_storage_key === $media->key($studio, 'cover'), 404);
+
+        return $covers->response($media->disk(), $studio->cover_image_storage_key, $studio->cover_image_revision);
     }
 
-    public function concertCover(Concert $concert, ManageBrandingMedia $media, ConcertCloudFrontSigner $cloudFront): RedirectResponse|StreamedResponse
+    public function concertCover(Concert $concert, ManageBrandingMedia $media, StoredGalleryCover $covers): StreamedResponse
     {
         if (! $concert->isPubliclyAvailable()) {
             Gate::authorize('manageConcerts');
         }
 
-        return $this->serve($concert->cover_image_storage_key, $concert->cover_image_revision, $concert->cover_image_mime_type, $media->key($concert, 'cover'), $media, $cloudFront);
+        abort_unless($concert->cover_image_storage_key === $media->key($concert, 'cover'), 404);
+
+        return $covers->response($media->disk(), $concert->cover_image_storage_key, $concert->cover_image_revision);
     }
 
     public function program(Request $request, Concert $concert, ConcertAccessSession $access, ManageBrandingMedia $media, ConcertCloudFrontSigner $cloudFront): RedirectResponse|StreamedResponse

@@ -4,6 +4,7 @@ namespace App\Features\Downloads\Actions;
 
 use App\Features\Downloads\Models\DownloadLink;
 use App\Features\Downloads\Services\DownloadUrlSigner;
+use App\Features\Downloads\Services\PurchasedDownloadAccess;
 use App\Features\Downloads\Support\DownloadLinkStatus;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -59,6 +60,12 @@ class ResolveDownloadLink
                 $downloadLink->original_filename,
                 $downloadLink->expires_at?->toISOString(),
             );
+        }
+
+        if (! app(PurchasedDownloadAccess::class)->allows($downloadLink)) {
+            $this->recordDownloadAccess->handle($downloadLink, $request, false, 'purchase_access_ended');
+
+            return $this->unavailable('Download unavailable', 'Access to this purchase has ended. Open My Purchases to check your current access.', 410);
         }
 
         try {

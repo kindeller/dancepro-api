@@ -23,6 +23,7 @@ class ConcertBookingPrefill
 
         return [
             'bookingStudio' => $studio,
+            'bookingDraft' => $studio ? app(StudioBookingDrafts::class)->find($user, $studio) : null,
             'prefill' => [
                 'studio_name' => $studio?->name,
                 'contact_name' => $contact?->name ?: ($studio?->contact_name ?: $user?->name),

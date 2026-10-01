@@ -16,6 +16,7 @@
 <section class="section"><div class="container">
     @include('customers.media._actions')
     <h2>My Orders</h2><p class="muted">Your order history, receipts and download availability.</p>
+    <p class="meta"><a href="{{ route('customer.media.help') }}#article-guide-media-account-guide">Help with orders, receipts and expired downloads</a></p>
     @if($orders->count() === 0)<div class="empty"><p>You have no orders yet.</p></div>
     @else<div class="order-list">
         @foreach($orders as $order)

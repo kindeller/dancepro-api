@@ -2,10 +2,9 @@
 
 namespace App\Features\Customers\Services;
 
-use App\Features\Customers\Models\CustomerCompetitionRegistration;
 use App\Features\Customers\Models\CustomerInboxNotification;
-use App\Features\Customers\Models\CustomerStudio;
 use App\Features\Customers\Models\CustomerSupportRequest;
+use App\Features\Families\Services\FamilyGalleryAccess;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Models\User;
 use Illuminate\Notifications\DatabaseNotification;
@@ -35,8 +34,8 @@ class CustomerInbox
     public function events(User $user)
     {
         return SchedulingEvent::whereNull('cancelled_at')->where(function ($query) use ($user): void {
-            $query->whereIn('id', CustomerCompetitionRegistration::where('user_id', $user->id)->whereNotNull('access_verified_at')->select('scheduling_event_id'))
-                ->orWhereIn('studio_id', CustomerStudio::where('user_id', $user->id)->whereNotNull('access_verified_at')->select('studio_id'));
+            $query->whereIn('id', app(FamilyGalleryAccess::class)->competitions($user)->whereNotNull('access_verified_at')->select('scheduling_event_id'))
+                ->orWhereIn('studio_id', app(FamilyGalleryAccess::class)->studios($user)->whereNotNull('access_verified_at')->select('studio_id'));
         })->orderByDesc('event_date');
     }
 

@@ -55,7 +55,7 @@ class GuestGallerySelections
                 $asset = $selection->asset;
                 $collection = $asset?->collection;
 
-                return $selection->access?->concert?->isPubliclyAvailable() && $asset?->status->value === 'available'
+                return $selection->access?->concert?->isPhotoGalleryAvailable() && $asset?->status->value === 'available'
                     && $asset->is_visible && $collection?->status->value === 'published'
                     && in_array($collection->visibility->value, ['customer', 'public'], true)
                     && $collection->published_at !== null;

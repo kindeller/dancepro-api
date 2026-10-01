@@ -31,6 +31,10 @@ class CustomerPurchasedMediaDownloadController extends Controller
 
             $entitlement->loadMissing('orderItem.order');
 
+            if ($entitlement->orderItem?->order?->user_id !== $request->user()->id) {
+                return to_route('customer.media.help')->with('status', 'This shared purchase has expired. Ask the original purchaser to request download reactivation through Help.');
+            }
+
             return to_route('customer.media.help', [
                 'type' => 'download_reactivation',
                 'order' => $entitlement->orderItem?->order_id,

@@ -331,7 +331,7 @@ class ConcertBookingWorkflowTest extends TestCase
 
         $this->assertSame('approved', $items[0]->refresh()->approval_status);
         $this->assertSame('pending', $items[1]->refresh()->approval_status);
-        $this->assertSame('pending', $booking->refresh()->status->value);
+        $this->assertSame('partial_approval', $booking->refresh()->status->value);
 
         $this->actingAs($staff)->patch(route('admin.concert-booking-events.bulk-status'), [
             'event_ids' => [$items[1]->uuid],
@@ -507,8 +507,8 @@ class ConcertBookingWorkflowTest extends TestCase
         $staff = User::factory()->staff()->create();
         $booking = ConcertBooking::query()->firstOrFail();
 
-        $this->actingAs($staff)->post(route('admin.concert-bookings.cancel', $booking))
-            ->assertRedirect(route('admin.concert-bookings.index'));
+        $this->actingAs($staff)->post(route('admin.concert-bookings.cancel', $booking), ['reason' => 'Studio cancelled its plans.'])
+            ->assertRedirect();
         $this->assertSame('cancelled', $booking->refresh()->status->value);
         $this->assertNotNull($booking->cancelled_at);
         $this->assertTrue($booking->items->every(fn (ConcertBookingItem $item): bool => $item->approval_status === 'cancelled'));
@@ -705,7 +705,7 @@ class ConcertBookingWorkflowTest extends TestCase
         $this->assertStringContainsString('16:00:00', $timeline->firstWhere('title', 'Crew arrival & setup · DR Portrait 1')['due_at']);
         $this->get(route('concert-bookings.thanks'))->assertOk()->assertHeader('Cache-Control', 'no-store, private')
             ->assertSee('Fictional Dance Academy')->assertSee('$1,400.00')->assertSee('$1,800.00')
-            ->assertSee('Event timeline')->assertSee('include GST')
+            ->assertSee('My timeline')->assertSee('include GST')
             ->assertSee(route('concert-bookings.submission', $booking), false);
 
         $booking->update(['studio_name' => 'Changed by staff', 'previous_video_feedback' => 'Changed feedback', 'internal_review_note' => 'Private staff note']);

@@ -21,6 +21,21 @@ class StudioBookingPlans
         return $this->query($studio)->latest('created_at')->latest('id')->paginate(12);
     }
 
+    public function latestForStudio(User $user, Studio $studio): ?ConcertBooking
+    {
+        abort_unless($this->access->canView($user, $studio), 403);
+
+        return $this->query($studio)->latest('created_at')->latest('id')->first();
+    }
+
+    public function previousForStudio(User $user, Studio $studio): LengthAwarePaginator
+    {
+        $latest = $this->latestForStudio($user, $studio);
+
+        return $this->query($studio)->when($latest, fn (Builder $query) => $query->whereKeyNot($latest->id))
+            ->latest('created_at')->latest('id')->paginate(12);
+    }
+
     public function estimates(User $user, Studio $studio): Collection
     {
         abort_unless($this->access->canView($user, $studio), 403);

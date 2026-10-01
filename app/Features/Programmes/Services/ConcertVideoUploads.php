@@ -91,7 +91,7 @@ class ConcertVideoUploads
                 'media_type' => 'video', 'catalogue_mode' => 'managed', 'status' => 'draft', 'visibility' => 'private',
                 'storage_disk' => $batch->files()->first()->storage_disk, 'storage_prefix' => 'concert-uploads/'.$event->uuid.'/'.$batch->uuid.'/',
                 'created_by_user_id' => $actor->id, 'metadata' => ['concert_video_batch_uuid' => $batch->uuid]]);
-            foreach ($batch->files()->orderBy('id')->get() as $index => $file) {
+            foreach ($batch->files()->get()->sort(fn ($a, $b) => strnatcasecmp($a->original_filename, $b->original_filename))->values() as $index => $file) {
                 $asset = MediaAsset::create(['media_collection_id' => $collection->id, 'media_type' => 'video',
                     'storage_disk' => $file->storage_disk, 'storage_key' => $file->storage_key,
                     'original_filename' => $file->original_filename, 'display_name' => $file->original_filename,

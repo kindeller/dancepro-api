@@ -79,6 +79,27 @@ class ProgrammeExtractionTest extends TestCase
         $this->assertDatabaseHas('programme_revisions', ['programme_id' => $programme->id, 'version' => 1]);
     }
 
+    public function test_studio_uploaded_source_populates_a_draft_that_staff_can_edit_without_approving(): void
+    {
+        $studioUser = User::factory()->customer()->create();
+        $programme = app(PrepareProgramme::class)->execute($this->event(), $studioUser, $this->pdf());
+        $extraction = ProgrammeExtraction::firstOrFail();
+        $nodes = $this->nodes();
+        $this->mock(ProgrammePdfExtractor::class, fn (MockInterface $mock) => $mock->shouldReceive('extract')->once()->andReturn(['nodes' => $nodes, 'issues' => []]));
+
+        app()->call([new ExtractProgramme($extraction->id), 'handle']);
+
+        $this->assertSame('ready', $extraction->fresh()->status);
+        $this->assertEquals($nodes, $programme->fresh()->draftNodes());
+        $this->assertDatabaseCount('programme_revisions', 0);
+        $this->actingAs($studioUser)->putJson(route('admin.programmes.save', $programme->event), ['version' => 2, 'nodes' => $nodes])->assertForbidden();
+        $staff = User::factory()->staff()->create();
+        $nodes[0]['title'] = 'Corrected title';
+        $this->actingAs($staff)->putJson(route('admin.programmes.save', $programme->event), ['version' => 2, 'nodes' => $nodes])->assertOk();
+        $this->assertSame('Corrected title', $programme->fresh()->draftNodes()[0]['title']);
+        $this->assertDatabaseCount('programme_revisions', 0);
+    }
+
     public function test_job_keeps_concurrent_edits_and_exposes_suggestions_for_review(): void
     {
         [$programme, $extraction, $user] = $this->prepare();

@@ -25,7 +25,8 @@ class StudioInvoices
             }
             $data = $this->source->data($booking);
             $line = $kind === 'video' ? $this->source->videoLine($booking) : ['description' => 'Studio services', 'quantity' => 1, 'unit_cents' => 0];
-            $invoice = StudioInvoice::create(['studio_id' => $booking->studio_id, 'concert_booking_id' => $booking->id, 'active_booking_id' => $booking->id, 'created_by_user_id' => $actor->id, 'status' => 'draft', 'is_test' => $test, 'bill_to' => $data['bill_to'], 'lines' => [$line], 'total_cents' => $line['unit_cents'], 'gst_cents' => (int) round($line['unit_cents'] / 11), 'currency' => 'AUD', 'source_hash' => $this->source->hash($booking), 'due_date' => today()->addDays(14)]);
+            $total = $line['quantity'] * $line['unit_cents'];
+            $invoice = StudioInvoice::create(['studio_id' => $booking->studio_id, 'concert_booking_id' => $booking->id, 'active_booking_id' => $booking->id, 'created_by_user_id' => $actor->id, 'status' => 'draft', 'is_test' => $test, 'bill_to' => $data['bill_to'], 'lines' => [$line], 'total_cents' => $total, 'gst_cents' => (int) round($total / 11), 'currency' => 'AUD', 'source_hash' => $this->source->hash($booking), 'due_date' => today()->addDays(14)]);
             $this->audit($invoice, $actor, 'created', ['kind' => $kind]);
 
             return $invoice;
@@ -54,7 +55,8 @@ class StudioInvoices
             $this->check($invoice->status === 'draft', 'Only draft invoices can be refreshed.');
             $line = $this->source->videoLine($invoice->booking);
             $data = $this->source->data($invoice->booking);
-            $invoice->update(['lines' => [$line], 'total_cents' => $line['unit_cents'], 'gst_cents' => (int) round($line['unit_cents'] / 11), 'bill_to' => $data['bill_to'], 'source_hash' => $this->source->hash($invoice->booking)]);
+            $total = $line['quantity'] * $line['unit_cents'];
+            $invoice->update(['lines' => [$line], 'total_cents' => $total, 'gst_cents' => (int) round($total / 11), 'bill_to' => $data['bill_to'], 'source_hash' => $this->source->hash($invoice->booking)]);
             $this->audit($invoice, $actor, 'quote_refreshed');
         });
     }
@@ -109,6 +111,7 @@ class StudioInvoices
             $this->check($amount > 0 && $amount <= $invoice->balanceCents(), 'Payment must not exceed the outstanding balance.');
             $payment = $invoice->payments()->create(['idempotency_key' => $data['idempotency_key'], 'user_id' => $actor->id, 'provider' => 'manual', 'status' => 'succeeded', 'is_test' => $invoice->is_test, 'amount_cents' => $amount, 'currency' => 'AUD', 'reference' => $data['reference'], 'paid_at' => $data['paid_at']]);
             $this->audit($invoice, $actor, 'payment_recorded', ['payment' => $payment->uuid, 'amount_cents' => $amount, 'reference' => $data['reference']]);
+            app(StudioPaymentReceipts::class)->prepare($payment);
         });
     }
 

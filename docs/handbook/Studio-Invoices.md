@@ -9,6 +9,27 @@
 5. The **4.2 Invoice & payment** tab also contains **Download PDF**, payment details and invoice history. **Sales & reports > Studio invoices** links to the same booking workspace. **Record received payment** records money already received by bank transfer or elsewhere, including partial payments. It does not charge the studio.
 6. Void only an unpaid invoice with no pending payment. Paid invoice corrections need the future credit-note/refund workflow. A mistaken manual receipt can be reversed with a reason; this is only a ledger correction.
 
+### Concert video line items
+
+New video drafts and **Replace lines with current video quote** use the same
+GST-inclusive quote, itemised to match the owner-supplied invoices:
+
+- **Concert Video - Online Delivery - Flat Rate (per concert)**: concert count
+  as the quantity, $1,500 as the unit price.
+- **Concert Video - Online Delivery - Family Rate**: confirmed unique family
+  count as the quantity, $15 as the unit price. The description also states the
+  number of concerts included; families are counted once across those concerts.
+- Use whichever produces the greater total; equal totals use the flat-rate label.
+  Dress rehearsal portraits and cancelled events are excluded from the concert
+  count. Both creation and quote refresh calculate quantity × unit price before
+  extracting included GST.
+
+These lines appear in the draft editor, Studio Hub invoice and PDF. Draft line
+edits, separate discounts and notes remain available. Existing drafts are not
+silently replaced; refresh their video quote deliberately if required. Issued
+invoices retain their frozen lines and amounts. This change does not alter pricing,
+introduce a rate-selection override, send invoices, or charge accounts.
+
 One active invoice per booking is supported. Repeated create clicks reopen it. Include related services as additional lines rather than creating duplicate invoices. Voided invoices remain visible in history. Sequential display numbers can have gaps and are distinct from retail order numbers.
 
 ## Studio workflow
@@ -57,3 +78,57 @@ The invoice list and invoice detail retain the three Studio Hub summary links:
 Events, actions remaining and Messages. Actions remaining opens the Events page
 with unfinished events expanded. Reading an invoice does not mark messages read.
 Studio Hub and My Profile submenu tabs preserve scroll position when switching.
+
+## Payment acknowledgement and Hub indicators (30 September 2026)
+
+- **Event invoices** shows a left-hand count of issued invoices with a remaining
+  balance. Part-payments retain the badge; paid, draft and void invoices do not
+  count. Reversing a recorded payment restores the badge when a balance returns.
+- Paid invoice cards and invoice details show a green **Invoice paid** confirmation
+  with the latest successful payment date. Bank transfer instructions disappear
+  once the invoice is paid.
+- Each newly confirmed successful payment creates a branded acknowledgement email
+  to the invoice's billing email and a Studio messages entry. Studio finance does
+  not appear in the personal My Messages inbox. The receipt links directly to the
+  authorised invoice page.
+  The message includes amount, date, method/reference, remaining balance or paid
+  in full, payment history/PDF instructions and how to report an error.
+- Pending, unknown, declined and failed attempts do not generate acknowledgements.
+  Reconciliation generates one when success is confirmed. Manual part-payments
+  use the same process. Simulated payments are explicitly labelled as tests.
+- Receipt content and notification references are saved atomically with payment;
+  delivery runs after commit. Delivery failure does not undo payment. Queue jobs
+  retry failed sends and skip receipts already sent or claimed for sending.
+  A payment reversed before delivery cancels the queued email. Local Mailpit
+  rehearsal delivers synchronously after commit; normal delivery uses the queue.
+- This applies to new confirmations, not a backfill of historic payments. No
+  existing paid invoice was charged or emailed again during implementation.
+- The additive receipt migration leaves amounts and financial history unchanged.
+  Its rollback removes only the receipt JSON/delivery metadata, so rollback would
+  discard delivery tracking but retain payments and stored account messages.
+
+Verification: full Sail suite passed 1,104 tests (11,772 assertions), with focused
+coverage of receipt retries, duplicate confirmations, failed email delivery,
+partial payments and reversals. Desktop/mobile paid invoices and the branded
+email were visually reviewed. Scoped Pint and diff checks passed.
+
+Direct-transfer details in the shared 4.2/Studio Hub invoice view include separate
+**Copy** buttons for BSB and account number. They copy digits only, preserve leading
+zeros, and show inline **Copied** feedback without navigating or resetting scroll.
+Numbers remain selectable if clipboard access is unavailable. The controls are
+hidden in print and, like bank instructions, disappear once the invoice is paid.
+Copy controls verified in a desktop/mobile browser preview, including clipboard
+success, browser fallback, manual selection and leading-zero preservation. Full
+Sail suite: 1,104 tests and 11,772 assertions passed; scoped Pint, JavaScript syntax
+and diff checks passed. Preview bank values were fictional; no invoice was changed.
+
+
+Studio-only payment notifications (30 September 2026): the correction migration
+removes only personal inbox projections created for studio payment receipts.
+Email audit records, Studio messages and financial records remain intact. Existing
+payment email records are excluded from future personal inbox synchronisation.
+Rollback deliberately does not recreate the misplaced notifications.
+
+The Studio-only correction was verified against the local paid invoice: its email
+remains sent, its Studio messages receipt remains present, and its personal inbox
+notification is absent. No payment or email was repeated during the correction.

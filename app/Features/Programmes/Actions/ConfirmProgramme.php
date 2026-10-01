@@ -2,6 +2,7 @@
 
 namespace App\Features\Programmes\Actions;
 
+use App\Features\Bookings\Support\ConcertBookingItemType;
 use App\Features\Programmes\Models\Programme;
 use App\Features\Programmes\Models\ProgrammeRevision;
 use App\Features\Programmes\Services\ConcertFolderSequence;
@@ -13,7 +14,7 @@ class ConfirmProgramme
 {
     public function __construct(private readonly ProgrammeStructure $structure, private readonly ConcertFolderSequence $folders) {}
 
-    public function execute(Programme $programme, User $user, int $version): ProgrammeRevision
+    public function execute(Programme $programme, ?User $user, int $version): ProgrammeRevision
     {
         return DB::transaction(function () use ($programme, $user, $version): ProgrammeRevision {
             $programme = Programme::whereKey($programme->id)->lockForUpdate()->firstOrFail();
@@ -26,7 +27,7 @@ class ConfirmProgramme
                     return $existing;
                 }
                 // Explicit reapproval upgrades the contract in a new revision, never in place.
-                $programme->update(['draft_version' => ++$version, 'updated_by_user_id' => $user->id]);
+                $programme->update(['draft_version' => ++$version, 'updated_by_user_id' => $user?->id]);
             }
             $nodes = $programme->draftNodes();
             $event = $programme->event;
@@ -37,12 +38,14 @@ class ConfirmProgramme
 
             return $programme->revisions()->create([
                 'version' => $version, 'programme_source_id' => $programme->programme_source_id,
-                'confirmed_by_user_id' => $user->id, 'confirmed_at' => now(),
+                'confirmed_by_user_id' => $user?->id, 'confirmed_at' => now(),
                 'snapshot' => [
                     'schema_version' => 1, 'event_uuid' => $event->uuid, 'event_code' => $event->eventCode(),
                     'event_name' => $event->name, 'event_type' => $event->event_type->value,
                     'programme_uuid' => $programme->uuid, 'version' => $version,
                     'source_uuid' => $programme->source?->uuid, 'nodes' => $nodes,
+                    ...($event->concertBookingItem?->item_type === ConcertBookingItemType::DressRehearsal
+                        ? ['capture_mode' => 'dress_rehearsal'] : []),
                 ],
             ]);
         });

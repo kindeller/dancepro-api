@@ -546,6 +546,7 @@ final class PhotoReviewTests: XCTestCase {
       roster: PhotographerRoster(
         eventUuid: manifest.programme.eventUuid, checkedAt: "2026-09-22T00:00:00Z",
         hasShifts: true, photographers: [person], unfilled: []), selectedId: person.id)
+    model.selectPhotographer(person.id)
     let plan = UUID().uuidString
     let contribution = UUID().uuidString
     let file = UUID().uuidString
@@ -643,9 +644,70 @@ final class PhotoReviewTests: XCTestCase {
   }
 
   @MainActor
+  func testConcertRoleMustBeConfirmedForEveryVisitIncludingSavedRole() async throws {
+    let (model, client, responses) = try await uploadFixture()
+    PhotoUploadProtocol.state.configure(responses)
+    XCTAssertTrue(model.roleConfirmed)
+    model.beginVisit()
+    XCTAssertFalse(model.canStartPhotoUpload)
+    model.startUploads(client: client)
+    XCTAssertFalse(model.isUploading)
+    XCTAssertTrue(PhotoUploadProtocol.state.paths().isEmpty)
+    model.selectPhotographer(model.photographerSelection?.selectedId)
+    XCTAssertTrue(model.canStartPhotoUpload)
+    let reopened = try PhotoReviewModel(local: model.local, quietInterval: 0)
+    await reopened.refresh()
+    XCTAssertNotNil(reopened.photographerSelection?.selected)
+    XCTAssertFalse(reopened.roleConfirmed)
+    XCTAssertFalse(reopened.canFinishUploads)
+    model.beginVisit()
+    XCTAssertFalse(model.roleConfirmed)
+  }
+
+  func testConcertUploadQueuesCurrentPhotosButNotLaterArrivals() async throws {
+    let (root, manifest) = try fixture()
+    try jpeg(root.appendingPathComponent("01 Ballet/One.jpg"))
+    let library = try PhotoLibrary(root: root, manifest: manifest, quietInterval: 0)
+    let queued = try await library.queueConcertPhotos()
+    XCTAssertEqual(queued.queuedIDs.count, 1)
+    try jpeg(root.appendingPathComponent("01 Ballet/Two.jpg"))
+    let later = try await library.scan()
+    XCTAssertEqual(later.photos.count, 2)
+    XCTAssertEqual(later.queuedIDs, queued.queuedIDs)
+    let nextClick = try await library.queueConcertPhotos()
+    XCTAssertEqual(nextClick.queuedIDs.count, 2)
+  }
+
+  func testConcertUploadWaitsForCopyingAndCompetitionsKeepReady() async throws {
+    let (root, manifest) = try fixture()
+    try jpeg(root.appendingPathComponent("01 Ballet/Copying.jpg"))
+    let library = try PhotoLibrary(root: root, manifest: manifest, quietInterval: 60)
+    do {
+      _ = try await library.queueConcertPhotos()
+      XCTFail("A file still settling must not be queued")
+    } catch {
+      XCTAssertTrue(error.localizedDescription.contains("still being copied"))
+    }
+    var programme = manifest.programme
+    programme.eventType = "competition"
+    let competition = PreparedEvent(server: manifest.server, programme: programme,
+      folders: manifest.folders, preparedAt: manifest.preparedAt, hasPdf: false)
+    let competitionLibrary = try PhotoLibrary(root: root, manifest: competition, quietInterval: 0)
+    do {
+      _ = try await competitionLibrary.queueConcertPhotos()
+      XCTFail("Competitions must keep explicit section Ready")
+    } catch {
+      XCTAssertTrue(error.localizedDescription.contains("Ready"))
+    }
+  }
+
+  @MainActor
   func testManualUploadAutomaticallyPreparesQueueAndPersistsVerifiedReceipt() async throws {
     let (model, client, responses) = try await uploadFixture()
     PhotoUploadProtocol.state.configure(responses)
+    await model.unqueue(model.queuedIDs)
+    XCTAssertTrue(model.queuedIDs.isEmpty)
+    XCTAssertTrue(model.canStartPhotoUpload)
     XCTAssertFalse(model.isUploading)
     XCTAssertTrue(PhotoUploadProtocol.state.paths().isEmpty)
     model.startUploads(client: client)
@@ -653,7 +715,7 @@ final class PhotoReviewTests: XCTestCase {
     XCTAssertNil(model.error)
     XCTAssertTrue(model.queuedIDs.isEmpty)
     XCTAssertTrue(model.photos[0].uploaded)
-    XCTAssertEqual(PhotoUploadProtocol.state.paths().count, 4)
+    XCTAssertEqual(PhotoUploadProtocol.state.paths().count, 6)
     let reopened = try PhotoReviewModel(local: model.local, quietInterval: 0)
     await reopened.refresh()
     XCTAssertTrue(reopened.photos[0].uploaded)
@@ -763,8 +825,8 @@ final class PhotoReviewTests: XCTestCase {
     model.startUploads(client: client)
     try await awaitUpload { !model.isUploading }
     XCTAssertTrue(model.canFinishUploads)
-    XCTAssertFalse(model.completionRecorded)
-    await model.finishUploads(client: client)
+    XCTAssertTrue(model.completionRecorded)
+    XCTAssertEqual(PhotoUploadProtocol.state.paths().filter { $0.hasSuffix("/photo-completion") }.count, 1)
     XCTAssertNil(model.error)
     XCTAssertTrue(model.completionRecorded)
     let reopened = try PhotoReviewModel(local: model.local, quietInterval: 0)
@@ -778,6 +840,86 @@ final class PhotoReviewTests: XCTestCase {
     XCTAssertTrue(reopened.uploadStatus.contains("New photos"))
     reopened.selectPhotographer(nil)
     XCTAssertFalse(reopened.completionRecorded)
+  }
+
+  @MainActor
+  func testCompetitionUploadStillRequiresExplicitCompletion() async throws {
+    let (model, client, responses) = try await uploadFixture()
+    let original = model.local.manifest
+    var programme = original.programme
+    programme.eventType = "competition"
+    let day = ProgrammeNode(uuid: UUID().uuidString, kind: "day", title: "Friday", date: "2026-09-04")
+    let section = ProgrammeNode(uuid: UUID().uuidString, parentUuid: day.uuid, kind: "section", title: "Dance", number: "01")
+    programme.nodes = [day, section] + programme.nodes.enumerated().map { index, node in
+      ProgrammeNode(uuid: node.uuid, parentUuid: section.uuid, kind: "item", title: node.title, number: "0\(index + 1)")
+    }
+    let manifest = PreparedEvent(server: original.server, programme: programme,
+      folders: original.folders, preparedAt: original.preparedAt, hasPdf: false)
+    model.local = LocalEvent(url: model.local.url, manifest: manifest)
+    PhotoUploadProtocol.state.configure(responses)
+    model.startUploads(client: client)
+    try await awaitUpload { !model.isUploading }
+    XCTAssertNil(model.error)
+    XCTAssertTrue(model.photos.allSatisfy(\.uploaded))
+    XCTAssertFalse(model.completionRecorded)
+    XCTAssertTrue(model.canFinishUploads)
+    XCTAssertFalse(PhotoUploadProtocol.state.paths().contains { $0.hasSuffix("/photo-completion") })
+  }
+
+  @MainActor
+  func testConcertCompletionFailureCanRetryWithoutTransferringPhotosAgain() async throws {
+    let (model, client, responses) = try await uploadFixture()
+    let missingCompletion = responses.filter { !$0.key.hasSuffix("/photo-completion") }
+    PhotoUploadProtocol.state.configure(missingCompletion)
+    model.startUploads(client: client)
+    try await awaitUpload { !model.isUploading }
+    XCTAssertTrue(model.photos.allSatisfy(\.uploaded))
+    XCTAssertFalse(model.completionRecorded)
+    XCTAssertTrue(model.canStartPhotoUpload)
+    XCTAssertTrue(model.uploadStatus.contains("tracker update failed"))
+
+    let originalSelection = try XCTUnwrap(model.photographerSelection)
+    let other = EventPhotographer(id: "another-role", crewUuid: nil, roleUuid: UUID().uuidString,
+      name: "P2", roleName: "Photographer 2", shifts: [])
+    model.photographerSelection = PhotographerSelection(server: model.local.manifest.server,
+      roster: PhotographerRoster(eventUuid: model.local.manifest.programme.eventUuid,
+        checkedAt: "2026-09-22T00:00:00Z", hasShifts: true, photographers: [other], unfilled: []),
+      selectedId: other.id)
+    model.selectPhotographer(other.id)
+    XCTAssertFalse(model.needsConcertCompletion) // P1's upload must never complete P2.
+    XCTAssertFalse(model.canStartPhotoUpload)
+    model.photographerSelection = originalSelection
+    model.selectPhotographer(originalSelection.selectedId)
+
+    // A restart still offers completion recovery without another photo transfer.
+    let reopened = try PhotoReviewModel(local: model.local, quietInterval: 0)
+    await reopened.refresh()
+    reopened.selectPhotographer(reopened.photographerSelection?.selectedId)
+    XCTAssertTrue(reopened.needsConcertCompletion)
+    PhotoUploadProtocol.state.configure(responses)
+    reopened.startUploads(client: client)
+    try await awaitUpload { !reopened.isUploading }
+    XCTAssertTrue(reopened.completionRecorded)
+    XCTAssertNil(reopened.error)
+    XCTAssertFalse(PhotoUploadProtocol.state.paths().contains { $0.hasSuffix("/content") })
+  }
+
+  @MainActor
+  func testConcertCopyingPhotosBlockAutomaticCompletionOnResume() async throws {
+    let (model, client, responses) = try await uploadFixture()
+    PhotoUploadProtocol.state.configure(responses, hold: true)
+    model.startUploads(client: client)
+    try await awaitUpload { PhotoUploadProtocol.state.paths().contains { $0.hasSuffix("/content") } }
+    try jpeg(model.local.url.appendingPathComponent("02 Jazz/Later.jpg"))
+    model.pauseUploads()
+    try await awaitUpload { !model.isUploading }
+    // A copying file also blocks finishing, even if the original upload is verified.
+    try Data([0xff, 0xd8]).write(to: model.local.url.appendingPathComponent("02 Jazz/Copying.jpg"))
+    PhotoUploadProtocol.state.configure(responses)
+    model.startUploads(client: client)
+    try await awaitUpload { !model.isUploading }
+    XCTAssertFalse(model.completionRecorded)
+    XCTAssertFalse(PhotoUploadProtocol.state.paths().contains { $0.hasSuffix("/photo-completion") })
   }
 
   @MainActor
@@ -1007,6 +1149,8 @@ final class PhotoReviewTests: XCTestCase {
     model.pauseUploads()
     try await awaitUpload { !model.isUploading }
     XCTAssertTrue(model.uploadPaused)
+    XCTAssertFalse(model.completionRecorded)
+    XCTAssertFalse(PhotoUploadProtocol.state.paths().contains { $0.hasSuffix("/photo-completion") })
     XCTAssertEqual(model.queuedIDs.count, 1)
     XCTAssertFalse(model.photos[0].uploaded)
     PhotoUploadProtocol.state.configure(responses)
@@ -1042,6 +1186,8 @@ final class PhotoReviewTests: XCTestCase {
     try await awaitUpload { !model.isUploading }
     XCTAssertNotNil(model.error)
     XCTAssertTrue(model.uploadPaused)
+    XCTAssertFalse(model.completionRecorded)
+    XCTAssertFalse(PhotoUploadProtocol.state.paths().contains { $0.hasSuffix("/photo-completion") })
     XCTAssertEqual(model.queuedIDs.count, 1)
     XCTAssertFalse(model.photos[0].uploaded)
     XCTAssertTrue(model.lockedItemIDs.isEmpty)

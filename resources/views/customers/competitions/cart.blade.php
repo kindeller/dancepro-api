@@ -71,7 +71,7 @@
     $mediaPricing = app(\App\Features\Media\Services\MediaCommerceSettings::class);
 @endphp
 <div class="container" style="padding-top:18px"><a href="{{ route($competitionRoutes['show'], $event) }}">← {{ $event->name }}</a></div>
-<section class="hero" style="padding:36px 0"><div class="container"><h1>{{ $activeTab === 'favourites' ? 'Favourites' : 'Cart' }}</h1><p class="lead">{{ $event->name }}</p></div></section>
+<section class="hero"><div class="container">@include('customers._heading', ['headingImageUrl' => $event->logoUrl() ?? $event->crewLogoUrl(), 'eyebrow' => $event->name, 'heading' => $activeTab === 'favourites' ? 'Favourites' : 'Cart', 'description' => $activeTab === 'favourites' ? 'Your saved photos and videos from this event.' : 'Review your selected media before checkout.'])</div></section>
 <section class="section"><div class="container">
     @include('customers.competitions.partials.tabs')
     @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
@@ -82,7 +82,7 @@
         @forelse($selections->where('is_favourite', true) as $selection)
             @php($detail = $selectionDetails[$selection->id])
             <div class="card selection-row is-favourite">
-                <a class="selection-thumbnail-link" href="{{ $detail['view_url'] }}" @if($selection->product === 'photo' && $detail['can_add'])data-selection-preview="{{ route($competitionRoutes['image'], ['schedulingEvent' => $event, 'photo' => $selection->photo_uuid]) }}" data-item-uuid="{{ $selection->item_uuid }}" data-photo-uuid="{{ $selection->photo_uuid }}" data-cart="{{ $selection->in_cart ? 'true' : 'false' }}" data-favourite="true"@endif aria-label="{{ $selection->product === 'photo' ? 'View photo of' : 'View album for' }} {{ $detail['competitor'] }}">
+                <a class="selection-thumbnail-link" href="{{ $detail['view_url'] }}" @if($selection->product === 'photo' && $selection->photo_uuid)data-selection-preview="{{ route($competitionRoutes['image'], ['schedulingEvent' => $event, 'photo' => $selection->photo_uuid]) }}" data-item-uuid="{{ $selection->item_uuid }}" data-photo-uuid="{{ $selection->photo_uuid }}" data-cart="{{ $selection->in_cart ? 'true' : 'false' }}" data-favourite="true"@endif aria-label="{{ $selection->product === 'photo' ? 'View photo of' : 'View album for' }} {{ $detail['competitor'] }}">
                     @if($detail['thumbnail_url'])<img class="selection-image" src="{{ $detail['thumbnail_url'] }}" alt="" loading="lazy">
                     @else<span class="selection-image selection-image-fallback" aria-hidden="true">▣</span>@endif
                 </a>
@@ -113,7 +113,7 @@
         @forelse($cart as $selection)
             @php($detail = $selectionDetails[$selection->id])
             <div class="card selection-row">
-                <a class="selection-thumbnail-link" href="{{ $detail['view_url'] }}" @if($selection->product === 'photo' && $detail['can_add'])data-selection-preview="{{ route($competitionRoutes['image'], ['schedulingEvent' => $event, 'photo' => $selection->photo_uuid]) }}" data-item-uuid="{{ $selection->item_uuid }}" data-photo-uuid="{{ $selection->photo_uuid }}" data-cart="true" data-favourite="{{ $selection->is_favourite ? 'true' : 'false' }}"@endif aria-label="{{ $selection->product === 'photo' ? 'View photo of' : 'View album for' }} {{ $detail['competitor'] }}">
+                <a class="selection-thumbnail-link" href="{{ $detail['view_url'] }}" @if($selection->product === 'photo' && $selection->photo_uuid)data-selection-preview="{{ route($competitionRoutes['image'], ['schedulingEvent' => $event, 'photo' => $selection->photo_uuid]) }}" data-item-uuid="{{ $selection->item_uuid }}" data-photo-uuid="{{ $selection->photo_uuid }}" data-cart="true" data-favourite="{{ $selection->is_favourite ? 'true' : 'false' }}"@endif aria-label="{{ $selection->product === 'photo' ? 'View photo of' : 'View album for' }} {{ $detail['competitor'] }}">
                     @if($detail['thumbnail_url'])<img class="selection-image" src="{{ $detail['thumbnail_url'] }}" alt="" loading="lazy">
                     @else<span class="selection-image selection-image-fallback" aria-hidden="true">▣</span>@endif
                 </a>
@@ -122,7 +122,7 @@
                 <p>{{ match($selection->product) { 'photo' => 'Individual photo', 'routine_photos' => 'All routine photos', 'routine_video' => 'Routine video', default => 'Routine package' } }} · ${{ number_format(($lineAmounts[$selection->id] ?? $mediaPricing->price('competition_'.$selection->product)) / 100, 2) }}
                     @if(!$priced->contains('id', $selection->id)) · Included in another cart item
                     @elseif($selection->product === 'routine_package' && ($lineAmounts[$selection->id] ?? null) !== $mediaPricing->price('competition_routine_package')) · Previously purchased video credit
-                    @endif</p></div>
+                    @endif</p>@if($selection->product === 'photo')<x-cart-photo-filename :filename="$detail['photo_filename'] ?? null" />@endif</div>
                 <div class="selection-actions">
                 <form method="post" action="{{ route($competitionRoutes['selection'], $event) }}">@csrf
                     <input type="hidden" name="item_uuid" value="{{ $selection->item_uuid }}"><input type="hidden" name="photo_uuid" value="{{ $selection->photo_uuid }}">
@@ -225,6 +225,11 @@
     };
     if (viewer && typeof viewer.showModal === 'function') {
         const image = viewer.querySelector('.selection-preview-image');
+        image.addEventListener('error', () => {
+            const error = viewer.querySelector('.selection-preview-error');
+            error.textContent = 'This photo preview is currently unavailable.';
+            error.hidden = false;
+        });
         document.querySelectorAll('[data-selection-preview]').forEach(link => link.addEventListener('click', event => {
             event.preventDefault();
             opener = link;
@@ -238,6 +243,21 @@
             viewer.querySelector('.selection-preview-error').hidden = true;
             viewer.showModal();
         }));
+        viewer.addEventListener('keydown', event => {
+            if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+            event.preventDefault();
+            const links = [...document.querySelectorAll('[data-selection-preview]')];
+            const index = links.indexOf(opener);
+            const next = index >= 0 ? links[index + (event.key === 'ArrowRight' ? 1 : -1)] : null;
+            if (next) {
+                const removedFavourite = opener.closest('.selection-row.is-favourite');
+                if (removedFavourite && opener.dataset.favourite === 'false') {
+                    removedFavourite.remove();
+                    updateEmpty();
+                }
+                next.click();
+            }
+        });
         viewer.querySelector('[data-close]').addEventListener('click', () => viewer.close());
         viewer.addEventListener('click', event => { if (event.target === viewer) viewer.close(); });
         viewer.addEventListener('close', () => {
@@ -246,7 +266,7 @@
             if (tile && opener.dataset.favourite === 'false') {
                 tile.remove();
                 updateEmpty();
-            } else opener?.focus();
+            } else opener?.focus({preventScroll:true});
         });
     }
     forms.forEach(form => form.addEventListener('submit', async event => {

@@ -4,8 +4,6 @@ namespace App\Features\Scheduling\Actions;
 
 use App\Features\Scheduling\Models\CrewNotification;
 use App\Features\Scheduling\Models\SchedulingShiftAssignment;
-use App\Features\Scheduling\Support\SchedulingEventType;
-use Illuminate\Validation\ValidationException;
 
 class UpdateAssignmentEquipment
 {
@@ -13,9 +11,6 @@ class UpdateAssignmentEquipment
     {
         $assignment->loadMissing(['shift.schedulingEvent', 'crewProfile']);
         $event = $assignment->shift->schedulingEvent;
-        if ($itemCode !== 'media' && $event->event_type !== SchedulingEventType::Concert) {
-            throw ValidationException::withMessages(['equipment' => 'Numbered video and backdrop kits are only assigned to concert work.']);
-        }
 
         $otherNotes = filled($otherNotes) ? trim($otherNotes) : null;
         if (! $isBringing && ! $isTaking && $otherNotes === null) {

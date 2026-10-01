@@ -28,9 +28,11 @@ class UpdateEventCrewAssignment
             return;
         }
 
-        if (! $crewProfile->roles()->whereKey($role->id)->wherePivot('status', 'approved')->exists()) {
-            throw ValidationException::withMessages(['crew_profile_uuid' => 'That crew member is not approved for this role.']);
+        if (! $crewProfile->user?->is_active) {
+            throw ValidationException::withMessages(['crew_profile_uuid' => 'Choose an active crew member.']);
         }
+        // Administrators may roster other crew too; the picker prioritises
+        // availability and approved training without changing qualifications.
 
         SchedulingShiftAssignment::query()->where('scheduling_shift_id', $shift->id)->where('crew_profile_id', $crewProfile->id)->where('crew_role_id', '!=', $role->id)->delete();
         $published = $event->roster_status !== 'draft';

@@ -17,7 +17,8 @@ class SaveCrewProfile
         return DB::transaction(function () use ($data, $crewProfile): CrewProfile {
             $user = $crewProfile?->user ?? new User;
             $user->fill([
-                'name' => $data['preferred_name'],
+                'name' => $data['name'] ?? ($user->name ?: $data['preferred_name']),
+                ...array_intersect_key($data, array_flip(['first_name', 'last_name'])),
                 'email' => $data['email'],
                 'type' => $user->exists ? $user->type : UserType::Crew->value,
                 'is_active' => $data['is_active'],

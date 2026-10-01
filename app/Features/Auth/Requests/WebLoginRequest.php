@@ -6,6 +6,8 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class WebLoginRequest extends FormRequest
 {
+    protected $redirectRoute = 'login';
+
     public function authorize(): bool
     {
         return true;

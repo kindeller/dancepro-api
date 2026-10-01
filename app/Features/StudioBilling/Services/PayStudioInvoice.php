@@ -69,6 +69,9 @@ class PayStudioInvoice
             }
             $payment->update(['status' => $result['status'], 'provider_transaction_id' => $result['transaction'], 'message' => $result['message'], 'paid_at' => $result['status'] === 'succeeded' ? now() : null]);
             $this->invoices->audit($invoice, $actor, 'payment_'.$result['status'], ['payment' => $payment->uuid, 'amount_cents' => $payment->amount_cents]);
+            if ($payment->status === 'succeeded') {
+                app(StudioPaymentReceipts::class)->prepare($payment);
+            }
 
             return $payment;
         });

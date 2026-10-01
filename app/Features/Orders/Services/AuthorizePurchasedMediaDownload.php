@@ -2,6 +2,7 @@
 
 namespace App\Features\Orders\Services;
 
+use App\Features\Families\Services\FamilyAccess;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Orders\Models\OrderMediaEntitlement;
 use App\Features\Orders\Support\OrderStatus;
@@ -13,7 +14,7 @@ class AuthorizePurchasedMediaDownload
     {
         $entitlement = OrderMediaEntitlement::with('orderItem.order')->findOrFail($entitlement->id);
         $order = $entitlement->orderItem?->order;
-        abort_unless($order && $order->user_id === $user->id
+        abort_unless($order && ($order->user_id === $user->id || app(FamilyAccess::class)->canViewSharedOrder($user, $order))
             && in_array($order->status, [OrderStatus::Paid, OrderStatus::Fulfilled], true)
             && $order->paid_at !== null, 404);
 

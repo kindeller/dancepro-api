@@ -15,6 +15,7 @@ use App\Features\Scheduling\Actions\UpdateAssignmentEquipment;
 use App\Features\Scheduling\Actions\UpdateAvailabilityRound;
 use App\Features\Scheduling\Actions\UpdateEventCrewAssignment;
 use App\Features\Scheduling\Actions\UpdateSchedulingShiftTimes;
+use App\Features\Scheduling\Actions\UpdateShiftRequirements;
 use App\Features\Scheduling\Actions\UpdateTeamLeader;
 use App\Features\Scheduling\Models\EventTypeDefinition;
 use App\Features\Scheduling\Models\SchedulingEvent;
@@ -28,6 +29,7 @@ use App\Features\Scheduling\Requests\UpdateAssignmentEquipmentRequest;
 use App\Features\Scheduling\Requests\UpdateAvailabilityRoundRequest;
 use App\Features\Scheduling\Requests\UpdateEventCrewAssignmentRequest;
 use App\Features\Scheduling\Requests\UpdateSchedulingShiftTimesRequest;
+use App\Features\Scheduling\Requests\UpdateShiftRequirementsRequest;
 use App\Features\Scheduling\Requests\UpdateTeamLeaderRequest;
 use App\Features\Scheduling\Services\EventAvailability;
 use App\Features\Scheduling\Services\PaymentPreviewCalculator;
@@ -146,6 +148,13 @@ class AdminSchedulingEventController extends Controller
         $updateTeamLeader->execute($schedulingShift, $crewProfile, $request->boolean('is_team_leader'));
 
         return $request->expectsJson() ? response()->json(['success' => true]) : back()->with('status', 'Team Leader updated.');
+    }
+
+    public function updateShiftRequirements(UpdateShiftRequirementsRequest $request, SchedulingShift $schedulingShift, UpdateShiftRequirements $update): JsonResponse
+    {
+        $update->execute($schedulingShift, $request->boolean('requires_setup'), $request->boolean('requires_set_down'));
+
+        return response()->json(['success' => true]);
     }
 
     public function updateAssignmentEquipment(UpdateAssignmentEquipmentRequest $request, SchedulingShiftAssignment $assignment, UpdateAssignmentEquipment $updateEquipment): JsonResponse|RedirectResponse

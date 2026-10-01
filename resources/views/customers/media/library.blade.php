@@ -45,7 +45,7 @@
     @if($is_preview && $kind === 'competition')
         <div class="library-grid">
             @foreach($items as $item)
-                <a class="card library-item" href="{{ $item['preview_url'] }}" target="_blank" rel="noopener" aria-label="Open watermarked photo preview">
+                <a class="card library-item" href="{{ $item['preview_url'] }}" data-gallery-preview target="_blank" rel="noopener" aria-label="Open watermarked photo preview">
                     <span class="library-image"><img loading="lazy" src="{{ $item['thumbnail_url'] }}" alt="Watermarked competition photo"></span>
                 </a>
             @endforeach
@@ -60,7 +60,7 @@
         <div class="library-folders">
             @foreach($folders as $folder)
                 <a class="card library-folder" href="{{ route('customer.media.library.show', ['kind' => $kind, 'event' => $event->uuid, 'routine' => $folder['uuid']]) }}">
-                    @if($folder['cover']?->thumbnail_storage_disk && $folder['cover']?->thumbnail_storage_key)<img class="library-folder-cover" src="{{ route('customer.media.library.thumbnail', ['kind' => $kind, 'event' => $event->uuid, 'asset' => $folder['cover']->uuid]) }}" alt="">
+                    @if($folder['cover']?->thumbnail_storage_disk && $folder['cover']?->thumbnail_storage_key)<img class="library-folder-cover" src="{{ route('customer.media.library.thumbnail', ['kind' => $kind, 'event' => $event->uuid, 'asset' => $folder['cover']->uuid, 'size' => 'cover']) }}" alt="">
                     @else<span class="library-folder-cover" aria-hidden="true">▣</span>@endif
                     <span class="library-folder-copy"><span class="library-folder-context">{{ $folder['context'] }}</span><strong class="library-folder-title">{{ $folder['title'] }}</strong><span class="library-folder-meta">{{ $folder['assets']->count() }} {{ Str::plural('file', $folder['assets']->count()) }}</span><span class="library-folder-action">View routine →</span></span>
                 </a>
@@ -91,6 +91,7 @@
         <div class="empty"><h2>No files available</h2><p>There are no files available here. Check My orders for the current status, or contact us through Help.</p></div>
     @endif
 </div></section>
+<x-gallery-photo-viewer />
 @endsection
 
 @push('scripts')

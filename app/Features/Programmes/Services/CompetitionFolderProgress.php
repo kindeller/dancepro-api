@@ -13,7 +13,7 @@ class CompetitionFolderProgress
 
     public function title(string $value): string
     {
-        return mb_strtolower($this->titles->clean($value));
+        return mb_strtolower($this->titles->clean($value, stripAccents: false));
     }
 
     public function forEvent(SchedulingEvent $event, string $revisionUuid): array

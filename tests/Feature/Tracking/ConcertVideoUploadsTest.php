@@ -6,17 +6,24 @@ use App\Features\Bookings\Models\ConcertBooking;
 use App\Features\Bookings\Models\ConcertBookingItem;
 use App\Features\Concerts\Models\Concert;
 use App\Features\Crew\Models\CrewProfile;
+use App\Features\Customers\Models\CustomerStudio;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Services\S3MediaStorage;
 use App\Features\Programmes\Models\ConcertVideoBatch;
 use App\Features\Scheduling\Models\SchedulingEvent;
+use App\Features\Studios\Models\StudioAccountAccess;
 use App\Features\Studios\Models\StudioEventFile;
+use App\Features\Tracking\Jobs\SendConcertTrackerEmail;
+use App\Features\Tracking\Models\ConcertTrackerEmailDelivery;
 use App\Features\Tracking\Models\ConcertTrackerTask;
 use App\Features\Tracking\Services\ConcertQualityChecklist;
 use App\Features\Tracking\Services\ConcertTracker;
 use App\Features\Tracking\Services\ConcertVideoReadiness;
 use App\Models\User;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Mockery\MockInterface;
@@ -123,6 +130,7 @@ class ConcertVideoUploadsTest extends TestCase
     {
         [$admin, $event] = $this->fixture();
         $this->app->detectEnvironment(fn (): string => 'local');
+        $this->withoutMiddleware(PreventRequestForgery::class);
         config()->set('filesystems.disks.s3_concerts.driver', 'local');
         $bytes = 'local concert mp4';
         $base = '/api/staff/events/'.$event->uuid.'/concert-videos/batches';
@@ -138,6 +146,43 @@ class ConcertVideoUploadsTest extends TestCase
         $this->call('PUT', $url, [], [], [], [], $bytes)->assertNotFound();
         $batch = ConcertVideoBatch::where('uuid', $payload['batch_uuid'])->firstOrFail();
         Storage::disk('s3_concerts')->assertExists($batch->files()->first()->storage_key);
+        Mail::fake();
+        Queue::fake();
+        Storage::fake('local');
+        $this->postJson($base.'/'.$batch->uuid.'/complete', ['all_items_included' => true])->assertOk();
+        $concert = $event->concertBookingItem->concert;
+        $concert->update(['event_date' => $event->event_date]);
+        $event->update(['studio_id' => $concert->studio_id]);
+        $director = User::factory()->customer()->create();
+        StudioAccountAccess::create(['studio_id' => $concert->studio_id, 'user_id' => $director->id,
+            'email' => $director->email, 'role' => 'owner', 'status' => 'active']);
+        ConcertTrackerTask::create(['scope_type' => 'event', 'scope_id' => $event->id, 'task_key' => 'concert_edited', 'status' => 'complete']);
+        $quality = app(ConcertQualityChecklist::class);
+        $task = app(ConcertTracker::class)->detail($event, 'quality_check')['task'];
+        $quality->save($task, $admin, $quality->keys(), $quality->fingerprint($task));
+        $event = $event->fresh();
+        $this->assertTrue(app(ConcertVideoReadiness::class)->page($event)['ready']);
+        $this->actingAs($admin, 'web')->post(route('admin.concert-tracker.tasks.email.send', [$event, 'approval_link_email']),
+            ['recipient_email' => $director->email])->assertRedirect()->assertSessionHasNoErrors();
+        $delivery = ConcertTrackerEmailDelivery::latest('id')->firstOrFail();
+        (new SendConcertTrackerEmail($delivery->id))->handle();
+        $this->assertSame('sent', $delivery->fresh()->status);
+        $this->actingAs($director, 'web')->get(route('customer.concert-review.show', $event))->assertOk();
+        $this->get(route('concerts.show', $concert))->assertNotFound();
+        $file = $batch->files()->first();
+        $this->get(route('customer.concert-review.video', [$event, $file->uuid]))->assertOk();
+        $this->post(route('customer.concert-review.release', $event), ['revision' => 0, 'batch_uuid' => $batch->uuid, 'confirm_release' => true])
+            ->assertSessionHasNoErrors();
+        $concert->refresh();
+        $this->assertTrue($concert->isPubliclyAvailable());
+        $customer = User::factory()->customer()->create();
+        CustomerStudio::create(['user_id' => $customer->id, 'studio_id' => $concert->studio_id, 'access_verified_at' => now()]);
+        $this->actingAs($customer, 'web')->get(route('concerts.media.stream', [$concert, $file->asset]))->assertForbidden();
+        $this->post(route('customer.media.concerts.store'), ['year' => $concert->event_date->year, 'concert_code' => $concert->codeGroup->code_encrypted])->assertSessionHasNoErrors();
+        $this->getJson(route('concerts.media.playback', [$concert, $file->asset]))->assertOk()->assertJsonPath('data.format', 'progressive');
+        $this->get(route('concerts.media.download', [$concert, $file->asset]))->assertDownload('Concert.mp4');
+        $this->assertSame($bytes, Storage::disk('s3_concerts')->get($file->storage_key));
+
     }
 
     private function fixture(): array

@@ -16,7 +16,7 @@ class TwoFactorAuthenticationTest extends TestCase
     {
         $user = User::factory()->staff()->create(['email' => 'admin@dancepro.test', 'password' => 'test-password']);
 
-        $this->actingAs($user)->get(route('account.security'))->assertNotFound();
+        $this->actingAs($user)->get(route('account.security'))->assertOk()->assertSee('Two-factor authentication is not currently available');
         auth()->logout();
         $this->post(route('login.store'), ['email' => $user->email, 'password' => 'test-password'])
             ->assertRedirect(route('admin.dashboard'));

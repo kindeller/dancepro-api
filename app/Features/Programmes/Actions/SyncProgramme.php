@@ -29,6 +29,12 @@ class SyncProgramme
             abort_unless($revision && strtolower($revision->uuid) === strtolower($revisionUuid), 409,
                 'A newer or different programme is approved. Prepare that version separately before syncing; your local photos are kept.');
             $nodes = $this->structure->validate($nodes, $revision->snapshot, $programme->id);
+            if (($revision->snapshot['capture_mode'] ?? null) === 'dress_rehearsal') {
+                abort_unless(count($nodes) === 1 && $nodes[0]['uuid'] === $revision->snapshot['nodes'][0]['uuid']
+                    && $nodes[0]['title'] === 'Dress Rehearsal Portraits'
+                    && ($nodes[0]['parent_uuid'] ?? null) === null && ($nodes[0]['merged_into_uuid'] ?? null) === null,
+                    422, 'Dress rehearsal portraits use one photo folder. Prepare this event again to restore its folder.');
+            }
             if ($revision->snapshot['event_type'] === 'competition') {
                 $originalIDs = array_column($revision->snapshot['nodes'], 'uuid');
                 $incoming = collect($nodes)->keyBy('uuid');

@@ -124,6 +124,7 @@ class CustomerCompetitionCart
         $selectionDetails = ($includeCards ? $selections : collect())->mapWithKeys(function (CustomerMediaSelection $selection) use ($event, $gallery, $routineDetails): array {
             $routine = $routineDetails[$selection->item_uuid];
             $photoUuid = $selection->photo_uuid;
+            $photo = null;
             $page = 1;
             if ($photoUuid && $gallery && $routine['available']) {
                 $photo = ProgrammePhotoFile::inGallery($gallery)->where('programme_photo_files.uuid', $photoUuid)
@@ -141,6 +142,7 @@ class CustomerCompetitionCart
             $thumbnailUuid = $photoUuid ?? $routine['thumbnail_photo_uuid'];
 
             return [$selection->id => $routine + [
+                'photo_filename' => $selection->product === 'photo' ? $photo?->file_name : null,
                 'thumbnail_url' => $thumbnailUuid ? route('customer.competitions.image', [
                     'schedulingEvent' => $event, 'photo' => $thumbnailUuid, 'size' => 'thumbnail',
                 ]) : $event->crewLogoUrl(),

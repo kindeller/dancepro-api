@@ -220,7 +220,7 @@
                         @else
                             <form method="post" action="{{ route('admin.media-settings.customer-credits.store') }}" class="grid">@csrf
                                 <label>Customer account<select name="user_id" required>
-                                    @foreach($creditCustomers as $customer)<option value="{{ $customer->id }}" @selected((int) old('user_id') === $customer->id)>Account #{{ $customer->id }} · {{ $customer->name }} · {{ $customer->email }} · ${{ number_format(($customer->credit_balance ?? 0) / 100, 2) }} credit</option>@endforeach
+                                    @foreach($creditCustomers as $customer)<option value="{{ $customer->id }}" @selected((int) old('user_id') === $customer->id)>Account ID: {{ $customer->uuid }} · {{ $customer->name }} · {{ $customer->email }} · ${{ number_format(($customer->credit_balance ?? 0) / 100, 2) }} credit</option>@endforeach
                                 </select></label>
                                 <label>Credit amount · $<input type="number" name="amount" min="0.01" max="100000" step="0.01" value="{{ old('amount') }}" required></label>
                                 <label>Credit type<select name="credit_type" required><option value="reward" @selected(old('credit_type', 'reward') === 'reward')>Reward</option><option value="gift" @selected(old('credit_type') === 'gift')>Gift</option><option value="purchased" @selected(old('credit_type') === 'purchased')>Purchased credit</option></select><span class="muted">GST for purchased credit is recorded when the credit is sold, not when it is redeemed.</span></label>

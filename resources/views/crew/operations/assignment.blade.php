@@ -6,7 +6,9 @@
     $allItems=$templates->flatMap->items; $done=$completedIds->intersect($allItems->pluck('id'))->count(); $total=$allItems->count();
     $isCancelled=$event->cancelled_at !== null;
 @endphp
-<div class="page-heading"><div><p class="eyebrow">{{ $event->event_type->value }} shift</p><h1 @if($isCancelled) style="text-decoration:line-through;color:#666" @endif>{{ $event->name }}</h1><p class="muted">{{ $assignment->role->name }} · {{ $shift->shift_date?->format('D j M Y') }}</p></div><a class="button secondary" href="{{ route('crew.availability.index',['view'=>$isCancelled?'cancelled':'upcoming']) }}">Back to shifts</a></div>
+<div class="page-heading"><div>
+@include('crew._brand')
+<p class="eyebrow">{{ $event->event_type->value }} shift</p><h1 @if($isCancelled) style="text-decoration:line-through;color:#666" @endif>{{ $event->name }}</h1><p class="muted">{{ $assignment->role->name }} · {{ $shift->shift_date?->format('D j M Y') }}</p></div><a class="button secondary" href="{{ route('crew.availability.index',['view'=>$isCancelled?'cancelled':'upcoming']) }}">Back to shifts</a></div>
 
 @if($isCancelled)<section class="card profile-section" style="background:#ededed;border-color:#aaa;color:#555"><span class="status-pill" style="background:#777;color:#fff">Cancelled</span><h2 style="text-decoration:line-through">This shift has been cancelled</h2><p>This record is kept for your reference. No availability, acknowledgement, cover, clock-in/out, checklist or new timesheet action is required.</p>@if($assignment->timeEntry)<p><strong>Existing recorded time is retained for administrative review.</strong></p>@endif</section>@endif
 

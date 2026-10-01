@@ -1,5 +1,5 @@
 @if(!$booking->cancelled_at && $booking->items->whereNull('cancelled_at')->contains(fn ($item) => $item->item_type->value === 'concert'))
-<section id="family-numbers" @if(!($familyNumbersEmbedded ?? false)) class="card card-body card-pad" style="margin:24px 0" @endif>
+<section id="{{ $familyNumbersId ?? 'family-numbers' }}" @if(!($familyNumbersEmbedded ?? false)) class="card card-body card-pad" style="margin:24px 0" @endif>
     <h2>{{ $familyNumbersHeading ?? 'Final family numbers' }}</h2>
     <p>Count each family once across all concerts in this booking, including performing siblings and parents. This count determines the video quote when videography is booked.</p>
     @if($booking->family_count_confirmed_at)<p><strong>{{ $booking->final_family_count }} families confirmed</strong> · {{ $booking->family_count_confirmed_at->format('j M Y, g:i a') }}</p>@endif

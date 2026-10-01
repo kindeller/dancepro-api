@@ -82,6 +82,7 @@ show source-derived and manual work together without duplicating completion stat
 - `{{ event_code }}`
 - `{{ contact_name }}`
 - `{{ event_details }}`
+- `{{ event_summary }}` — concise names/dates for the current 20-day email group
 - `{{ services }}`
 - `{{ family_count }}`
 - `{{ venue }}`
@@ -92,7 +93,7 @@ show source-derived and manual work together without duplicating completion stat
 - `{{ gallery_access }}`
 
 Templates may conditionally include a block with
-`{{#if condition}}...{{/if}}`. Supported conditions are `video`, `photo`,
+`{{#if condition}}...{{/if}}`. Supported conditions are `video`, `photo`, `photos` (concert photos or portraits),
 `photo_and_video`, `photo_only`, `portraits`, `second_photographer`,
 `programme_missing` and `slideshow_missing`. These are resolved from booking,
 programme, staffing and Tracker records before previewing or sending an email.
@@ -1087,3 +1088,100 @@ Temporary layout fixtures were rolled back. No routes or migrations changed.
 - My editing is renamed My Tasks in the menu, page title, heading and task return links. It continues to list assigned concert edits; other tracker tasks have not yet been added.
 - Chrome checks passed at 1440, 900 and 390 pixels, including eight menu items with Account security enabled, equal desktop spacing, active My Tasks state and no horizontal overflow or JavaScript errors. Scoped Sail Pint passed. No routes or permissions changed.
 - Full verification: `./vendor/bin/sail artisan test --compact` passed all 919 tests / 9,332 assertions; `git diff --check` passed. Next: select any additional tracker tasks to expose through My Tasks.
+
+
+### Grouped post-concert email — 29 September 2026
+
+- Task 2.4 uses the same fixed, inclusive 20-day booking windows as 1.4. The window starts with the first non-cancelled event; it does not chain successive 20-day gaps. Separate bookings and later groups remain separate.
+- All events in a group share one task, due the day after its final event, plus duplicate protection, sent history and completion. Scheduling is not completion. Automation uses the final event with a default one-day offset, preserving its configured mode and send time. Admin can choose another offset.
+- Early sending shows a yellow timing warning with the recommended date, but does not block sending or scheduling. The worker honours the chosen send time and retains existing booking-change invalidation. Duplicate-send and resend confirmation rules remain unchanged.
+- Replaced legacy post-concert copy with Studio Hub upload, photo access, owner review/corrections/release, and customer streaming/individual or multiple download instructions. Photo/video sections follow booked services. The button opens Concert events; the email never claims media is already released.
+- Migration consolidates historical tasks and retains sent bodies. Old pending/failed messages are cancelled for review because their individual-event dates and content are stale. Rollback deliberately does not split histories or restore outdated copy.
+
+- Verification: full Sail run passed 1,077/1,078 tests; the sole outdated individual-task assertion was corrected. All 58 affected tracker/booking tests then passed (1,193 assertions). Desktop/mobile email and scheduling preview checks, targeted Pint and diff checks passed. Local migration applied; no emails sent.
+
+- Timing-warning follow-up: removed early-send enforcement from the form, queue and worker; optional early scheduling and configured automation offsets are accepted. All 1,079 Sail tests passed (11,493 assertions), with desktop/mobile form checks and targeted Pint/diff checks passing. No emails sent.
+
+### One-off tracker email editing — 29 September 2026
+
+- Audited every tracker email entry point: 1.1 booking confirmation and Received/Partial Approval/Cancelled notices, 1.2 seats & families, 1.4 concert week, 2.4 post-concert, studio-file requests, 3.5 review link, 3.6 corrections, 4.1 photo release and 4.2 invoice.
+- All use the same one-off subject/message editor. The formatted message itself is editable with paragraph/heading, bold/italic, numbered/bulleted list, callout and link controls. There is no separate source/preview step. Branding/signature stay outside the editable body, and Reset restores the original generated message. A plain-text fallback remains when JavaScript is unavailable.
+- Visual edits convert to the existing Markdown message format using Turndown, then pass through the existing server-side safe formatter. Pasted text does not import active HTML. Blank/oversized bodies and subject header injection are rejected. The standard template remains separate and collapsed; automation continues to render standard templates when no one-off fields are supplied.
+- The exact subject/body are frozen on each delivery (including scheduled sends) and can be expanded in delivery history. Booking-status notices retain their existing draft/history record. Photo release edits apply to the current recipient batch; previously sent/queued recipients remain skipped. Existing readiness, stale-context and duplicate-send checks remain in force.
+- Verification: all 1,082 Sail tests passed (11,539 assertions). Direct-editing browser checks passed at 1500px and 390px, including formatted text, safe links, reset, blank-message validation and unchanged templates. Targeted Pint and production asset build passed. No emails sent; no routes or migrations changed.
+
+### Completion ownership and task-bar date — 29 September 2026
+
+- Completing a tracker record with a recorded user now fills its blank assignee from that completer. Existing assignments are preserved, including when a status-only update omits the assignee field. Automated completions without a recorded person remain unassigned.
+- Applied a data migration to fill blank assignees on already-completed records with known completers. Rollback deliberately retains these assignments because later manual changes cannot safely be distinguished.
+- The shared tracker bar replaces Due date with Completed on (date and time) only while the task is complete. It uses the source completion time for automatic tasks and the stored task completion time for manual/email tasks; missing historical dates show Not recorded. Completed tasks no longer open a due-date dialog. Reopening restores the normal deadline control.
+- Photo upload status now includes the last required photo-role completion time. Crew readiness uses the latest publication/acknowledgement, photo release can use album publication dates for older ungrouped releases, and video readiness uses the last recorded upload/edit/check/inclusion prerequisite time.
+- Verification: all 1,086 Sail tests passed (11,567 assertions). Desktop/mobile browser checks passed at 1500px and 390px, confirming the assignee, completion date/time, hidden deadline control and responsive layout. Targeted Pint and diff checks passed; migration applied and rollback behaviour reviewed. No emails sent.
+
+### Studio media file sizes — 29 September 2026
+
+- Task 2.5 shows the stored file size beside each current studio video/slideshow filename, using readable KB/MB/GB units and an exact-byte tooltip. Missing historical sizes show Size unavailable. No storage requests or upload/review workflow changes are needed.
+- In-memory Blade rendering verified KB, MB, GB and missing-size labels. Scoped Sail Pint and diff checks passed. All 1,086 Sail tests passed (11,567 assertions). No routes or database changes. Next: review uploaded file sizes in task 2.5.
+
+
+### 4.2 concert video invoice quantities - 30 September 2026
+
+- Reviewed all four supplied Square invoice PDFs. Video invoice drafts now show
+  concert quantities at $1,500 or unique family quantities at $15, selecting the
+  greater existing quote. Equal totals use flat rate. Family-rate descriptions
+  include the number of concerts, with correct singular/plural wording.
+- Shared rate constants keep booking quotes and invoice lines aligned. Draft
+  creation and quote refresh multiply quantity by unit price for totals/GST.
+  The invoice preparation page explains the rule. Existing issued amounts and
+  manually edited drafts are preserved; the existing refresh action can rebuild
+  a draft's lines explicitly.
+- Verification: 24 invoice feature tests passed (276 assertions), including
+  one/two concerts, equal-rate totals, 151/584 families, excluded portraits and
+  cancelled concerts, and switching a refreshed draft from flat to family rate.
+  Both actual invoice PDF layouts were rendered and visually checked using
+  unsaved synthetic samples. Scoped Pint passed. The full Sail suite passed
+  1,100 tests / 11,712 assertions.
+- No invoice records were created for PDF review, no existing invoices changed,
+  no invoice emails sent and no payments initiated. Next: review a new video
+  draft in booking tab 4.2, or refresh an existing draft to use the itemised lines.
+
+
+### Whole-event photo release and DR import - 30 September 2026
+
+- Redesigned 4.1 around selectable event cards for the current studio/year, with
+  covers, dates, photo/album counts and readiness explanations. Select all ready
+  selects whole events. Release name and watermark are collapsed advanced options;
+  release history and the one-announcement flow remain on the same task page.
+- Event selections are checked server-side and expanded to all photo albums.
+  Mixed studios, cancelled/unapproved events, unfinished roles and previously
+  grouped/released albums are rejected. Publication is atomic; then the admin
+  reviews one announcement listing every included event. Retries skip recipients
+  already queued/sent for this release.
+- Customers browse individual event cards under the studio, without a release-group
+  folder. DR portraits still open directly to images. Old explicit group URLs remain
+  supported. Published native photos can be accessed while a booked concert video
+  remains draft; photo release never grants video streaming/download access.
+- DR Import Photos is restored as an optional copy/review tool with a single
+  destination and no black-frame splitting. Manual Finder copy/paste remains valid.
+- Removed “per unique family” from newly generated family-rate invoice descriptions.
+  Quantity, pricing, GST and the greater-of-two-rates rule remain unchanged.
+- Verification: focused 45 Laravel tests / 614 assertions passed; 111 Swift tests
+  passed and the signed uploader rebuilt. Desktop/mobile selection checks passed.
+  Full Sail regression passed: 1,102 tests / 11,740 assertions. Scoped Pint and
+  diff checks passed. No real galleries released or email announcements sent.
+
+### Studio invoice acknowledgements and DR upload review — 30 September 2026
+
+- Studio Hub invoice tabs now count unpaid issued invoices. Paid cards and invoice
+  details show a green Invoice paid confirmation; partial payments keep the badge.
+- Confirmed payments generate branded email, Studio messages and an authorised
+  billing account notification, with a balance summary and invoice link. Receipt
+  snapshots prevent repeat confirmations; delivery failure leaves payment intact.
+- Energy's DR upload was checked through the tracker service: 34 verified photos,
+  no pending photos, role P Complete and task 3.1 Complete. An already-open tracker
+  needs refreshing to see completion; no upload record or override was changed.
+- Verification: focused billing/welcome/studio-message suite passed 32 tests and
+  388 assertions. Desktop/mobile invoice pages and branded receipt were reviewed.
+- Full Sail suite passed all 1,104 tests (11,772 assertions). Scoped Pint and
+  `git diff --check` passed; the receipt migration applied locally. No real
+  payments, customer email sends or gallery releases were performed.

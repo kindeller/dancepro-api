@@ -54,6 +54,7 @@ class CustomerAccountMediaSelections
             ->where($flag, true)->distinct()->pluck('studio_id');
         foreach (Studio::whereIn('id', $studioIds)->get() as $studio) {
             $quote = $this->concertCart->forStudio($user, $studio);
+            $events = collect();
             foreach ($quote['selections']->where($flag, true)->groupBy('concert_id') as $selections) {
                 $concert = $selections->first()->concert->loadMissing('bookingItem.schedulingEvent');
                 $cartSelections = $selections->where('in_cart', true);
@@ -61,12 +62,30 @@ class CustomerAccountMediaSelections
                 $eligibleSubtotal = $quote['principalPrice'] ? 0 : $subtotal;
                 $percent = $this->settings->discountPercent($eligibleSubtotal);
                 $discount = intdiv($eligibleSubtotal * $percent, 100);
-                $groups->push(['kind' => 'concert', 'event' => $concert, 'studio' => $studio,
+                $events->push(['kind' => 'concert', 'event' => $concert, 'studio' => $studio,
                     'title' => $concert->name, 'date' => $concert->event_date, 'logo' => $studio->logoUrl(),
                     'selections' => $selections->values(), 'lineAmounts' => $quote['lineAmounts'],
                     'subtotal' => $subtotal, 'discount' => $discount, 'total' => $subtotal - $discount,
                     'bulk_eligible_subtotal' => $eligibleSubtotal,
                     'discount_percent' => $percent]);
+            }
+            $events = $events->sort(function (array $left, array $right) use ($focusKind, $focusEvent): int {
+                if ($focusKind === 'concert' && ($left['event']->uuid === $focusEvent || $right['event']->uuid === $focusEvent)) {
+                    return $left['event']->uuid === $focusEvent ? -1 : 1;
+                }
+
+                return ($right['date']?->timestamp ?? 0) <=> ($left['date']?->timestamp ?? 0);
+            })->values();
+            if ($mode === 'cart' && $events->isNotEmpty()) {
+                $groups->push(array_replace($events->first(), [
+                    'title' => $studio->name, 'scope' => 'studio', 'events' => $events,
+                    'selections' => $events->flatMap(fn (array $event) => $event['selections'])->values(),
+                    'subtotal' => $quote['subtotal'], 'discount' => $quote['discount'], 'total' => $quote['total'],
+                    'bulk_eligible_subtotal' => $quote['bulk_eligible_subtotal'],
+                    'discount_percent' => $quote['percent'], 'principalPrice' => $quote['principalPrice'],
+                ]));
+            } else {
+                $groups = $groups->concat($events);
             }
         }
 

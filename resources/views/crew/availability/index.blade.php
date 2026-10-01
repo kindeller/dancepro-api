@@ -2,14 +2,12 @@
 
 @section('content')
 @php
-    $equipmentItems = [
-        'video_1' => ['🔵', 'Video 1'], 'video_2' => ['🟢', 'Video 2'], 'video_3' => ['🔴', 'Video 3'],
-        'backdrop_1' => ['🟠', 'Backdrop 1'], 'backdrop_2' => ['🟡', 'Backdrop 2'], 'media' => ['💾', 'Media'],
-    ];
+    $equipmentItems = \App\Features\Scheduling\Support\AssignmentEquipmentItems::all();
 @endphp
 
 <div class="page-heading">
-    <div><div class="crew-hub-brand"><img src="{{ asset('images/brand/dancepro-icon-blue.png') }}" alt=""><span>CREW HUB</span></div><h1>My Shifts</h1><p class="muted">Everything you need for your upcoming work.</p></div>
+    <div>@include('crew._brand')
+<h1>My Shifts</h1><p class="muted">Everything you need for your upcoming work.</p></div>
     <div style="display:grid;justify-items:end;gap:8px"><a class="button secondary" href="{{ route('crew.availability.index',['view'=>$filter==='calendar'?'upcoming':'calendar']) }}">{{ $filter==='calendar'?'List view':'Calendar view' }}</a>@if($pendingAvailability || $needsAcknowledgement)<div class="action-summary">@if($pendingAvailability)<span><strong>{{ $pendingAvailability }}</strong> availability</span>@endif @if($needsAcknowledgement)<span><strong>{{ $needsAcknowledgement }}</strong> acknowledge</span>@endif</div>@endif</div>
 </div>
 
@@ -216,6 +214,7 @@ document.querySelectorAll('[data-prestart-checklist-url]').forEach((box) => box.
                     <td>
                         <form method="POST" action="{{ $availabilityState === 'unavailable' ? route('crew.availability.clear', $shift) : route('crew.availability.store', $shift) }}" class="availability-cycle-form" data-store-url="{{ route('crew.availability.store', $shift) }}" data-clear-url="{{ route('crew.availability.clear', $shift) }}">
                             @csrf
+                            <input type="hidden" name="layout" value="grid">
                             <input type="hidden" name="_method" value="{{ $availabilityState === 'unavailable' ? 'DELETE' : 'PUT' }}">
                             <input type="hidden" name="status" value="{{ $availabilityState === 'blank' ? 'available' : 'unavailable' }}" @disabled($availabilityState === 'unavailable')>
                             <button type="submit" class="availability-cycle" data-state="{{ $availabilityState }}" aria-label="{{ $availabilityState === 'blank' ? 'No availability selected. Select available' : ucfirst($availabilityState).'. Change availability' }}" title="{{ $availabilityState === 'blank' ? 'Not answered' : ucfirst($availabilityState) }}">{{ $availabilityState === 'available' ? '✓' : ($availabilityState === 'unavailable' ? '✕' : '—') }}</button>
@@ -248,9 +247,9 @@ document.querySelectorAll('[data-prestart-checklist-url]').forEach((box) => box.
                 <span class="muted">Arrival {{ $shift->posted_arrival_at?->format('g:i a') ?? 'TBC' }} · Start {{ $shift->starts_at?->format('g:i a') ?? 'TBC' }} · Finish {{ $shift->estimated_finish_at?->format('g:i a') ?? 'TBC' }}</span>
             </div>
             <div class="availability-card-actions">
-                <form method="POST" action="{{ route('crew.availability.store', $shift) }}" class="availability-form">@csrf @method('PUT')<input name="note" value="{{ $response?->note }}" placeholder="Optional note"><div>@if($response)<div class="response-saved {{ $response->status->value }}">✓ Saved as {{ ucfirst($response->status->value) }}</div>@endif<div class="choice-buttons"><button class="available-button {{ $response?->status->value === 'available' ? 'selected' : '' }}" @if($response?->status->value === 'available')form="clear-availability-{{ $shift->uuid }}" aria-label="Unselect Available"@else name="status" value="available"@endif>{{ $response?->status->value === 'available' ? '✓ ' : '' }}Available</button><button class="unavailable {{ $response?->status->value === 'unavailable' ? 'selected' : '' }}" @if($response?->status->value === 'unavailable')form="clear-availability-{{ $shift->uuid }}" aria-label="Unselect Unavailable"@else name="status" value="unavailable"@endif>{{ $response?->status->value === 'unavailable' ? '✕ ' : '' }}Unavailable</button></div></div></form>
+                <form method="POST" action="{{ route('crew.availability.store', $shift) }}" class="availability-form">@csrf @method('PUT')<input type="hidden" name="layout" value="detailed"><input name="note" value="{{ $response?->note }}" placeholder="Optional note"><div>@if($response)<div class="response-saved {{ $response->status->value }}">✓ Saved as {{ ucfirst($response->status->value) }}</div>@endif<div class="choice-buttons"><button class="available-button {{ $response?->status->value === 'available' ? 'selected' : '' }}" @if($response?->status->value === 'available')form="clear-availability-{{ $shift->uuid }}" aria-label="Unselect Available"@else name="status" value="available"@endif>{{ $response?->status->value === 'available' ? '✓ ' : '' }}Available</button><button class="unavailable {{ $response?->status->value === 'unavailable' ? 'selected' : '' }}" @if($response?->status->value === 'unavailable')form="clear-availability-{{ $shift->uuid }}" aria-label="Unselect Unavailable"@else name="status" value="unavailable"@endif>{{ $response?->status->value === 'unavailable' ? '✕ ' : '' }}Unavailable</button></div></div></form>
                 @if($response)
-                <form id="clear-availability-{{ $shift->uuid }}" method="POST" action="{{ route('crew.availability.clear', $shift) }}" class="availability-clear-form">@csrf @method('DELETE')</form>
+                <form id="clear-availability-{{ $shift->uuid }}" method="POST" action="{{ route('crew.availability.clear', $shift) }}" class="availability-clear-form">@csrf @method('DELETE')<input type="hidden" name="layout" value="detailed"></form>
                 @endif
             </div>
         </div>

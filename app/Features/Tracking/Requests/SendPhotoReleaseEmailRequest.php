@@ -13,6 +13,14 @@ class SendPhotoReleaseEmailRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['confirm_send' => ['accepted']];
+        return [
+            'guest_email_subject' => ['sometimes', 'required', 'string', 'max:200', 'not_regex:/[\r\n]/'],
+            'guest_email_body' => ['sometimes', 'required', 'string', 'max:20000'],
+            'studio_email_subject' => ['sometimes', 'required', 'string', 'max:200', 'not_regex:/[\r\n]/'],
+            'studio_email_body' => ['sometimes', 'required', 'string', 'max:20000'],
+            'confirm_send' => ['accepted'],
+            'email_subject' => ['sometimes', 'required', 'string', 'max:200', 'not_regex:/[\r\n]/'],
+            'email_body' => ['sometimes', 'required', 'string', 'max:20000'],
+        ];
     }
 }

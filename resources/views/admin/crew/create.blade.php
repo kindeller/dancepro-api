@@ -17,7 +17,9 @@
         <div class="card card-pad">
             <h2>New DancePro account</h2>
             <div class="grid two-col">
-                <label>Preferred name<input name="preferred_name" value="{{ old('preferred_name') }}" required maxlength="255" autofocus></label>
+                <label>First name<input name="first_name" value="{{ old('first_name') }}" required maxlength="255" autocomplete="given-name"></label>
+        <label>Last name<input name="last_name" value="{{ old('last_name') }}" maxlength="255" autocomplete="family-name"></label>
+        <label>Preferred name<input name="preferred_name" value="{{ old('preferred_name') }}" required maxlength="255" autofocus></label>
                 <label>Email address<input type="email" name="email" value="{{ old('email') }}" required maxlength="255"></label>
             </div>
             <label style="margin-top:18px;display:flex;flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="send_invitation" value="1" @checked(old('send_invitation', true)) style="width:auto"> Send their setup invitation now</label>

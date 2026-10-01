@@ -14,10 +14,13 @@ class LocalAccountSwitcher
      */
     public function accounts(): Collection
     {
+        if (! app()->environment(['local', 'testing'])) {
+            return collect();
+        }
+
         $users = User::query()
             ->with('crewProfile')
             ->where('is_active', true)
-            ->where('email', 'like', '%.test')
             ->orderBy('name')
             ->get();
 
@@ -42,7 +45,7 @@ class LocalAccountSwitcher
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
-                    'destination' => $this->destinationFor($role),
+                    'destination' => $role === 'studio' ? 'customer.studio-hub' : $user->homeRouteName(),
                 ] : null;
             })
             ->filter()
@@ -70,20 +73,10 @@ class LocalAccountSwitcher
                     : 'customer';
         }
 
-        if ($user->canAccessCrew()) {
+        if ($user->canAccessCrew() || ($user->canAccessCustomer() && in_array($user->type, [UserType::Crew->value, UserType::Staff->value], true))) {
             return 'staff';
         }
 
         return null;
-    }
-
-    private function destinationFor(string $role): string
-    {
-        return match ($role) {
-            'admin' => 'admin.dashboard',
-            'staff' => 'crew.availability.index',
-            'studio' => 'customer.studio-hub',
-            default => 'customer.media.index',
-        };
     }
 }

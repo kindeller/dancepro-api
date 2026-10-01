@@ -1,18 +1,20 @@
-@extends('layouts.admin', ['title' => $event->name.' photos', 'heading' => 'Concert photos', 'subheading' => $event->name])
+@extends('layouts.admin', ['title' => $event->name.' photos', 'heading' => 'Concert photos', 'subheading' => 'Manage studio galleries, event albums and photos.'])
 
 @push('styles')
 <style>
-    .concert-gallery-summary { display:flex;align-items:center;gap:16px; }
-    .concert-gallery-summary-copy { flex:1;min-width:220px; }
-    .concert-gallery-summary-copy h2,.concert-gallery-summary-copy p { margin:0; }
-    .concert-gallery-summary-copy p { margin-top:5px; }
-    .concert-gallery-summary-actions { margin-left:auto; }
-    .concert-album-card:hover { transform:none; }
     .concert-album-card .backend-gallery-card-media { position:relative; }
+    .concert-album-open { display:grid;width:100%;height:100%;place-items:center;color:inherit;text-decoration:none; }
     .concert-album-card .backend-gallery-card-body { display:grid;gap:7px; }
     .concert-album-card .backend-gallery-card-meta { margin:0; }
-    .concert-album-controls { margin:8px -16px -16px;padding:0 16px 16px;border-top:1px solid var(--line); }
-    .concert-album-controls>summary { padding:13px 0 0;cursor:pointer;color:var(--brand-strong);font-weight:800; }
+    .concert-album-footer { position:relative;border-top:1px solid var(--line);margin-top:auto; }
+    .concert-album-view { position:absolute;left:16px;top:14px;color:var(--brand-strong);font-weight:750;text-decoration:none; }
+    .concert-album-view:hover { text-decoration:none; }
+    .concert-album-controls { margin:0;padding:0; }
+    .concert-album-controls>summary { display:flex;align-items:center;justify-content:center;width:36px;height:36px;margin:8px 12px 8px auto;padding:0;border:1px solid var(--line);border-radius:4px;background:#f4f8fa;cursor:pointer;color:var(--brand-strong);list-style:none; }
+    .concert-album-controls>summary::-webkit-details-marker { display:none; }
+    .concert-album-controls>summary:hover,.concert-album-controls>summary:focus-visible { border-color:var(--brand);outline:2px solid var(--brand);outline-offset:2px; }
+    .concert-album-controls>summary svg { width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round; }
+    .concert-album-settings-panel { padding:8px 16px 16px;border-top:1px solid var(--line); }
     .concert-album-edit { display:grid;grid-template-columns:minmax(0,1fr) 92px;gap:12px;margin-top:14px; }
     .concert-album-edit .concert-album-save { grid-column:1/-1; }
     .album-cover-heading { margin:18px 0 4px; }
@@ -31,47 +33,43 @@
     .concert-source-card p { margin:5px 0 10px; }
     .concert-source-thumbs { display:flex;gap:6px;overflow:auto; }
     .concert-source-thumbs img { width:72px;height:54px;flex:0 0 auto;border-radius:5px;object-fit:cover; }
-    @media(max-width:700px){.concert-gallery-summary{align-items:flex-start;flex-wrap:wrap}.concert-gallery-summary-actions{width:100%;margin-left:0}.concert-gallery-summary-actions button{width:100%}.concert-album-edit{grid-template-columns:1fr}}
+    @media(max-width:700px){.concert-album-edit{grid-template-columns:1fr}}
 </style>
 @endpush
 
 @section('content')
 @include('admin.media._backend-gallery-styles')
-<div class="toolbar" style="margin-bottom:20px">
-    <a class="button secondary" href="{{ route('admin.concert-photo-gallery.events') }}">← Concert photos</a>
-    <a class="button secondary" href="{{ route('admin.concert-tracker.tasks.show', [$event, 'photo_release']) }}#prepare-release">Prepare photo release</a>
-</div>
-@include('admin.media._photo-gallery-tabs')
+<x-admin.gallery-heading title="Albums" :studio="$event->studio" :event="$event" :release="true"
+    description="Open an album to view its photos. Use the settings cog to edit its title, order or cover."
+    :back-url="route('admin.concert-photo-gallery.events', $event->studio ? ['studio' => $event->studio->uuid] : ['unlinked' => 1])" back-label="Back to events" />
+@include('admin.media._concert-breadcrumbs')
 @if(session('status'))<p class="card card-pad" role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<p class="card card-pad" role="alert" style="color:#a62232">{{ $errors->first() }}</p>@endif
 
 @if(!$concert)
     <section class="card card-pad"><h2>Link the customer concert record</h2><p>This scheduled event is not linked to a customer concert yet. Open Concert media, create or edit the matching concert and choose this booking event. Photo uploads remain private and unchanged.</p><a class="button" href="{{ route('admin.concerts.index') }}">Open Concert media</a></section>
 @else
-    <section class="card card-pad">
-        <div class="concert-gallery-summary">
-            <x-event-artwork :url="$event->crewLogoUrl()" :name="$event->name" />
-            <div class="concert-gallery-summary-copy"><h2>{{ $concert->name }}</h2><p>{{ $event->studio?->name }} · {{ $event->event_date?->format('j M Y') }}</p><p class="muted">Verified uploader photos sync into private customer albums. Existing album names and release settings are preserved.</p></div>
-            <form class="concert-gallery-summary-actions" method="post" action="{{ route('admin.concert-photo-gallery.sync', $event) }}">@csrf<button @disabled(!$gallery || !$plan)>Sync verified photos</button></form>
-        </div>
-        @if(!$gallery)<p class="muted">No verified uploader photo gallery exists for this event yet.</p>@endif
-    </section>
-
-    <div class="toolbar" style="margin:24px 0 14px"><div><h2 style="margin:0">Customer albums</h2><p class="muted" style="margin:4px 0 0">These folders use the same card layout as Competition photos.</p></div></div>
+    @if(!$gallery)<p class="card card-pad">No verified photo uploads are available for this event yet.</p>@endif
     <div class="backend-gallery-grid">
         @forelse($concert->mediaCollections->filter(fn($album) => $album->media_type->value === 'photo')->sortBy('sort_order') as $album)
             @php($coverAsset = $album->assets->firstWhere('id', $album->cover_media_asset_id) ?? $album->assets->where('media_type.value', 'photo')->where('is_visible', true)->first())
             <article id="album-{{ $album->uuid }}" class="card backend-gallery-card concert-album-card">
                 <div class="backend-gallery-card-media media-grant-target">
-                    @if($coverAsset)<img src="{{ route('admin.concert-photo-gallery.asset', ['schedulingEvent' => $event, 'asset' => $coverAsset, 'size' => 'thumbnail']) }}" alt="{{ $album->name }} cover" loading="lazy">
+                    <a class="concert-album-open" href="{{ route('admin.concert-photo-gallery.show', ['schedulingEvent' => $event, 'album' => $album->uuid]) }}" aria-label="View photos in {{ $album->name }}">
+                    @if($coverAsset)<img src="{{ route('admin.concert-photo-gallery.asset', ['schedulingEvent' => $event, 'asset' => $coverAsset, 'size' => 'cover']) }}" alt="{{ $album->name }} cover" loading="lazy">
                     @else<span class="backend-gallery-card-placeholder" aria-hidden="true">▱</span>@endif
+                    </a>
                     <x-admin.media-grant-button source-kind="concert_item" :event-uuid="$concert->uuid" :source-uuid="$album->uuid" :label="'Add every photo from '.$album->name.' to a customer account'" :aria-label="'Add '.$album->name.' to an account'" />
                 </div>
                 <div class="backend-gallery-card-body">
-                    <strong class="backend-gallery-card-title">{{ $album->name }}</strong>
+                    <a href="{{ route('admin.concert-photo-gallery.show', ['schedulingEvent' => $event, 'album' => $album->uuid]) }}" style="color:inherit;text-decoration:none"><strong class="backend-gallery-card-title">{{ $album->name }}</strong></a>
                     <div class="backend-gallery-card-meta">{{ $album->assets->where('media_type.value', 'photo')->count() }} photos · {{ $album->published_at ? 'Released '.$album->published_at->format('j M Y') : 'Private draft' }}</div>
+                </div>
+                <div class="concert-album-footer">
+                    <a class="concert-album-view" href="{{ route('admin.concert-photo-gallery.show', ['schedulingEvent' => $event, 'album' => $album->uuid]) }}">View album <span aria-hidden="true">→</span></a>
                     <details class="concert-album-controls">
-                        <summary>Manage album</summary>
+                        <summary aria-label="Album settings for {{ $album->name }}" title="Album settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 3 .6 2.1a7 7 0 0 1 4.8 0L15 3l3 1.7-1.5 1.6a7 7 0 0 1 2.4 4.2L21 11v3l-2.1.5a7 7 0 0 1-2.4 4.2L18 20.3 15 22l-.6-2.1a7 7 0 0 1-4.8 0L9 22l-3-1.7 1.5-1.6a7 7 0 0 1-2.4-4.2L3 14v-3l2.1-.5a7 7 0 0 1 2.4-4.2L6 4.7Z"/><circle cx="12" cy="12.5" r="3"/></svg></summary>
+                        <div class="concert-album-settings-panel">
                         @if(!$album->published_at)
                             <form method="post" action="{{ route('admin.concert-photo-gallery.albums.update', [$event, $album]) }}" class="concert-album-edit">@csrf
                                 <label>Album title<input name="name" value="{{ $album->name }}" maxlength="255" required></label>
@@ -91,11 +89,12 @@
                             @endforeach
                         </div>
                         @if($album->cover_media_asset_id)<form method="post" action="{{ route('admin.concert-photo-gallery.albums.cover.update', [$event, $album]) }}" style="margin-top:12px">@csrf<button class="secondary">Use first photo automatically</button></form>@endif
+                        </div>
                     </details>
                 </div>
             </article>
         @empty
-            <p class="card card-pad">Sync verified photos to create the first private albums.</p>
+            <p class="card card-pad">Private albums appear automatically as concert photos are uploaded and verified.</p>
         @endforelse
     </div>
 
@@ -111,6 +110,7 @@
             @endforelse
         </div></div>
     </details>
+    <details class="card card-pad" style="margin-top:20px"><summary>Gallery repair</summary><p class="muted">Uploaded photos are added to albums automatically. Use repair only for older uploads or after linking an existing event.</p><form method="post" action="{{ route('admin.concert-photo-gallery.sync', $event) }}">@csrf<button class="secondary" @disabled(!$gallery || !$plan)>Repair gallery from verified uploads</button></form></details>
 @endif
 @include('admin.customers._grant-dialog')
 @endsection

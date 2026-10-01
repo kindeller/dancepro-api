@@ -1,7 +1,9 @@
                 <h3>Studio videos &amp; slideshows</h3>
                 @forelse($event->studioFiles->where('kind', 'studio_video')->where('is_current', true) as $file)
                     <div class="material-file">
-                        <a href="{{ route('studio-event-files.download', $file) }}">{{ $file->original_name }}</a> · {{ str($file->status)->replace('_', ' ')->title() }}
+                        <a href="{{ route('studio-event-files.download', $file) }}">{{ $file->original_name }}</a>
+                        <span class="muted" @if($file->size_bytes !== null) title="{{ number_format($file->size_bytes) }} bytes" @endif>· {{ $file->size_bytes !== null ? Illuminate\Support\Number::fileSize($file->size_bytes, precision: 1) : 'Size unavailable' }}</span>
+                        · {{ str($file->status)->replace('_', ' ')->title() }}
                         <details><summary>Replace file</summary>
                             <form method="post" enctype="multipart/form-data" action="{{ route('admin.concert-booking-events.files', $item) }}">
                                 @csrf<input type="hidden" name="kind" value="studio_video"><input type="hidden" name="replace_uuid" value="{{ $file->uuid }}">

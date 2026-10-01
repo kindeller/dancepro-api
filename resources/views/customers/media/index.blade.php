@@ -7,27 +7,12 @@
     .media-tabs { display:inline-flex; gap:4px; padding:4px; border:1px solid var(--line); border-radius:999px; background:#eef4f7; }
     .media-tabs button { border:0; border-radius:999px; padding:8px 16px; background:transparent; color:var(--ink); font:inherit; font-weight:750; cursor:pointer; }
     .media-tabs button[aria-selected="true"] { background:var(--ink); color:#fff; }
-    .media-card { display:block; padding:0; color:inherit; text-decoration:none; }
-    button.media-card { width:100%; border:1px solid var(--line); border-radius:var(--radius); background:#fff; font:inherit; text-align:left; cursor:pointer; }
-    .media-card:hover, .media-card:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-    .media-card-image { display:grid; place-items:center; width:100%; aspect-ratio:4/3; background:#14212a; color:#dbeaf0; overflow:hidden; }
-    .media-card-image img { width:100%; height:100%; object-fit:contain; }
-    .media-card-body { padding:17px; }
-    .media-card-body h3 { margin:0 0 6px; font-size:19px; }
-    .media-card-body p { margin:0 0 8px; }
-    .media-card-status { color:#12668c; font-weight:750; font-size:14px; }
-    .compact-media-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,230px)); gap:14px; }
     .media-grid-more { display:flex; justify-content:flex-end; margin-top:14px; }
     .media-grid-more[hidden] { display:none; }
     .media-grid-more button { border:0; background:transparent; color:#0879a7; font:inherit; font-weight:850; cursor:pointer; padding:7px 0; }
     .media-grid-more button:hover,.media-grid-more button:focus-visible { text-decoration:underline; text-underline-offset:4px; }
-    .compact-media-card .media-card-body { display:grid; gap:4px; padding:12px; }
-    .compact-media-card .media-card-body > * { min-width:0; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .compact-media-card .media-card-body h3 { font-size:15px; line-height:1.3; overflow:visible; text-overflow:clip; white-space:normal; overflow-wrap:anywhere; }
-    .compact-media-card .media-card-body p, .compact-media-card .media-card-status { font-size:13px; }
-    .media-card-image { position:relative; }
     .media-review-badge { position:absolute; top:8px; left:8px; padding:3px 7px; border-radius:5px; background:#fff; color:#263640; font-size:11px; font-weight:800; }
-    @media (max-width: 520px) { .compact-media-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } }
+    #add-media-heading { scroll-margin-top:90px; }
     .add-media-options { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:16px; align-items:stretch; }
     .add-media-option { padding:20px; border:1px solid var(--line); border-radius:12px; background:#f8fbfc; }
     .add-media-option-head { display:flex; align-items:center; gap:12px; min-height:46px; margin-bottom:18px; }
@@ -36,6 +21,7 @@
     .add-media-option:nth-child(2) .add-media-icon { background:#edf0fc; color:#465bb5; }
     .add-media-option:nth-child(3) .add-media-icon { background:#ebf7ef; color:#267448; }
     .add-media-icon svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .add-media-studios { display:grid;justify-content:center;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),270px));gap:16px; }
     .add-media-option p { margin-bottom:14px; }
     .add-media-option .button { margin-top:8px; }
     .account-credit { display:flex; align-items:center; justify-content:space-between; gap:18px; margin-bottom:22px; padding:18px 20px; border:1px solid #9bdcf4; border-radius:12px; background:#eaf8fd; }
@@ -64,10 +50,10 @@
         <h2 id="add-media-heading">Add media</h2>
         <div class="add-media-options">
             <section class="add-media-option" id="add-competition">
-                <div class="add-media-option-head"><span class="add-media-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="16.5" cy="8.5" r="1"/></svg></span><h3>Add competition media</h3></div>
+                <div class="add-media-option-head"><span class="add-media-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="16.5" cy="8.5" r="1"/></svg></span><h3>View &amp; order Competition media</h3></div>
                 @if($dancers->isEmpty())
                     <p>Add a dancer in My Profile before adding a competition.</p>
-                    <a class="button" href="{{ route('customer.profile.edit', ['tab' => 'dancers']) }}">Add now</a>
+                    <a class="button" href="{{ route('customer.profile.edit', ['tab' => 'family']) }}">Add now</a>
                 @else
                     <form method="POST" action="{{ route('customer.competitions.store') }}">@csrf
                         <label>Competition event<select name="event_uuid" required><option value="">Select an event</option>@foreach($availableEvents as $event)<option value="{{ $event->uuid }}" @selected(old('event_uuid', request()->query('event')) === $event->uuid)>{{ $event->name }} · {{ $event->event_date?->format('j M Y') }}</option>@endforeach</select></label>
@@ -79,16 +65,16 @@
                 @endif
             </section>
             <section class="add-media-option">
-                <div class="add-media-option-head"><span class="add-media-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16v12H4zM8 7l1-3h6l1 3"/><circle cx="12" cy="13" r="3"/></svg></span><h3>View/order concert photos</h3></div>
+                <div class="add-media-option-head"><span class="add-media-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16v12H4zM8 7l1-3h6l1 3"/><circle cx="12" cy="13" r="3"/></svg></span><h3>View &amp; order Concert photos</h3></div>
                 @if($studios->isEmpty())
                     <p>Add your studio in My Profile to view and order your concert photos.</p>
                     <a class="button" href="{{ route('customer.profile.edit', ['tab' => 'studios']) }}">Add now</a>
                 @else
-                    @foreach($studios as $studio)<p><a class="button secondary" href="{{ route('customer.profile.studio', $studio) }}">{{ $studio->name }}</a></p>@endforeach
+                    <div class="add-media-studios">@foreach($studios as $studio)<x-studio-gallery-card :studio="$studio" :href="route('customer.profile.studio', $studio)" />@endforeach</div>
                 @endif
             </section>
             <section class="add-media-option">
-                <div class="add-media-option-head"><span class="add-media-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 8l6 4-6 4z"/></svg></span><h3>Download concert video</h3></div>
+                <div class="add-media-option-head"><span class="add-media-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10 8l6 4-6 4z"/></svg></span><h3>Stream &amp; download Concert videos</h3></div>
                 @if($studios->isEmpty())
                     <p>Add your studio in My Profile to access your concert videos.</p>
                     <a class="button" href="{{ route('customer.profile.edit', ['tab' => 'studios']) }}">Add now</a>
@@ -115,23 +101,23 @@
         @foreach(['dancers' => 'My Dancers', 'studios' => 'My Studio'] as $group => $label)
             <div id="recommended-{{ $group }}" role="tabpanel" aria-labelledby="recommended-{{ $group }}-tab" @if($group !== 'dancers') hidden @endif>
                 @if(empty($recommendations[$group]))
-                    <div class="empty"><p>No ready routines to recommend yet.</p><a href="{{ route('customer.profile.edit', ['tab' => $group === 'dancers' ? 'dancers' : 'studios']) }}">Check your profile</a></div>
+                    <div class="empty"><p>No ready routines to recommend yet.</p><a href="{{ route('customer.profile.edit', ['tab' => $group === 'dancers' ? 'family' : 'studios']) }}">Check your profile</a></div>
                 @else
-                    <div class="compact-media-grid" data-collapsible-grid>
+                    <div class="compact-media-grid gallery-navigation-grid" data-collapsible-grid>
                         @foreach($recommendations[$group] as $suggestion)
                             @php($event = $suggestion['event'])
                             @if($suggestion['registered'])
-                            <a class="card media-card compact-media-card" href="{{ route('customer.competitions.show', ['schedulingEvent' => $event, 'folder' => $suggestion['routine']['uuid']]) }}">
+                            <a class="card media-card compact-media-card gallery-navigation-card" href="{{ route('customer.competitions.show', ['schedulingEvent' => $event, 'folder' => $suggestion['routine']['uuid']]) }}">
                             @else
-                            <button class="card media-card compact-media-card" type="button" data-open-event-access data-event-uuid="{{ $event->uuid }}" data-event-title="{{ $event->name }}">
+                            <button class="card media-card compact-media-card gallery-navigation-card" type="button" data-open-event-access data-event-uuid="{{ $event->uuid }}" data-event-title="{{ $event->name }}">
                             @endif
-                                <div class="media-card-image">
-                                    @if($suggestion['photo'])<img loading="lazy" src="{{ route('customer.media.recommendations.thumbnail', ['schedulingEvent' => $event, 'item' => $suggestion['routine']['uuid'], 'photo' => $suggestion['photo']]) }}" alt="Watermarked preview of {{ $suggestion['routine']['label'] }}">
+                                <div class="media-card-image gallery-nav-image {{ !$suggestion['photo'] ? 'is-logo' : '' }}">
+                                    @if($suggestion['photo'])<img loading="lazy" src="{{ route('customer.media.recommendations.thumbnail', ['schedulingEvent' => $event, 'item' => $suggestion['routine']['uuid'], 'photo' => $suggestion['photo'], 'size' => 'cover']) }}" alt="Watermarked preview of {{ $suggestion['routine']['label'] }}">
                                     @elseif($event->crewLogoUrl())<img loading="lazy" src="{{ $event->crewLogoUrl() }}" alt="">
                                     @else<span>Routine photo coming soon</span>@endif
                                 </div>
-                                <div class="media-card-body"><h3>{{ $event->name }}</h3><p class="meta" title="{{ $suggestion['routine']['section'] }}">{{ $suggestion['routine']['section'] }}</p><p title="{{ $suggestion['routine']['label'] }}">{{ $suggestion['routine']['label'] }}</p>
-                                    <span class="media-card-status">{{ $suggestion['registered'] ? 'View routine →' : 'Add event login to view →' }}</span>
+                                <div class="media-card-body gallery-nav-body"><h3 class="gallery-nav-title">{{ $event->name }}</h3><p class="gallery-nav-subtitle" title="{{ $suggestion['routine']['section'] }}">{{ $suggestion['routine']['section'] }}</p><p class="gallery-nav-subtitle" title="{{ $suggestion['routine']['label'] }}">{{ $suggestion['routine']['label'] }}</p>
+                                    </div><div class="gallery-nav-footer"><span class="gallery-nav-action">{{ $suggestion['registered'] ? 'View routine →' : 'Add event login to view →' }}</span>
                                 </div>
                             @if($suggestion['registered'])</a>@else</button>@endif
                         @endforeach
@@ -150,14 +136,15 @@
                 <button type="button" role="tab" id="purchased-videos-tab" aria-controls="purchased-videos" aria-selected="false" tabindex="-1" data-media-tab="purchased-videos">Videos</button>
             </div>
         </div>
+        <p class="meta"><a href="{{ route('customer.media.help') }}#article-guide-download-history">Saving your purchases, download history and access dates</a></p>
         @foreach(['photos' => 'Photos', 'videos' => 'Videos'] as $type => $label)
             <div id="purchased-{{ $type }}" role="tabpanel" aria-labelledby="purchased-{{ $type }}-tab" @if($type !== 'photos') hidden @endif>
                 @if(empty($mediaLibrary[$type]))<div class="empty"><p>No purchased {{ strtolower($label) }} are linked to your account yet.</p></div>
-                @else<div class="compact-media-grid" data-collapsible-grid>
+                @else<div class="compact-media-grid gallery-navigation-grid" data-collapsible-grid>
                     @foreach($mediaLibrary[$type] as $purchase)
                         @php($event = $purchase['event'])
-                        <a class="card media-card compact-media-card" href="{{ $purchase['can_browse'] ? route('customer.media.library.show', ['kind' => $purchase['kind'], 'event' => $event->uuid]) : route('customer.media.index', ['event' => $event->uuid]).'#add-competition' }}">
-                            <div class="media-card-image">
+                        <a class="card media-card compact-media-card gallery-navigation-card" href="{{ $purchase['can_browse'] ? route('customer.media.library.show', ['kind' => $purchase['kind'], 'event' => $event->uuid]) : route('customer.media.index', ['event' => $event->uuid]).'#add-competition' }}">
+                            <div class="media-card-image gallery-nav-image {{ !($purchase['thumbnail_url'] ?? null) && !($purchase['kind'] === 'concert' && $event->coverImageForDisplay()) ? 'is-logo' : '' }}">
                                 @if($purchase['thumbnail_url'])<img loading="lazy" src="{{ $purchase['thumbnail_url'] }}" alt="">
                                 @elseif($purchase['kind'] === 'concert' && $event->coverImageForDisplay())<img loading="lazy" src="{{ $event->coverImageForDisplay() }}" alt="">
                                 @elseif($purchase['kind'] === 'concert' && $event->studio?->logoUrl())<img loading="lazy" src="{{ $event->studio->logoUrl() }}" alt="">
@@ -165,7 +152,7 @@
                                 @else<span>{{ ucfirst($purchase['kind']) }}</span>@endif
                                 @if($purchase['is_preview'])<span class="media-review-badge">Sample</span>@endif
                             </div>
-                            <div class="media-card-body"><h3>{{ $purchase['title'] }}</h3><p class="meta">{{ $purchase['kind'] === 'concert' ? $event->event_date?->format('j M Y') : 'Competition' }}</p><span class="media-card-status">{{ $purchase['can_browse'] ? 'View media →' : 'Add event login to view →' }}</span></div>
+                            <div class="media-card-body gallery-nav-body"><h3 class="gallery-nav-title">{{ $purchase['title'] }}</h3><p class="gallery-nav-subtitle">{{ $event->event_date?->format('j M Y') ?? 'Date to be confirmed' }}</p></div><div class="gallery-nav-footer"><span class="gallery-nav-action">{{ $purchase['can_browse'] ? 'View media →' : 'Add event login to view →' }}</span></div>
                         </a>
                     @endforeach
                 </div><div class="media-grid-more" data-grid-more hidden><button type="button" aria-expanded="false">View more ↓</button></div>@endif
@@ -179,23 +166,23 @@
         @if(empty($events))
             <div class="empty"><p>Events you add, or can view through your studio, will appear here.</p></div>
         @else
-            <div class="compact-media-grid" data-collapsible-grid>
+            <div class="compact-media-grid gallery-navigation-grid" data-collapsible-grid>
                 @foreach($events as $entry)
                     @php($event = $entry['event'])
                     @php($externalGallery = $entry['kind'] === 'concert' && $entry['photos'] && !$entry['video'] && !$entry['native_photos'])
                     @php($eventUrl = $entry['kind'] === 'competition' ? ($entry['gallery'] ? route('customer.competitions.show', $event) : route('customer.media.index', ['event' => $event->uuid]).'#add-competition') : (($entry['native_photos'] ?? false) && !$entry['video'] ? route('customer.concerts.photos.show', $event) : ($externalGallery ? $event->galleryForDisplay() : route('concerts.show', $event))))
-                    <a class="card media-card compact-media-card" href="{{ $eventUrl }}" @if($externalGallery) target="_blank" rel="noopener" @endif>
-                        <div class="media-card-image">
+                    <a class="card media-card compact-media-card gallery-navigation-card" href="{{ $eventUrl }}" @if($externalGallery) target="_blank" rel="noopener" @endif>
+                        <div class="media-card-image gallery-nav-image {{ !($entry['thumbnail_url'] ?? null) && !($entry['kind'] === 'concert' && $event->coverImageForDisplay()) ? 'is-logo' : '' }}">
                             @if($entry['kind'] === 'concert' && ($entry['thumbnail_url'] ?? null))<img loading="lazy" src="{{ $entry['thumbnail_url'] }}" alt="">
                             @elseif($entry['kind'] === 'concert' && $event->coverImageForDisplay())<img loading="lazy" src="{{ $event->coverImageForDisplay() }}" alt="">
                             @elseif($entry['kind'] === 'concert' && $event->studio?->logoUrl())<img loading="lazy" src="{{ $event->studio->logoUrl() }}" alt="">
                             @elseif($entry['kind'] === 'competition' && $event->crewLogoUrl())<img loading="lazy" src="{{ $event->crewLogoUrl() }}" alt="">
                             @else<span>{{ ucfirst($entry['kind']) }}</span>@endif
                         </div>
-                        <div class="media-card-body">
-                            <h3>{{ $entry['title'] }}</h3>
-                            <p class="meta">{{ ucfirst($entry['kind']) }}</p>
-                            <span class="media-card-status">{{ $entry['kind'] === 'competition' && !$entry['gallery'] ? 'Add event login to view →' : 'View event →' }}</span>
+                        <div class="media-card-body gallery-nav-body">
+                            <h3 class="gallery-nav-title">{{ $entry['title'] }}</h3>
+                            <p class="gallery-nav-subtitle">{{ $event->event_date?->format('j M Y') ?? 'Date to be confirmed' }}</p>
+                            </div><div class="gallery-nav-footer"><span class="gallery-nav-action">{{ $entry['kind'] === 'competition' && !$entry['gallery'] ? 'Add event login to view →' : 'View event →' }}</span>
                         </div>
                     </a>
                 @endforeach

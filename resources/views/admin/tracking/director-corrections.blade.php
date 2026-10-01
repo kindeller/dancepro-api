@@ -3,7 +3,7 @@
 @include('admin.tracking._task-bar', ['bar' => $trackerBar])
 @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<p role="alert">{{ $errors->first() }}</p>@endif
-<section class="card card-pad" style="max-width:1000px"><h2>Director corrections</h2>
+<section class="card card-pad" style="width:100%;min-width:0"><h2>Director corrections</h2>
 @forelse($review['review']->feedback ?? [] as $feedback)<article style="border-bottom:1px solid var(--line);padding:12px 0"><strong>{{ $feedback['name'] }}</strong> · {{ \Carbon\Carbon::parse($feedback['created_at'])->format('j M Y, g:i a') }}<p style="white-space:pre-wrap">{{ $feedback['body'] }}</p></article>
 @empty<p>No corrections have been submitted by the studio director.</p>@endforelse
 @if($review['review']->revision && !$review['released'])

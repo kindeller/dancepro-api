@@ -9,7 +9,7 @@
     @if($uploadSummary['percent'] !== null)
         <div class="upload-percentage"><strong>{{ $uploadSummary['percent'] }}% of registered photos verified</strong><progress max="100" value="{{ $uploadSummary['percent'] }}" aria-label="Registered photos verified"></progress></div>
     @endif
-    <p class="muted">The uploader registers its queued photos when Upload starts. Counts update when that list reaches DancePro; photos still only on the laptop are not included. 100% verified is separate from the photographer confirming Upload Complete. Duplicate copies are excluded.</p>
+    <p class="muted">The uploader registers its queued photos when Upload starts. Counts update when that list reaches DancePro; photos still only on the laptop are not included. For concerts, the uploader automatically records completion after verification. Competitions still require Upload Complete. Duplicate copies are excluded.</p>
     @if($progress)<small class="muted">Checked {{ \Illuminate\Support\Carbon::parse($progress['checked_at'])->format('j M Y, g:i:s a') }} · {{ $progress['plan_current'] ? 'Current working programme' : 'Older working programme' }}</small>@endif
     <div class="upload-role-table"><table><thead><tr><th>Photo role / crew</th><th>Registered</th><th>Verified</th><th>Remaining</th><th>Progress</th><th>Completion</th></tr></thead><tbody>
     @forelse($progress['photographers'] ?? [] as $person)
@@ -20,7 +20,7 @@
             $completion = match($person['status']) {
                 'complete' => 'Upload complete', 'complete_with_exceptions' => 'Complete with waivers',
                 'waived' => 'Waived', 'no_items' => 'No assigned items', 'needs_attention' => 'Programme needs attention',
-                'receiving' => $person['pending_file_count'] ? 'Awaiting files' : 'Awaiting Upload Complete', default => 'Not started',
+                'receiving' => $person['pending_file_count'] ? 'Awaiting files' : 'Awaiting completion', default => 'Not started',
             };
         @endphp
         <tr><td><strong>{{ $person['role_name'] }}</strong><small>{{ $crewNames ?: 'No published photographer assigned' }}</small>

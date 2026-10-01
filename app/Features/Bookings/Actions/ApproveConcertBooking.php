@@ -7,6 +7,7 @@ use App\Features\Bookings\Models\ConcertBookingItem;
 use App\Features\Bookings\Services\BookingCrewRequirements;
 use App\Features\Bookings\Support\ConcertBookingItemType;
 use App\Features\Bookings\Support\ConcertBookingStatus;
+use App\Features\Programmes\Actions\PrepareDressRehearsalPhotos;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Scheduling\Support\AvailabilityRoundStatus;
 use App\Features\Scheduling\Support\SchedulingEventType;
@@ -41,6 +42,9 @@ class ApproveConcertBooking
 
         return DB::transaction(function () use ($item, $reviewedBy, $studio): SchedulingEvent {
             $booking = ConcertBooking::query()->lockForUpdate()->findOrFail($item->concert_booking_id);
+            if (in_array($booking->status, [ConcertBookingStatus::Cancelled, ConcertBookingStatus::Declined], true)) {
+                throw ValidationException::withMessages(['events' => 'A cancelled or declined booking cannot be approved.']);
+            }
             $item = ConcertBookingItem::query()->lockForUpdate()->findOrFail($item->id);
             if ($item->approval_status !== 'pending') {
                 throw ValidationException::withMessages(['events' => 'This event has already been reviewed. Reload the booking.']);
@@ -97,13 +101,13 @@ class ApproveConcertBooking
 
             $this->media->execute($item->fresh(['schedulingEvent', 'booking', 'concert']), $reviewedBy);
 
-            if (! $booking->items()->where('approval_status', 'pending')->exists()) {
-                $booking->update([
-                    'status' => ConcertBookingStatus::Approved,
-                    'reviewed_by_user_id' => $reviewedBy->id,
-                    'reviewed_at' => now(),
-                ]);
-            }
+            app(PrepareDressRehearsalPhotos::class)->execute($event, $reviewedBy);
+
+            $booking->update([
+                'status' => $booking->items()->where('approval_status', 'pending')->exists() ? ConcertBookingStatus::PartialApproval : ConcertBookingStatus::Approved,
+                'reviewed_by_user_id' => $reviewedBy->id,
+                'reviewed_at' => now(),
+            ]);
 
             return $event;
         });

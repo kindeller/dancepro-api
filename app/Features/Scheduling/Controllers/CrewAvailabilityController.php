@@ -151,7 +151,7 @@ class CrewAvailabilityController extends Controller
 
         return $request->expectsJson()
             ? response()->json(['success' => true, 'status' => $request->validated('status')])
-            : back()->with('status', 'Availability saved.');
+            : redirect()->route('crew.availability.index', ['view' => 'availability', 'layout' => $request->input('layout') === 'grid' ? 'grid' : 'detailed'])->with('status', 'Availability saved.');
     }
 
     public function clear(Request $request, SchedulingShift $schedulingShift, ClearAvailabilityResponse $clearResponse): JsonResponse|RedirectResponse
@@ -161,7 +161,7 @@ class CrewAvailabilityController extends Controller
 
         return $request->expectsJson()
             ? response()->json(['success' => true, 'status' => null])
-            : back()->with('status', 'Availability response cleared.');
+            : redirect()->route('crew.availability.index', ['view' => 'availability', 'layout' => $request->input('layout') === 'grid' ? 'grid' : 'detailed'])->with('status', 'Availability response cleared.');
     }
 
     public function acknowledge(Request $request, SchedulingShiftAssignment $assignment, AcknowledgeShiftAssignment $acknowledge): RedirectResponse

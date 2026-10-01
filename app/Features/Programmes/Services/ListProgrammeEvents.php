@@ -19,9 +19,12 @@ class ListProgrammeEvents
             ->when($user && ! $user->canAccessAdmin(), fn ($query) => $query->where(fn ($access) => $access
                 ->whereHas('event.shifts.assignments', fn ($assignments) => $assignments->where('crew_profile_id', $user->crewProfile?->id)->where('status', 'published'))
                 ->orWhereIn('scheduling_events.id', ConcertTrackerTask::where('scope_type', 'event')->where('task_key', 'concert_edited')->where('assignee_user_id', $user->id)->select('scope_id'))))
-            ->when($search, fn ($query) => $query->where('scheduling_events.name', 'like', '%'.$search.'%'))
+            ->when($search, fn ($query) => $query->where(fn ($matches) => $matches
+                ->where('scheduling_events.name', 'like', '%'.$search.'%')
+                ->orWhereHas('event.studio', fn ($studio) => $studio->where('name', 'like', '%'.$search.'%'))
+                ->orWhereHas('event.concertBookingItem', fn ($item) => $item->where('title', 'like', '%'.$search.'%'))))
             ->when($from, fn ($query) => $query->whereDate('scheduling_events.event_date', '>=', $from))
-            ->with(['event.studio', 'event.competitionContact', 'latestRevision'])
+            ->with(['event.studio', 'event.competitionContact', 'event.concertBookingItem', 'latestRevision'])
             ->orderBy('scheduling_events.event_date')->orderBy('programmes.id')
             ->paginate($perPage);
     }
@@ -36,6 +39,9 @@ class ListProgrammeEvents
         return [
             'uuid' => $programme->event->uuid,
             'name' => $programme->event->name,
+            'studio_name' => $programme->event->studio?->name,
+            'event_title' => filled($programme->event->concertBookingItem?->title) ? $programme->event->concertBookingItem->title : (($revision->snapshot['capture_mode'] ?? null) === 'dress_rehearsal' ? 'Dress Rehearsal Portraits' : $programme->event->name),
+            'capture_mode' => $revision->snapshot['capture_mode'] ?? null,
             'event_type' => $programme->event->event_type->value,
             'event_date' => $programme->event->event_date?->format('Y-m-d'),
             'event_code' => $programme->event->eventCode(),

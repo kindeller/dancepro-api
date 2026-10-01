@@ -1,6 +1,7 @@
 <?php
 
 use App\Features\Auth\Actions\PruneApiIdempotencyRecords;
+use App\Features\Concerts\Actions\PruneConcertFamilyContactData;
 use App\Features\Contacts\Actions\ExportContactDirectory;
 use App\Features\Contacts\Actions\ImportContactDirectory;
 use App\Features\Customers\Actions\BackfillCustomerInbox;
@@ -229,3 +230,6 @@ Artisan::command('customers:sync-inbox', function (): void {
     app(BackfillCustomerInbox::class)->execute();
     $this->info('Existing customer notices and conversations are available in My Messages. No emails were sent.');
 })->purpose('Idempotently import existing customer correspondence into My Messages');
+
+Schedule::call(fn () => app(PruneConcertFamilyContactData::class)->execute())
+    ->name('concerts:prune-family-contact-data')->daily()->withoutOverlapping()->onOneServer();

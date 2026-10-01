@@ -1,0 +1,74 @@
+[
+    {
+        "slug": "guide-account-setup",
+        "category": "Getting started",
+        "title": "Create, verify and manage your DancePro account",
+        "summary": "One sign-in for your media and any hubs available to you.",
+        "body": "Choose Create an account, enter your details and follow the email verification steps. If a verification email is missing, check junk mail and use the resend option on the verification screen. Already registered? Sign in with the email address used for your account or purchases. Use Forgot password on the sign-in page if needed.\n\nMy Profile holds your contact details, dancers, studios and email preferences. To change your account email, contact DancePro through My Messages. Sign out from My Profile when using a shared device.\n\nAccount security supports two-factor authentication and recovery codes. If enabled or required for your account, follow the verification prompt when signing in and keep your recovery codes somewhere safe. Never send your password or recovery codes to DancePro.\n\nStudio, crew and admin hub buttons appear only for accounts with those permissions. Adding your dance studio to a customer profile does not make you its manager. Contact DancePro if you need studio management access.",
+        "keywords": "sign up register verification resend password reset security two factor recovery profile email hubs",
+        "sort_order": 10
+    },
+    {
+        "slug": "guide-media-account-guide",
+        "category": "Getting started",
+        "title": "What is in My Events, My Purchases and My Orders?",
+        "summary": "Find galleries, keep your purchases together and check receipts.",
+        "body": "My Events: add a studio or competition using the access code supplied where required, open galleries and explore recommendations. Add concert video access with the separate code supplied by your studio after release.\n\nMy Purchases: use the Photos and Videos filters to find purchased media, then open an event or routine to download available files. Adding an event or saving a favourite is not a purchase. Concert videos supplied through your studio are accessed from your added concert in My Events.\n\nMy Orders: check order and payment status, open receipts and see whether media is ready, still preparing or past its download period. If payment is pending, follow the status shown before attempting another payment. For expired purchased media, choose Request reactivation; an extension needs DancePro approval.\n\nYour cart is for items you intend to buy. Favourites keep selections for later without placing an order. Prices, package inclusions, eligible discounts and any available account credit are shown during shopping and checkout. Review the final total before paying.",
+        "keywords": "events purchases orders receipts favourites cart packages discounts credit payment preparing reactivation",
+        "sort_order": 11
+    },
+    {
+        "slug": "guide-gallery-updates",
+        "category": "Gallery access",
+        "title": "Register for gallery updates or unlock a gallery?",
+        "summary": "Notifications and access codes do different jobs.",
+        "body": "In Media galleries, choose Register now and confirm the notification details. For a concert studio, register once for updates about its new event galleries. Competition registration is for the selected event. You can unsubscribe from gallery update emails using their unsubscribe link.\n\nRegistering for updates does not create a paid order, unlock protected photos or grant concert video access. To view protected media, use the gallery or studio access code provided by your organiser or studio. Concert videos have a separate access code, supplied by the studio after the director releases them.\n\nYou can browse public event listings before signing in. Your DancePro account keeps added events and purchases together. If a code does not work, check that it is for the correct studio, event and media type. Ask the studio or organiser for the current code; do not share your account password.",
+        "keywords": "registration register now notify subscription unsubscribe studio concert competition gallery password code",
+        "sort_order": 12
+    },
+    {
+        "slug": "guide-find-dancer-routines",
+        "category": "Profiles",
+        "title": "Find routines with My dancers and My studios",
+        "summary": "Help your account recognise the performances that matter to you.",
+        "body": "In My Profile, add yourself or the dancers whose routines you want to find. Include the spelling used in the programme and any other names or aliases under which the dancer performs. Add your dance studio using its access code where requested.\n\nMy Media can recommend routines matched to your dancers and studios across events. In a competition gallery, use My Dancers or My Studios to narrow the available routines, or browse the event when a name has not matched. Improvisation items have their own gallery view where available.\n\nA recommendation is a way to find a routine, not permission to access or download it. Event access codes and purchases still apply. If something is missing, send DancePro the event, routine and dancer details through My Messages rather than creating another account.",
+        "keywords": "dancers aliases names studios recommendations matching routines improvisation missing competition",
+        "sort_order": 13
+    },
+    {
+        "slug": "guide-download-history",
+        "category": "Downloads",
+        "title": "Save purchases and understand download history",
+        "summary": "Keep a local copy and check the access dates shown in your account.",
+        "body": "Open My Media → My Purchases, choose Photos or Videos and open the event or routine. Use the download control beside an available purchased file. Where a purchased photo folder offers Download all as ZIP, you can save that photo collection together and extract it on your device.\n\nConcert videos use a different download manager: it requests separate video files, not a ZIP. You can also download each video individually. Allow multiple files if your browser asks, and check the browser download list for completed transfers.\n\nA green download tick and the date or count record that a file was requested. They do not prove that the transfer finished or that a copy is still on your device. If a repeat-download prompt appears, check your Downloads or Files folder before requesting another copy.\n\nCheck the streaming and download expiry dates shown for your media; they may be different. Save originals before access ends and keep a backup. Phone downloads normally appear in Files or Downloads; available save/share options depend on the device and file type. For expired purchased media, My Orders provides Request reactivation. Approval is not automatic.",
+        "keywords": "download downloaded history green tick count date ZIP photos files multiple videos phone tablet expiry backup",
+        "sort_order": 14
+    },
+    {
+        "slug": "guide-messages-guide",
+        "category": "Account & privacy",
+        "title": "Notifications, Conversations and New message",
+        "summary": "Keep account updates and support replies together in My Messages.",
+        "body": "Notifications contains automated account updates such as order confirmations, gallery announcements and media notices. Follow an update’s action button to the relevant page and use Mark as read when finished. The unread badge helps you spot new activity.\n\nConversations contains your personal enquiries and DancePro replies. Open a conversation to read and reply in the same thread. New message only needs a subject and message. Expand Advanced options if you want to identify an event, order or expired media, choose a topic, or attach a supporting file. Supported message attachments include JPG, PNG, WebP, PDF and plain text, up to 10 MB per attachment.\n\nFor the most reliable record, send and reply inside My Messages. Messages sent from your own email app are not automatically guaranteed to appear in Conversations.\n\nIn My Profile → Email preferences, choose media-ready updates, expiry reminders and news/offers, then save. These preferences control optional emails; check your account for progress as well. Studio booking and production conversations are available in Studio Hub.",
+        "keywords": "messages notifications conversations new message advanced options attachments unread email preferences privacy support",
+        "sort_order": 15
+    },
+    {
+        "slug": "guide-studio-invoice-guide",
+        "category": "Studio Hub",
+        "title": "View, download and pay studio invoices",
+        "summary": "Quotes, minimum spends and issued invoices in one place.",
+        "body": "Open Studio Hub → Invoices using an account authorised for the studio. The quote and photography minimum-spend summary are shown above the invoices, alongside the booking information in Event timeline. A quote or minimum-spend summary is not itself an invoice to pay.\n\nOpen an issued invoice to check its items, adjustments, notes, balance and due date. Choose Download PDF to save a copy. When online payment is available, use the payment form on that invoice. Otherwise follow the payment instructions shown or contact DancePro.\n\nIf a payment is being verified, use Check payment status and do not pay again. Once recorded, payment details and the remaining balance appear on the invoice. If anything needs correcting, message DancePro before paying.\n\nStudio invoices are separate from personal media purchases: customer order receipts remain in My Media → My Orders. Only authorised studio accounts can view the studio’s invoices.",
+        "keywords": "invoice invoices PDF payment paid balance quote minimum spend discount notes receipt studio",
+        "sort_order": 16
+    },
+    {
+        "slug": "guide-studio-review-guide",
+        "category": "Studio Hub",
+        "title": "Review, request corrections and release your concert video",
+        "summary": "The studio director controls when the finished concert reaches families.",
+        "body": "Open Studio Hub → Events and find Review & release concert video under Your actions. It is unavailable while the concert is being prepared. Once ready, watch every item, including titles, picture, sound and any supplied studio videos or slideshows.\n\nIf changes are needed, use Corrections requested and include the video filename, time in the video and the change needed. Your feedback remains visible on the review page. DancePro makes and uploads the corrections, then sends an update so you can review again. Release remains unavailable while corrections are outstanding.\n\nWhen you are happy with all items, tick the review confirmation and choose Release concert video. The released-video progress item then provides the link and Access Code. Send that code to your dancers and families so they can add the concert to their own accounts. Photo gallery access uses its own code and release process.\n\nEligible customers can use Family sharing for private invitations without sharing their account password or the studio code. Authorised studio managers can manage whether family sharing and family downloads are available.\n\nEvent timeline gives estimated delivery dates and preparation deadlines. The video review estimate is not a promise that families can watch on that date: director review and release must happen first.",
+        "keywords": "studio director review approval corrections release access code video slideshow timeline family settings",
+        "sort_order": 17
+    }
+]

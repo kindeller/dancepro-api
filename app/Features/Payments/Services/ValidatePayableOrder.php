@@ -4,15 +4,18 @@ namespace App\Features\Payments\Services;
 
 use App\Features\Customers\Models\CustomerConcertPhotoSelection;
 use App\Features\Customers\Models\CustomerMediaSelection;
+use App\Features\Families\Services\FamilyAccess;
 use App\Features\Orders\Models\Order;
 use App\Features\Scheduling\Models\SchedulingEvent;
 use App\Features\Studios\Models\Studio;
+use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 class ValidatePayableOrder
 {
     public function execute(Order $order): void
     {
+        app(FamilyAccess::class)->requirePurchasing(User::findOrFail($order->user_id));
         $metadata = $order->metadata;
         if (($metadata['source'] ?? null) !== 'customer_cart') {
             return;
@@ -48,7 +51,7 @@ class ValidatePayableOrder
             $expected = $this->ids($group['selection_ids'] ?? []);
             $current = match ($group['kind'] ?? null) {
                 'competition' => $this->competitionGroupSelectionIds($order, $group['source_uuid'] ?? null),
-                'concert' => $this->concertGroupSelectionIds($order, $group['source_uuid'] ?? null),
+                'concert' => $this->concertGroupSelectionIds($order, $group['source_uuid'] ?? null, ($group['scope'] ?? null) === 'studio'),
                 default => [],
             };
             if ($expected === [] || $expected !== $current) {
@@ -65,10 +68,10 @@ class ValidatePayableOrder
             ->where('scheduling_event_id', $event->id)->where('in_cart', true)->pluck('id')->all()) : [];
     }
 
-    private function concertGroupSelectionIds(Order $order, ?string $concertUuid): array
+    private function concertGroupSelectionIds(Order $order, ?string $concertUuid, bool $studioScope = false): array
     {
         return $this->ids(CustomerConcertPhotoSelection::query()->where('user_id', $order->user_id)
-            ->where('in_cart', true)->whereHas('concert', fn ($query) => $query->where('uuid', $concertUuid))
+            ->where('in_cart', true)->whereHas($studioScope ? 'concert.studio' : 'concert', fn ($query) => $query->where('uuid', $concertUuid))
             ->pluck('id')->all());
     }
 

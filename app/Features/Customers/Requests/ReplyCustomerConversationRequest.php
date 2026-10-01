@@ -13,6 +13,6 @@ class ReplyCustomerConversationRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['message' => ['required', 'string', 'max:5000'], 'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf,txt', 'max:10240']];
+        return ['message' => ['required', 'string', 'max:5000'], 'attachment' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp,pdf,txt,doc,docx,xls,xlsx,csv', 'max:10240']];
     }
 }

@@ -38,7 +38,7 @@ class CompetitionGallerySettings
             'watermark_uuid' => $settings?->watermark?->uuid,
             'watermark_name' => $settings?->watermark?->name ?? 'Default competition watermark',
             'cover_uuid' => $cover?->uuid, 'version' => $settings?->version ?? 0,
-            'cover_url' => $cover ? route('admin.competition-gallery.image', ['schedulingEvent' => $event, 'photo' => $cover->uuid, 'size' => 'thumbnail']) : $event->crewLogoUrl()];
+            'cover_url' => $cover ? route('admin.competition-gallery.image', ['schedulingEvent' => $event, 'photo' => $cover->uuid, 'size' => 'cover']) : $event->crewLogoUrl()];
     }
 
     public function editor(SchedulingEvent $event): array

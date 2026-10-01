@@ -2,13 +2,9 @@
 
 @section('content')
 @include('admin.media._backend-gallery-styles')
-<div class="backend-gallery-grid">
+<div class="gallery-navigation-grid">
     @forelse($events as $event)
-        <a class="card backend-gallery-card" href="{{ route('admin.competition-gallery.show', $event) }}">
-            <div class="backend-gallery-card-media"><x-event-artwork :url="$event->crewLogoUrl()" :name="$presentation[$event->uuid]['title']" size="large" /></div>
-            <div class="backend-gallery-card-body"><strong class="backend-gallery-card-title">{{ $presentation[$event->uuid]['title'] }}</strong>
-            <div class="backend-gallery-card-meta">{{ $event->eventCode() }} · {{ $event->event_date?->format('j M Y') }}</div></div>
-        </a>
+        <x-gallery-navigation-card :title="$presentation[$event->uuid]['title']" :image="$event->crewLogoUrl()" :logo="true" :subtitle="$event->eventCode().' · '.$event->event_date?->format('j M Y')" :href="route('admin.competition-gallery.show', $event)" />
     @empty
         <p class="card card-pad">No competitions yet.</p>
     @endforelse

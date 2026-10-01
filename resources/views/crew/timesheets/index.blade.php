@@ -1,6 +1,7 @@
 @extends('layouts.crew',['title'=>'My Timesheets'])
 @section('content')
-<div class="page-heading"><div><div class="crew-hub-brand"><img src="{{ asset('images/brand/dancepro-icon-blue.png') }}" alt=""><span>CREW HUB</span></div><h1>My Timesheets</h1><p class="muted">Select completed work to create an invoice or confirm that you sent your own.</p></div></div>
+<div class="page-heading"><div>@include('crew._brand')
+<h1>My Timesheets</h1><p class="muted">Select completed work to create an invoice or confirm that you sent your own.</p></div></div>
 
 <nav class="chat-tabs" aria-label="Financial views">
     <a class="{{ $view === 'timesheets' ? 'active' : '' }}" href="{{ route('crew.timesheets.index') }}" @if($view === 'timesheets') aria-current="page" @endif>Timesheets</a>

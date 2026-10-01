@@ -7,6 +7,7 @@ use App\Features\Media\Models\MediaCollection;
 use App\Features\Media\Requests\AdminConcertPhotoGalleryRequest;
 use App\Features\Media\Requests\UpdateConcertPhotoAlbumRequest;
 use App\Features\Media\Requests\UpdateConcertPhotoCoverRequest;
+use App\Features\Media\Services\AdminConcertAlbums;
 use App\Features\Media\Services\AdminConcertPhotoPreview;
 use App\Features\Media\Services\ConcertPhotoGallerySetup;
 use App\Features\Media\Services\ConcertPhotoReleases;
@@ -22,15 +23,16 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminConcertPhotoGalleryController extends Controller
 {
-    public function events(AdminConcertPhotoGalleryRequest $request, ConcertPhotoGallerySetup $gallery): Response
+    public function events(AdminConcertPhotoGalleryRequest $request, AdminConcertAlbums $gallery): Response
     {
-        return response()->view('admin.media.concert-photo-events', ['events' => $gallery->events()])
+        return response()->view('admin.media.concert-photo-events', $gallery->browse($request->validated('studio'), $request->boolean('unlinked')))
             ->header('Cache-Control', 'private, no-store');
     }
 
     public function show(AdminConcertPhotoGalleryRequest $request, SchedulingEvent $schedulingEvent, ConcertPhotoGallerySetup $gallery): Response
     {
-        return response()->view('admin.media.concert-photo-gallery', $gallery->editor($schedulingEvent))
+        return response()->view($request->validated('album') ? 'admin.media.concert-photo-album' : 'admin.media.concert-photo-gallery',
+            $request->validated('album') ? $gallery->albumView($schedulingEvent, $request->validated('album')) : $gallery->editor($schedulingEvent))
             ->header('Cache-Control', 'private, no-store');
     }
 

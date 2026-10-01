@@ -49,7 +49,9 @@ class ExtractProgramme implements ShouldQueue
                 $programme = Programme::whereKey($extraction->programme_id)->lockForUpdate()->firstOrFail();
                 $items = collect($result['nodes'])->where('kind', 'item')->count();
                 $user = User::find($programme->updated_by_user_id);
-                $canApply = $user && $user->canAccessAdmin() && ! $programme->event->cancelled_at
+                // Studio uploads are authorised when the source is captured.
+                // They may seed an empty draft too; only staff can approve it.
+                $canApply = $user && ! $programme->event->cancelled_at
                     && $programme->programme_source_id === $extraction->programme_source_id
                     && $programme->draft_version === $extraction->draft_version
                     && ! $programme->nodes()->where('is_active', true)->where('kind', 'item')->exists();
@@ -59,7 +61,7 @@ class ExtractProgramme implements ShouldQueue
                 $extraction->update([
                     'status' => $items ? ($canApply ? 'ready' : 'review') : 'empty',
                     'result' => $result,
-                    'message' => $items ? ($canApply ? "$items entries extracted. Review them beside the PDF, then approve the programme." : "$items entries extracted. Your existing running order was kept. Compare the extracted suggestions below before making changes.")
+                    'message' => $items ? ($canApply ? "$items entries extracted. Edit the running order beside the PDF, then approve the programme when it is correct." : "$items entries extracted. The draft was not changed because it already has items, changed while reading, or is no longer editable. Compare the suggestions with the running order below.")
                         : 'No running order could be recognised. Your PDF is safe; enter the items manually or try another PDF.',
                 ]);
             });

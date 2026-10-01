@@ -45,15 +45,16 @@ class BookingSeatsAndFamilies
         }
         $activity = collect();
         if ($familiesConfirmed) {
-            $activity->push('Families: '.($booking->familyCountConfirmedBy?->name ?? 'Former user').' · '.$booking->family_count_confirmed_at->format('j M Y, g:i a'));
+            $activity->push(['name' => $booking->familyCountConfirmedBy?->name ?? 'Former user', 'at' => $booking->family_count_confirmed_at]);
         }
         if ($this->seatsComplete($current, $booking)) {
             $result['seatSummary'] = $this->summary($current)->all();
-            foreach ($current->roleSeats as $allocation) {
-                $activity->push($this->roleLabel($allocation->crewRole->code).': '.($allocation->submittedBy?->name ?? 'Former user').' · '.$allocation->submitted_at?->format('j M Y, g:i a'));
-            }
         }
-        $result['activity'] = $activity->isNotEmpty() ? $activity->join(' | ') : null;
+        foreach ($current->roleSeats as $allocation) {
+            $activity->push(['name' => $allocation->submittedBy?->name ?? 'Former user', 'at' => $allocation->submitted_at]);
+        }
+        $latest = $activity->filter(fn (array $entry): bool => $entry['at'] !== null)->sortBy('at')->last();
+        $result['activity'] = $latest ? $latest['name'].' · '.$latest['at']->format('j M Y') : null;
         if ($complete) {
             $result['completedAt'] = collect([$booking->family_count_confirmed_at])->merge($concerts->flatMap(fn ($item) => $item->schedulingEvent->roleSeats->pluck('submitted_at')))->filter()->max();
         }
@@ -96,7 +97,31 @@ class BookingSeatsAndFamilies
 
     public function summary(SchedulingEvent $event): Collection
     {
-        return $event->roleSeats->map(fn ($allocation) => $this->roleLabel($allocation->crewRole->code).': '.collect($allocation->seats)->map(fn ($seat) => $seat['row'].$seat['seat'])->join(', '));
+        return $event->roleSeats->map(fn ($allocation) => $this->roleLabel($allocation->crewRole->code).': '.$this->seatRanges($allocation->seats));
+    }
+
+    public function seatRanges(array $seats): string
+    {
+        return collect($seats)->groupBy('row')->flatMap(function (Collection $rowSeats, string $row): array {
+            $ranges = [];
+            $start = $end = null;
+            foreach ($rowSeats->pluck('seat')->map(fn ($seat): string => (string) $seat)->unique()->sort(SORT_NATURAL) as $seat) {
+                if ($end !== null && ctype_digit($end) && ctype_digit($seat) && (int) $seat === (int) $end + 1) {
+                    $end = $seat;
+
+                    continue;
+                }
+                if ($start !== null) {
+                    $ranges[] = $row.$start.($start !== $end ? '-'.$end : '');
+                }
+                $start = $end = $seat;
+            }
+            if ($start !== null) {
+                $ranges[] = $row.$start.($start !== $end ? '-'.$end : '');
+            }
+
+            return $ranges;
+        })->join(', ');
     }
 
     private function roleLabel(string $code): string

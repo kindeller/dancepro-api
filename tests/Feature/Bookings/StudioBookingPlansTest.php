@@ -19,7 +19,7 @@ class StudioBookingPlansTest extends TestCase
     {
         [$user, $studio] = $this->studioAccount();
         $this->actingAs($user)->get(route('customer.studio-communications.index', $studio))
-            ->assertOk()->assertSee('Event timeline')->assertSee(route('customer.studio-bookings.index', $studio), false);
+            ->assertOk()->assertSee('My timeline')->assertSee(route('customer.studio-bookings.index', $studio), false);
         $this->get(route('concert-bookings.create', ['studio' => $studio->uuid]))
             ->assertOk()->assertSee('name="studio" value="'.$studio->uuid.'"', false);
         $response = $this->post(route('concert-bookings.store'), $this->data($studio));
@@ -33,12 +33,40 @@ class StudioBookingPlansTest extends TestCase
             ->assertHeader('Cache-Control', 'no-store, private')->assertSee('Portrait session')
             ->assertSee(route('customer.studio-bookings.show', [$studio, $booking]), false);
         $this->get(route('customer.studio-bookings.show', [$studio, $booking]))->assertOk()
-            ->assertHeader('Cache-Control', 'no-store, private')->assertSee('Event timeline')
+            ->assertHeader('Cache-Control', 'no-store, private')->assertSee('My timeline')
             ->assertSee(route('customer.studio-bookings.submission', [$studio, $booking]), false)
-            ->assertSee(route('customer.studio-bookings.index', $studio), false);
+            ->assertSee(route('customer.studio-communications.index', [$studio, 'tab' => 'events']), false);
         $this->get(route('customer.studio-bookings.submission', [$studio, $booking]))->assertOk()
-            ->assertHeader('Cache-Control', 'no-store, private')->assertSee('Your submitted booking')
+            ->assertHeader('Cache-Control', 'no-store, private')->assertSee('My booking')
             ->assertSee(route('customer.studio-bookings.show', [$studio, $booking]), false);
+    }
+
+    public function test_latest_booking_replaces_the_hub_shortcut_and_previous_submissions_remain_private(): void
+    {
+        [$user, $studio] = $this->studioAccount();
+        $studio->update(['logo_path' => 'logos/studio.png']);
+        $hub = route('customer.studio-communications.index', $studio);
+        $this->actingAs($user)->get($hub)->assertOk()->assertDontSee('>My booking</a>', false);
+        $data = $this->data($studio);
+        $data['items'][0]['title'] = 'Earlier submitted event';
+        $this->post(route('concert-bookings.store'), $data)->assertRedirect();
+        $first = ConcertBooking::latest('id')->firstOrFail();
+        $this->get($hub)->assertSee(route('customer.studio-bookings.submission', [$studio, $first]), false);
+        $data['items'][0]['title'] = 'Latest submitted event';
+        $this->post(route('concert-bookings.store'), $data)->assertRedirect();
+        $latest = ConcertBooking::latest('id')->firstOrFail();
+        $this->assertNotSame($first->id, $latest->id);
+        $this->get($hub)->assertSee(route('customer.studio-bookings.submission', [$studio, $latest]), false)
+            ->assertDontSee('href="'.route('customer.studio-bookings.submission', [$studio, $first]).'">My booking</a>', false)
+            ->assertSee(route('customer.studio-bookings.show', [$studio, $latest]), false);
+        $this->get(route('customer.studio-bookings.submission', [$studio, $latest]))->assertOk()
+            ->assertSee('Latest submitted event')->assertSee('See previous booking forms')->assertSee($studio->logoUrl(), false);
+        $history = route('customer.studio-bookings.previous', $studio);
+        $this->get($history)->assertOk()->assertSee('Earlier submitted event')->assertDontSee('Latest submitted event');
+        $this->get(route('customer.studio-bookings.show', [$studio, $latest]))->assertOk()
+            ->assertSee('My timeline')->assertSee($studio->logoUrl(), false)->assertSee('Back to My Events')
+            ->assertDontSee('All times are')->assertDontSee('Studio invoices')->assertDontSee('Confirm final numbers');
+        $this->actingAs(User::factory()->customer()->create())->get($history)->assertForbidden();
     }
 
     public function test_other_studio_members_and_revoked_members_cannot_read_receipts(): void
@@ -78,7 +106,7 @@ class StudioBookingPlansTest extends TestCase
         $event = SchedulingEvent::query()->create(['name' => 'Linked event', 'event_type' => 'concert', 'event_date' => today()->addMonth(), 'studio_id' => $studio->id]);
         $booking->items()->firstOrFail()->update(['scheduling_event_id' => $event->id]);
         $this->flushSession();
-        $this->get(route('customer.studio-bookings.show', [$studio, $booking]))->assertOk()->assertSee('Event timeline');
+        $this->get(route('customer.studio-bookings.show', [$studio, $booking]))->assertOk()->assertSee('My timeline');
 
         $anotherStudio = Studio::factory()->create();
         $booking->update(['studio_id' => $anotherStudio->id]);
