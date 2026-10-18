@@ -70,6 +70,7 @@ Route::middleware('auth')
             Route::post('assets/{asset}/multipart', [MediaUploadController::class, 'startMultipart'])->name('multipart.start');
             Route::post('assets/{asset}/multipart/{upload}/parts', [MediaUploadController::class, 'multipartParts'])->name('multipart.parts');
             Route::post('assets/{asset}/multipart/{upload}/complete', [MediaUploadController::class, 'completeMultipart'])->name('multipart.complete');
+            Route::post('assets/{asset}/cancel', [MediaUploadController::class, 'cancelAsset'])->name('assets.cancel');
             Route::post('assets/{asset}/finalize', [MediaUploadController::class, 'finalize'])->name('assets.finalize');
         });
         Route::get('competitions/objects', [AdminCompetitionObjectController::class, 'index'])->name('competition.objects.index');

@@ -28,6 +28,7 @@
                         <div class="concert-media-name"><span>{{ $asset->display_name }}</span><small class="muted">{{ $asset->status->value }} · {{ $asset->is_visible ? 'visible' : 'hidden' }}</small></div>
                         <div class="concert-media-controls">
                             <button type="button" class="button secondary" data-edit-asset aria-label="Edit video title" title="Edit video title">✎</button>
+                            @if($managed && $asset->status->value === 'processing')<button type="button" class="button secondary" data-cancel-asset>Cancel upload</button>@endif
                             @if($asset->verified_at)<button type="button" class="button secondary" data-asset-visible="{{ $asset->is_visible ? '0' : '1' }}">{{ $asset->is_visible ? 'Hide' : 'Show' }}</button>@endif
                             @if($managed && $asset->status->value !== 'processing')<a class="button secondary" href="{{ route('admin.concerts.media.assets.confirm-delete', $asset) }}" aria-label="Delete {{ $asset->display_name }}" title="Delete video and files">🗑</a>@endif
                         </div>

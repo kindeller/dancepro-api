@@ -70,6 +70,9 @@
                 <form class="media-file-upload media-stack">
                     @include('admin.concerts._media_upload_fields', ['buttonLabel' => 'Continue upload and verify', 'showTitle' => false])
                 </form>
+                <div class="media-actions"><button type="button" class="secondary" data-cancel-asset>Cancel upload</button><span class="muted">Cancel this unfinished upload before deleting the video or collection.</span></div>
+                @elseif($asset->status->value === 'cancelled')
+                <div class="media-actions"><a class="button secondary" href="{{ route('admin.concerts.media.assets.confirm-delete', $asset) }}">Delete cancelled video</a></div>
                 @elseif($asset->verified_at)
                 <div class="media-actions"><button type="button" data-asset-visible="{{ $asset->is_visible ? '0' : '1' }}">{{ $asset->is_visible ? 'Hide video' : 'Make video visible' }}</button></div>
                 @endif

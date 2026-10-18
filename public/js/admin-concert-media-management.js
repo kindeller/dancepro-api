@@ -14,6 +14,16 @@
         location.reload();
     }
 
+    async function post(path) {
+        const response = await fetch(`${config.base}/${path}`, {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': config.csrf },
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(Object.values(result.errors || {}).flat().join(' ') || result.message || `Request failed (${response.status}).`);
+        location.reload();
+    }
+
     function showError(error) {
         message.hidden = false;
         message.textContent = error.message;
@@ -25,6 +35,14 @@
         const collection = button.closest('[data-collection]');
         const asset = button.closest('[data-asset]');
         const path = asset ? `assets/${asset.dataset.asset}` : `collections/${collection.dataset.collection}`;
+
+        if (button.matches('[data-cancel-asset]')) {
+            if (!confirm('Cancel this unfinished upload? You can delete the video or collection afterward.')) return;
+            button.disabled = true;
+            try { await post(`${path}/cancel`); }
+            catch (error) { showError(error); button.disabled = false; }
+            return;
+        }
 
         if (button.matches('[data-edit-collection], [data-edit-asset]')) {
             const current = button.matches('[data-edit-collection]')

@@ -92,11 +92,17 @@ class S3MediaStorage
     public function abortMultipart(string $disk, string $key, string $uploadId): void
     {
         [$adapter, $bucket, $resolvedKey] = $this->s3Context($disk, $key);
-        $adapter->getClient()->abortMultipartUpload([
-            'Bucket' => $bucket,
-            'Key' => $resolvedKey,
-            'UploadId' => $uploadId,
-        ]);
+        try {
+            $adapter->getClient()->abortMultipartUpload([
+                'Bucket' => $bucket,
+                'Key' => $resolvedKey,
+                'UploadId' => $uploadId,
+            ]);
+        } catch (AwsException $exception) {
+            if ($exception->getAwsErrorCode() !== 'NoSuchUpload') {
+                throw $exception;
+            }
+        }
     }
 
     /**

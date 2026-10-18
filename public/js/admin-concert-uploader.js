@@ -353,6 +353,15 @@
         catch (error) { status.textContent = error.message; button.disabled = false; }
     }));
 
+    document.querySelectorAll('[data-cancel-asset]').forEach(button => button.addEventListener('click', async () => {
+        if (busy) { status.textContent = 'Wait for the current browser upload to stop before cancelling.'; return; }
+        if (!confirm('Cancel this unfinished upload? You can delete the video or collection afterward.')) return;
+        button.disabled = true;
+        const asset = button.closest('[data-asset]').dataset.asset;
+        try { await api(`assets/${asset}/cancel`); location.reload(); }
+        catch (error) { status.textContent = error.message; button.disabled = false; }
+    }));
+
     document.querySelectorAll('[data-collection-status]').forEach(button => button.addEventListener('click', async () => {
         button.disabled = true;
         try { await api(`collections/${button.closest('[data-collection]').dataset.collection}`, 'PATCH', { status: button.dataset.collectionStatus }); location.reload(); }

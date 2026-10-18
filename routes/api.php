@@ -58,6 +58,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
             Route::post('media-assets/{asset}/multipart-uploads/{upload}/parts', [MediaUploadController::class, 'multipartParts']);
             Route::post('media-assets/{asset}/multipart-uploads/{upload}/complete', [MediaUploadController::class, 'completeMultipart']);
             Route::post('media-assets/{asset}/multipart-uploads/{upload}/abort', [MediaUploadController::class, 'abortMultipart']);
+            Route::post('media-assets/{asset}/cancel', [MediaUploadController::class, 'cancelAsset']);
             Route::post('media-assets/{asset}/finalize', [MediaUploadController::class, 'finalize']);
             Route::post('media-collections/{collection}/imports', [LegacyMediaController::class, 'store']);
         });

@@ -360,6 +360,7 @@ POST /api/staff/media-assets/{asset_uuid}/multipart-uploads
 POST /api/staff/media-assets/{asset_uuid}/multipart-uploads/{upload_uuid}/parts
 POST /api/staff/media-assets/{asset_uuid}/multipart-uploads/{upload_uuid}/complete
 POST /api/staff/media-assets/{asset_uuid}/multipart-uploads/{upload_uuid}/abort
+POST /api/staff/media-assets/{asset_uuid}/cancel
 ```
 
 Initiation request:
@@ -389,6 +390,16 @@ Abort only cancels an unfinished multipart upload. It must not delete a
 previously completed media object. Server lifecycle configuration should also
 abort abandoned incomplete multipart uploads after the approved retention
 period.
+
+Asset cancellation closes every pending upload belonging to an unfinished
+processing asset. Laravel aborts pending multipart sessions in S3, marks pending
+single-object batches as aborted, and changes the asset status to `cancelled`.
+Completed objects remain in storage until staff use the separately confirmed
+managed-media deletion workflow. This lets abandoned reservations leave the
+`processing` state without combining cancellation with object deletion.
+Cancellation also treats S3 `NoSuchUpload` as an already-absent multipart
+session so an expired or lifecycle-aborted provider upload cannot leave the
+database record permanently stuck.
 
 ### Finalise an uploaded asset
 

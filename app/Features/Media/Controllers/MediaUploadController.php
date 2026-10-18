@@ -2,10 +2,12 @@
 
 namespace App\Features\Media\Controllers;
 
+use App\Features\Media\Actions\CancelMediaAssetUpload;
 use App\Features\Media\Actions\ManageMediaUploads;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Models\MediaUpload;
 use App\Features\Media\Requests\AbortMultipartUploadRequest;
+use App\Features\Media\Requests\CancelMediaAssetUploadRequest;
 use App\Features\Media\Requests\CompleteMultipartUploadRequest;
 use App\Features\Media\Requests\CompleteUploadBatchRequest;
 use App\Features\Media\Requests\CreateMultipartPartsRequest;
@@ -135,6 +137,22 @@ class MediaUploadController extends Controller
             'status' => $upload->status,
             'aborted_at' => $upload->aborted_at,
         ]);
+    }
+
+    public function cancelAsset(
+        CancelMediaAssetUploadRequest $request,
+        MediaAsset $asset,
+        CancelMediaAssetUpload $cancellation,
+    ): JsonResponse {
+        Gate::authorize('upload', $asset);
+        /** @var User $user */
+        $user = $request->user();
+        $asset = $cancellation->handle($asset, $user);
+
+        return ApiResponse::success(
+            'Media upload cancelled.',
+            new MediaAssetResource($asset->load('collection')),
+        );
     }
 
     public function finalize(FinalizeMediaAssetRequest $request, MediaAsset $asset, ManageMediaUploads $uploads): JsonResponse
