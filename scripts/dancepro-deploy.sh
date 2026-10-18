@@ -1,383 +1,275 @@
 #!/usr/bin/env bash
 
-# DancePro V2 production deployment script - V3
-#
-# Normal deployment:
-#   dancepro-deploy
-#
-# Dry run:
-#   dancepro-deploy --dry-run
-#
-# Optional health check override:
-#   HEALTHCHECK_URL="http://127.0.0.1/health" dancepro-deploy
-#
-# This script:
-#   - validates the repository, branch, origin remote and production environment
-#   - validates its own tracked state and the complete Git working tree
-#   - verifies database connectivity before deployment
-#   - fetches and previews origin/master
-#   - supports a non-destructive --dry-run mode
-#   - creates a timestamped rollback tag
-#   - logs the complete deployment
-#   - enters Laravel maintenance mode using a pre-rendered maintenance page
-#   - performs a fast-forward-only update
-#   - installs locked production dependencies when Composer files changed
-#   - reviews and optionally runs pending migrations
-#   - rebuilds Laravel caches
-#   - verifies the public storage symlink
-#   - reloads PHP-FPM when available
-#   - returns the application to service
-#   - performs an HTTP health check
-#   - prints rollback commands, timing and a deployment summary
-#
-# Database backups remain a separate prerequisite until the backup process
-# is automated and integrated.
+# Version-controlled, unattended DancePro production deployment.
+# The independently installed dancepro-deploy launcher updates the checkout and
+# invokes this script with the exact approved commit and rollback reference.
 
 set -Eeuo pipefail
 
-APP_DIR="/var/www/dancepro-api"
-BRANCH="master"
-REMOTE="origin"
-EXPECTED_REMOTE_URL="https://github.com/kindeller/dancepro-api.git"
-SCRIPT_RELATIVE_PATH="scripts/dancepro-deploy.sh"
-HEALTHCHECK_URL="${HEALTHCHECK_URL:-http://127.0.0.1}"
-DEPLOY_LOG_DIR="$APP_DIR/storage/logs/deployments"
+readonly APP_DIR="/var/www/dancepro-api"
+readonly BRANCH="master"
+readonly EXPECTED_REMOTE_URL="https://github.com/kindeller/dancepro-api.git"
+readonly BACKUP_S3_BUCKET="dance-pro-db-backup"
+readonly BACKUP_S3_PREFIX="deployments"
+readonly AWS_REGION="ap-southeast-2"
+readonly HEALTHCHECK_URL="${HEALTHCHECK_URL:-http://127.0.0.1/up}"
+readonly DEPLOY_LOG_DIR="$APP_DIR/storage/logs/deployments"
 
-DRY_RUN=false
-DEPLOY_STARTED=false
-DEPLOY_SUCCEEDED=false
+FROM_COMMIT=""
+TARGET_COMMIT=""
 ROLLBACK_TAG=""
-CURRENT_COMMIT=""
-REMOTE_COMMIT=""
-MIGRATION_CHANGES=""
-COMPOSER_CHANGED=false
-
+BACKUP_TEMP_DIR=""
+BACKUP_KEY=""
+MAINTENANCE_ENABLED=false
 START_EPOCH="$(date +%s)"
-DEPLOY_TIMESTAMP_UTC="$(date -u +'%Y-%m-%d_%H-%M-%S')"
-DEPLOY_LOG_FILE="$DEPLOY_LOG_DIR/deploy-$DEPLOY_TIMESTAMP_UTC.log"
 
 usage() {
-    cat <<EOF
+    cat <<'EOF'
 Usage:
-  $(basename "$0")
-  $(basename "$0") --dry-run
-  $(basename "$0") --help
+  scripts/dancepro-deploy.sh \
+    --from-commit <40-character-sha> \
+    --target-commit <40-character-sha> \
+    --rollback-tag <validated-tag>
 
-Options:
-  --dry-run   Fetch and show exactly what would be deployed without changing
-              the working tree, application state, database, caches or services.
-  --help      Show this help text.
-
-Environment:
-  HEALTHCHECK_URL   Override the default health check URL.
-                    Default: $HEALTHCHECK_URL
+This application script is invoked by the stable production launcher. It does
+not update Git and does not prompt for input.
 EOF
 }
 
-for arg in "$@"; do
-    case "$arg" in
-        --dry-run)
-            DRY_RUN=true
+fail() {
+    printf 'ERROR: %s\n' "$1" >&2
+    exit 1
+}
+
+log() {
+    printf '\n=== %s ===\n' "$1"
+}
+
+format_duration() {
+    local total_seconds="$1"
+    printf '%dm %ds' "$((total_seconds / 60))" "$((total_seconds % 60))"
+}
+
+while (($# > 0)); do
+    case "$1" in
+        --from-commit|--target-commit|--rollback-tag)
+            (($# >= 2)) || fail "Missing value for $1."
+            case "$1" in
+                --from-commit) FROM_COMMIT="$2" ;;
+                --target-commit) TARGET_COMMIT="$2" ;;
+                --rollback-tag) ROLLBACK_TAG="$2" ;;
+            esac
+            shift 2
             ;;
         --help|-h)
             usage
             exit 0
             ;;
         *)
-            printf 'Unknown option: %s\n\n' "$arg" >&2
             usage >&2
-            exit 1
+            fail "Unknown option: $1"
             ;;
     esac
 done
 
+[[ "$FROM_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid source commit SHA."
+[[ "$TARGET_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail "Invalid target commit SHA."
+[[ "$ROLLBACK_TAG" =~ ^pre-deploy-[0-9]{8}-[0-9]{6}-[0-9a-f]{12}$ ]] || fail "Invalid rollback tag."
+
+umask 077
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export COMPOSER_NO_INTERACTION=1
+
 mkdir -p "$DEPLOY_LOG_DIR"
+readonly DEPLOY_LOG_FILE="$DEPLOY_LOG_DIR/deploy-$(date -u +'%Y-%m-%d_%H-%M-%S')-${TARGET_COMMIT:0:12}.log"
 exec > >(tee -a "$DEPLOY_LOG_FILE") 2>&1
 
-log() {
-    printf '\n\033[1;34m=== %s ===\033[0m\n' "$1"
-}
-
-warn() {
-    printf '\n\033[1;33mWARNING:\033[0m %s\n' "$1"
-}
-
-fail() {
-    printf '\n\033[1;31mERROR:\033[0m %s\n' "$1" >&2
-    exit 1
-}
-
-confirm() {
-    local prompt="${1:-Continue?}"
-    local answer
-    read -r -p "$prompt [y/N]: " answer
-    [[ "$answer" =~ ^[Yy]$ ]]
-}
-
-format_duration() {
-    local total_seconds="$1"
-    local minutes=$((total_seconds / 60))
-    local seconds=$((total_seconds % 60))
-
-    if (( minutes > 0 )); then
-        printf '%dm %ds' "$minutes" "$seconds"
-    else
-        printf '%ds' "$seconds"
-    fi
-}
-
-print_rollback_instructions() {
-    [[ -n "$ROLLBACK_TAG" ]] || return 0
-
+print_recovery_instructions() {
     cat <<EOF
 
-Rollback commands:
-
-  cd "$APP_DIR"
-  php artisan down --render="errors.503"
-  git reset --hard "$ROLLBACK_TAG"
-  composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
-  php artisan optimize:clear
-  php artisan config:cache
-  php artisan event:cache
-  php artisan route:cache
-  php artisan view:cache
-  php artisan up
-
-Important:
-  A code rollback does not reverse database migrations automatically.
-  Review database changes before rolling back a deployment that ran migrations.
+Recovery requires operator review:
+  1. Inspect $DEPLOY_LOG_FILE and storage/logs/laravel.log.
+  2. Determine whether any migration was applied. Migrations are not
+     automatically reversed and the database backup is not auto-restored.
+  3. If a code rollback is safe, reset to tag $ROLLBACK_TAG, reinstall locked
+     dependencies, rebuild caches, reload PHP-FPM, test, then run artisan up.
 EOF
+}
+
+cleanup() {
+    if [[ -n "$BACKUP_TEMP_DIR" && -d "$BACKUP_TEMP_DIR" ]]; then
+        rm -f -- "$BACKUP_TEMP_DIR/client.cnf" "$BACKUP_TEMP_DIR/database-name" \
+            "$BACKUP_TEMP_DIR/database.sql" "$BACKUP_TEMP_DIR/database.sql.gz"
+        rmdir "$BACKUP_TEMP_DIR" 2>/dev/null || true
+    fi
 }
 
 on_exit() {
     local exit_code=$?
-    local end_epoch
-    local duration
+    trap - EXIT
+    cleanup
 
-    end_epoch="$(date +%s)"
-    duration="$(format_duration $((end_epoch - START_EPOCH)))"
-
-    if [[ "$DEPLOY_STARTED" == true && "$DEPLOY_SUCCEEDED" != true ]]; then
-        printf '\n\033[1;31mDeployment did not complete.\033[0m\n'
-        printf 'The application has intentionally been left in maintenance mode.\n'
-        printf 'Elapsed time: %s\n' "$duration"
-        printf 'Deployment log: %s\n' "$DEPLOY_LOG_FILE"
-        print_rollback_instructions
+    if ((exit_code != 0)); then
+        printf '\nDeployment failed with exit code %d.\n' "$exit_code" >&2
+        if [[ "$MAINTENANCE_ENABLED" == true ]]; then
+            printf 'The application remains in maintenance mode to avoid serving an unverified release.\n' >&2
+            print_recovery_instructions >&2
+        else
+            printf 'The running application was not placed in maintenance mode.\n' >&2
+        fi
     fi
 
     exit "$exit_code"
 }
 trap on_exit EXIT
 
-log "DancePro deployment starting"
-printf 'Mode:          %s\n' "$([[ "$DRY_RUN" == true ]] && echo "DRY RUN" || echo "LIVE DEPLOYMENT")"
-printf 'Started:       %s UTC\n' "$(date -u +'%Y-%m-%d %H:%M:%S')"
-printf 'Application:   %s\n' "$APP_DIR"
-printf 'Branch:        %s/%s\n' "$REMOTE" "$BRANCH"
-printf 'Health check:  %s\n' "$HEALTHCHECK_URL"
-printf 'Log file:      %s\n' "$DEPLOY_LOG_FILE"
-
 log "Preflight validation"
+[[ "$PWD" == "$APP_DIR" ]] || fail "This script must run from $APP_DIR."
+[[ -f artisan && -f .env ]] || fail "The Laravel application or production .env file is missing."
 
-[[ -d "$APP_DIR" ]] || fail "Application directory does not exist: $APP_DIR"
-cd "$APP_DIR"
+for required_command in git php composer curl aws gzip stat mktemp; do
+    command -v "$required_command" >/dev/null 2>&1 || fail "$required_command is not installed."
+done
 
-command -v git >/dev/null 2>&1 || fail "Git is not installed."
-command -v php >/dev/null 2>&1 || fail "PHP is not installed."
-command -v composer >/dev/null 2>&1 || fail "Composer is not installed."
-command -v curl >/dev/null 2>&1 || fail "curl is not installed."
-command -v systemctl >/dev/null 2>&1 || fail "systemctl is not available."
-
-[[ -f artisan ]] || fail "Laravel artisan file was not found."
-[[ -f .env ]] || fail "The production .env file is missing."
-[[ -f "$SCRIPT_RELATIVE_PATH" ]] || fail "Tracked deployment script is missing: $SCRIPT_RELATIVE_PATH"
-
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 || \
-    fail "$APP_DIR is not a Git working tree."
-
-CURRENT_BRANCH="$(git branch --show-current)"
-[[ "$CURRENT_BRANCH" == "$BRANCH" ]] || \
-    fail "Expected branch '$BRANCH', but '$CURRENT_BRANCH' is checked out."
-
-ACTUAL_REMOTE_URL="$(git remote get-url "$REMOTE")"
-[[ "$ACTUAL_REMOTE_URL" == "$EXPECTED_REMOTE_URL" ]] || \
-    fail "Unexpected origin remote: $ACTUAL_REMOTE_URL"
-
-# Explicit self-protection before the broader dirty-tree check.
-if ! git diff --quiet -- "$SCRIPT_RELATIVE_PATH" || \
-   ! git diff --cached --quiet -- "$SCRIPT_RELATIVE_PATH"; then
-    git status --short -- "$SCRIPT_RELATIVE_PATH"
-    fail "The deployment script has local changes. Commit or restore it before deploying."
-fi
+[[ "$(git branch --show-current)" == "$BRANCH" ]] || fail "The production checkout is not on $BRANCH."
+[[ "$(git remote get-url origin)" == "$EXPECTED_REMOTE_URL" ]] || fail "The origin remote is not authorised."
+[[ "$(git rev-parse HEAD)" == "$TARGET_COMMIT" ]] || fail "The checkout does not match the approved target commit."
+git rev-parse "$ROLLBACK_TAG^{commit}" >/dev/null 2>&1 || fail "The rollback tag does not exist."
+[[ "$(git rev-parse "$ROLLBACK_TAG^{commit}")" == "$FROM_COMMIT" ]] || fail "The rollback tag does not match the source commit."
 
 if [[ -n "$(git status --porcelain)" ]]; then
     git status --short
-    fail "The working tree is not clean. Resolve the changes before deploying."
+    fail "The production working tree is not clean."
 fi
 
-# Laravel 13 reports the environment as:
-# "INFO  The application environment is [production]."
-APP_ENV_VALUE="$(
-    php artisan env --no-ansi 2>/dev/null |
-    sed -n 's/.*application environment is \[\([^]]*\)\].*/\1/p'
-)"
+[[ -w storage && -w bootstrap/cache ]] || fail "storage and bootstrap/cache must be writable by the deployment user."
 
-if [[ "$APP_ENV_VALUE" != "production" ]]; then
-    php artisan about --only=environment || true
-    fail "This application is not reporting APP_ENV=production."
-fi
+printf 'Commit:      %s\n' "$TARGET_COMMIT"
 
-printf 'Repository:    verified\n'
-printf 'Origin remote: verified\n'
-printf 'Branch:        verified\n'
-printf 'Working tree:  clean\n'
-printf 'Environment:   production\n'
-
-log "Database connectivity check"
-php artisan migrate:status >/dev/null
-printf 'Database connection: OK\n'
-
-log "Fetch latest code"
-git fetch "$REMOTE" "$BRANCH"
-
-CURRENT_COMMIT="$(git rev-parse HEAD)"
-REMOTE_COMMIT="$(git rev-parse "$REMOTE/$BRANCH")"
-
-printf 'Current live commit:  %s\n' "$(git log -1 --oneline "$CURRENT_COMMIT")"
-printf 'Remote master commit: %s\n' "$(git log -1 --oneline "$REMOTE_COMMIT")"
-
-if [[ "$CURRENT_COMMIT" == "$REMOTE_COMMIT" ]]; then
-    printf '\nThe live server is already up to date.\n'
-    printf 'No deployment is required.\n'
-    exit 0
-fi
-
-git merge-base --is-ancestor "$CURRENT_COMMIT" "$REMOTE_COMMIT" || \
-    fail "origin/$BRANCH cannot fast-forward the current live commit."
-
-log "Commits to deploy"
-git log --oneline --decorate "$CURRENT_COMMIT..$REMOTE_COMMIT"
-
-log "Changed files"
-git diff --stat "$CURRENT_COMMIT..$REMOTE_COMMIT"
-
-log "Change classification"
-
-if git diff --quiet "$CURRENT_COMMIT" "$REMOTE_COMMIT" -- composer.json composer.lock; then
-    printf 'Composer files: unchanged\n'
+log "Create and verify database backup"
+DUMP_COMMAND=""
+if command -v mariadb-dump >/dev/null 2>&1; then
+    DUMP_COMMAND="mariadb-dump"
+elif command -v mysqldump >/dev/null 2>&1; then
+    DUMP_COMMAND="mysqldump"
 else
-    COMPOSER_CHANGED=true
-    printf 'Composer files: changed\n'
+    fail "Neither mariadb-dump nor mysqldump is installed."
 fi
 
-if git diff --quiet "$CURRENT_COMMIT" "$REMOTE_COMMIT" -- routes config; then
-    printf 'Routes/config: unchanged\n'
-else
-    printf 'Routes/config: changed\n'
-fi
+BACKUP_TEMP_DIR="$(mktemp -d /tmp/dancepro-deploy-backup.XXXXXX)"
+chmod 700 "$BACKUP_TEMP_DIR"
 
-if git diff --quiet "$CURRENT_COMMIT" "$REMOTE_COMMIT" -- resources/views; then
-    printf 'Blade views:   unchanged\n'
-else
-    printf 'Blade views:   changed\n'
-fi
+php -r '
+require $argv[1]."/vendor/autoload.php";
+$dotenv = Dotenv\Dotenv::createImmutable($argv[1]);
+$dotenv->load();
+$get = static fn (string $key, ?string $default = null): ?string =>
+    array_key_exists($key, $_ENV) ? (string) $_ENV[$key] : $default;
+if ($get("APP_ENV") !== "production") {
+    fwrite(STDERR, "APP_ENV must be production.\n");
+    exit(2);
+}
+if (! in_array($get("DB_CONNECTION"), ["mysql", "mariadb"], true)) {
+    fwrite(STDERR, "Production database must use the mysql or mariadb driver.\n");
+    exit(2);
+}
+if (($get("DB_URL", "") ?? "") !== "") {
+    fwrite(STDERR, "DB_URL is not supported by the deployment backup; configure discrete DB_* values.\n");
+    exit(2);
+}
+$values = [
+    "host" => $get("DB_HOST", "127.0.0.1"),
+    "port" => $get("DB_PORT", "3306"),
+    "user" => $get("DB_USERNAME", ""),
+    "password" => $get("DB_PASSWORD", ""),
+];
+$socket = $get("DB_SOCKET", "");
+if ($socket !== "") {
+    $values["socket"] = $socket;
+}
+foreach ($values as $value) {
+    if (str_contains($value, "\n") || str_contains($value, "\r") || str_contains($value, "\0")) {
+        fwrite(STDERR, "Database credentials contain unsupported control characters.\n");
+        exit(2);
+    }
+}
+$lines = ["[client]"];
+foreach ($values as $key => $value) {
+    $lines[] = $key."=\"".addcslashes($value, "\\\"")."\"";
+}
+file_put_contents($argv[2], implode("\n", $lines)."\n", LOCK_EX);
+chmod($argv[2], 0600);
+$name = $get("DB_DATABASE", "");
+if ($name === "" || str_contains($name, "\n") || str_contains($name, "\r") || str_contains($name, "\0")) {
+    fwrite(STDERR, "Database name is missing or invalid.\n");
+    exit(2);
+}
+file_put_contents($argv[3], $name, LOCK_EX);
+chmod($argv[3], 0600);
+' "$APP_DIR" "$BACKUP_TEMP_DIR/client.cnf" "$BACKUP_TEMP_DIR/database-name"
 
-MIGRATION_CHANGES="$(git diff --name-status "$CURRENT_COMMIT" "$REMOTE_COMMIT" -- database/migrations || true)"
+printf 'Environment: production\n'
 
-if [[ -n "$MIGRATION_CHANGES" ]]; then
-    printf 'Migrations:    changed\n'
-else
-    printf 'Migrations:    unchanged\n'
-fi
+DB_NAME="$(<"$BACKUP_TEMP_DIR/database-name")"
+BACKUP_IDENTIFIER="$(date -u +'%Y-%m-%d_%H-%M-%S')-${TARGET_COMMIT:0:12}"
+BACKUP_FILE="$BACKUP_TEMP_DIR/database.sql.gz"
+BACKUP_KEY="$BACKUP_S3_PREFIX/dancepro-db-$BACKUP_IDENTIFIER.sql.gz"
 
-log "Migration review"
+"$DUMP_COMMAND" \
+    --defaults-extra-file="$BACKUP_TEMP_DIR/client.cnf" \
+    --single-transaction \
+    --quick \
+    --routines \
+    --triggers \
+    --events \
+    --result-file="$BACKUP_TEMP_DIR/database.sql" \
+    -- "$DB_NAME"
 
-if [[ -n "$MIGRATION_CHANGES" ]]; then
-    printf '%s\n' "$MIGRATION_CHANGES"
-    printf '\nMigration diff:\n'
-    git diff "$CURRENT_COMMIT" "$REMOTE_COMMIT" -- database/migrations || true
-else
-    printf 'No migration files changed.\n'
-fi
+[[ -s "$BACKUP_TEMP_DIR/database.sql" ]] || fail "The database dump is empty."
+gzip -9 "$BACKUP_TEMP_DIR/database.sql"
+BACKUP_FILE="$BACKUP_TEMP_DIR/database.sql.gz"
+[[ -s "$BACKUP_FILE" ]] || fail "The compressed database backup is empty."
+gzip -t "$BACKUP_FILE"
 
-if [[ "$DRY_RUN" == true ]]; then
-    END_EPOCH="$(date +%s)"
-    DURATION="$(format_duration $((END_EPOCH - START_EPOCH)))"
+LOCAL_BACKUP_BYTES="$(stat -c %s "$BACKUP_FILE")"
+aws s3 cp "$BACKUP_FILE" "s3://$BACKUP_S3_BUCKET/$BACKUP_KEY" \
+    --region "$AWS_REGION" \
+    --no-progress \
+    --only-show-errors \
+    --metadata "deployment-commit=$TARGET_COMMIT"
 
-    log "Dry run complete"
+S3_BACKUP_BYTES="$(aws s3api head-object \
+    --bucket "$BACKUP_S3_BUCKET" \
+    --key "$BACKUP_KEY" \
+    --region "$AWS_REGION" \
+    --query ContentLength \
+    --output text)"
 
-    cat <<EOF
+[[ "$S3_BACKUP_BYTES" =~ ^[0-9]+$ ]] || fail "S3 returned an invalid backup size."
+[[ "$LOCAL_BACKUP_BYTES" == "$S3_BACKUP_BYTES" ]] || fail "The uploaded backup size does not match the local backup."
+printf 'Verified backup: s3://%s/%s (%s bytes)\n' "$BACKUP_S3_BUCKET" "$BACKUP_KEY" "$S3_BACKUP_BYTES"
 
-────────────────────────────────────────────────────────
-DancePro Deployment Dry Run
-────────────────────────────────────────────────────────
-Current commit:  $(git log -1 --oneline "$CURRENT_COMMIT")
-Target commit:   $(git log -1 --oneline "$REMOTE_COMMIT")
-Composer files:  $([[ "$COMPOSER_CHANGED" == true ]] && echo "changed" || echo "unchanged")
-Migration files: $([[ -n "$MIGRATION_CHANGES" ]] && echo "changed" || echo "unchanged")
-Elapsed time:    $DURATION
-Log file:        $DEPLOY_LOG_FILE
-Changes made:    none
-────────────────────────────────────────────────────────
-EOF
-
-    exit 0
-fi
-
-printf '\nA verified database backup should exist before continuing.\n'
-confirm "Deploy these changes to production?" || fail "Deployment cancelled."
-
-log "Create rollback tag"
-ROLLBACK_TAG="pre-deploy-$(date -u +'%Y%m%d-%H%M%S')"
-git tag "$ROLLBACK_TAG" "$CURRENT_COMMIT"
-printf 'Created local rollback tag: %s -> %s\n' "$ROLLBACK_TAG" "$CURRENT_COMMIT"
+cleanup
+BACKUP_TEMP_DIR=""
 
 log "Enable maintenance mode"
 if [[ -f resources/views/errors/503.blade.php ]]; then
     php artisan down --render="errors.503"
 else
-    printf 'Custom 503 view not present; using Laravel default maintenance response.\n'
     php artisan down
 fi
-DEPLOY_STARTED=true
+MAINTENANCE_ENABLED=true
 
-log "Update production branch"
-git pull --ff-only "$REMOTE" "$BRANCH"
-
-log "Production dependencies"
-
-if [[ "$COMPOSER_CHANGED" == true ]]; then
-    composer install \
-        --no-dev \
-        --optimize-autoloader \
-        --no-interaction \
-        --prefer-dist
-else
-    printf 'composer.json and composer.lock are unchanged.\n'
-    printf 'Skipping composer install.\n'
-fi
+log "Install locked production dependencies"
+composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
 
 log "Clear old Laravel caches"
 php artisan optimize:clear
 
-log "Review database migration status"
-php artisan migrate:status
-
-if [[ -n "$MIGRATION_CHANGES" ]]; then
-    printf '\nThis deployment contains migration-file changes.\n'
-    if confirm "Have you reviewed them and want to run pending migrations now?"; then
-        php artisan migrate --force
-    else
-        fail "Migration changes were not approved. Deployment stopped safely."
-    fi
-else
-    printf '\nNo migration files changed in this deployment.\n'
-    if confirm "Run pending migrations anyway?"; then
-        php artisan migrate --force
-    else
-        printf 'Skipping migrations.\n'
-    fi
+log "Run database migrations"
+if ! php artisan migrate --force; then
+    printf 'Migration failure: one or more migrations may have been partially applied.\n' >&2
+    fail "Database migration failed; automatic database restore is intentionally disabled."
 fi
 
 log "Rebuild production caches"
@@ -388,23 +280,20 @@ php artisan view:cache
 
 log "Verify public storage link"
 EXPECTED_STORAGE_TARGET="$APP_DIR/storage/app/public"
-
 if [[ -L public/storage ]]; then
     ACTUAL_STORAGE_TARGET="$(readlink -f public/storage || true)"
-    [[ "$ACTUAL_STORAGE_TARGET" == "$EXPECTED_STORAGE_TARGET" ]] || \
-        fail "public/storage points to '$ACTUAL_STORAGE_TARGET', expected '$EXPECTED_STORAGE_TARGET'."
-    printf 'Storage link already correct: public/storage -> %s\n' "$ACTUAL_STORAGE_TARGET"
+    [[ "$ACTUAL_STORAGE_TARGET" == "$EXPECTED_STORAGE_TARGET" ]] || fail "public/storage points to an unexpected target: $ACTUAL_STORAGE_TARGET"
 elif [[ -e public/storage ]]; then
-    fail "public/storage exists but is not a symbolic link. Inspect it manually."
+    fail "public/storage exists but is not a symbolic link."
 else
     php artisan storage:link
-    printf 'Storage link created.\n'
 fi
 
-log "Reload PHP-FPM"
-PHP_FPM_SERVICE=""
+log "Restart workers and reload PHP-FPM"
+php artisan queue:restart
 
-for candidate in php-fpm php8.5-fpm php85-php-fpm; do
+PHP_FPM_SERVICE=""
+for candidate in php-fpm php8.5-fpm php85-php-fpm php8.4-fpm php8.3-fpm; do
     if systemctl list-unit-files "$candidate.service" 2>/dev/null | grep -q "^$candidate.service"; then
         PHP_FPM_SERVICE="$candidate"
         break
@@ -412,91 +301,51 @@ for candidate in php-fpm php8.5-fpm php85-php-fpm; do
 done
 
 if [[ -n "$PHP_FPM_SERVICE" ]]; then
-    if sudo systemctl reload "$PHP_FPM_SERVICE"; then
-        printf 'Reloaded service: %s\n' "$PHP_FPM_SERVICE"
-    else
-        fail "Could not reload $PHP_FPM_SERVICE."
-    fi
+    sudo -n systemctl reload "$PHP_FPM_SERVICE" || fail "Could not reload $PHP_FPM_SERVICE without an interactive prompt."
+    printf 'Reloaded service: %s\n' "$PHP_FPM_SERVICE"
 else
-    warn "No recognised PHP-FPM service was found. Skipping reload."
+    printf 'WARNING: no recognised PHP-FPM service was found; no service was reloaded.\n'
 fi
 
-log "Final checks before reopening"
-
+log "Final integrity checks"
+[[ "$(git rev-parse HEAD)" == "$TARGET_COMMIT" ]] || fail "The deployed commit changed during deployment."
 if [[ -n "$(git status --porcelain)" ]]; then
     git status --short
-    fail "Deployment changed tracked or untracked repository files."
+    fail "Deployment changed files inside the Git working tree."
 fi
-
-php artisan about --only=environment
 
 log "Return application to service"
 php artisan up
+MAINTENANCE_ENABLED=false
 
 log "HTTP health check"
-HEALTHCHECK_ATTEMPTS=5
-HEALTHCHECK_DELAY_SECONDS=2
 HEALTHCHECK_OK=false
-
-for ((attempt=1; attempt<=HEALTHCHECK_ATTEMPTS; attempt++)); do
-    HTTP_STATUS="$(curl \
-        --silent \
-        --show-error \
-        --output /dev/null \
-        --write-out '%{http_code}' \
-        --max-time 10 \
-        "$HEALTHCHECK_URL" || true)"
-
-    printf 'Attempt %d/%d: HTTP %s\n' \
-        "$attempt" "$HEALTHCHECK_ATTEMPTS" "${HTTP_STATUS:-000}"
-
-    if [[ "$HTTP_STATUS" =~ ^(200|204|301|302)$ ]]; then
+for attempt in 1 2 3 4 5; do
+    HTTP_STATUS="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 10 "$HEALTHCHECK_URL" || true)"
+    printf 'Attempt %d/5: HTTP %s\n' "$attempt" "${HTTP_STATUS:-000}"
+    if [[ "$HTTP_STATUS" == "200" ]]; then
         HEALTHCHECK_OK=true
         break
     fi
-
-    sleep "$HEALTHCHECK_DELAY_SECONDS"
+    sleep 2
 done
 
 if [[ "$HEALTHCHECK_OK" != true ]]; then
     php artisan down --render="errors.503"
-    fail "Health check failed. The application was returned to maintenance mode."
+    MAINTENANCE_ENABLED=true
+    fail "Health check failed."
 fi
 
-DEPLOY_SUCCEEDED=true
+COMPLETED_AT="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+printf '{"commit":"%s","rollback_tag":"%s","backup_key":"%s","completed_at":"%s"}\n' \
+    "$TARGET_COMMIT" "$ROLLBACK_TAG" "$BACKUP_KEY" "$COMPLETED_AT" \
+    > "$DEPLOY_LOG_DIR/current-deployment.json"
 
 END_EPOCH="$(date +%s)"
-DURATION="$(format_duration $((END_EPOCH - START_EPOCH)))"
-DEPLOYED_COMMIT="$(git rev-parse HEAD)"
-LARAVEL_VERSION="$(php artisan --version | sed 's/^Laravel Framework //')"
-PHP_VERSION="$(php -r 'echo PHP_VERSION;')"
-
 log "Deployment successful"
-
-cat <<EOF
-
-────────────────────────────────────────────────────────
-DancePro Deployment Successful
-────────────────────────────────────────────────────────
-Application:    DancePro V2
-Laravel:        $LARAVEL_VERSION
-PHP:            $PHP_VERSION
-Branch:         $BRANCH
-Commit:         $(git log -1 --oneline "$DEPLOYED_COMMIT")
-Completed:      $(date -u +'%Y-%m-%d %H:%M:%S') UTC
-Duration:       $DURATION
-Rollback tag:   $ROLLBACK_TAG
-Deployment log: $DEPLOY_LOG_FILE
-Health check:   $HEALTHCHECK_URL
-Working tree:   clean
-────────────────────────────────────────────────────────
-EOF
-
-print_rollback_instructions
-
-printf '\nRecommended manual smoke tests:\n'
-printf '  - Sign in with an authorised account\n'
-printf '  - Open the competition media page\n'
-printf '  - Confirm the logo loads\n'
-printf '  - Create and open a download link\n'
-printf '  - Check recent logs: tail -50 storage/logs/laravel.log\n'
+printf 'Commit:         %s\n' "$TARGET_COMMIT"
+printf 'Rollback tag:   %s\n' "$ROLLBACK_TAG"
+printf 'Backup:         s3://%s/%s\n' "$BACKUP_S3_BUCKET" "$BACKUP_KEY"
+printf 'Health check:   %s\n' "$HEALTHCHECK_URL"
+printf 'Deployment log: %s\n' "$DEPLOY_LOG_FILE"
+printf 'Duration:       %s\n' "$(format_duration $((END_EPOCH - START_EPOCH)))"

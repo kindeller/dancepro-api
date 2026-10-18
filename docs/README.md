@@ -29,6 +29,7 @@ Start with:
 - [Remote Development](handbook/Remote-Development.md)
 - [Remote Development Cheat Sheet](handbook/Remote-Development-Cheat-Sheet.md)
 - [Git Workflow](handbook/Git-Workflow.md)
+- [Production Deployment](handbook/Deployment.md)
 - [Architecture](handbook/Architecture.md)
 - [API Guidelines](handbook/API-Guidelines.md)
 - [DancePro V1 S3 Structure](handbook/V1-S3-Structure.md)
@@ -98,6 +99,7 @@ Current records:
 - [ADR-0001 - Generic Downloads Bounded Context](decisions/ADR-0001-Generic-Downloads-Bounded-Context.md)
 - [ADR-0002 - Concert Media Storage and Playback](decisions/ADR-0002-Concert-Media-Storage-and-Playback.md)
 - [ADR-0003 - Desktop Media Ingest and Assignment](decisions/ADR-0003-Desktop-Media-Ingest-and-Assignment.md)
+- [ADR-0007 - Commit-Pinned Two-Stage Production Deployment](decisions/ADR-0007-Commit-Pinned-Two-Stage-Production-Deployment.md)
 
 ## Documentation Principle
 

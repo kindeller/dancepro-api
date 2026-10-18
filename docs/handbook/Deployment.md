@@ -1,464 +1,306 @@
-# Deployment
+# Production Deployment
 
-This document describes the deployment process for the DancePro API.
+DancePro API production deployments use GitHub Actions, AWS Systems Manager
+(SSM), and a two-stage EC2 deployment process. The production `.env`, runtime
+keys, AWS instance-role credentials, logs, and database backups remain outside
+Git.
 
-The project is developed locally using Docker/Sail and deployed to a Linux
-production server running PHP 8.3+ with Laravel 13. These are minimum PHP and
-framework requirements, not a claim that local Sail and production run the same
-PHP patch version. Verify the actual versions with `php -v` and
-`php artisan --version` on each environment before deploying.
+Automatic deployment on merge is deliberately **not enabled yet**. The checked-in
+workflow supports manual dispatch only until the readiness checklist in this
+document has been completed and approved.
 
-The production server retains its own environment configuration. Sensitive values such as application keys, database credentials and AWS credentials are **never committed to the repository**.
+## Current State
 
----
+The following infrastructure was reported as established before this repository
+change, but still requires production validation:
 
-# Deployment Workflow
+- EC2 instance `i-09a5f7c942155e96a` in `ap-southeast-2`.
+- Application checkout `/var/www/dancepro-api` on branch `master`.
+- An online SSM managed node and the `DancePro-Deploy-Production` Command
+  document.
+- GitHub's OIDC provider and IAM role `DancePro-GitHub-Deploy-Role`.
+- S3 database-backup bucket `dance-pro-db-backup` and existing retention
+  arrangements.
 
-The intended deployment workflow is:
+This repository now contains the stable launcher source, the application deploy
+script, the proposed SSM document, a manual-only production workflow, and safe
+isolated shell tests. No AWS resource, EC2 configuration, production file,
+database, or GitHub repository setting is changed merely by merging these files.
 
-1. Develop and test locally using Docker/Sail.
-2. Commit changes to a feature branch.
-3. Push to GitHub.
-4. Open and review a Pull Request; run the required Sail checks locally.
-5. Merge into `master`.
-6. Create and verify a production database backup on EC2.
-7. Run `dancepro-deploy --dry-run` and review the proposed changes.
-8. Run `dancepro-deploy` on EC2.
-9. Perform a production smoke test.
+## Architecture
 
-The checked-in [deployment script](../../scripts/dancepro-deploy.sh) requires a
-clean `master` checkout and deploys `origin/master`. The Git branch is independent
-of PHP/Laravel versions. If the repository later adopts `main`, update and test
-the script and this handbook together before changing the production branch.
-
----
-
-# Production Environment
-
-The production server should provide:
-
-- PHP 8.3+
-- Composer
-- Apache
-- Git
-- MySQL or MariaDB dump client
-- AWS CLI
-- Required PHP extensions
-- Laravel writable directories
-- Production `.env` configuration
-
-The production `.env` file is maintained only on the server.
-
-It must never be committed to Git.
-
----
-
-# Pre-Deployment Database Backup
-
-While the production MySQL/MariaDB database is hosted on the EC2 application
-server, create a compressed logical backup before each deployment. The deployment
-script does **not** create or upload this backup; its confirmation prompt only
-reminds the operator that a verified backup should already exist. This is a
-manual step until a separately tested backup automation is added.
-
-Use the existing `dance-pro-db-backup` bucket, after confirming that its access
-and encryption settings meet the production backup policy. The bucket name is
-an identifier, not a credential. The EC2 instance needs permission to write a
-new object there and read its metadata. Do not place AWS keys in these commands.
-Uploads incur S3 storage and request charges; retain and restore-test backups
-under the bucket's established retention policy.
-
-## Check the database and tools
-
-From `/var/www/dancepro-api` on the production EC2 instance:
-
-```bash
-php artisan about --only=environment
-grep -E '^DB_(CONNECTION|HOST|PORT|DATABASE|USERNAME)=' .env
-command -v mariadb-dump || command -v mysqldump
-aws --version
+```text
+approved master commit (GitHub SHA)
+              |
+              v
+GitHub Actions tests and OIDC role assumption
+              |
+              v
+SSM DancePro-Deploy-Production(TargetCommit)
+              |
+              v
+/usr/local/bin/dancepro-deploy <TargetCommit>
+  - independent, root-owned launcher
+  - lock, logs, repository and ancestry checks
+  - fast-forward to the exact approved SHA
+              |
+              v
+scripts/dancepro-deploy.sh from that SHA
+  - environment and database checks
+  - verified database backup to S3
+  - maintenance, dependencies, migrations and caches
+  - services, health check and deployment record
 ```
 
-Confirm `DB_CONNECTION` is `mysql` or `mariadb`, and that the dump client can
-connect to the **same** database as Laravel. Do not display or paste
-`DB_PASSWORD`. The commands below request the password interactively; obtain it
-through the server's approved access method. If the server uses a socket or a
-configured client option file instead of password authentication, adapt the
-connection flags to match and verify the selected database before dumping.
+The launcher is copied out of the repository so an update cannot replace the
+process currently changing the checkout. Application behaviour remains in the
+version-controlled script and changes through the normal pull request process.
 
-## Create and check the local dump
+The launcher accepts only a lowercase full SHA. It requires the requested commit
+to be an ancestor of `origin/master` and the current production commit to be an
+ancestor of the target. It never merges divergent history, rebases, resets, or
+overwrites local changes. GitHub waits for the terminal SSM plugin status;
+acceptance of `SendCommand` alone is not success. GitHub and EC2 both prevent
+overlapping deployments.
 
-Set the non-secret values from the production configuration. Keep the dump out
-of the Git checkout and restrict its permissions:
+## Database Backup Gate
 
-```bash
-set -o pipefail
-umask 077
-BACKUP_TIMESTAMP=$(date -u +'%Y-%m-%d_%H-%M-%S-%N')
-BACKUP_FILE="/tmp/dancepro-db-${BACKUP_TIMESTAMP}.sql.gz"
-test ! -e "$BACKUP_FILE" || { echo 'Backup file already exists; stop' >&2; exit 1; }
-DB_HOST_VALUE='<DB_HOST>'
-DB_PORT_VALUE='<DB_PORT>'
-DB_USER_VALUE='<DB_USERNAME>'
-DB_NAME_VALUE='<DB_DATABASE>'
+Every live invocation performs a backup before maintenance mode, Composer, or
+migrations:
+
+1. Laravel's installed Dotenv library reads the server-only `.env` without
+   booting the newly updated application. It requires `APP_ENV=production`, a
+   MySQL/MariaDB connection, and discrete `DB_*` values rather than `DB_URL`.
+2. PHP writes a mode-`0600` temporary client file. The password is never put in
+   a command argument or printed. The successful dump is the connectivity test.
+3. `mariadb-dump` is preferred, with `mysqldump` as fallback. The dump uses a
+   single transaction and includes routines, triggers, and events.
+4. The script requires non-empty SQL, compresses it, and runs `gzip -t`.
+5. It uploads with the EC2 instance role to
+   `s3://dance-pro-db-backup/deployments/dancepro-db-<UTC>-<commit>.sql.gz`.
+6. `head-object` must report the same non-zero byte count before deployment.
+7. Restricted temporary files are removed by the exit trap.
+
+A size match confirms transfer completeness, not restorability. Periodically
+restore into an isolated nonproduction database and record the rehearsal. The
+existing S3 retention, encryption, versioning, and lifecycle arrangements were
+not changed here and require separate review. Never automatically restore after
+a failed migration: migrations can be partially applied and a restore can lose
+production writes made after the snapshot.
+
+## One-Time EC2 Migration
+
+These are manual production changes that Codex has not executed. Perform them
+during an approved maintenance window.
+
+1. Confirm the checkout is clean, on `master`, and uses the authorised remote:
+
+   ```bash
+   cd /var/www/dancepro-api
+   sudo -u ec2-user git status --short --branch
+   sudo -u ec2-user git remote get-url origin
+   ```
+
+2. Verify Git authentication is noninteractive:
+
+   ```bash
+   sudo -u ec2-user env GIT_TERMINAL_PROMPT=0 git ls-remote origin refs/heads/master
+   ```
+
+   Keep any deploy key or Git credential outside the repository and read-only.
+   GitHub Actions uses OIDC and needs no permanent AWS access key or SSH key.
+
+3. Replace the current symlink with an independently installed, root-owned copy:
+
+   ```bash
+   cd /var/www/dancepro-api
+   sudo install -o root -g root -m 0755 \
+       scripts/dancepro-deploy-launcher.sh \
+       /usr/local/bin/dancepro-deploy.new
+   sudo mv /usr/local/bin/dancepro-deploy.new /usr/local/bin/dancepro-deploy
+   sudo test -f /usr/local/bin/dancepro-deploy
+   sudo test ! -L /usr/local/bin/dancepro-deploy
+   ```
+
+4. Create independent lock and log locations:
+
+   ```bash
+   sudo install -d -o ec2-user -g ec2-user -m 0750 /var/log/dancepro-deploy
+   sudo touch /var/lock/dancepro-deploy.lock
+   sudo chown ec2-user:ec2-user /var/lock/dancepro-deploy.lock
+   sudo chmod 0640 /var/lock/dancepro-deploy.lock
+   ```
+
+5. Confirm `storage/` and `bootstrap/cache/` are writable by `ec2-user` and the
+   web-service group. Never use mode `0777`.
+
+6. Identify the installed PHP-FPM service. If it exists, grant only its exact
+   reload command in `/etc/sudoers.d/dancepro-deploy`, checked with `visudo -cf`:
+
+   ```text
+   ec2-user ALL=(root) NOPASSWD: /usr/bin/systemctl reload php-fpm.service
+   ```
+
+   Confirm the binary path and service first; do not grant unrestricted `sudo`
+   or guessed service names. If PHP-FPM is not used, no reload grant is needed.
+
+7. Verify `git`, PHP 8.3+, Composer, `curl`, `gzip`, AWS CLI v2,
+   `mariadb-dump` or `mysqldump`, `flock`, and `systemctl` are available.
+
+8. Verify SSM Agent is at least `3.3.2746.0`. The proposed document uses SSM
+   `ENV_VAR` interpolation so the SHA is data rather than shell source.
+
+## Required AWS and GitHub Changes
+
+These remain manual and must be reviewed before production testing.
+
+### SSM document
+
+Replace the current parameterless content with
+`deployment/aws/ssm/DancePro-Deploy-Production.yaml`. This explicit document
+change adds required `TargetCommit`, restricts it to `^[0-9a-f]{40}$`, invokes
+the stable launcher as `ec2-user`, and preserves the 1,800-second timeout.
+
+Review the new document version, make it default only for the controlled test,
+and retain the previous version for recovery. Never add a free-form command
+parameter.
+
+### GitHub OIDC role
+
+Verify the trust policy requires audience `sts.amazonaws.com` and subject
+`repo:kindeller/dancepro-api:ref:refs/heads/master`. If the repository owner is
+not `kindeller`, use the exact owner. The workflow does not use a GitHub
+Environment, so do not use an environment-form subject without reviewing both
+designs.
+
+The role should allow `ssm:SendCommand` only for the production instance and
+the `DancePro-Deploy-Production` document, plus minimum read actions for command
+status and output. Some SSM result APIs may require `Resource: "*"`; keep their
+action list narrow rather than broadening `SendCommand`. Validate the effective
+policy with IAM Access Analyzer.
+
+### EC2 instance role
+
+In addition to managed-node permissions, it needs:
+
+- `s3:PutObject` on `arn:aws:s3:::dance-pro-db-backup/deployments/*`;
+- `s3:GetObject` on that prefix so `HeadObject` can verify uploads;
+- required KMS actions if the bucket uses a customer-managed key.
+
+It needs no S3 delete, lifecycle, bucket-policy, or protection-changing access.
+Confirm the bucket policy permits the role and enforces established encryption.
+
+### GitHub repository
+
+Create repository variable `AWS_DEPLOY_ROLE_ARN` with the complete ARN of
+`DancePro-GitHub-Deploy-Role`. This identifier is not a static credential.
+
+The workflow currently has only `workflow_dispatch`. After all testing below,
+enable merge deployment in a separate reviewed pull request by adding:
+
+```yaml
+push:
+  branches:
+    - master
 ```
 
-Replace the four placeholders with the values shown above. If only `mysqldump`
-is installed, substitute that command for `mariadb-dump`. Then run:
+Keep the concurrency group and `cancel-in-progress: false` so later merges queue
+behind an active deployment.
+
+## Failure Recovery
+
+Launcher logs are under `/var/log/dancepro-deploy/`; application logs and the
+successful `current-deployment.json` record are under
+`storage/logs/deployments/`.
+
+- Fetch, validation, dirty-tree, ancestry, or lock failure stops before the
+  application script.
+- Backup or upload failure stops before maintenance mode and migrations.
+- Dependency, migration, cache, reload, or integrity failure leaves maintenance
+  mode enabled for diagnosis.
+- Health-check failure returns the site to maintenance mode.
+- Every failure exits non-zero through SSM and GitHub.
+
+The launcher does not automatically reset Git and never automatically restores
+the database. New code may already have run migrations, so either action needs
+operator review. For an approved code-only rollback:
 
 ```bash
-if mariadb-dump \
-    --host="$DB_HOST_VALUE" \
-    --port="$DB_PORT_VALUE" \
-    --user="$DB_USER_VALUE" \
-    --password \
-    --single-transaction \
-    --quick \
-    --routines \
-    --triggers \
-    --events \
-    "$DB_NAME_VALUE" | gzip > "$BACKUP_FILE"; then
-    echo 'Database dump completed'
-else
-    echo 'Database dump failed; stop the deployment' >&2
-    exit 1
-fi
-
-test -s "$BACKUP_FILE" && gzip -t "$BACKUP_FILE"
-stat -c 'Local backup size: %s bytes' "$BACKUP_FILE"
-```
-
-`set -o pipefail` makes a dump failure fail the pipeline even if `gzip` exits
-successfully. `--single-transaction` gives a consistent snapshot for
-transactional tables such as InnoDB; avoid schema changes during the dump and
-review any nontransactional tables separately. The application can stay online
-for this snapshot, but writes after the snapshot will not exist in a restore.
-Stop if the dump, size check or gzip check fails. A small dump compared with
-previous backups needs investigation before proceeding.
-
-## Upload and verify the exact object
-
-```bash
-BACKUP_KEY=$(basename "$BACKUP_FILE")
-aws s3 cp "$BACKUP_FILE" "s3://dance-pro-db-backup/$BACKUP_KEY" --no-progress
-LOCAL_BYTES=$(stat -c %s "$BACKUP_FILE")
-if S3_BYTES=$(aws s3api head-object \
-    --bucket dance-pro-db-backup \
-    --key "$BACKUP_KEY" \
-    --query ContentLength \
-    --output text) && \
-    test "$LOCAL_BYTES" -gt 0 && test "$LOCAL_BYTES" = "$S3_BYTES"; then
-    printf 'Verified backup: s3://dance-pro-db-backup/%s (%s bytes)\n' "$BACKUP_KEY" "$S3_BYTES"
-else
-    echo 'S3 backup verification failed; keep the local file and stop deployment' >&2
-    exit 1
-fi
-```
-
-`head-object` checks the exact key without requiring permission to list the
-whole bucket. Record the key and `git rev-parse HEAD` in the deployment record.
-The size check detects an incomplete upload; it does not prove that SQL will
-restore successfully. Retain the local file if upload or verification fails and
-stop the deployment. After successful verification, remove the temporary EC2
-copy using `rm -f "$BACKUP_FILE"` and confirm it is gone with
-`test ! -e "$BACKUP_FILE"`.
-
-Run `dancepro-deploy --dry-run`, review the commits and migration diff, then run
-`dancepro-deploy`. The dry run fetches remote Git metadata and writes a
-deployment log; it leaves the application, database, checked-out code and
-services unchanged. The live script creates a rollback tag, enters maintenance
-mode, updates code, and prompts before running migrations. It leaves the site
-in maintenance mode if deployment fails after that point.
-
-Periodically restore a downloaded backup into an isolated nonproduction database
-to test recoverability. A production restore is a separate recovery operation:
-review the backup timestamp, application commit, migration state, and customer
-data written since the dump before replacing any live database.
-
----
-
-# Deployment Steps
-
-For normal production updates, use `dancepro-deploy` after the verified backup
-and dry run above. Its underlying operations include:
-
-```bash
-composer install \
-    --no-dev \
-    --prefer-dist \
-    --optimize-autoloader \
-    --no-interaction
-
-php artisan migrate --force
-
+cd /var/www/dancepro-api
+php artisan down --render=errors.503
+git show --no-patch <pre-deploy-tag>
+git reset --hard <pre-deploy-tag>
+composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 php artisan optimize:clear
-
 php artisan config:cache
+php artisan event:cache
 php artisan route:cache
 php artisan view:cache
+sudo -n systemctl reload <verified-php-fpm-service>
+curl --fail --max-time 10 http://127.0.0.1/up
+php artisan up
 ```
 
-If queue workers are used:
+Review migrations, customer writes, the exact tag, and backup first. A Git reset
+is destructive to the checkout and is not an automatic deployment action.
+
+## Manual Emergency Deployment
+
+Use the launcher so all normal safeguards remain active:
 
 ```bash
-php artisan queue:restart
+TARGET_COMMIT=<approved-full-master-sha>
+/usr/local/bin/dancepro-deploy --dry-run "$TARGET_COMMIT"
+/usr/local/bin/dancepro-deploy "$TARGET_COMMIT"
 ```
 
-The script does not currently restart queue workers, so handle this separately
-when production workers exist. It also does not build Vite assets; confirm the
-matching frontend build is present before exposing new concert-player changes.
+Do not invoke `scripts/dancepro-deploy.sh` directly. Updating application logic
+uses a normal pull request. Updating the launcher is exceptional: review its
+tests, schedule a window, install atomically, and record its checksum.
 
----
+## Safe Activation Plan
 
-# File Permissions
+1. **Static validation:** run `bash -n` on both scripts,
+   `bash tests/Deployment/deployment-scripts.sh`, `sail artisan test`, and
+   `sail pint --test`.
+2. **Local dry-run:** use the isolated shell suite; it creates temporary local
+   Git repositories and makes no AWS calls. Review workflow syntax separately.
+3. **EC2 installation:** perform the one-time migration and run launcher
+   `--dry-run` with the current approved SHA. Verify locks and logs.
+4. **SSM test:** install a reviewed document version and invoke it with the
+   already-deployed SHA. This live-script test still creates an S3 backup, so
+   schedule and monitor it as a production deployment test.
+5. **OIDC test:** confirm only the intended repository and `master` can assume
+   the role, and that the role cannot target another instance or document.
+6. **Manual workflow:** set `AWS_DEPLOY_ROLE_ARN`, dispatch from `master`, type
+   `DEPLOY`, and verify tests, SHA, SSM output, backup, health, and smoke tests.
+7. **Automatic activation:** after owner approval, add the `push` trigger in a
+   reviewed pull request and monitor the first low-risk merge end to end.
 
-Apache must be able to write to:
+Do not proceed after a failed stage.
 
-```text
-storage/
-bootstrap/cache/
-```
+## Production Smoke Tests
 
-Typical ownership:
+Verify `/up`, authentication, competition listings and downloads, public
+concert discovery, authorised concert playback and seeking, original downloads,
+branding assets, and an authorised staff media upload/finalisation. Confirm
+unsigned private media remains inaccessible and inspect recent logs without
+copying credentials or signed URLs into tickets.
 
-```bash
-sudo chown -R ec2-user:apache storage bootstrap/cache
-```
+## Known Limits
 
-Typical permissions:
-
-```bash
-find storage bootstrap/cache -type d -exec chmod 775 {} \;
-find storage bootstrap/cache -type f -exec chmod 664 {} \;
-```
-
-Never use `chmod -R 777`.
-
----
-
-# Environment Changes
-
-Whenever the production `.env` file changes:
-
-```bash
-php artisan optimize:clear
-php artisan config:cache
-```
-
-Do not rely on `env()` values during runtime.
-
-Laravel should access configuration using the `config()` helper.
-
----
-
-# AWS Configuration
-
-The production environment requires valid AWS credentials.
-
-Competition storage uses the `s3_competitions` filesystem disk. Concert media
-uses `s3_concerts`, while unmigrated V1 concert media may use
-`s3_concerts_legacy`. Production credentials should be scoped to the required
-bucket and operations for each domain.
-
-The following values must be configured:
-
-```text
-AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY
-AWS_DEFAULT_REGION
-
-AWS_COMPETITIONS_ACCESS_KEY_ID
-AWS_COMPETITIONS_SECRET_ACCESS_KEY
-AWS_COMPETITIONS_DEFAULT_REGION
-AWS_COMPETITIONS_BUCKET
-
-AWS_CONCERT_ACCESS_KEY_ID
-AWS_CONCERT_SECRET_ACCESS_KEY
-AWS_CONCERT_DEFAULT_REGION
-AWS_CONCERT_BUCKET
-
-AWS_CONCERT_LEGACY_ACCESS_KEY_ID
-AWS_CONCERT_LEGACY_SECRET_ACCESS_KEY
-AWS_CONCERT_LEGACY_DEFAULT_REGION
-AWS_CONCERT_LEGACY_BUCKET
-
-CONCERT_PLAYBACK_SIGNED_URL_TTL_MINUTES
-CLOUDFRONT_CONCERT_DOMAIN
-CLOUDFRONT_CONCERT_KEY_PAIR_ID
-CLOUDFRONT_CONCERT_PRIVATE_KEY_PATH
-CLOUDFRONT_CONCERT_COOKIE_DOMAIN
-
-DOWNLOAD_ALLOWED_DISKS
-DOWNLOAD_DEFAULT_DISK
-DOWNLOAD_SIGNED_URL_TTL_MINUTES
-```
-
-When CloudFront signing is enabled, production also requires the configured
-distribution domain, key-pair ID and private key or readable private-key path
-described in [AWS](AWS.md). Private-key contents must remain outside source
-control. The standard file-based configuration uses
-`CLOUDFRONT_CONCERT_PRIVATE_KEY_PATH=app/private/keys/dancepro-concerts-private.pem`;
-Laravel resolves this relative to `storage_path()`. The deployment process must
-place the key at that runtime location without adding it to the deployment
-artifact or Git repository.
-
-The configured region should always resolve to:
-
-```text
-ap-southeast-2
-```
-
-A missing region will prevent Laravel from constructing the AWS S3 client.
-
----
-
-# Deployment Validation
-
-Following deployment, validate:
-
-```bash
-php artisan about
-```
-
-Verify:
-
-- Production environment
-- Debug disabled
-- Correct database connection
-- Correct filesystem configuration
-
-Check both storage disks:
-
-```bash
-php artisan tinker
-```
-
-```php
-config('filesystems.disks.s3_competitions.region');
-config('filesystems.disks.s3_concerts.region');
-config('filesystems.disks.s3_concerts_legacy.region');
-
-Storage::disk('s3_competitions')->directories('');
-Storage::disk('s3_concerts')->directories('');
-Storage::disk('s3_concerts_legacy')->directories('');
-```
-
-The regions should resolve correctly and both configured buckets should be
-accessible with their production credentials.
-
-When CloudFront concert delivery is configured, also verify that Laravel can
-generate short-lived playback cookies and a short-lived attachment URL without
-logging or displaying private signing material.
-Before publishing concert video, verify the CloudFront behavior requires signed
-requests and that the S3 origin cannot be read directly. Test an unsigned MP4
-CloudFront URL and its direct S3 URL; both must be denied. Test a signed MP4 URL
-and byte-range seeking from an authorised concert session. Assets on the legacy
-disk are not routed through the new concert distribution.
-
-When the Flutter media API is deployed, use a synthetic asset to verify that an
-active staff media token can reserve an asset and obtain prefix-constrained
-upload requests, while customer and unrelated tokens receive `403`. Confirm
-that uploaded checksums are validated, incomplete multipart upload can resume,
-finalisation is idempotent and no bearer token or presigned query string appears
-in logs.
-For the staff web uploader, verify that a session-authenticated staff member
-can reserve a test asset, upload both MP4 versions directly to S3, finalise it,
-make it visible and publish its collection. Confirm a customer cannot access
-the admin page or media actions. S3 CORS must permit the admin origin's `PUT`
-requests and expose `ETag`; the browser should not send video bytes to PHP.
-
----
-
-# Smoke Tests
-
-Following deployment, verify:
-
-- Application loads.
-- Authentication succeeds.
-- Competition objects are listed.
-- Download links are generated.
-- Downloads complete successfully.
-- Public studios and available concerts are listed.
-- Password-protected concert access succeeds and failed attempts are handled.
-- A concert playlist loads and advances to the next video.
-- Desktop and mobile playback can seek when using the production media path.
-- The player handles an unavailable or expired media URL safely.
-- Concert originals use tracking links and download as attachments.
-- A synthetic fallback-only MP4 can be uploaded, assigned and played without an
-  HLS manifest.
-- A synthetic 720p/480p HLS package uploads its master manifest last and plays
-  through CloudFront.
-- The packaged macOS Flutter client stores its bearer token in Keychain and
-  contains no embedded AWS access key.
-- Disabled, unavailable or unapproved concerts remain inaccessible.
-- A studio cover, concert cover and PDF program can be uploaded, viewed,
-  replaced and cleared against the configured concert bucket. Check the
-  production PHP and web-server upload limits before testing a 10 MB file.
-
----
-
-# Restore and Future Database Hosting
-
-An object in S3 is only a usable recovery point after a successful restore
-rehearsal. Periodically download a backup into an isolated, nonproduction
-environment, run `gzip -t`, restore it into a fresh database, and check expected
-tables, row counts and application behaviour. Never rehearse against production.
-
-Before a production restore, identify the backup key and UTC timestamp, the Git
-commit deployed when it was made, all migrations applied since then, and any
-customer data written afterward. Restoring an older dump replaces that later
-database activity. Reverting Git alone does not revert migrations or S3 objects.
-
-If production moves to Amazon RDS, replace this EC2 dump procedure with a tested
-RDS backup and recovery plan, including retention, point-in-time recovery,
-encryption, monitoring and periodic restores. A deployment backup remains a
-separate decision from routine database protection.
-
----
-
-# Automated Deployment
-
-The long-term deployment strategy is:
-
-```
-Developer
-        │
-        ▼
-Feature Branch
-        │
-        ▼
-Pull Request
-        │
-        ▼
-GitHub Actions
-        │
-        ▼
-Run Tests
-        │
-        ▼
-Merge to master
-        │
-        ▼
-Deploy to EC2
-        │
-        ▼
-Production Smoke Tests
-```
-
-GitHub Actions should eventually perform the deployment automatically by connecting to the EC2 instance and executing the production deployment script.
-
-That automation is a future plan, not a current deployment check. It must also
-create and verify a database backup before running migrations while MySQL or
-MariaDB remains local to EC2. After a move to RDS, replace this logical-dump
-procedure with a tested RDS backup and recovery plan.
-
-The production `.env` file should remain on the EC2 instance and should not be recreated during deployment.
-
----
+- Deployment uses an in-place fast-forward rather than immutable releases. The
+  independent launcher prevents executing a partially updated deploy script;
+  release-directory switching would be a separate project.
+- Backup verification covers gzip integrity and exact object size. Only a
+  restore rehearsal proves recoverability.
+- Code rollback does not reverse migrations or S3 object changes.
+- Retention, Git authentication, service names, IAM, SSM Agent version, and
+  production health behaviour need manual validation before activation.
 
 ## Related Documentation
 
-- [Development Environment](Development-Environment.md)
+- [ADR-0007 - Commit-Pinned Two-Stage Production Deployment](../decisions/ADR-0007-Commit-Pinned-Two-Stage-Production-Deployment.md)
 - [Git Workflow](Git-Workflow.md)
 - [Security](Security.md)
 - [Testing](Testing.md)

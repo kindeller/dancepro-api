@@ -1,0 +1,29 @@
+schemaVersion: '2.2'
+description: 'Deploy an approved DancePro API master commit to production'
+parameters:
+  TargetCommit:
+    type: String
+    description: 'Exact lowercase 40-character commit SHA to deploy'
+    interpolationType: ENV_VAR
+    allowedPattern: '^[0-9a-f]{40}$'
+mainSteps:
+  - action: aws:runShellScript
+    name: deployDancePro
+    precondition:
+      StringEquals:
+        - platformType
+        - Linux
+    inputs:
+      timeoutSeconds: '1800'
+      runCommand:
+        - |
+          set -Eeuo pipefail
+          test -n "${SSM_TargetCommit:-}" || {
+              echo 'TargetCommit was not provided through SSM environment interpolation.' >&2
+              exit 2
+          }
+          [[ "$SSM_TargetCommit" =~ ^[0-9a-f]{40}$ ]] || {
+              echo 'TargetCommit is invalid.' >&2
+              exit 2
+          }
+          exec sudo -n -u ec2-user -- /usr/local/bin/dancepro-deploy "$SSM_TargetCommit"

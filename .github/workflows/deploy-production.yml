@@ -1,0 +1,196 @@
+name: Deploy production
+
+# Automatic deployment is intentionally disabled until the production readiness
+# checklist in docs/handbook/Deployment.md has been completed. To activate it,
+# retain workflow_dispatch and add:
+#   push:
+#     branches:
+#       - master
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type DEPLOY to run the production deployment from master'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dancepro-production-deployment
+  cancel-in-progress: false
+
+jobs:
+  validate-request:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require master and explicit manual confirmation
+        shell: bash
+        env:
+          DEPLOY_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -Eeuo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/master" ]] || {
+              echo 'Production deployments must run from master.' >&2
+              exit 1
+          }
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "$DEPLOY_CONFIRMATION" != "DEPLOY" ]]; then
+              echo 'Manual deployment confirmation did not match DEPLOY.' >&2
+              exit 1
+          fi
+
+  test:
+    needs: validate-request
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the approved commit
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate deployment scripts
+        run: bash tests/Deployment/deployment-scripts.sh
+
+      - name: Create local test environment
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          cp .env.example .env
+
+          replace_env_value() {
+              local env_key="$1"
+              local env_value="$2"
+              local match_count
+
+              match_count="$(grep -Ec "^#?[[:space:]]*${env_key}=" .env)"
+              [[ "$match_count" == "1" ]] || {
+                  echo "Expected exactly one ${env_key} entry in .env.example; found ${match_count}." >&2
+                  exit 1
+              }
+
+              sed -Ei "s|^#?[[:space:]]*${env_key}=.*$|${env_key}=${env_value}|" .env
+          }
+
+          replace_env_value DB_CONNECTION mysql
+          replace_env_value DB_HOST mysql
+          replace_env_value DB_PORT 3306
+          replace_env_value DB_DATABASE testing
+          replace_env_value DB_USERNAME sail
+          replace_env_value DB_PASSWORD password
+
+      - name: Install dependencies through the Sail Composer image
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --volume "$PWD:/var/www/html" \
+            --workdir /var/www/html \
+            laravelsail/php85-composer:latest \
+            composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Start Sail
+        run: ./vendor/bin/sail up -d
+
+      - name: Prepare Laravel
+        run: ./vendor/bin/sail artisan key:generate
+
+      - name: Run Laravel tests
+        run: ./vendor/bin/sail artisan test
+
+      - name: Stop Sail
+        if: always()
+        run: ./vendor/bin/sail down -v
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ap-southeast-2
+      INSTANCE_ID: i-09a5f7c942155e96a
+      SSM_DOCUMENT: DancePro-Deploy-Production
+    steps:
+      - name: Configure AWS credentials through GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: dancepro-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Send commit-pinned deployment command and wait for completion
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          command_id="$(aws ssm send-command \
+              --region "$AWS_REGION" \
+              --document-name "$SSM_DOCUMENT" \
+              --instance-ids "$INSTANCE_ID" \
+              --parameters "TargetCommit=$GITHUB_SHA" \
+              --comment "DancePro GitHub run $GITHUB_RUN_ID attempt $GITHUB_RUN_ATTEMPT" \
+              --timeout-seconds 1800 \
+              --query 'Command.CommandId' \
+              --output text)"
+
+          [[ "$command_id" != "None" && -n "$command_id" ]] || {
+              echo 'Systems Manager did not return a command ID.' >&2
+              exit 1
+          }
+
+          echo "SSM command ID: $command_id"
+          status="Pending"
+
+          for attempt in $(seq 1 210); do
+              if status="$(aws ssm get-command-invocation \
+                  --region "$AWS_REGION" \
+                  --command-id "$command_id" \
+                  --instance-id "$INSTANCE_ID" \
+                  --plugin-name deployDancePro \
+                  --query Status \
+                  --output text 2>/dev/null)"; then
+                  echo "SSM status: $status"
+                  case "$status" in
+                      Success)
+                          break
+                          ;;
+                      Pending|InProgress|Delayed)
+                          ;;
+                      *)
+                          break
+                          ;;
+                  esac
+              else
+                  echo 'SSM invocation is not available yet.'
+              fi
+              sleep 10
+          done
+
+          echo '--- SSM standard output ---'
+          aws ssm get-command-invocation \
+              --region "$AWS_REGION" \
+              --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" \
+              --plugin-name deployDancePro \
+              --query StandardOutputContent \
+              --output text || true
+
+          echo '--- SSM standard error ---'
+          aws ssm get-command-invocation \
+              --region "$AWS_REGION" \
+              --command-id "$command_id" \
+              --instance-id "$INSTANCE_ID" \
+              --plugin-name deployDancePro \
+              --query StandardErrorContent \
+              --output text || true
+
+          [[ "$status" == "Success" ]] || {
+              echo "Production deployment did not succeed; final status: $status" >&2
+              exit 1
+          }
+
+          echo "Production deployed commit $GITHUB_SHA successfully."
