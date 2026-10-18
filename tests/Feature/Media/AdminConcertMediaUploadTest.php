@@ -23,7 +23,7 @@ class AdminConcertMediaUploadTest extends TestCase
     {
         $concert = Concert::factory()->create();
 
-        $this->actingAs(User::factory()->create())
+        $this->actingAs(User::factory()->customer()->create())
             ->get(route('admin.concerts.media.index', $concert))->assertForbidden();
         $this->withHeader('Idempotency-Key', (string) Str::uuid())
             ->postJson(route('admin.media-api.collections.store', $concert), [
@@ -63,7 +63,8 @@ class AdminConcertMediaUploadTest extends TestCase
         $url = route('admin.media-api.collections.update', $collection);
 
         $this->actingAs($staff)->patchJson($url, ['status' => 'published'])
-            ->assertUnprocessable();
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('status');
 
         MediaAsset::factory()->for($collection, 'collection')->create([
             'media_type' => MediaType::Video,
@@ -127,7 +128,8 @@ class AdminConcertMediaUploadTest extends TestCase
 
         $this->actingAs(User::factory()->staff()->create())
             ->get(route('admin.concerts.media.collections.confirm-delete', $collection))
-            ->assertUnprocessable();
+            ->assertRedirect()
+            ->assertSessionHasErrors('storage_disk');
     }
 
     public function test_collection_delete_rechecks_object_list_before_removing_database_rows(): void
