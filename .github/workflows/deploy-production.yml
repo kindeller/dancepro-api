@@ -54,16 +54,32 @@ jobs:
         run: bash tests/Deployment/deployment-scripts.sh
 
       - name: Create local test environment
+        shell: bash
         run: |
+          set -Eeuo pipefail
+
           cp .env.example .env
-          {
-              echo 'DB_CONNECTION=mysql'
-              echo 'DB_HOST=mysql'
-              echo 'DB_PORT=3306'
-              echo 'DB_DATABASE=dancepro_test'
-              echo 'DB_USERNAME=sail'
-              echo 'DB_PASSWORD=password'
-          } >> .env
+
+          replace_env_value() {
+              local env_key="$1"
+              local env_value="$2"
+              local match_count
+
+              match_count="$(grep -Ec "^#?[[:space:]]*${env_key}=" .env)"
+              [[ "$match_count" == "1" ]] || {
+                  echo "Expected exactly one ${env_key} entry in .env.example; found ${match_count}." >&2
+                  exit 1
+              }
+
+              sed -Ei "s|^#?[[:space:]]*${env_key}=.*$|${env_key}=${env_value}|" .env
+          }
+
+          replace_env_value DB_CONNECTION mysql
+          replace_env_value DB_HOST mysql
+          replace_env_value DB_PORT 3306
+          replace_env_value DB_DATABASE testing
+          replace_env_value DB_USERNAME sail
+          replace_env_value DB_PASSWORD password
 
       - name: Install dependencies through the Sail Composer image
         run: |
