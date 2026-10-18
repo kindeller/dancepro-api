@@ -15,10 +15,11 @@ unattended, commit-consistent status to GitHub Actions.
 Use two stages:
 
 1. An independently installed launcher validates the repository, serialises
-   deployments, fetches `master`, fast-forwards to a validated full SHA, and
-   executes the deployment script from that commit.
-2. The version-controlled application script performs environment checks,
-   verified backup, maintenance, dependencies, migrations, caches, service
+   deployments, fetches `master`, creates and verifies an S3 database backup
+   from the unchanged current release, enables maintenance mode, fast-forwards
+   to a validated full SHA, and executes the deployment script from that commit.
+2. The version-controlled application script validates the launcher-provided
+   backup reference and performs dependencies, migrations, caches, service
    handling, and health validation without prompts.
 
 GitHub passes its exact SHA through a restricted SSM parameter using environment
@@ -31,7 +32,9 @@ until production validation finishes.
   point.
 - A run deploys its approved SHA, not an incidental later branch tip.
 - Dirty or divergent checkouts fail closed, and concurrent runs are rejected.
-- Every live attempt is gated by a verified S3 logical backup.
+- Every live attempt is gated by a verified S3 logical backup before maintenance
+  mode, rollback-tag creation, or any working-tree change. Backup failure leaves
+  the current checkout and running application untouched.
 - The launcher and SSM document have a separate controlled update lifecycle.
 - Deployments remain in-place; immutable releases remain a possible future ADR.
 - Rollback stays operator-reviewed because code, migrations, and customer writes

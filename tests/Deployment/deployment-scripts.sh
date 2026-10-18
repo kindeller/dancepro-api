@@ -8,6 +8,14 @@ readonly DEPLOY_SCRIPT="$PROJECT_ROOT/scripts/dancepro-deploy.sh"
 
 TEST_ROOT="$(mktemp -d /tmp/dancepro-deployment-tests.XXXXXX)"
 trap 'rm -rf -- "$TEST_ROOT"' EXIT
+fake_bin="$TEST_ROOT/fake-bin"
+mkdir -p "$fake_bin"
+rendered_launcher="$TEST_ROOT/dancepro-deploy-launcher.sh"
+
+sed \
+    -e "s|export PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"|export PATH=\"$fake_bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"|" \
+    "$LAUNCHER" > "$rendered_launcher"
+chmod +x "$rendered_launcher"
 
 assert_contains() {
     local haystack="$1"
@@ -24,7 +32,9 @@ run_launcher() {
     DANCEPRO_DEPLOY_LOCK_FILE="$TEST_ROOT/deploy.lock" \
     DANCEPRO_DEPLOY_LOG_DIR="$TEST_ROOT/logs" \
     DEPLOY_TEST_TRACE="$TEST_ROOT/deploy-trace" \
-        "$LAUNCHER" "$@"
+    DEPLOY_TEST_BACKUP_SIZE="$TEST_ROOT/backup-size" \
+    DEPLOY_TEST_BACKUP_FAIL="${DEPLOY_TEST_BACKUP_FAIL:-false}" \
+        "$rendered_launcher" "$@"
 }
 
 printf 'Checking Bash syntax...\n'
@@ -36,12 +46,61 @@ if grep -nE '(^|[[:space:]])read[[:space:]]+-?[a-zA-Z]*[[:space:]]' "$DEPLOY_SCR
     exit 1
 fi
 
-backup_line="$(grep -n 'log "Create and verify database backup"' "$DEPLOY_SCRIPT" | cut -d: -f1)"
-migration_line="$(grep -n 'php artisan migrate --force' "$DEPLOY_SCRIPT" | cut -d: -f1)"
-[[ "$backup_line" -lt "$migration_line" ]] || {
-    printf 'The verified backup must occur before migrations.\n' >&2
+backup_line="$(grep -n 'log "Create and verify pre-deployment database backup"' "$LAUNCHER" | cut -d: -f1)"
+maintenance_line="$(grep -n 'log "Enable maintenance mode before checkout"' "$LAUNCHER" | cut -d: -f1)"
+checkout_line="$(grep -n 'git merge --ff-only' "$LAUNCHER" | cut -d: -f1)"
+[[ "$backup_line" -lt "$maintenance_line" && "$maintenance_line" -lt "$checkout_line" ]] || {
+    printf 'The verified backup and maintenance mode must precede the production checkout.\n' >&2
     exit 1
 }
+
+if grep -qE 'mariadb-dump|mysqldump|aws s3 cp' "$DEPLOY_SCRIPT"; then
+    printf 'Database backup operations must remain in the stable launcher.\n' >&2
+    exit 1
+fi
+
+cat > "$fake_bin/php" <<'EOF'
+#!/usr/bin/env bash
+set -eu
+if [[ "${1:-}" == "-r" ]]; then
+    printf '[client]\npassword="not-logged"\n' > "$4"
+    printf 'dancepro_test' > "$5"
+elif [[ "${1:-}" == "artisan" ]]; then
+    printf 'php %s\n' "$*" >> "$DEPLOY_TEST_TRACE"
+else
+    exit 1
+fi
+EOF
+
+cat > "$fake_bin/mariadb-dump" <<'EOF'
+#!/usr/bin/env bash
+set -eu
+printf 'backup-head %s\n' "$(git -C "$DANCEPRO_APP_DIR" rev-parse HEAD)" >> "$DEPLOY_TEST_TRACE"
+if [[ "$DEPLOY_TEST_BACKUP_FAIL" == "true" ]]; then
+    printf 'dump failed\n' >&2
+    exit 7
+fi
+for argument in "$@"; do
+    case "$argument" in
+        --result-file=*) output_file="${argument#--result-file=}" ;;
+    esac
+done
+printf '%s\n' 'database backup' > "$output_file"
+EOF
+
+cat > "$fake_bin/aws" <<'EOF'
+#!/usr/bin/env bash
+set -eu
+if [[ "${1:-}" == "s3" && "${2:-}" == "cp" ]]; then
+    stat -c %s "$3" > "$DEPLOY_TEST_BACKUP_SIZE"
+    printf 's3-upload %s\n' "$4" >> "$DEPLOY_TEST_TRACE"
+elif [[ "${1:-}" == "s3api" && "${2:-}" == "head-object" ]]; then
+    cat "$DEPLOY_TEST_BACKUP_SIZE"
+else
+    exit 1
+fi
+EOF
+chmod +x "$fake_bin"/*
 
 printf 'Creating isolated Git repositories...\n'
 git init --bare --quiet "$TEST_ROOT/origin.git"
@@ -49,8 +108,15 @@ git init --quiet --initial-branch=master "$TEST_ROOT/source"
 git -C "$TEST_ROOT/source" config user.name 'Deployment Test'
 git -C "$TEST_ROOT/source" config user.email 'deployment-test@example.invalid'
 mkdir -p "$TEST_ROOT/source/scripts"
+mkdir -p "$TEST_ROOT/source/vendor" "$TEST_ROOT/source/storage" \
+    "$TEST_ROOT/source/bootstrap/cache"
+printf '.env\n' > "$TEST_ROOT/source/.gitignore"
+touch "$TEST_ROOT/source/storage/.gitkeep" "$TEST_ROOT/source/bootstrap/cache/.gitkeep"
+printf '%s\n' '<?php' > "$TEST_ROOT/source/vendor/autoload.php"
+printf '#!/usr/bin/env php\n' > "$TEST_ROOT/source/artisan"
+chmod +x "$TEST_ROOT/source/artisan"
 printf 'initial\n' > "$TEST_ROOT/source/application.txt"
-printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" > "$DEPLOY_TEST_TRACE"\nexit 0\n' \
+printf '#!/usr/bin/env bash\nprintf "deploy-args %%s\\n" "$*" >> "$DEPLOY_TEST_TRACE"\nprintf "deploy-head %%s\\n" "$(git rev-parse HEAD)" >> "$DEPLOY_TEST_TRACE"\nexit 0\n' \
     > "$TEST_ROOT/source/scripts/dancepro-deploy.sh"
 chmod +x "$TEST_ROOT/source/scripts/dancepro-deploy.sh"
 git -C "$TEST_ROOT/source" add .
@@ -58,6 +124,7 @@ git -C "$TEST_ROOT/source" commit --quiet -m initial
 git -C "$TEST_ROOT/source" remote add origin "$TEST_ROOT/origin.git"
 git -C "$TEST_ROOT/source" push --quiet -u origin master
 git clone --quiet "$TEST_ROOT/origin.git" "$TEST_ROOT/production"
+touch "$TEST_ROOT/production/.env"
 
 initial_commit="$(git -C "$TEST_ROOT/production" rev-parse HEAD)"
 printf 'second\n' > "$TEST_ROOT/source/application.txt"
@@ -83,9 +150,16 @@ printf 'Checking commit-pinned deployment...\n'
 run_launcher "$target_commit" >/dev/null
 [[ "$(git -C "$TEST_ROOT/production" rev-parse HEAD)" == "$target_commit" ]]
 trace="$(<"$TEST_ROOT/deploy-trace")"
-assert_contains "$trace" "--from-commit $initial_commit"
+assert_contains "$trace" "backup-head $initial_commit"
+assert_contains "$trace" "deploy-args --from-commit $initial_commit"
 assert_contains "$trace" "--target-commit $target_commit"
 assert_contains "$trace" '--rollback-tag pre-deploy-'
+assert_contains "$trace" '--verified-backup-key deployments/dancepro-db-'
+assert_contains "$trace" "deploy-head $target_commit"
+
+backup_trace_line="$(grep -n '^backup-head ' "$TEST_ROOT/deploy-trace" | tail -1 | cut -d: -f1)"
+checkout_trace_line="$(grep -n '^deploy-head ' "$TEST_ROOT/deploy-trace" | tail -1 | cut -d: -f1)"
+[[ "$backup_trace_line" -lt "$checkout_trace_line" ]]
 
 printf 'Checking application exit-code propagation...\n'
 printf '#!/usr/bin/env bash\nexit 42\n' > "$TEST_ROOT/source/scripts/dancepro-deploy.sh"
@@ -124,72 +198,15 @@ exec 8>&-
 [[ "$lock_status" -ne 0 ]]
 assert_contains "$lock_output" 'Another DancePro deployment is already running'
 
-printf 'Checking backup failure blocks migrations...\n'
-backup_app="$TEST_ROOT/backup-app"
-fake_bin="$TEST_ROOT/fake-bin"
-mkdir -p "$backup_app/scripts" "$backup_app/storage/logs/deployments" \
-    "$backup_app/bootstrap/cache" "$fake_bin"
-git init --quiet --initial-branch=master "$backup_app"
-git -C "$backup_app" config user.name 'Deployment Test'
-git -C "$backup_app" config user.email 'deployment-test@example.invalid'
-printf '.env\nstorage/logs/\n' > "$backup_app/.gitignore"
-printf '#!/usr/bin/env php\n' > "$backup_app/artisan"
-chmod +x "$backup_app/artisan"
-git -C "$backup_app" add .
-git -C "$backup_app" commit --quiet -m fixture
-git -C "$backup_app" remote add origin "$TEST_ROOT/origin.git"
-backup_commit="$(git -C "$backup_app" rev-parse HEAD)"
-backup_tag="pre-deploy-20261018-120000-${backup_commit:0:12}"
-git -C "$backup_app" tag "$backup_tag" "$backup_commit"
-touch "$backup_app/.env"
-
-sed \
-    -e "s|readonly APP_DIR=\"/var/www/dancepro-api\"|readonly APP_DIR=\"$backup_app\"|" \
-    -e "s|readonly EXPECTED_REMOTE_URL=\"https://github.com/kindeller/dancepro-api.git\"|readonly EXPECTED_REMOTE_URL=\"$TEST_ROOT/origin.git\"|" \
-    -e "s|export PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"|export PATH=\"$fake_bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"|" \
-    "$DEPLOY_SCRIPT" > "$TEST_ROOT/rendered-deploy.sh"
-chmod +x "$TEST_ROOT/rendered-deploy.sh"
-
-cat > "$fake_bin/php" <<'EOF'
-#!/usr/bin/env bash
-set -eu
-if [[ "${1:-}" == "artisan" && "${2:-}" == "env" ]]; then
-    echo 'INFO  The application environment is [production].'
-elif [[ "${1:-}" == "artisan" ]]; then
-    printf 'php %s\n' "$*" >> "$DEPLOY_TEST_TRACE"
-elif [[ "${1:-}" == "-r" ]]; then
-    printf '[client]\npassword="not-logged"\n' > "$4"
-    printf 'dancepro_test' > "$5"
-else
-    exit 1
-fi
-EOF
-
-cat > "$fake_bin/mariadb-dump" <<'EOF'
-#!/usr/bin/env bash
-printf 'dump failed\n' >&2
-exit 7
-EOF
-
-for command_name in composer curl aws; do
-    cat > "$fake_bin/$command_name" <<'EOF'
-#!/usr/bin/env bash
-printf '%s %s\n' "$(basename "$0")" "$*" >> "$DEPLOY_TEST_TRACE"
-exit 0
-EOF
-done
-chmod +x "$fake_bin"/*
-
-: > "$TEST_ROOT/backup-trace"
+printf 'Checking backup failure preserves current code and service state...\n'
+printf 'backup failure target\n' > "$TEST_ROOT/source/application.txt"
+git -C "$TEST_ROOT/source" add application.txt
+git -C "$TEST_ROOT/source" commit --quiet -m backup-failure-target
+git -C "$TEST_ROOT/source" push --quiet
+backup_failure_target="$(git -C "$TEST_ROOT/source" rev-parse HEAD)"
+: > "$TEST_ROOT/deploy-trace"
 set +e
-backup_output="$(
-    cd "$backup_app"
-    DEPLOY_TEST_TRACE="$TEST_ROOT/backup-trace" \
-        "$TEST_ROOT/rendered-deploy.sh" \
-        --from-commit "$backup_commit" \
-        --target-commit "$backup_commit" \
-        --rollback-tag "$backup_tag" 2>&1
-)"
+backup_output="$(DEPLOY_TEST_BACKUP_FAIL=true run_launcher "$backup_failure_target" 2>&1)"
 backup_status=$?
 set -e
 [[ "$backup_status" -eq 7 ]] || {
@@ -197,10 +214,11 @@ set -e
     exit 1
 }
 assert_contains "$backup_output" 'dump failed'
-assert_contains "$backup_output" 'running application was not placed in maintenance mode'
-if grep -Eq 'composer|migrate --force|artisan down' "$TEST_ROOT/backup-trace"; then
-    printf 'Deployment continued after a failed backup:\n' >&2
-    cat "$TEST_ROOT/backup-trace" >&2
+assert_contains "$backup_output" 'production checkout and running application were not changed'
+[[ "$(git -C "$TEST_ROOT/production" rev-parse HEAD)" == "$failing_commit" ]]
+if grep -Eq 'artisan down|deploy-head|deploy-args' "$TEST_ROOT/deploy-trace"; then
+    printf 'Deployment continued after a failed pre-checkout backup:\n' >&2
+    cat "$TEST_ROOT/deploy-trace" >&2
     exit 1
 fi
 
