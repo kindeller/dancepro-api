@@ -42,19 +42,22 @@ SSM DancePro-Deploy-Production(TargetCommit)
 /usr/local/bin/dancepro-deploy <TargetCommit>
   - independent, root-owned launcher
   - lock, logs, repository and ancestry checks
+  - verified database backup from the current release
+  - maintenance mode using the current release
   - fast-forward to the exact approved SHA
               |
               v
 scripts/dancepro-deploy.sh from that SHA
-  - environment and database checks
-  - verified database backup to S3
-  - maintenance, dependencies, migrations and caches
+  - verifies the launcher-provided backup reference
+  - dependencies, migrations and caches
   - services, health check and deployment record
 ```
 
 The launcher is copied out of the repository so an update cannot replace the
-process currently changing the checkout. Application behaviour remains in the
-version-controlled script and changes through the normal pull request process.
+process currently changing the checkout. The pre-checkout backup and maintenance
+gate therefore lives in the installed launcher. Release-specific behaviour
+remains in the version-controlled script and changes through the normal pull
+request process.
 
 The launcher accepts only a lowercase full SHA. It requires the requested commit
 to be an ancestor of `origin/master` and the current production commit to be an
@@ -65,12 +68,13 @@ overlapping deployments.
 
 ## Database Backup Gate
 
-Every live invocation performs a backup before maintenance mode, Composer, or
-migrations:
+Every live invocation performs and verifies a backup from the current production
+release before maintenance mode, rollback-tag creation, or any checkout change:
 
-1. Laravel's installed Dotenv library reads the server-only `.env` without
-   booting the newly updated application. It requires `APP_ENV=production`, a
-   MySQL/MariaDB connection, and discrete `DB_*` values rather than `DB_URL`.
+1. Laravel's installed Dotenv library reads the server-only `.env` from the
+   unchanged current release without booting Laravel. It requires
+   `APP_ENV=production`, a MySQL/MariaDB connection, and discrete `DB_*` values
+   rather than `DB_URL`.
 2. PHP writes a mode-`0600` temporary client file. The password is never put in
    a command argument or printed. The successful dump is the connectivity test.
 3. `mariadb-dump` is preferred, with `mysqldump` as fallback. The dump uses a
@@ -80,6 +84,9 @@ migrations:
    `s3://dance-pro-db-backup/deployments/dancepro-db-<UTC>-<commit>.sql.gz`.
 6. `head-object` must report the same non-zero byte count before deployment.
 7. Restricted temporary files are removed by the exit trap.
+8. Only after verification succeeds does the launcher enable maintenance mode,
+   create the rollback tag, and fast-forward to the approved commit. It passes
+   the validated object key to the version-controlled deployment script.
 
 A size match confirms transfer completeness, not restorability. Periodically
 restore into an isolated nonproduction database and record the rehearsal. The
@@ -87,6 +94,9 @@ existing S3 retention, encryption, versioning, and lifecycle arrangements were
 not changed here and require separate review. Never automatically restore after
 a failed migration: migrations can be partially applied and a restore can lose
 production writes made after the snapshot.
+
+Each live invocation, including a same-commit SSM test, creates a new object and
+therefore incurs the associated S3 request and storage charges.
 
 ## One-Time EC2 Migration
 
@@ -110,13 +120,23 @@ during an approved maintenance window.
    Keep any deploy key or Git credential outside the repository and read-only.
    GitHub Actions uses OIDC and needs no permanent AWS access key or SSH key.
 
-3. Replace the current symlink with an independently installed, root-owned copy:
+3. Before the first deployment of this architecture, install the launcher from
+   the exact approved target commit without changing the production checkout.
+   This ordering is mandatory because the launcher now creates the backup and
+   passes its verified key to the application script; the previous launcher is
+   not compatible with that handoff.
 
    ```bash
    cd /var/www/dancepro-api
-   sudo install -o root -g root -m 0755 \
-       scripts/dancepro-deploy-launcher.sh \
-       /usr/local/bin/dancepro-deploy.new
+   TARGET_COMMIT=<approved-full-master-sha>
+   sudo -u ec2-user git fetch --no-tags origin \
+       +refs/heads/master:refs/remotes/origin/master
+   sudo -u ec2-user git merge-base --is-ancestor "$TARGET_COMMIT" origin/master
+   sudo -u ec2-user git show \
+       "$TARGET_COMMIT:scripts/dancepro-deploy-launcher.sh" \
+       | sudo tee /usr/local/bin/dancepro-deploy.new >/dev/null
+   sudo chown root:root /usr/local/bin/dancepro-deploy.new
+   sudo chmod 0755 /usr/local/bin/dancepro-deploy.new
    sudo mv /usr/local/bin/dancepro-deploy.new /usr/local/bin/dancepro-deploy
    sudo test -f /usr/local/bin/dancepro-deploy
    sudo test ! -L /usr/local/bin/dancepro-deploy
@@ -213,9 +233,10 @@ Launcher logs are under `/var/log/dancepro-deploy/`; application logs and the
 successful `current-deployment.json` record are under
 `storage/logs/deployments/`.
 
-- Fetch, validation, dirty-tree, ancestry, or lock failure stops before the
-  application script.
-- Backup or upload failure stops before maintenance mode and migrations.
+- Fetch, validation, dirty-tree, ancestry, lock, backup, or upload failure stops
+  before maintenance mode and leaves the production checkout unchanged.
+- After the backup is verified, the launcher enables maintenance mode before
+  creating the rollback tag or changing the checkout.
 - Dependency, migration, cache, reload, or integrity failure leaves maintenance
   mode enabled for diagnosis.
 - Health-check failure returns the site to maintenance mode.
