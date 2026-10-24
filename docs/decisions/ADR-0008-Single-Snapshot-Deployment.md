@@ -40,3 +40,12 @@ failure. No automatic database restoration or migration rollback is introduced.
   zero-exposure switching remains a separate project.
 - SSH and future SSM callers use the same command. GitHub stays manual-only;
   SSM and GitHub delivery remain unverified until separate staged testing.
+
+## October 2026 frontend correction
+
+Keep the same single executor for SSH and SSM, bypassing the legacy installed
+launcher. Build locked frontend inputs in private staging before live changes,
+validate all Vite entries/assets, and publish the complete directory during
+maintenance. Retain previous assets for reviewed recovery. Repository Node/PHP
+validation helpers are checks, not additional deployment entry points. CI and EC2
+use Node 22.22.0; no artifact service or new infrastructure is introduced.

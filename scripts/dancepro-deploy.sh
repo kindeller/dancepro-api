@@ -33,6 +33,7 @@ readonly BRANCH=master
 DRY_RUN=false
 TARGET_COMMIT="" CURRENT_COMMIT="" ROLLBACK_TAG="" BACKUP_TEMP_DIR="" BACKUP_KEY=""
 MAINTENANCE_REQUESTED=false
+RELEASE_STAGE="" ASSET_BACKUP=""
 umask 077
 RUN_DIR="$(mktemp -d /tmp/dancepro-checks.XXXXXX)"
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -124,6 +125,8 @@ http_once() {
             ' "$path" "$RUN_DIR/body" ;;
         /js/admin-concert-uploader.js)
             [[ "$type" == *javascript* ]] && cmp -s public/js/admin-concert-uploader.js "$RUN_DIR/body" ;;
+        /build/*)
+            [[ "$type" == *javascript* ]] && cmp -s "public$path" "$RUN_DIR/body" ;;
         *) return 1 ;;
     esac
 }
@@ -168,6 +171,9 @@ on_exit() {
         rm -f -- "$BACKUP_TEMP_DIR/"{client.cnf,database-name,database.sql,database.sql.gz}
         rmdir "$BACKUP_TEMP_DIR" 2>/dev/null || true
     fi
+    if [[ -n "$RELEASE_STAGE" ]]; then
+        printf 'Release staging retained for inspection/recovery: %s\nPrevious assets: %s\n' "$RELEASE_STAGE" "${ASSET_BACKUP:-none}"
+    fi
     rm -f -- "$RUN_DIR/"{tracked,body,down,maintenance.php}
     rmdir "$RUN_DIR" 2>/dev/null || true
     rm -f -- "$DANCEPRO_SNAPSHOT_FILE"
@@ -181,7 +187,11 @@ TARGET_COMMIT="$1"
 [[ "$(id -un)" == "$DEPLOY_USER" && "$DEPLOY_USER" != "$RUNTIME_USER" ]] || fail 'Run as the deployment user, not root or PHP-FPM.'
 [[ "$ORIGIN_HOST" =~ ^[a-zA-Z0-9.-]+$ && "$ORIGIN_PORT" =~ ^[0-9]+$ && ("$ORIGIN_SCHEME" == http || "$ORIGIN_SCHEME" == https) ]] || fail 'Invalid origin settings.'
 cd "$APP_DIR"
-for command in git php composer curl sudo flock gzip stat mktemp; do command -v "$command" >/dev/null || fail "Missing command: $command"; done
+for command in git php composer curl sudo flock gzip stat mktemp node npm tar; do command -v "$command" >/dev/null || fail "Missing command: $command"; done
+[[ "$(node --version)" == v22.22.0 ]] || fail 'Node.js v22.22.0 is required.'
+npm --version >/dev/null
+[[ ! -e public/hot && ! -L public/hot ]] || fail 'Remove the reviewed stale public/hot marker before deployment.'
+[[ ! -L public/build && (! -e public/build || -d public/build) ]] || fail 'public/build must be a regular directory.'
 id -nG | tr ' ' '\n' | grep -Fxq "$APP_GROUP" || fail "Deployment user needs membership of $APP_GROUP."
 [[ "$(stat -c %G .)" == "$APP_GROUP" && -w . ]] || fail 'Provision the application root with the shared group and deployment ownership.'
 for directory in storage/framework storage/framework/views bootstrap/cache; do
@@ -214,6 +224,16 @@ command -v aws >/dev/null || fail 'AWS CLI is missing.'
 if command -v mariadb-dump >/dev/null; then DUMP_COMMAND=mariadb-dump
 elif command -v mysqldump >/dev/null; then DUMP_COMMAND=mysqldump
 else fail 'A MySQL/MariaDB dump tool is required.'; fi
+
+log 'Build approved frontend before changing the live release'
+RELEASE_STAGE="$(mktemp -d "$APP_DIR/../.dancepro-release.XXXXXX")"
+[[ "$(stat -c %d "$RELEASE_STAGE")" == "$(stat -c %d public)" ]] || fail 'Build staging and public must share a filesystem.'
+# Only tracked release inputs enter staging: never production .env, keys or uploads.
+git archive "$TARGET_COMMIT" | tar -x -C "$RELEASE_STAGE"
+# Tailwind scans Laravel pagination templates. Supply them without Composer hooks.
+mkdir -p "$RELEASE_STAGE/vendor/laravel/framework/src/Illuminate/Pagination/resources"
+cp -R vendor/laravel/framework/src/Illuminate/Pagination/resources/views "$RELEASE_STAGE/vendor/laravel/framework/src/Illuminate/Pagination/resources/"
+(cd "$RELEASE_STAGE"; npm ci --include=dev; npm run build; node scripts/validate-vite-build.mjs public/build)
 
 log "Create and verify pre-deployment database backup"
 BACKUP_TEMP_DIR="$(mktemp -d /tmp/dancepro-deploy-backup.XXXXXX)"
@@ -329,6 +349,18 @@ log 'Install locked dependencies'
 (umask 027; composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress)
 permissions code
 permissions generated
+log 'Publish validated frontend assets'
+node "$RELEASE_STAGE/scripts/validate-vite-build.mjs" "$RELEASE_STAGE/public/build"
+find "$RELEASE_STAGE/public/build" -type d -exec chmod 0755 {} +
+find "$RELEASE_STAGE/public/build" -type f -exec chmod 0644 {} +
+chgrp -R "$APP_GROUP" "$RELEASE_STAGE/public/build"
+# Both paths are on the application filesystem. Only complete directories move.
+if [[ -d public/build ]]; then
+    ASSET_BACKUP="$RELEASE_STAGE/previous-build"
+    mv -T public/build "$ASSET_BACKUP"
+    printf 'Previous assets: %s\n' "$ASSET_BACKUP"
+fi
+mv -T "$RELEASE_STAGE/public/build" public/build
 log 'Migrate and rebuild caches as Apache'
 for command in config:clear event:clear route:clear view:clear; do artisan "$command"; done
 artisan migrate --force || fail 'Migration failed and may be partially applied; review before recovery.'
@@ -339,6 +371,11 @@ artisan queue:restart
 sudo -n /usr/bin/systemctl reload "$PHP_FPM_SERVICE"
 http_check /up || fail 'PHP-FPM health failed while maintenance remained active.'
 http_check /js/admin-concert-uploader.js || fail 'Static asset check failed.'
+[[ ! -e public/hot && ! -L public/hot ]] || fail 'Production must not contain public/hot.'
+PLAYER_ASSET="$(node "$RELEASE_STAGE/scripts/validate-vite-build.mjs" public/build --player)"
+http_check "/build/$PLAYER_ASSET" || fail 'Vite concert player HTTP check failed.'
+(umask 007; sudo -n -u "$RUNTIME_USER" -- "$PHP_BIN" "$APP_DIR/scripts/check-deployment.php" "$APP_DIR")
+http_check / closed || fail 'Maintenance must remain active during application checks.'
 [[ "$(git rev-parse HEAD)" == "$TARGET_COMMIT" && -z "$(git status --porcelain)" ]] || fail 'Checkout changed during deployment.'
 log 'Reopen and check application responses'
 artisan up

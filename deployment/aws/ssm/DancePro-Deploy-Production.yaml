@@ -1,5 +1,7 @@
 schemaVersion: '2.2'
-description: 'Deploy an approved DancePro API master commit to production'
+# Update the installed document and its default version before workflow use.
+# Never invoke the legacy /usr/local/bin/dancepro-deploy launcher.
+description: 'Deploy DancePro through the authoritative repository script'
 parameters:
   TargetCommit:
     type: String
@@ -17,6 +19,7 @@ mainSteps:
       timeoutSeconds: '1800'
       runCommand:
         - |
+          exec /bin/bash <<'DANCEPRO_SSM'
           set -Eeuo pipefail
           test -n "${SSM_TargetCommit:-}" || {
               echo 'TargetCommit was not provided through SSM environment interpolation.' >&2
@@ -27,3 +30,4 @@ mainSteps:
               exit 2
           }
           exec sudo -n -u ec2-user -- /bin/bash /var/www/dancepro-api/scripts/dancepro-deploy.sh "$SSM_TargetCommit"
+          DANCEPRO_SSM

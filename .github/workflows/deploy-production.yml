@@ -49,6 +49,17 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22.22.0'
+          cache: npm
+
+      - name: Install and test frontend
+        run: |
+          npm ci --include=dev
+          node --test tests/JavaScript/*.test.js
+
       - name: Validate deployment scripts
         run: bash tests/Deployment/deployment-scripts.sh
 
@@ -112,6 +123,11 @@ jobs:
 
       - name: Prepare Laravel
         run: ./vendor/bin/sail artisan key:generate
+
+      - name: Build and validate production frontend
+        run: |
+          npm run build
+          node scripts/validate-vite-build.mjs public/build
 
       - name: Run Laravel tests
         run: ./vendor/bin/sail artisan test
