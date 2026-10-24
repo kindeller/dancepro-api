@@ -17,7 +17,7 @@ cookies for HLS after the distribution, trusted key group and signing
 configuration are supplied. Progressive playback now uses an exact-object,
 short-lived CloudFront signed URL for assets on `s3_concerts`. Playback from the
 legacy disk or without signing configuration fails closed. Original downloads
-still use Laravel filesystem responses.
+redirect to S3 presigned URLs with an attachment disposition on the asset's disk.
 
 The media-ingest API reserves exact object keys, issues short-lived presigned
 requests and verifies multipart uploads. A staff-only web uploader under each

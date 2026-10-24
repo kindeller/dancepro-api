@@ -20,14 +20,16 @@ the proposed resources, permissions and costs before applying them.
 - New V2 object keys use immutable collection and media asset UUIDs.
 - Studio names, concert names, slugs and other mutable business data must not
   appear in authoritative storage prefixes.
-- Original downloads authorise through the concert web route, then return a
-  short-lived signed CloudFront redirect for `s3_concerts`. Without concert
-  CloudFront configuration, and for legacy storage, they redirect to signed S3.
-  File bytes no longer pass through PHP. Generic database-backed download-link
-  tracking remains a separate workflow.
-- CloudFront must forward and cache by `response-content-disposition` so the
-  original download receives its attachment filename. This parameter is included
-  before signing; changing it invalidates the URL. Verify the deployed policy.
+- Original downloads authorise through the concert web route, then redirect to a
+  short-lived S3 presigned URL on the asset's own disk, including
+  `ResponseContentDisposition=attachment` and its download filename. Both the
+  original-download button and download manager use this route. Bytes do not pass
+  through PHP. Generic database-backed download tracking is a separate workflow.
+- Originals bypass CloudFront so attachment delivery does not depend on forwarding
+  or caching `response-content-disposition`. Playback continues through CloudFront.
+  Direct S3 downloads incur S3 request/data-transfer charges rather than CloudFront
+  delivery charges; verify production runtime `GetObject` access and any bucket
+  restrictions on direct signed requests before release.
 - HLS playback uses CloudFront signed cookies because a stream consists of a
   manifest and multiple protected files.
 - Laravel performs playback authorisation and generates the signed cookies.
