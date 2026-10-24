@@ -107,3 +107,17 @@ HLS retains signed cookies, `use-credentials`, and hls.js `withCredentials`.
 The Laravel playback metadata fetch retains same-origin session authentication.
 CloudFront SimpleCORS supports anonymous MP4 delivery; credentialed HLS needs an
 explicit allowed app origin and `Access-Control-Allow-Credentials: true`.
+
+Production frontend checks (also required by the manual deployment workflow):
+
+```bash
+sail npm ci --include=dev
+sail node --test tests/JavaScript/*.test.js
+sail npm run build
+sail node scripts/validate-vite-build.mjs public/build
+```
+
+Deployment integration tests stub npm/cloud/network boundaries and verify that a
+failed staged build preserves the checkout and live manifest. Actions separately
+performs the real locked npm install and Vite build. The EC2 deployment performs
+its own real staged build before touching the serving release.

@@ -10,7 +10,7 @@ if [[ "${1:-}" != --integration ]]; then
     exit 0
 fi
 [[ "$(id -u)" == 0 && -n "${LARAVEL_SAIL:-}" ]] || { printf 'Integration tests require root inside the isolated Sail container.\n' >&2; exit 1; }
-for command in setpriv git php python3; do command -v "$command" >/dev/null; done
+for command in setpriv git php python3 node; do command -v "$command" >/dev/null; done
 # Sail intentionally has no sudo package. The isolated fixture uses root as its
 # code owner, then genuinely drops to www-data for every runtime operation.
 readonly DEPLOY_ID=0
@@ -54,6 +54,8 @@ mkdir -p "$TEST_ROOT/source/scripts"
 sed -e "s|/usr/bin/systemctl|$TEST_ROOT/bin/systemctl|g" \
     -e "s|export PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"|export PATH=\"$TEST_ROOT/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"|" \
     "$PROJECT_ROOT/scripts/dancepro-deploy.sh" > "$TEST_ROOT/source/scripts/dancepro-deploy.sh"
+cp "$PROJECT_ROOT/scripts/"{validate-vite-build.mjs,check-deployment.php} "$TEST_ROOT/source/scripts/"
+cp "$PROJECT_ROOT/"{package.json,package-lock.json,vite.config.js} "$TEST_ROOT/source/"
 cp "$PROJECT_ROOT/"{artisan,composer.json,composer.lock,.gitignore} "$TEST_ROOT/source/"
 # Every repository in this suite is temporary; no project Git state is changed.
 git() { command git -c safe.directory='*' "$@"; }
@@ -176,8 +178,10 @@ closed = (root / 'storage/framework/down').exists()
 status, mime = 200, 'text/html; charset=UTF-8'
 body = {'/': 'Find your dance studio.', '/login': '<title>DancePro Login</title>', '/up': '{"status":"up"}', '/api/studios': '{"success":true,"data":[]}'}.get(path, '')
 if path in ('/up', '/api/studios'): mime = 'application/json'
-if closed and path != '/js/admin-concert-uploader.js' and (path != '/up' or 'deployment maintenance' in (root / 'storage/framework/maintenance.php').read_text()):
+if closed and not path.startswith(('/js/', '/build/')) and (path != '/up' or 'deployment maintenance' in (root / 'storage/framework/maintenance.php').read_text()):
     status, mime, body = 503, 'text/html', 'DancePro deployment maintenance.'
+elif path.startswith('/build/'):
+    mime, body = 'application/javascript', (root / 'public' / path.lstrip('/')).read_text()
 elif path == '/js/admin-concert-uploader.js':
     mime, body = 'application/javascript', (root / 'public/js/admin-concert-uploader.js').read_text()
 elif not closed and failure == 'http-login' and path == '/login':
@@ -186,6 +190,31 @@ elif not closed and failure == 'http-json' and path == '/api/studios':
     body = '{"success":false,"data":[]}'
 pathlib.Path(args[args.index('--output') + 1]).write_text(body)
 print(f'{status}\n{mime}', end='')
+EOF
+cat > "$TEST_ROOT/bin/node" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == --version ]]; then echo v22.22.0; exit 0; fi
+exec "$(command -v node)" "\$@"
+EOF
+cat > "$TEST_ROOT/bin/npm" <<EOF
+#!/usr/bin/env bash
+set -eu
+[[ "\${1:-}" != --version ]] || { echo 10; exit 0; }
+failure='$TEST_ROOT/production/fixture-failure'
+[[ ! -f "\$failure" || "\$(cat "\$failure")" != build ]] || exit 42
+if [[ "\${1:-}" == run ]]; then
+    mkdir -p public/build/assets
+    python3 - <<'PYBUILD'
+import json
+from pathlib import Path
+manifest = {}
+for i, entry in enumerate(['resources/css/app.css', 'resources/js/app.js', 'resources/js/concert-player.js']):
+    filename = f'assets/{i}.js'
+    Path('public/build/' + filename).write_text('fixture')
+    manifest[entry] = {'file': filename, 'isEntry': True}
+Path('public/build/manifest.json').write_text(json.dumps(manifest))
+PYBUILD
+fi
 EOF
 chmod 0755 "$TEST_ROOT/bin/"*
 
@@ -243,6 +272,13 @@ setpriv --reuid="$RUNTIME_ID" --regid="$SHARED_GROUP" --clear-groups test -r "$T
 setpriv --reuid="$RUNTIME_ID" --regid="$SHARED_GROUP" --clear-groups test ! -w "$TEST_ROOT/production/app"
 grep -q 'Deployment successful:' "$TEST_ROOT/success"
 [[ -s "$TEST_ROOT/logs/current-deployment.json" ]]
+[[ "$(stat -c %a "$TEST_ROOT/production/public/build/assets/2.js")" == 644 ]]
+[[ "$(stat -c %a "$TEST_ROOT/production/public/build")" == 755 ]]
+# A subsequent release must retain the previous complete build outside public.
+run_launcher "$TARGET" > "$TEST_ROOT/second-success"
+previous_assets="$(sed -n 's/^Previous assets: //p' "$TEST_ROOT/second-success" | head -1)"
+[[ -f "$previous_assets/manifest.json" ]]
+cmp "$previous_assets/manifest.json" "$TEST_ROOT/production/public/build/manifest.json"
 backup_line="$(grep -n '^backup$' "$TEST_ROOT/production/fixture-trace" | head -1 | cut -d: -f1)"
 down_line="$(grep -n '^artisan down' "$TEST_ROOT/production/fixture-trace" | head -1 | cut -d: -f1)"
 composer_line="$(grep -n '^composer$' "$TEST_ROOT/production/fixture-trace" | head -1 | cut -d: -f1)"
@@ -254,6 +290,22 @@ find "$TEST_ROOT/production/storage/framework/views" -name '*.php' -type f | whi
     setpriv --reuid="$RUNTIME_ID" --regid="$SHARED_GROUP" --clear-groups test -r "$path"
 done
 [[ -n "$(find "$TEST_ROOT/production/storage/framework/views" -name '*.php' -print -quit)" ]]
+
+printf 'Checking failed staged build preserves live release and assets...\n'
+before="$(git -C "$TEST_ROOT/production" rev-parse HEAD)"
+asset_before="$(sha256sum "$TEST_ROOT/production/public/build/manifest.json")"
+printf build > "$TEST_ROOT/production/fixture-failure"
+expect_failure "$TARGET"
+[[ "$(git -C "$TEST_ROOT/production" rev-parse HEAD)" == "$before" ]]
+[[ "$(sha256sum "$TEST_ROOT/production/public/build/manifest.json")" == "$asset_before" ]]
+[[ ! -e "$TEST_ROOT/production/storage/framework/down" ]]
+rm "$TEST_ROOT/production/fixture-failure"
+
+printf 'Checking stale development marker is refused...\n'
+printf stale > "$TEST_ROOT/production/public/hot"
+expect_failure "$TARGET"
+grep -q 'public/hot' "$TEST_ROOT/last-failure"
+rm "$TEST_ROOT/production/public/hot"
 
 printf 'Checking backup failure preserves checkout and serving state...\n'
 new_target backup-failure

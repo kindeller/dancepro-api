@@ -10,8 +10,9 @@ bash scripts/dancepro-deploy.sh 'approved-full-master-sha'
 
 Replace the placeholder with the reviewed lowercase 40-character SHA. The script
 copies itself to a private temporary file and runs that snapshot, so checkout
-cannot replace the running deployment. No installed launcher, support bundle,
-protocol versions, runtime helper, process scans, or service-mask changes are needed.
+cannot replace the running deployment. No installed launcher, support bundle, protocol versions, process scans, or
+service-mask changes are needed. Repository validation helpers run under the one
+authoritative deployment script.
 
 GitHub Actions still has **only `workflow_dispatch`**: merging to `master` does
 not deploy. GitHub/SSM delivery remains unverified and deferred. Neither is needed
@@ -162,10 +163,8 @@ above if a release needs its new deployment behavior immediately.
 
 The existing `/usr/local/bin/dancepro-deploy` remains the **old** launcher until
 separately updated; do not assume editing Git changes it. That installed command
-is unnecessary for the direct path. If retaining its name is preferred, hold the
-deployment lock, back up the old regular file, and atomically replace it with a
-copy of the reviewed single script. Restore that copy to undo the installation;
-this does not roll back application code or data. There are no companion files.
+is unnecessary for the direct path. Retire it from the deployment procedure and use the
+repository script directly; the October transition checklist below applies.
 
 ## Validation, failure and recovery
 
@@ -240,3 +239,118 @@ Sail waits for services to become healthy before testing. MySQL publishes port
 connects to `mysql:3306` inside Docker. Cleanup runs after a Sail startup attempt
 (including a partial startup failure), but skips failed dependency installation
 so a missing Sail executable does not obscure the installation failure.
+
+## Vite deployment and launcher transition (October 2026)
+
+The authoritative entry point is `scripts/dancepro-deploy.sh`, with one positional
+approved full SHA. Do not use `/usr/local/bin/dancepro-deploy`: the installed old
+launcher passed named options and caused the interrupted deployment. Neither a
+Git update nor editing this document replaces an installed launcher or SSM document.
+The reported online baseline is `83b37afa927f2033856e1fbd8a886cedbf4c50e8`;
+verify it on EC2 rather than treating HEAD as evidence of a completed deployment.
+
+### One-time prerequisites
+
+- Install **Node.js 22.22.0** and its bundled npm for the EC2 architecture. Verify
+  the official archive checksum before installation. Expose `node` and `npm` in
+  `/usr/local/bin` or `/usr/bin`, not only an interactive NVM shell. The deployment
+  script requires this exact Node version; Actions uses the same pin.
+- Retain the existing PHP/Composer, dump tool, AWS CLI, Apache group, scoped sudo,
+  lock/log directory and runtime permissions described above. Also provide `tar`.
+- Permit the deployment user to create private staging directories beside the
+  application (`/var/www/.dancepro-release.*`). These must be on the same filesystem
+  as `public/build`; provision parent access deliberately, without making it
+  world-writable. Allow enough disk for dependencies, a build and previous assets.
+- Permit outbound HTTPS to the npm registry and Bunny font endpoints used by the
+  configured Laravel Vite font plugin. No production secrets enter build staging.
+- `public/build`, if present, must be a deployment-owned regular directory, without
+  symlinks. Nginx requires public directory traversal and files readable as 0644.
+  Review and remove only an identified stale `public/hot` before deployment; the
+  script refuses it rather than deleting it automatically.
+- Keep file-based maintenance and the existing origin hostname/port overrides.
+  The local Nginx listener must serve `/build/*` statically during maintenance.
+- Verify SSM Agent supports `interpolationType: ENV_VAR`, the instance is managed,
+  the existing OIDC role can send/read this command, and the instance retains its
+  existing Git and S3 backup access. No new AWS resources are needed.
+
+### Safe adoption before enabling the workflow
+
+1. Stop use of the old launcher and do not start a workflow during transition.
+   Inspect current HEAD, clean tree, maintenance state, migration status, deployment
+   log and `current-deployment.json`. Confirm baseline HTTP responses. Reconcile the
+   interrupted deployment before attempting another; do not reset code or rerun
+   migrations blindly.
+2. After the implementation is reviewed and separately committed/merged, fetch the
+   approved SHA and extract `scripts/dancepro-deploy.sh` from that SHA to a private
+   temporary file using the adoption commands above. Review/hash it and run its
+   `--dry-run` with the positional SHA. This selects the new executor without
+   changing the live checkout first. The first actual invocation still requires
+   explicit deployment approval. Dry-run validates tools but does not build.
+3. Use that reviewed executor for the first approved manual deployment. It stages
+   the target's tracked inputs, runs `npm ci --include=dev` and `npm run build`, and
+   validates the entire build **before backup, maintenance or Git advancement**.
+   A failed build leaves the existing checkout and assets untouched. Tailwind's
+   Laravel pagination sources come from the current installed framework; rerun
+   the Actions build when changing the framework version as well.
+4. Manually update the existing AWS Systems Manager **Command document**
+   `DancePro-Deploy-Production` in `ap-southeast-2` from
+   `deployment/aws/ssm/DancePro-Deploy-Production.yaml`. In the AWS console, create
+   a new document version and explicitly make it the **default version**. Review
+   its content: it must call `/bin/bash /var/www/dancepro-api/scripts/dancepro-deploy.sh`
+   as `ec2-user`, passing only `"$SSM_TargetCommit"`; it must never call the installed
+   launcher. Verify the installed default document content before running Actions.
+   Updating the file in Git does not perform this AWS update.
+5. Once the corrected repository script is present on EC2, SSH and SSM both invoke
+   that same script directly. Retire the old launcher from operational instructions;
+   it need not be replaced to use this process. Any removal/rename of its installed
+   file is a separate reviewed host operation. Do not keep two deployment engines.
+6. After approved SSM validation, trigger Actions only on reviewed `master`, enter
+   `DEPLOY`, and verify both the test job and SSM execution complete successfully.
+   Merging alone never deploys. A future change to deployment-script behaviour must
+   be adopted from the reviewed target script before a deployment that needs it;
+   the running executor snapshots itself and is not replaced mid-run.
+
+### Publish and verification
+
+The complete validated build directory is moved into place during maintenance,
+with 0755 directories and 0644 files. The prior directory is retained at the exact
+`Previous assets:` path in the deployment log. No build runs in the live public
+folder. All staging paths are logged and retained for operator inspection; do not
+let retained node_modules consume the disk indefinitely. After confirming success,
+review and remove only the exact staging directories no longer needed for recovery.
+
+Validation checks every manifest entry, referenced CSS/assets and imported chunks,
+required entry points, regular files, and rejects links/path escapes. Referenced
+assets must be nonempty except the intentionally empty placeholder app.js entry.
+The configured font files and font manifest travel with the complete directory.
+The player bundle must return HTTP 200, a JavaScript type and byte-identical content
+through local Nginx. Laravel boots with its production caches and renders the actual
+concert Blade view with in-memory fixture models (no customer data, playback URL
+signing or writes). Home/login/public API route checks run through the CLI HTTP
+kernel with maintenance middleware excluded **only in that process**; maintenance
+remains HTTP 503 publicly. FPM `/up` and static asset checks run before reopening;
+real HTTP route checks run immediately after reopening and failure closes again.
+These checks do not prove CloudFront playback: verify a permitted concert in Chrome
+and confirm `/playback` and the compiled bundle load after release approval.
+
+### First-deployment failure recovery
+
+- Before maintenance: inspect the logged staged build failure; the serving release
+  and assets remain intact. Fix the cause, obtain approval and rerun the same
+  reviewed script. Do not force past failed validation.
+- After maintenance/Git changes: leave HTTP 503 in place. Read the exact failure,
+  current SHA, rollback tag, previous-assets path, backup key and migration state.
+  The script does not automatically reset Git, restore the database or reopen.
+- If asset publishing failed after moving the old build, its complete directory is
+  at the logged previous-assets path. Under the deployment lock and maintenance,
+  preserve any new build separately and move that exact prior directory back to
+  `public/build` only as part of recovery to its matching application release.
+  The first deployment may have **no** previous build; do not invent a backup path.
+- Prefer a corrected forward deployment after reviewing migrations. If reverting
+  code is necessary, use the recorded rollback reference and review compatibility
+  with applied migrations/customer writes before separately authorising recovery.
+  Restore the matching assets, locked PHP dependencies and caches; reload FPM and
+  repeat all checks before reopening. Never blindly run migration rollback or
+  restore the backup. A database restore requires its own reviewed recovery plan.
+- If closure cannot be verified, the script reports CRITICAL: keep traffic blocked
+  at Nginx and investigate locally. Do not rerun the legacy launcher.
