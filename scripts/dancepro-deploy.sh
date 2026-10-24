@@ -15,6 +15,7 @@ if [[ "${DANCEPRO_SNAPSHOT_FILE:-}" != "${BASH_SOURCE[0]}" || "${DANCEPRO_SNAPSH
 fi
 
 readonly APP_DIR="${DANCEPRO_APP_DIR:-/var/www/dancepro-api}"
+readonly STAGING_PARENT="${DANCEPRO_STAGING_PARENT:-/var/www/dancepro-staging}"
 readonly DEPLOY_USER="${DANCEPRO_DEPLOY_USER:-ec2-user}"
 readonly RUNTIME_USER="${DANCEPRO_RUNTIME_USER:-apache}"
 readonly APP_GROUP="${DANCEPRO_APP_GROUP:-apache}"
@@ -190,6 +191,9 @@ cd "$APP_DIR"
 for command in git php composer curl sudo flock gzip stat mktemp node npm tar; do command -v "$command" >/dev/null || fail "Missing command: $command"; done
 [[ "$(node --version)" == v22.22.0 ]] || fail 'Node.js v22.22.0 is required.'
 npm --version >/dev/null
+[[ -d "$STAGING_PARENT" && ! -L "$STAGING_PARENT" && "$(readlink -f "$STAGING_PARENT")" == "$STAGING_PARENT" ]] || fail 'Staging parent must be an existing directory without symlink components.'
+[[ "$(stat -c %u "$STAGING_PARENT")" == "$(id -u)" && "$(stat -c %a "$STAGING_PARENT")" == 700 && -w "$STAGING_PARENT" && -x "$STAGING_PARENT" ]] || fail 'Staging parent must be deployment-owned, writable and mode 0700.'
+[[ "$(stat -c %d "$STAGING_PARENT")" == "$(stat -c %d public)" ]] || fail 'Staging parent and public must share a filesystem.'
 [[ ! -e public/hot && ! -L public/hot ]] || fail 'Remove the reviewed stale public/hot marker before deployment.'
 [[ ! -L public/build && (! -e public/build || -d public/build) ]] || fail 'public/build must be a regular directory.'
 id -nG | tr ' ' '\n' | grep -Fxq "$APP_GROUP" || fail "Deployment user needs membership of $APP_GROUP."
@@ -226,7 +230,7 @@ elif command -v mysqldump >/dev/null; then DUMP_COMMAND=mysqldump
 else fail 'A MySQL/MariaDB dump tool is required.'; fi
 
 log 'Build approved frontend before changing the live release'
-RELEASE_STAGE="$(mktemp -d "$APP_DIR/../.dancepro-release.XXXXXX")"
+RELEASE_STAGE="$(mktemp -d "$STAGING_PARENT/dancepro-release.XXXXXX")"
 [[ "$(stat -c %d "$RELEASE_STAGE")" == "$(stat -c %d public)" ]] || fail 'Build staging and public must share a filesystem.'
 # Only tracked release inputs enter staging: never production .env, keys or uploads.
 git archive "$TARGET_COMMIT" | tar -x -C "$RELEASE_STAGE"

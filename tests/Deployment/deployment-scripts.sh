@@ -28,6 +28,7 @@ cleanup() {
 }
 trap cleanup EXIT
 chmod 0755 "$TEST_ROOT"
+mkdir -m 0700 "$TEST_ROOT/staging"
 mkdir -p "$TEST_ROOT/bin" "$TEST_ROOT/source" "$TEST_ROOT/logs"
 for area in app bootstrap config database resources routes public; do cp -a "$PROJECT_ROOT/$area" "$TEST_ROOT/source/"; done
 # Production migrations deliberately use MySQL-only constraints. Exercise the
@@ -223,6 +224,7 @@ sed -e "s|/usr/bin/systemctl|$TEST_ROOT/bin/systemctl|g" \
     "$PROJECT_ROOT/scripts/dancepro-deploy.sh" > "$TEST_ROOT/runner"
 run_launcher() {
     setpriv --reuid="$DEPLOY_ID" --regid="$SHARED_GROUP" --groups="$SHARED_GROUP" env \
+        DANCEPRO_STAGING_PARENT="$TEST_ROOT/staging" \
         DANCEPRO_DEPLOY_USER=root DANCEPRO_RUNTIME_USER=www-data DANCEPRO_APP_GROUP=www-data \
         DANCEPRO_APP_DIR="$TEST_ROOT/production" DANCEPRO_EXPECTED_REMOTE_URL="$TEST_ROOT/origin.git" \
         DANCEPRO_PHP_BIN="$TEST_ROOT/bin/php" \
@@ -252,6 +254,18 @@ grep -q '40-character' "$TEST_ROOT/last-failure"
 run_launcher --dry-run "$TARGET" > "$TEST_ROOT/dry-run"
 [[ ! -e "$TEST_ROOT/production/storage/framework/down" ]]
 [[ ! -e "$TEST_ROOT/production/fixture-backup-size" ]]
+
+printf 'Checking staging parent privacy and symlink refusal...\n'
+chmod 0755 "$TEST_ROOT/staging"
+expect_failure --dry-run "$TARGET"
+grep -q 'mode 0700' "$TEST_ROOT/last-failure"
+chmod 0700 "$TEST_ROOT/staging"
+mv "$TEST_ROOT/staging" "$TEST_ROOT/staging-real"
+ln -s "$TEST_ROOT/staging-real" "$TEST_ROOT/staging"
+expect_failure --dry-run "$TARGET"
+grep -q 'without symlink components' "$TEST_ROOT/last-failure"
+rm "$TEST_ROOT/staging"
+mv "$TEST_ROOT/staging-real" "$TEST_ROOT/staging"
 
 printf 'Checking real Unix identity separation and existing tracked code repair...\n'
 existing="$TEST_ROOT/production/app/Features/Auth/Controllers/AuthController.php"
