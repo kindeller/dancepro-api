@@ -7519,7 +7519,7 @@
           "Location": {
             "type": "string",
             "nullable": false,
-            "example": "https://media.example.test/original/video.mp4?Expires=1792800000&Signature=REDACTED&Key-Pair-Id=EXAMPLE"
+            "example": "https://concert-bucket.example.invalid/original/video.mp4?response-content-disposition=attachment%3B%20filename%3D%22performance.mp4%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=REDACTED&X-Amz-Date=20261024T060000Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=REDACTED"
           },
           "Cache-Control": "private, no-store"
         }
@@ -7530,7 +7530,7 @@
         "503": "Unsupported storage disk",
         "500": "Storage/signing infrastructure error"
       },
-      "delivery": "Concert CloudFront for s3_concerts when configured; otherwise short-lived signed S3. Legacy storage always signs its own disk. Attachment disposition is included before signing."
+      "delivery": "Short-lived S3 presigned URL on the asset storage disk, including when CloudFront playback is configured. Attachment disposition and filename are included before signing. Both the original-download button and download manager use this route."
     }
   }
 }

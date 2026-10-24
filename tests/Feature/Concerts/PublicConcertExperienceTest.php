@@ -11,6 +11,7 @@ use App\Features\Studios\Models\Studio;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use PHPUnit\Framework\Assert;
 use Tests\TestCase;
 
 class PublicConcertExperienceTest extends TestCase
@@ -169,19 +170,26 @@ class PublicConcertExperienceTest extends TestCase
         }
     }
 
-    public function test_original_download_redirects_to_signed_concert_cloudfront_url(): void
+    public function test_original_download_requests_s3_attachment_even_with_cloudfront_configured(): void
     {
+        Storage::fake('s3_concerts');
         $this->configureConcertCloudFront();
         [$concert, , $asset] = $this->createVideoAsset();
+        Storage::disk('s3_concerts')->buildTemporaryUrlsUsing(
+            function ($path, $expiration, $options) use ($asset): string {
+                Assert::assertSame($asset->storage_key, $path);
+                Assert::assertEqualsWithDelta(now()->addMinutes(15)->timestamp, $expiration->timestamp, 2);
+
+                return 'https://s3.dancepro.test/'.$path.'?'.http_build_query($options);
+            },
+        );
 
         $response = $this->get(route('concerts.media.download', [$concert, $asset]))->assertRedirect();
         $location = $response->headers->get('Location');
-        $this->assertStringStartsWith('https://media.dancepro.test/'.$asset->storage_key.'?', $location);
+        $this->assertStringStartsWith('https://s3.dancepro.test/'.$asset->storage_key.'?', $location);
         parse_str(parse_url($location, PHP_URL_QUERY), $query);
-        $this->assertArrayHasKey('Signature', $query);
-        $this->assertArrayHasKey('Expires', $query);
-        $this->assertStringContainsString('attachment;', $query['response-content-disposition']);
-        $this->assertStringContainsString('performance.mp4', $query['response-content-disposition']);
+        $this->assertStringStartsWith('attachment;', $query['ResponseContentDisposition']);
+        $this->assertStringContainsString('performance.mp4', $query['ResponseContentDisposition']);
         $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
     }
 

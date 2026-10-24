@@ -1650,15 +1650,18 @@ codes/status/request IDs, never bearer tokens or presigned query strings.
 Authentication is the unlocked concert session, a valid Laravel signed URL
 (`expires`, `signature`, `access=1`), or a concert without a password. No bearer
 ability grants customer access. Success is **302**, with an empty body and a
-non-null string `Location` header pointing to a short-lived signed concert
-CloudFront URL or S3 URL. The attachment filename is signed with the URL;
+non-null string `Location` header pointing to a short-lived S3 presigned URL
+on the asset's disk, even when CloudFront playback is configured. The attachment
+filename is signed with the URL;
 `Cache-Control: private, no-store` prevents caching the redirect.
 
-Example: `Location: https://media.example.test/collection/media/asset/original/video.mp4?response-content-disposition=attachment%3B%20filename%3D%22performance.mp4%22&Expires=1792800000&Signature=REDACTED&Key-Pair-Id=EXAMPLE`.
+Example: `Location: https://concert-bucket.example.invalid/collection/media/asset/original/video.mp4?response-content-disposition=attachment%3B%20filename%3D%22performance.mp4%22&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=REDACTED&X-Amz-Date=20261024T060000Z&X-Amz-Expires=900&X-Amz-SignedHeaders=host&X-Amz-Signature=REDACTED`.
 Errors: 403 for missing access; 404 for unavailable concerts, unrelated,
 unpublished, hidden or unavailable assets; 503 for unsupported storage disks.
 Storage/signing infrastructure errors may return 500. The original recorded
 storage key is downloaded. Legacy disks always use their own S3 origin.
+The original-download button and download manager use this same attachment route.
+Browsers may still require permission for multiple automatic downloads.
 These web operations remain outside the JSON API `paths` contract; their delivery
 contract is recorded in the OpenAPI `x-concert-web-delivery` extension.
 
