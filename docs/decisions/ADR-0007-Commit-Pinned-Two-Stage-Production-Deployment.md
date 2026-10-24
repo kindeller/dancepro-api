@@ -1,6 +1,6 @@
 # ADR-0007: Commit-Pinned Two-Stage Production Deployment
 
-- Status: Accepted for staged production validation
+- Status: Superseded by ADR-0008
 - Date: 2026-10-18
 
 ## Context
@@ -39,3 +39,9 @@ until production validation finishes.
 - Deployments remain in-place; immutable releases remain a possible future ADR.
 - Rollback stays operator-reviewed because code, migrations, and customer writes
   cannot safely be reversed as one automatic action.
+
+## Superseded
+
+[ADR-0008](ADR-0008-Single-Snapshot-Deployment.md) replaces the separate launcher
+and application-script handoff with one self-snapshotting deployment script.
+The backup, approved-SHA, lock, and operator-reviewed recovery safeguards remain.

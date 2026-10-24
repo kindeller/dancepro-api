@@ -1,328 +1,227 @@
 # Production Deployment
 
-DancePro API production deployments use GitHub Actions, AWS Systems Manager
-(SSM), and a two-stage EC2 deployment process. The production `.env`, runtime
-keys, AWS instance-role credentials, logs, and database backups remain outside
-Git.
-
-Automatic deployment on merge is deliberately **not enabled yet**. The checked-in
-workflow supports manual dispatch only until the readiness checklist in this
-document has been completed and approved.
-
-## Current State
-
-The following infrastructure was reported as established before this repository
-change, but still requires production validation:
-
-- EC2 instance `i-09a5f7c942155e96a` in `ap-southeast-2`.
-- Application checkout `/var/www/dancepro-api` on branch `master`.
-- An online SSM managed node and the `DancePro-Deploy-Production` Command
-  document.
-- GitHub's OIDC provider and IAM role `DancePro-GitHub-Deploy-Role`.
-- S3 database-backup bucket `dance-pro-db-backup` and existing retention
-  arrangements.
-
-This repository now contains the stable launcher source, the application deploy
-script, the proposed SSM document, a manual-only production workflow, and safe
-isolated shell tests. No AWS resource, EC2 configuration, production file,
-database, or GitHub repository setting is changed merely by merging these files.
-
-## Architecture
-
-```text
-approved master commit (GitHub SHA)
-              |
-              v
-GitHub Actions tests and OIDC role assumption
-              |
-              v
-SSM DancePro-Deploy-Production(TargetCommit)
-              |
-              v
-/usr/local/bin/dancepro-deploy <TargetCommit>
-  - independent, root-owned launcher
-  - lock, logs, repository and ancestry checks
-  - verified database backup from the current release
-  - maintenance mode using the current release
-  - fast-forward to the exact approved SHA
-              |
-              v
-scripts/dancepro-deploy.sh from that SHA
-  - verifies the launcher-provided backup reference
-  - dependencies, migrations and caches
-  - services, health check and deployment record
-```
-
-The launcher is copied out of the repository so an update cannot replace the
-process currently changing the checkout. The pre-checkout backup and maintenance
-gate therefore lives in the installed launcher. Release-specific behaviour
-remains in the version-controlled script and changes through the normal pull
-request process.
-
-The launcher accepts only a lowercase full SHA. It requires the requested commit
-to be an ancestor of `origin/master` and the current production commit to be an
-ancestor of the target. It never merges divergent history, rebases, resets, or
-overwrites local changes. GitHub waits for the terminal SSM plugin status;
-acceptance of `SendCommand` alone is not success. GitHub and EC2 both prevent
-overlapping deployments.
-
-## Database Backup Gate
-
-Every live invocation performs and verifies a backup from the current production
-release before maintenance mode, rollback-tag creation, or any checkout change:
-
-1. Laravel's installed Dotenv library reads the server-only `.env` from the
-   unchanged current release without booting Laravel. It requires
-   `APP_ENV=production`, a MySQL/MariaDB connection, and discrete `DB_*` values
-   rather than `DB_URL`.
-2. PHP writes a mode-`0600` temporary client file. The password is never put in
-   a command argument or printed. The successful dump is the connectivity test.
-3. `mariadb-dump` is preferred, with `mysqldump` as fallback. The dump uses a
-   single transaction and includes routines, triggers, and events.
-4. The script requires non-empty SQL, compresses it, and runs `gzip -t`.
-5. It uploads with the EC2 instance role to
-   `s3://dance-pro-db-backup/deployments/dancepro-db-<UTC>-<commit>.sql.gz`.
-6. `head-object` must report the same non-zero byte count before deployment.
-7. Restricted temporary files are removed by the exit trap.
-8. Only after verification succeeds does the launcher enable maintenance mode,
-   create the rollback tag, and fast-forward to the approved commit. It passes
-   the validated object key to the version-controlled deployment script.
-
-A size match confirms transfer completeness, not restorability. Periodically
-restore into an isolated nonproduction database and record the rehearsal. The
-existing S3 retention, encryption, versioning, and lifecycle arrangements were
-not changed here and require separate review. Never automatically restore after
-a failed migration: migrations can be partially applied and a restore can lose
-production writes made after the snapshot.
-
-Each live invocation, including a same-commit SSM test, creates a new object and
-therefore incurs the associated S3 request and storage charges.
-
-## One-Time EC2 Migration
-
-These are manual production changes that Codex has not executed. Perform them
-during an approved maintenance window.
-
-1. Confirm the checkout is clean, on `master`, and uses the authorised remote:
-
-   ```bash
-   cd /var/www/dancepro-api
-   sudo -u ec2-user git status --short --branch
-   sudo -u ec2-user git remote get-url origin
-   ```
-
-2. Verify Git authentication is noninteractive:
-
-   ```bash
-   sudo -u ec2-user env GIT_TERMINAL_PROMPT=0 git ls-remote origin refs/heads/master
-   ```
-
-   Keep any deploy key or Git credential outside the repository and read-only.
-   GitHub Actions uses OIDC and needs no permanent AWS access key or SSH key.
-
-3. Before the first deployment of this architecture, install the launcher from
-   the exact approved target commit without changing the production checkout.
-   This ordering is mandatory because the launcher now creates the backup and
-   passes its verified key to the application script; the previous launcher is
-   not compatible with that handoff.
-
-   ```bash
-   cd /var/www/dancepro-api
-   TARGET_COMMIT=<approved-full-master-sha>
-   sudo -u ec2-user git fetch --no-tags origin \
-       +refs/heads/master:refs/remotes/origin/master
-   sudo -u ec2-user git merge-base --is-ancestor "$TARGET_COMMIT" origin/master
-   sudo -u ec2-user git show \
-       "$TARGET_COMMIT:scripts/dancepro-deploy-launcher.sh" \
-       | sudo tee /usr/local/bin/dancepro-deploy.new >/dev/null
-   sudo chown root:root /usr/local/bin/dancepro-deploy.new
-   sudo chmod 0755 /usr/local/bin/dancepro-deploy.new
-   sudo mv /usr/local/bin/dancepro-deploy.new /usr/local/bin/dancepro-deploy
-   sudo test -f /usr/local/bin/dancepro-deploy
-   sudo test ! -L /usr/local/bin/dancepro-deploy
-   ```
-
-4. Create independent lock and log locations:
-
-   ```bash
-   sudo install -d -o ec2-user -g ec2-user -m 0750 /var/log/dancepro-deploy
-   sudo touch /var/lock/dancepro-deploy.lock
-   sudo chown ec2-user:ec2-user /var/lock/dancepro-deploy.lock
-   sudo chmod 0640 /var/lock/dancepro-deploy.lock
-   ```
-
-5. Confirm `storage/` and `bootstrap/cache/` are writable by `ec2-user` and the
-   web-service group. Never use mode `0777`.
-
-6. Identify the installed PHP-FPM service. If it exists, grant only its exact
-   reload command in `/etc/sudoers.d/dancepro-deploy`, checked with `visudo -cf`:
-
-   ```text
-   ec2-user ALL=(root) NOPASSWD: /usr/bin/systemctl reload php-fpm.service
-   ```
-
-   Confirm the binary path and service first; do not grant unrestricted `sudo`
-   or guessed service names. If PHP-FPM is not used, no reload grant is needed.
-
-7. Verify `git`, PHP 8.3+, Composer, `curl`, `gzip`, AWS CLI v2,
-   `mariadb-dump` or `mysqldump`, `flock`, and `systemctl` are available.
-
-8. Verify SSM Agent is at least `3.3.2746.0`. The proposed document uses SSM
-   `ENV_VAR` interpolation so the SHA is data rather than shell source.
-
-## Required AWS and GitHub Changes
-
-These remain manual and must be reviewed before production testing.
-
-### SSM document
-
-Replace the current parameterless content with
-`deployment/aws/ssm/DancePro-Deploy-Production.yaml`. This explicit document
-change adds required `TargetCommit`, restricts it to `^[0-9a-f]{40}$`, invokes
-the stable launcher as `ec2-user`, and preserves the 1,800-second timeout.
-
-Review the new document version, make it default only for the controlled test,
-and retain the previous version for recovery. Never add a free-form command
-parameter.
-
-### GitHub OIDC role
-
-Verify the trust policy requires audience `sts.amazonaws.com` and subject
-`repo:kindeller/dancepro-api:ref:refs/heads/master`. If the repository owner is
-not `kindeller`, use the exact owner. The workflow does not use a GitHub
-Environment, so do not use an environment-form subject without reviewing both
-designs.
-
-The role should allow `ssm:SendCommand` only for the production instance and
-the `DancePro-Deploy-Production` document, plus minimum read actions for command
-status and output. Some SSM result APIs may require `Resource: "*"`; keep their
-action list narrow rather than broadening `SendCommand`. Validate the effective
-policy with IAM Access Analyzer.
-
-### EC2 instance role
-
-In addition to managed-node permissions, it needs:
-
-- `s3:PutObject` on `arn:aws:s3:::dance-pro-db-backup/deployments/*`;
-- `s3:GetObject` on that prefix so `HeadObject` can verify uploads;
-- required KMS actions if the bucket uses a customer-managed key.
-
-It needs no S3 delete, lifecycle, bucket-policy, or protection-changing access.
-Confirm the bucket policy permits the role and enforces established encryption.
-
-### GitHub repository
-
-Create repository variable `AWS_DEPLOY_ROLE_ARN` with the complete ARN of
-`DancePro-GitHub-Deploy-Role`. This identifier is not a static credential.
-
-The workflow currently has only `workflow_dispatch`. After all testing below,
-enable merge deployment in a separate reviewed pull request by adding:
-
-```yaml
-push:
-  branches:
-    - master
-```
-
-Keep the concurrency group and `cancel-in-progress: false` so later merges queue
-behind an active deployment.
-
-## Failure Recovery
-
-Launcher logs are under `/var/log/dancepro-deploy/`; application logs and the
-successful `current-deployment.json` record are under
-`storage/logs/deployments/`.
-
-- Fetch, validation, dirty-tree, ancestry, lock, backup, or upload failure stops
-  before maintenance mode and leaves the production checkout unchanged.
-- After the backup is verified, the launcher enables maintenance mode before
-  creating the rollback tag or changing the checkout.
-- Dependency, migration, cache, reload, or integrity failure leaves maintenance
-  mode enabled for diagnosis.
-- Health-check failure returns the site to maintenance mode.
-- Every failure exits non-zero through SSM and GitHub.
-
-The launcher does not automatically reset Git and never automatically restores
-the database. New code may already have run migrations, so either action needs
-operator review. For an approved code-only rollback:
+Production deployment is manual on one EC2 instance. Use one script as `ec2-user`:
 
 ```bash
 cd /var/www/dancepro-api
-php artisan down --render=errors.503
-git show --no-patch <pre-deploy-tag>
-git reset --hard <pre-deploy-tag>
-composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
-php artisan optimize:clear
-php artisan config:cache
-php artisan event:cache
-php artisan route:cache
-php artisan view:cache
-sudo -n systemctl reload <verified-php-fpm-service>
-curl --fail --max-time 10 http://127.0.0.1/up
-php artisan up
+bash scripts/dancepro-deploy.sh --dry-run 'approved-full-master-sha'
+bash scripts/dancepro-deploy.sh 'approved-full-master-sha'
 ```
 
-Review migrations, customer writes, the exact tag, and backup first. A Git reset
-is destructive to the checkout and is not an automatic deployment action.
+Replace the placeholder with the reviewed lowercase 40-character SHA. The script
+copies itself to a private temporary file and runs that snapshot, so checkout
+cannot replace the running deployment. No installed launcher, support bundle,
+protocol versions, runtime helper, process scans, or service-mask changes are needed.
 
-## Manual Emergency Deployment
+GitHub Actions still has **only `workflow_dispatch`**: merging to `master` does
+not deploy. GitHub/SSM delivery remains unverified and deferred. Neither is needed
+for the manual command above.
 
-Use the launcher so all normal safeguards remain active:
+## Deployment sequence
+
+1. Acquire the lock; validate user, clean `master`, origin, exact SHA and
+   fast-forward ancestry, Apache's Artisan access, FPM, and current origin health.
+2. Create and verify the existing private MySQL/MariaDB backup in S3.
+3. Prepare code access and deployment-owned generated leftovers; enter maintenance
+   and verify HTTP 503 before changing checkout.
+4. Update the approved SHA and install locked production dependencies, repairing
+   Git/Composer-created permissions at each boundary.
+5. Run explicit cache clearing, migrations, all cache/view generation, and queue
+   restart **as Apache**. Reload the exact configured PHP-FPM unit.
+6. Verify bootstrap/view compilation, FPM `/up`, and a static asset during
+   maintenance. Reopen and immediately check home, login, health, and public API
+   status, response type, and content. Failure restores maintenance.
+7. Write the private record `/var/log/dancepro-deploy/current-deployment.json`.
+
+## One-time host setup
+
+Recovery confirmed PHP-FPM runs as `apache` and Nginx as `nginx`. Reuse Apache's
+existing group; add `ec2-user` to it if missing and start a new deployment login.
+Apache already has its primary group, so no new group or FPM group restart is
+required. Review existing ownership/ACLs before applying setup changes.
+
+| Area | Intended access |
+|---|---|
+| Application root | `ec2-user:apache`, `2751`: deploy write, Apache read, Nginx traversal |
+| Tracked code and dependencies | Deployment-owned, group `apache`; directories `2750`, files `0640`, required executables `0750` |
+| Tracked public assets | Directories `2755`, files `0644`; executable bits preserved |
+| `bootstrap/cache`, `storage/framework`, `storage/framework/views` | Group `apache`, directories `2770`, writable by both identities |
+| Application logs | Apache writable; repair an existing incorrect log only by its exact reviewed path |
+| Deployment logs | Deployment-only directory `0700`, files created under `077` |
+| `.env`, keys, uploads, backups, Git metadata | Preserve separately; never recursively normalize them |
+
+Separately approved setup examples, **not executed by Codex**:
 
 ```bash
-TARGET_COMMIT=<approved-full-master-sha>
-/usr/local/bin/dancepro-deploy --dry-run "$TARGET_COMMIT"
-/usr/local/bin/dancepro-deploy "$TARGET_COMMIT"
+id ec2-user
+id apache
+stat -c '%U:%G %a %n' /var/www/dancepro-api
+# Only if membership is missing:
+sudo usermod -aG apache ec2-user
+sudo chgrp apache /var/www/dancepro-api
+sudo chmod 2751 /var/www/dancepro-api
+cd /var/www/dancepro-api
+for path in bootstrap/cache storage/framework storage/framework/views; do
+    sudo chgrp apache "$path"
+    sudo chmod 2770 "$path"
+done
+sudo install -d -o ec2-user -g ec2-user -m 0700 /var/log/dancepro-deploy
+sudo touch /var/lock/dancepro-deploy.lock
+sudo chown ec2-user:ec2-user /var/lock/dancepro-deploy.lock
+sudo chmod 0600 /var/lock/dancepro-deploy.lock
 ```
 
-Do not invoke `scripts/dancepro-deploy.sh` directly. Updating application logic
-uses a normal pull request. Updating the launcher is exceptional: review its
-tests, schedule a window, install atomically, and record its checksum.
+Keep Nginx out of the Apache group. It needs public-file access and traversal of
+public-storage ancestors, not `.env` or cached configuration access. Preserve the
+recovered public-storage access; its link must resolve exactly to
+`/var/www/dancepro-api/storage/app/public`. Review SELinux separately, without
+disabling it. Do not recursively change storage permissions.
 
-## Safe Activation Plan
+Validate these two scoped sudo grants with `visudo -cf` before deploying:
 
-1. **Static validation:** run `bash -n` on both scripts,
-   `bash tests/Deployment/deployment-scripts.sh`, `sail artisan test`, and
-   `sail pint --test`.
-2. **Local dry-run:** use the isolated shell suite; it creates temporary local
-   Git repositories and makes no AWS calls. Review workflow syntax separately.
-3. **EC2 installation:** perform the one-time migration and run launcher
-   `--dry-run` with the current approved SHA. Verify locks and logs.
-4. **SSM test:** install a reviewed document version and invoke it with the
-   already-deployed SHA. This live-script test still creates an S3 backup, so
-   schedule and monitor it as a production deployment test.
-5. **OIDC test:** confirm only the intended repository and `master` can assume
-   the role, and that the role cannot target another instance or document.
-6. **Manual workflow:** set `AWS_DEPLOY_ROLE_ARN`, dispatch from `master`, type
-   `DEPLOY`, and verify tests, SHA, SSM output, backup, health, and smoke tests.
-7. **Automatic activation:** after owner approval, add the `push` trigger in a
-   reviewed pull request and monitor the first low-risk merge end to end.
+```sudoers
+ec2-user ALL=(apache) NOPASSWD: /usr/bin/php /var/www/dancepro-api/artisan *
+ec2-user ALL=(root) NOPASSWD: /usr/bin/systemctl reload php-fpm.service
+```
 
-Do not proceed after a failed stage.
+Artisan runs as the application user, not root; arbitrary root PHP/shell/chmod is
+not granted. No per-release sudoers or helper installation is needed. Keep the
+existing PHP, Composer, Git, curl, sudo, coreutils, flock, gzip, AWS CLI and dump
+tool available. Align queue/scheduler identity with Apache where practical;
+`queue:restart` is a signal, not proof the supervisor restarted its workers.
 
-## Production Smoke Tests
+## Concert media runtime permissions
 
-Verify `/up`, authentication, competition listings and downloads, public
-concert discovery, authorised concert playback and seeking, original downloads,
-branding assets, and an authorised staff media upload/finalisation. Confirm
-unsigned private media remains inaccessible and inspect recent logs without
-copying credentials or signed URLs into tickets.
+**Required on live: `s3:ListBucket` on the concert bucket ARN
+`arn:aws:s3:::dance-pro-concerts`.** This is a bucket permission; attaching it
+only to `arn:aws:s3:::dance-pro-concerts/*` does not grant bucket access.
+The Laravel runtime also needs the scoped object permissions documented in
+[Required concert upload permissions](Concert-Streaming-AWS-Setup-Handoff.md#required-concert-upload-permissions).
+Verify the identity used by PHP-FPM and queue workers, rather than relying on
+the deployment user's AWS access or access to the database-backup bucket.
 
-## Known Limits
+The 21 October 2026 live multipart upload incident was resolved by adding the
+missing concert bucket `s3:ListBucket` permission. Parts uploaded successfully,
+but the API completion step returned HTTP 500 and the upload remained pending.
+The completion action checks for an existing assembled object with `HeadObject`
+before completing the upload. Without `s3:ListBucket`, a missing object returns
+403 instead of the 404 the application expects. See [AWS HeadObject documentation](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html).
 
-- Deployment uses an in-place fast-forward rather than immutable releases. The
-  independent launcher prevents executing a partially updated deploy script;
-  release-directory switching would be a separate project.
-- Backup verification covers gzip integrity and exact object size. Only a
-  restore rehearsal proves recoverability.
-- Code rollback does not reverse migrations or S3 object changes.
-- Retention, Git authentication, service names, IAM, SSM Agent version, and
-  production health behaviour need manual validation before activation.
+Include a real concert multipart upload through finalisation in release smoke
+checks when changing media configuration or runtime IAM permissions. Confirm
+the upload becomes `completed`; successful part transfers, `/up`, and deployment
+backup checks do not verify this workflow. The deployment script does not
+provision or validate concert IAM permissions. If finalisation fails, inspect
+the production Laravel log for `HeadObject` / 403 at the request time before
+assuming application code needs redeployment.
 
-## Related Documentation
+## Why this fixes the incident
 
-- [ADR-0007 - Commit-Pinned Two-Stage Production Deployment](../decisions/ADR-0007-Commit-Pinned-Two-Stage-Production-Deployment.md)
-- [Git Workflow](Git-Workflow.md)
-- [Security](Security.md)
-- [Testing](Testing.md)
-- [AWS](AWS.md)
+Git/Composer use `027`, setgid code directories inherit the Apache group, and
+explicit normalization also handles restrictive archive/file modes. Only tracked
+code and dependencies are normalized. Storage, bootstrap cache contents, `.env`
+variants and Git metadata are excluded from that code pass. Symlinks/hard links,
+filesystem boundaries, and unexpected code ownership stop the operation.
+
+All Artisan output is created by Apache, so Apache can read its caches, views,
+maintenance files and logs even if sudo applies a restrictive mask. There is no
+requirement to change the global FPM mask. Deployment-owned leftovers are repaired
+only in bootstrap cache, compiled views, and the two exact maintenance files.
+Other runtime/private contents are untouched. PHP-FPM cannot write source code.
+
+## Adopt the new script safely
+
+Earlier scripts remain in Git history. For the first corrected deployment,
+extract and review the new script without updating production checkout first:
+
+```bash
+cd /var/www/dancepro-api
+DEPLOY_SHA='replace-with-approved-40-character-master-sha'
+[[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
+git fetch --no-tags origin +refs/heads/master:refs/remotes/origin/master
+git merge-base --is-ancestor "$DEPLOY_SHA" origin/master
+umask 077
+reviewed_script="$(mktemp /tmp/dancepro-reviewed.XXXXXX)"
+git show "$DEPLOY_SHA:scripts/dancepro-deploy.sh" > "$reviewed_script"
+bash -n "$reviewed_script"
+sha256sum "$reviewed_script"
+# Review it, verify host setup, then perform the nondeploying check:
+bash "$reviewed_script" --dry-run "$DEPLOY_SHA"
+# Separately approve this live invocation:
+bash "$reviewed_script" "$DEPLOY_SHA"
+```
+
+A dry run fetches Git and checks access/health, but does not back up, change
+permissions, enter maintenance, migrate, or update checkout. Ordinary runtime/log
+activity can occur. Stop on failure; do not change the working application just
+to force a pass. Remove only the exact reviewed temporary file after use.
+
+After adoption, use the repository script directly. Deployment-script changes
+normally take effect on the next invocation. Extract/review the target script as
+above if a release needs its new deployment behavior immediately.
+
+The existing `/usr/local/bin/dancepro-deploy` remains the **old** launcher until
+separately updated; do not assume editing Git changes it. That installed command
+is unnecessary for the direct path. If retaining its name is preferred, hold the
+deployment lock, back up the old regular file, and atomically replace it with a
+copy of the reviewed single script. Restore that copy to undo the installation;
+this does not roll back application code or data. There are no companion files.
+
+## Validation, failure and recovery
+
+Record the baseline SHA, clean tree, group/access metadata and public home/login/
+API responses before the first corrected manual deployment. Check the private
+record and public HTTPS pages/assets afterward; inspect fresh logs locally and
+redact sensitive data before sharing. Approve authenticated/playback/download
+smoke tests separately because they can create sessions/audits or AWS requests.
+
+Checks default to local HTTP port 80 with the production hostname via `--resolve`.
+If that listener redirects, set `DANCEPRO_ORIGIN_SCHEME=https` and
+`DANCEPRO_ORIGIN_PORT=443`; TLS verification stays enabled. The exact unit/PHP path
+can be set with `DANCEPRO_PHP_FPM_SERVICE` / `DANCEPRO_PHP_BIN`. Defaults are
+`php-fpm.service` and `/usr/bin/php`. Keep any nonsecret overrides consistent for
+SSH and later SSM. No new host configuration file is needed.
+
+Compiling all views and bootstrapping as Apache before reopening catches the
+permission failures seen here. Actual home/login/API requests run immediately
+after `up`, leaving a short exposure window for route-specific failures. A
+zero-exposure cutover requires a separate traffic-gate/release design.
+
+Failure after maintenance is requested re-enters maintenance and verifies HTTP
+503. If Laravel cannot boot, the script attempts a minimal standalone response
+in the two exact maintenance files. Unverified closure is reported as **CRITICAL**:
+an operator must block traffic at Nginx. Disk/host failure, inaccessible framework
+directories or stale OPcache can still require intervention. Use file maintenance
+when relying on this fallback. There is no automatic Git reset, migration rollback
+or database restoration; review migrations and customer writes before recovery.
+
+The existing backup gate is preserved: current-release Dotenv reading, private
+client file, nonempty dump, gzip verification, S3 upload to
+`dance-pro-db-backup/deployments/`, and equal nonzero local/S3 sizes. Backup failure
+leaves checkout and maintenance unchanged. Only a restore rehearsal proves
+recoverability. No S3 deletion or protection change is introduced.
+
+## Local tests and future SSM
+
+```bash
+bash tests/Deployment/deployment-scripts.sh
+sail exec -T -u root laravel.test bash tests/Deployment/deployment-scripts.sh --integration
+sail artisan test
+sail pint --test
+```
+
+The isolated fixture uses real Laravel cache/migration operations, a minimal
+SQLite schema and separate Unix identities, with cloud/HTTP/service boundaries
+stubbed. It tests permissions, backup ordering, failures, locks and replacement of
+the repository script during checkout. The normal MySQL suite covers the full app
+schema. Neither suite proves actual EC2 sudoers, FPM, Nginx, SELinux or S3.
+
+The proposed SSM document invokes the same repository script as SSH. Later, test
+SSM identity/environment/exit reporting with an approved nondeploying command or
+dry run, then authorize one controlled deployment. Verify GitHub OIDC identity
+before testing its manual workflow. Keep both integrations unverified until those
+stages pass, and keep `workflow_dispatch` as the only trigger. Updating document
+source does not update AWS or the working production application.
+
+See [ADR-0008](../decisions/ADR-0008-Single-Snapshot-Deployment.md),
+[Testing](Testing.md), and [Git Workflow](Git-Workflow.md).

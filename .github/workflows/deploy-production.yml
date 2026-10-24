@@ -1,11 +1,7 @@
 name: Deploy production
 
-# Automatic deployment is intentionally disabled until the production readiness
-# checklist in docs/handbook/Deployment.md has been completed. To activate it,
-# retain workflow_dispatch and add:
-#   push:
-#     branches:
-#       - master
+# Deployment is manual-only. GitHub Actions/SSM remain unverified end to end;
+# validate the manual EC2 deployment script first. Do not add a push trigger.
 on:
   workflow_dispatch:
     inputs:
@@ -92,6 +88,9 @@ jobs:
 
       - name: Start Sail
         run: ./vendor/bin/sail up -d
+
+      - name: Test deployment with separate Unix identities
+        run: ./vendor/bin/sail exec -T -u root laravel.test bash tests/Deployment/deployment-scripts.sh --integration
 
       - name: Prepare Laravel
         run: ./vendor/bin/sail artisan key:generate

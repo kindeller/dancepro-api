@@ -8,12 +8,21 @@ It should explain why decisions were made and how the system is intended to work
 
 ```text
 docs/
+├── api/
 ├── handbook/
 ├── epics/
 ├── specifications/
 ├── milestones/
 └── decisions/
 ```
+
+## API Reference
+
+Give consuming application developers the [API reference](api/README.md) and
+[OpenAPI contract](api/openapi.json). Every JSON API operation has request and
+response schemas and complete success examples, including authentication,
+collections, reservation, upload URLs, completion, finalisation and errors.
+Update the contract and examples whenever the API changes.
 
 ## Handbook
 
@@ -35,6 +44,7 @@ Start with:
 - [DancePro V1 S3 Structure](handbook/V1-S3-Structure.md)
 - [Concert Streaming AWS Setup Handoff](handbook/Concert-Streaming-AWS-Setup-Handoff.md)
 - [Concert Streaming AWS ChatGPT Prompt](handbook/Concert-Streaming-AWS-ChatGPT-Prompt.md)
+- [Flutter macOS Upload Handoff](handbook/Flutter-Mac-Upload-Handoff.md)
 - [Brand Style](handbook/Brand-Style.md)
 - [Security](handbook/Security.md)
 

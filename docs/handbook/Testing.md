@@ -11,6 +11,16 @@ signing, Competition object browsing, the Concert/media domain, public Concert
 access, staff studio/concert management, local demonstration data and
 maintenance behavior.
 
+Manual EC2 deployment has a separate regression suite. Run Bash syntax checks
+with `bash tests/Deployment/deployment-scripts.sh`, then run
+`sail exec -T -u root laravel.test bash tests/Deployment/deployment-scripts.sh --integration`.
+It copies the app into temporary storage, exercises real Laravel cache compilation,
+Unix permission behavior with separate identities, and checkout of a replacement
+deployment script while the private snapshot continues. It stubs cloud/network
+and service boundaries. See [Deployment](Deployment.md) for its scope and the
+remaining production validation. GitHub Actions/SSM are unverified end to end;
+neither local tests nor a successful manual EC2 deployment prove that pipeline.
+
 Browser playback has also been manually checked on desktop and mobile across
 multiple browsers. The current playlist advances automatically without closing
 the active player. Production-like S3 or CloudFront delivery still requires

@@ -20,7 +20,10 @@ the proposed resources, permissions and costs before applying them.
 - New V2 object keys use immutable collection and media asset UUIDs.
 - Studio names, concert names, slugs and other mutable business data must not
   appear in authoritative storage prefixes.
-- Original MP4 downloads continue through Laravel's tracked-download workflow.
+- Original MP4 downloads are intended to use Laravel's tracked-download workflow.
+  As reviewed on 18 October 2026, the concert-original web route streams through
+  Laravel and is not yet connected to generic tracked-download redirects. See
+  the [Flutter upload handoff](Flutter-Mac-Upload-Handoff.md) for current behaviour.
 - HLS playback uses CloudFront signed cookies because a stream consists of a
   manifest and multiple protected files.
 - Laravel performs playback authorisation and generates the signed cookies.
@@ -104,7 +107,9 @@ profile is accepted.
 
 The target Flutter integration is documented in
 [Flutter Desktop Media Ingest API](../specifications/Flutter-Desktop-Media-Ingest-API.md).
-The corresponding Laravel endpoints are not yet implemented.
+The corresponding Laravel endpoints are implemented and tested with mocked S3.
+An actual upload from the packaged macOS app and environment-specific AWS access
+remain to be verified. Start with the [Flutter upload handoff](Flutter-Mac-Upload-Handoff.md).
 
 The intended flow is:
 
@@ -264,6 +269,41 @@ workflow requires it.
 
 CloudFront signing uses the private key locally; it does not require broad
 CloudFront administration permissions at application runtime.
+
+### Required concert upload permissions
+
+**The production Laravel runtime must have `s3:ListBucket` on the concert
+bucket itself, in addition to object read/write permissions.** For the V2
+bucket, the bucket resource is `arn:aws:s3:::dance-pro-concerts`, without `/*`.
+Object permissions use `arn:aws:s3:::dance-pro-concerts/*`, scoped further to
+the application media prefixes where appropriate.
+
+| Permission | Resource | Purpose |
+|---|---|---|
+| `s3:ListBucket` | Concert bucket ARN | Missing-object checks before multipart completion and media listing |
+| `s3:GetObject` | Concert object ARNs | Read media and verify uploaded object size and checksums using `HeadObject` |
+| `s3:PutObject` | Concert object ARNs | Create multipart uploads, upload parts and complete uploads; presign single-object uploads |
+| `s3:AbortMultipartUpload` | Concert object ARNs | Explicit multipart cancellation through the application |
+
+Keep bucket and object permissions in separate policy statements because they
+use different resource types. Apply them to the identity actually used by the
+Laravel runtime, preferably the EC2 instance role. A deploy operator's access
+or CloudFront's origin access does not establish application access.
+
+On 21 October 2026, production Flutter multipart finalisation returned HTTP 500
+because `s3:ListBucket` was missing on the concert bucket. Adding that permission
+resolved the incident. The completion action first calls `HeadObject` to check
+whether a previous attempt already assembled the object. Before assembly, that
+object normally does not exist. S3 returns 404 for a missing object when the
+caller has `s3:ListBucket`, but 403 without it. The application handles 404 as
+absent and propagates 403 as an error, so successful part uploads alone do not
+prove finalisation permissions are correct.
+
+If the bucket uses SSE-KMS, separately verify the KMS permissions required for
+uploads and checksum reads. See the [AWS HeadObject permission requirements](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html)
+and [multipart upload permissions](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html#mpuAndPermissions).
+Keep access logging, CloudTrail data events and CloudWatch metrics configured
+for the production observability requirements.
 
 ## Application Configuration Boundary
 

@@ -1,5 +1,22 @@
 # API Guidelines
 
+## Consumer Contract
+
+The central API reference is [docs/api/README.md](../api/README.md), with typed
+schemas and complete examples in [openapi.json](../api/openapi.json). Hand both
+files to consuming app developers; feature handoffs explain workflows but do
+not replace this contract.
+
+Every endpoint must include method/path, request schema and example (or an
+explicit no-body declaration), parameters/headers, authentication/abilities,
+success status, full response example, field types/nullability, pagination and
+relevant error schemas/examples. Keep both reference files current in the same
+change as any route, validation, controller, resource or response change.
+Document conditional omissions separately from fields that return null. Use
+fictional examples and redacted capabilities; never copy production credentials
+or personal responses. `ApiDocumentationTest` checks route coverage and examples;
+it does not replace behaviour tests or actual AWS integration verification.
+
 ## Route Shape
 
 The V2 API replaces the old API, so endpoints should use clean resource names instead of a version prefix.
@@ -58,9 +75,12 @@ apply. New login tokens receive explicit abilities and an individual expiry
 configured by `STAFF_API_TOKEN_TTL_MINUTES` (30 days by default). The optional
 `SANCTUM_EXPIRATION` global limit is not newly imposed on old tokens.
 
-Create, import, upload-completion and finalisation requests must support an
-`Idempotency-Key` so a desktop client can retry after an uncertain network
-result without duplicating business records or completing an operation twice.
+Collection creation, asset reservation, upload URL batches, multipart initiation
+and legacy imports require a UUID `Idempotency-Key`. Reuse it for an unchanged
+retry after an uncertain result. Completion and finalisation are retryable by
+their existing resource/upload identifiers and do not require a new header.
+Generic download-link creation is not idempotent; do not assume this behaviour
+applies to every POST request.
 
 The API allocates UUIDs and authoritative object keys. A client may submit only
 validated relative paths within its reserved media asset. Presigned upload URLs
