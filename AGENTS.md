@@ -172,6 +172,15 @@ Preferred format:
 
 Create shared response helpers where appropriate.
 
+The consumer API contract lives in `docs/api/openapi.json`, with readable
+endpoint examples in `docs/api/README.md`. Every API endpoint must document its
+request parameters/body, authentication and abilities, response field types and
+nullability, success status and full example response, and relevant errors.
+When adding or changing an endpoint, update both files in the same change.
+Examples must reflect the implementation and use fictional/redacted values.
+Include this documentation check in the Definition of Done; a handoff document
+alone does not replace the API contract.
+
 ------------------------------------------------------------------------
 
 # Security
@@ -270,6 +279,8 @@ A task is only complete when all applicable items are finished.
 -   Relevant docs updated.
 -   Epic, specification, or handbook files updated where affected.
 -   ADR added only if an architectural decision was made.
+-   API changes include updated request/response schemas and complete examples
+    in `docs/api/openapi.json` and `docs/api/README.md`.
 
 ## Database
 

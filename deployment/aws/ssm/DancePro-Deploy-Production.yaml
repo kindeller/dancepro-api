@@ -26,4 +26,4 @@ mainSteps:
               echo 'TargetCommit is invalid.' >&2
               exit 2
           }
-          exec sudo -n -u ec2-user -- /usr/local/bin/dancepro-deploy "$SSM_TargetCommit"
+          exec sudo -n -u ec2-user -- /bin/bash /var/www/dancepro-api/scripts/dancepro-deploy.sh "$SSM_TargetCommit"

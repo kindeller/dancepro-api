@@ -2,12 +2,21 @@
 
 ## Purpose
 
+For the maintained, typed endpoint contract and full request/response examples,
+use the central [API reference](../api/README.md) and
+[OpenAPI file](../api/openapi.json). This feature specification explains the
+workflow; its shorter illustrations do not replace the complete API schemas.
+
 This document is the integration handoff for the macOS Flutter application that
 converts and uploads DancePro concert media.
 
 The repository is DancePro V2. The Git branch name `v1-migration` means that the
 original DancePro V1 application is being ported into the new application; it
 does not mean this Laravel codebase is V1.
+
+Start with the [Flutter macOS upload handoff](../handbook/Flutter-Mac-Upload-Handoff.md)
+for the reviewed local configuration, concrete multipart requests, smoke-test
+sequence and known gaps. This specification describes the broader contract.
 
 ## Implementation status
 
@@ -17,9 +26,10 @@ ready until the new migrations have run, the S3/IAM prerequisites have been
 applied, automated tests pass in Sail and a synthetic upload succeeds in the
 target environment.
 
-The API intentionally does not include studio/concert creation, publication,
-asset deletion or arbitrary S3 browsing. Per-studio account scope and the
-CloudFront progressive-download improvements remain separate future work.
+The API does not include studio/concert creation, concert publication, asset
+deletion or arbitrary S3 browsing. Collection PATCH currently accepts `status`
+(`draft` or `published`), although the initial Flutter workflow should leave
+publication to web-admin review. Per-studio account scope remains future work.
 
 ## Responsibility boundary
 
@@ -229,9 +239,10 @@ Laravel assigns the collection UUID, `s3_concerts` disk and immutable storage
 prefix. A new collection starts as `draft` and `private`. Flutter must not be
 able to submit a bucket name, AWS region or unrestricted storage prefix.
 
-Collection updates from Flutter are limited to name and sort order. Publishing,
-archiving and customer-facing visibility remain web-admin operations in the
-initial release.
+The initial Flutter UI should update only name and sort order. The implemented
+PATCH also accepts collection `status`: publishing requires a verified, visible
+asset and sets collection visibility to public. That does not publish or approve
+the concert. Keep this operation in the web-admin review workflow initially.
 
 ### Reserve a new asset
 
@@ -276,7 +287,7 @@ returns the same asset rather than creating a duplicate.
 The default package is:
 
 ```text
-original/video.mp4       optional when no original download will be offered
+original/video.mp4       required download-quality MP4
 stream/fallback.mp4      required for reliable playback
 stream/master.m3u8       optional HLS entry point
 stream/720p*             maximum streaming rendition
@@ -286,6 +297,12 @@ thumbnail/poster.png     optional
 
 No high-resolution or source-quality stream is part of the initial contract.
 The original is never referenced by `master.m3u8`.
+
+Both `original` and `fallback_mp4` are required at reservation and finalisation.
+`original_filename` is display metadata: a `.mov` source must be converted or
+remuxed into a valid MP4 before uploading it as `original/video.mp4`. Renaming a
+MOV file is insufficient. Use PNG for the `poster` output; finalisation checks
+`thumbnail/poster.png` specifically.
 
 ### Request single-object upload URLs
 
@@ -338,7 +355,18 @@ request per accepted object:
 
 Flutter must send the returned headers exactly. It must not add an ACL header.
 It must never log the URL or query string. An expired URL can be replaced by
-requesting a new batch for only the unfinished objects.
+reissuing an identical pending batch with its original idempotency key. Changing
+the file set requires a new key. Complete the batch after all its objects upload:
+
+```text
+POST /api/staff/media-assets/{asset_uuid}/upload-batches/{upload_batch_uuid}/complete
+GET  /api/staff/media-assets/{asset_uuid}/uploads/{upload_batch_uuid}
+```
+
+Completion accepts an empty JSON object and verifies stored object metadata.
+The GET returns upload status for uncertain responses. If replacing a batch with
+a smaller unfinished-file batch, track that separately; the old batch remains
+pending until all its original files exist and it is completed.
 
 Laravel must reject:
 
@@ -455,13 +483,17 @@ visibility remain explicit later steps.
 If HLS conversion fails, Flutter may complete the asset with:
 
 ```text
-original/video.mp4     optional but recommended for downloads
+original/video.mp4     required
 stream/fallback.mp4    required
 thumbnail/poster.png   optional
 ```
 
-It omits all HLS outputs from `expected_outputs`. The Laravel player will select
-the compressed MP4. No fake or empty HLS manifest should be uploaded.
+It omits all HLS outputs from `expected_outputs` at reservation. The Laravel
+player will select the compressed MP4. No fake or empty HLS manifest should be
+uploaded. Finalisation must match the reserved outputs exactly; if a reserved
+HLS conversion fails, there is no API to remove that requirement from the asset.
+Complete conversion before reservation or reserve a replacement asset with a
+new idempotency key. There is no desktop asset-cleanup endpoint.
 
 If even the compressed conversion fails but a valid source MP4 is available,
 Flutter may upload that MP4 as `stream/fallback.mp4`. Using the original for
@@ -537,15 +569,22 @@ HLS is selected only when CloudFront signing is configured and the master
 manifest exists. The browser also switches to the fallback MP4 after a fatal HLS
 error.
 
-Production HLS and MP4 bytes should be delivered by CloudFront from private S3,
-not proxied through Laravel. MP4 responses must support byte-range requests and
-seeking. Originals use a Laravel tracked-download URL that redirects to a
-short-lived attachment URL.
+Current concert playback uses authorised web routes and CloudFront: HLS requires
+signed cookies, and progressive MP4 uses a signed CloudFront URL. There is no
+staff-bearer preview endpoint in the desktop ingest API. Local S3 upload success
+does not verify that the configured CloudFront origin serves the test bucket.
+
+The current concert-original download route authorises web access and streams
+the object through `Storage::download`. It does not use the generic Downloads
+tracking/redirect workflow. Moving concert originals to tracked redirects remains
+follow-up work; Flutter must not assume that integration exists.
 
 ## Client retry rules
 
-- Generate and reuse an `Idempotency-Key` for every create, import and finalise
-  operation until that operation succeeds.
+- Generate a separate UUID `Idempotency-Key` for each collection creation, asset
+  reservation, upload batch, multipart initiation and legacy import. Reuse it
+  for an unchanged retry. Completion and finalisation are retryable without a
+  new header and expose their resulting state through GET requests.
 - Retry network timeouts and `429`/eligible `5xx` responses with exponential
   backoff and jitter.
 - Honour `Retry-After` when present.
@@ -563,9 +602,8 @@ short-lived attachment URL.
 | `401` | Token missing, expired or revoked | Clear the Keychain token and log in again |
 | `403` | Account or token lacks media permission | Stop and show a permission message |
 | `404` | Business resource or permitted object not found | Refresh selection; do not reveal storage details |
-| `409` | State or idempotency conflict | Fetch current server state and reconcile |
-| `413` | Declared file/package exceeds policy | Stop and show the server limit |
-| `422` | Validation or package verification failed | Show field/object failures and allow correction |
+| `422` | Validation, state/idempotency conflict, configured size limit or package verification failure | Show field/object failures and allow correction; current ingest actions use this status for these cases |
+| `413` | HTTP infrastructure rejects the request size | Stop and inspect the limit; media bytes should go directly to S3 |
 | `429` | Rate limited | Honour `Retry-After` and back off |
 | `5xx` | Temporary server or AWS integration failure | Retry safely using the same idempotency key |
 
@@ -594,8 +632,9 @@ support, while redacting the complete request URL and signature.
 2. Implement staff studio/concert selection using the required staff discovery
    endpoints, not the public catalogue.
 3. Implement collection selection/creation.
-4. Reserve an asset and persist its UUID plus idempotency key in the local job.
-5. Convert to the agreed fallback MP4 and optional 720p/480p HLS package.
+4. Convert to the original MP4, fallback MP4 and optional 720p/480p HLS package.
+5. Reserve an asset with the outputs actually produced; persist its UUID plus
+   idempotency key in the local job.
 6. Calculate sizes and checksums.
 7. Upload large MP4s with multipart endpoints and smaller HLS objects in signed
    URL batches.
@@ -604,7 +643,12 @@ support, while redacting the complete request URL and signature.
 10. Update display name, order and visibility after staff review.
 11. Confirm the web preview plays, seeks, falls back and downloads correctly.
 
-## Laravel implementation and acceptance checklist
+## Laravel acceptance checklist
+
+Most ingest application items below are implemented and covered by automated
+tests. The list also contains operational acceptance and future work; it is not
+a list of missing endpoints. See the handoff's reviewed gaps before scheduling
+backend changes. S3 integration needs an actual upload test beyond mocked tests.
 
 - Add staff/media policies and limited Sanctum token abilities.
 - Add and test per-studio/per-concert staff scope before onboarding external
