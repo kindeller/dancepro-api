@@ -7499,5 +7499,38 @@
         ]
       }
     }
+  },
+  "x-concert-web-delivery": {
+    "download": {
+      "method": "GET",
+      "path": "/concerts/{concert}/media/{asset}/download",
+      "parameters": {
+        "concert": "string (UUID), required",
+        "asset": "string (UUID), required",
+        "expires": "integer, optional signed-link expiry",
+        "signature": "string, optional Laravel URL signature",
+        "access": "integer, 1 for signed access"
+      },
+      "authentication": "Unlocked concert session, valid temporary signed access URL, or password-free concert; no bearer ability.",
+      "success": {
+        "status": 302,
+        "body": null,
+        "headers": {
+          "Location": {
+            "type": "string",
+            "nullable": false,
+            "example": "https://media.example.test/original/video.mp4?Expires=1792800000&Signature=REDACTED&Key-Pair-Id=EXAMPLE"
+          },
+          "Cache-Control": "private, no-store"
+        }
+      },
+      "errors": {
+        "403": "Concert access denied",
+        "404": "Concert or published visible available asset not found",
+        "503": "Unsupported storage disk",
+        "500": "Storage/signing infrastructure error"
+      },
+      "delivery": "Concert CloudFront for s3_concerts when configured; otherwise short-lived signed S3. Legacy storage always signs its own disk. Attachment disposition is included before signing."
+    }
   }
 }

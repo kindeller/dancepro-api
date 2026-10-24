@@ -27,6 +27,7 @@ if (player && items.length > 0) {
         destroyHls();
         activeFallbackUrl = null;
         fallbackInProgress = true;
+        player.crossOrigin = 'anonymous';
         player.src = url;
         playerStatus.textContent = 'MP4 playback';
         player.load();
@@ -38,6 +39,7 @@ if (player && items.length > 0) {
 
     function useHlsSource(source, autoplay) {
         destroyHls();
+        player.crossOrigin = 'use-credentials';
         activeFallbackUrl = source.fallback_url;
         fallbackInProgress = false;
         playerStatus.textContent = 'Adaptive streaming';

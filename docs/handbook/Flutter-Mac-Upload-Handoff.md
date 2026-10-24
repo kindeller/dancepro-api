@@ -351,8 +351,9 @@ Customer playback uses the web access/session gate and CloudFront signed URLs
 or HLS cookies. A desktop viewer would need a separate contract; do not point a
 bearer token at the public playback route and assume it grants access.
 
-The current original concert download uses an authorised web route and streams
-through Laravel. Generic Downloads tracking/redirect integration is separate.
+The original concert download uses an authorised web route and redirects to a
+short-lived concert CloudFront URL, or signed S3 for legacy storage/unconfigured
+CloudFront. Generic Downloads database tracking remains separate.
 Local test-bucket upload verification can pass even if CloudFront playback fails:
 the configured distribution may serve another bucket. Validate test delivery
 separately without changing a production distribution for this pilot.
@@ -419,7 +420,7 @@ These findings constrain rollout and deserve follow-up based on pilot results:
 | Before claiming storage isolation is enforced | Current destination guard blocks the legacy disk/bucket, but does not reject an upload bucket aliased to the competition bucket or enforce a local test-bucket allowlist. Current config is separate; stronger guards and tests would protect against later misconfiguration. |
 | If HLS can fail after reservation | Add an explicit output-contract amendment/cancellation workflow, or continue reserving after conversion. Collection/asset retries return the existing reservation without validating every changed payload field; keep retry payloads immutable. |
 | If choosing existing collections in desktop | Consider returning a server-derived `can_upload` field. Current collection resource omits its storage disk, so Flutter cannot identify otherwise similar local/legacy collections from mode alone. |
-| If desktop preview/download is needed | Design a staff-authorised read contract and test-bucket delivery. Current customer web access and original-download streaming do not provide it. |
+| If desktop preview/download is needed | Design a staff-authorised read contract and test-bucket delivery. Current customer web access and original-download redirects do not provide it. |
 
 No backend fixes from this table were implemented as part of this review.
 

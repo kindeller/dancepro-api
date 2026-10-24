@@ -32,7 +32,7 @@ class ConcertCloudFrontSigner
         );
     }
 
-    public function signedVideoUrl(ConcertPlaybackSource $source): string
+    public function signedVideoUrl(ConcertPlaybackSource $source, ?string $contentDisposition = null): string
     {
         if (! $this->isConfigured() || $source->disk !== 's3_concerts') {
             throw new RuntimeException('Signed CloudFront concert playback is not available for this storage disk.');
@@ -42,7 +42,9 @@ class ConcertCloudFrontSigner
             (string) config('concerts.playback.cloudfront.key_pair_id'),
             (string) $this->privateKey(),
         ))->getSignedUrl(
-            $this->urlFor($source->key),
+            $this->urlFor($source->key).($contentDisposition === null ? '' : '?'.http_build_query([
+                'response-content-disposition' => $contentDisposition,
+            ], '', '&', PHP_QUERY_RFC3986)),
             now()->addMinutes((int) config('concerts.playback.signed_url_ttl_minutes', 15))->getTimestamp(),
         );
     }

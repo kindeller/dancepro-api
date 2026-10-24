@@ -1643,3 +1643,26 @@ conflicts also return 422, not 409. **429** generally uses
 Unexpected 5xx failures may use `{"message":"Server Error"}` or another shape.
 S3 upload errors are not DancePro API responses; retain only sanitized error
 codes/status/request IDs, never bearer tokens or presigned query strings.
+
+## Concert customer web delivery
+
+`GET /concerts/{concert}/media/{asset}/download` uses UUID path parameters.
+Authentication is the unlocked concert session, a valid Laravel signed URL
+(`expires`, `signature`, `access=1`), or a concert without a password. No bearer
+ability grants customer access. Success is **302**, with an empty body and a
+non-null string `Location` header pointing to a short-lived signed concert
+CloudFront URL or S3 URL. The attachment filename is signed with the URL;
+`Cache-Control: private, no-store` prevents caching the redirect.
+
+Example: `Location: https://media.example.test/collection/media/asset/original/video.mp4?response-content-disposition=attachment%3B%20filename%3D%22performance.mp4%22&Expires=1792800000&Signature=REDACTED&Key-Pair-Id=EXAMPLE`.
+Errors: 403 for missing access; 404 for unavailable concerts, unrelated,
+unpublished, hidden or unavailable assets; 503 for unsupported storage disks.
+Storage/signing infrastructure errors may return 500. The original recorded
+storage key is downloaded. Legacy disks always use their own S3 origin.
+These web operations remain outside the JSON API `paths` contract; their delivery
+contract is recorded in the OpenAPI `x-concert-web-delivery` extension.
+
+Playback retains its existing CloudFront HLS/progressive contract. Progressive
+MP4 URLs authenticate with their signature; the player only requests cross-origin
+cookies for HLS. Legacy playback still fails closed with 503 because the concert
+CloudFront distribution is only mapped to `s3_concerts`.

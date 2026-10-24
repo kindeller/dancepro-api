@@ -8,7 +8,7 @@ use App\Features\Concerts\Models\Concert;
 use App\Features\Concerts\Requests\UnlockConcertRequest;
 use App\Features\Concerts\Services\ConcertAccessSession;
 use App\Features\Concerts\Services\ConcertCloudFrontSigner;
-use App\Features\Concerts\Services\ConcertDownloadFilename;
+use App\Features\Concerts\Services\ConcertDownloadUrlSigner;
 use App\Features\Media\Models\MediaAsset;
 use App\Features\Media\Support\MediaAssetStatus;
 use App\Features\Media\Support\MediaCollectionStatus;
@@ -18,10 +18,8 @@ use App\Shared\Responses\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\View\View;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PublicConcertController extends Controller
 {
@@ -128,14 +126,12 @@ class PublicConcertController extends Controller
         return redirect()->away($cloudFront->signedVideoUrl($source));
     }
 
-    public function download(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access, ConcertDownloadFilename $filenames): StreamedResponse
+    public function download(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access, ConcertDownloadUrlSigner $signer): RedirectResponse
     {
         $this->authorizeAsset($request, $concert, $asset, $access);
 
-        return Storage::disk($asset->storage_disk)->download(
-            $asset->storage_key,
-            $filenames->for($concert, $asset),
-        );
+        return redirect()->away($signer->signedUrl($concert, $asset))
+            ->withHeaders(['Cache-Control' => 'private, no-store']);
     }
 
     private function authorizeAsset(Request $request, Concert $concert, MediaAsset $asset, ConcertAccessSession $access): void

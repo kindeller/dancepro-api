@@ -20,15 +20,19 @@ the proposed resources, permissions and costs before applying them.
 - New V2 object keys use immutable collection and media asset UUIDs.
 - Studio names, concert names, slugs and other mutable business data must not
   appear in authoritative storage prefixes.
-- Original MP4 downloads are intended to use Laravel's tracked-download workflow.
-  As reviewed on 18 October 2026, the concert-original web route streams through
-  Laravel and is not yet connected to generic tracked-download redirects. See
-  the [Flutter upload handoff](Flutter-Mac-Upload-Handoff.md) for current behaviour.
+- Original downloads authorise through the concert web route, then return a
+  short-lived signed CloudFront redirect for `s3_concerts`. Without concert
+  CloudFront configuration, and for legacy storage, they redirect to signed S3.
+  File bytes no longer pass through PHP. Generic database-backed download-link
+  tracking remains a separate workflow.
+- CloudFront must forward and cache by `response-content-disposition` so the
+  original download receives its attachment filename. This parameter is included
+  before signing; changing it invalidates the URL. Verify the deployed policy.
 - HLS playback uses CloudFront signed cookies because a stream consists of a
   manifest and multiple protected files.
 - Laravel performs playback authorisation and generates the signed cookies.
 - CloudFront delivers manifests, segments and MP4 fallback content.
-- S3 remains private and must not be exposed as the public delivery endpoint.
+- S3 remains private; fallback delivery uses expiring signed URLs.
 - The macOS Flutter application converts media and uploads bytes directly to S3
   only through short-lived, Laravel-authorised presigned requests.
 - No long-lived AWS credential or CloudFront signing key is stored in Flutter.

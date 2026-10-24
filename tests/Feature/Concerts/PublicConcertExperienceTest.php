@@ -86,21 +86,26 @@ class PublicConcertExperienceTest extends TestCase
         }
 
         $this->get(route('concerts.show', $concert))->assertOk()
-            ->assertSeeInOrder(['5pm show', 'Dance 0', '7pm show', 'Dance 1']);
+            ->assertSeeInOrder(['5pm show', 'Dance 0', '7pm show', 'Dance 1'])
+            ->assertSee('crossorigin="anonymous"', false);
     }
 
     public function test_signed_download_bypasses_password_without_exposing_an_internal_id(): void
     {
-        Storage::fake('local');
-        Storage::disk('local')->put('concerts/performance.mp4', 'video-content');
+        Storage::fake('s3_concerts');
+        config()->set('concerts.playback.cloudfront.domain', null);
+        Storage::disk('s3_concerts')->buildTemporaryUrlsUsing(
+            fn ($path, $expiration, $options) => 'https://s3.dancepro.test/'.rawurlencode($path).'?'.http_build_query($options),
+        );
+        Storage::disk('s3_concerts')->put('concerts/performance.mp4', 'video-content');
         $concert = Concert::factory()->published()->create(['access_password_hash' => 'secret']);
         $collection = MediaCollection::factory()->for($concert)->create([
             'status' => MediaCollectionStatus::Published,
             'media_type' => MediaType::Video,
-            'storage_disk' => 'local',
+            'storage_disk' => 's3_concerts',
         ]);
         $asset = MediaAsset::factory()->for($collection, 'collection')->create([
-            'storage_disk' => 'local',
+            'storage_disk' => 's3_concerts',
             'storage_key' => 'concerts/performance.mp4',
             'original_filename' => 'performance.mp4',
             'media_type' => MediaType::Video,
@@ -111,19 +116,25 @@ class PublicConcertExperienceTest extends TestCase
             'access' => 1,
         ]);
 
-        $this->get($url)->assertOk()->assertDownload('performance.mp4');
+        $response = $this->get($url)->assertRedirect();
+        parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
+        $this->assertStringContainsString('performance.mp4', $query['ResponseContentDisposition']);
         $this->assertStringContainsString($concert->uuid, $url);
         $this->assertStringContainsString($asset->uuid, $url);
     }
 
     public function test_downloads_use_video_titles_for_generic_keys_and_unique_names_for_duplicates(): void
     {
-        Storage::fake('local');
+        Storage::fake('s3_concerts');
+        config()->set('concerts.playback.cloudfront.domain', null);
+        Storage::disk('s3_concerts')->buildTemporaryUrlsUsing(
+            fn ($path, $expiration, $options) => 'https://s3.dancepro.test/'.rawurlencode($path).'?'.http_build_query($options),
+        );
         $concert = Concert::factory()->published()->create();
         $collection = MediaCollection::factory()->for($concert)->create([
             'status' => MediaCollectionStatus::Published,
             'media_type' => MediaType::Video,
-            'storage_disk' => 'local',
+            'storage_disk' => 's3_concerts',
         ]);
 
         foreach ([
@@ -132,7 +143,7 @@ class PublicConcertExperienceTest extends TestCase
             ['Second dance', 'performance.mp4', null],
         ] as [$title, $originalName, $expectedName]) {
             $asset = MediaAsset::factory()->for($collection, 'collection')->create([
-                'storage_disk' => 'local',
+                'storage_disk' => 's3_concerts',
                 'storage_key' => 'concerts/'.str_replace(' ', '-', $title).'/video.mp4',
                 'original_filename' => $originalName,
                 'display_name' => $title,
@@ -140,7 +151,7 @@ class PublicConcertExperienceTest extends TestCase
                 'extension' => 'mp4',
                 'is_visible' => true,
             ]);
-            Storage::disk('local')->put($asset->storage_key, 'video-content');
+            Storage::disk('s3_concerts')->put($asset->storage_key, 'video-content');
             $expectedName ??= 'performance-'.substr($asset->uuid, 0, 8).'.mp4';
             $url = URL::temporarySignedRoute('concerts.media.download', now()->addMinute(), [
                 'concert' => $concert,
@@ -152,8 +163,47 @@ class PublicConcertExperienceTest extends TestCase
         }
 
         foreach ($downloads as [$url, $expectedName]) {
-            $this->get($url)->assertOk()->assertDownload($expectedName);
+           $response = $this->get($url)->assertRedirect();
+            parse_str(parse_url($response->headers->get('Location'), PHP_URL_QUERY), $query);
+            $this->assertStringContainsString($expectedName, $query['ResponseContentDisposition']);
         }
+    }
+
+    public function test_original_download_redirects_to_signed_concert_cloudfront_url(): void
+    {
+        $this->configureConcertCloudFront();
+        [$concert, , $asset] = $this->createVideoAsset();
+
+        $response = $this->get(route('concerts.media.download', [$concert, $asset]))->assertRedirect();
+        $location = $response->headers->get('Location');
+        $this->assertStringStartsWith('https://media.dancepro.test/'.$asset->storage_key.'?', $location);
+        parse_str(parse_url($location, PHP_URL_QUERY), $query);
+        $this->assertArrayHasKey('Signature', $query);
+        $this->assertArrayHasKey('Expires', $query);
+        $this->assertStringContainsString('attachment;', $query['response-content-disposition']);
+        $this->assertStringContainsString('performance.mp4', $query['response-content-disposition']);
+        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+    }
+
+    public function test_legacy_download_uses_its_own_s3_disk_even_with_cloudfront_configured(): void
+    {
+        $this->configureConcertCloudFront();
+        [$concert, , $asset] = $this->createVideoAsset();
+        $asset->update(['storage_disk' => 's3_concerts_legacy']);
+        Storage::fake('s3_concerts_legacy')->buildTemporaryUrlsUsing(
+            fn ($path, $expiration, $options) => 'https://legacy-s3.dancepro.test/'.rawurlencode($path),
+        );
+
+        $this->get(route('concerts.media.download', [$concert, $asset]))
+            ->assertRedirect('https://legacy-s3.dancepro.test/'.rawurlencode($asset->storage_key));
+    }
+
+    public function test_protected_download_requires_access_before_signing(): void
+    {
+        [$concert, , $asset] = $this->createVideoAsset();
+        $concert->update(['access_password_hash' => 'example-password']);
+
+        $this->get(route('concerts.media.download', [$concert, $asset]))->assertForbidden();
     }
 
     public function test_playback_prefers_hls_and_returns_cloudfront_cookies_and_progressive_fallback(): void

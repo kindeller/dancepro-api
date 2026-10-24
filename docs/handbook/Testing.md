@@ -93,3 +93,17 @@ Current Concert production-readiness coverage should include:
 
 Add feature-specific test expectations to the relevant specification or epic
 when behaviour becomes detailed enough to warrant it.
+
+## Concert player request modes
+
+Run `sail node --test tests/JavaScript/concert-player.test.js` to exercise the
+actual player script with DOM/HLS test doubles. These tests check the request
+mode at source assignment, direct MP4, native HLS, hls.js credentialed requests,
+and each MP4 fallback, including switching back from HLS. They do not simulate
+browser CORS enforcement or verify production CloudFront headers.
+
+Signed MP4 playback uses `crossOrigin = 'anonymous'` before source assignment.
+HLS retains signed cookies, `use-credentials`, and hls.js `withCredentials`.
+The Laravel playback metadata fetch retains same-origin session authentication.
+CloudFront SimpleCORS supports anonymous MP4 delivery; credentialed HLS needs an
+explicit allowed app origin and `Access-Control-Allow-Credentials: true`.
