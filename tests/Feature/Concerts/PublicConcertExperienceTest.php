@@ -87,7 +87,7 @@ class PublicConcertExperienceTest extends TestCase
 
         $this->get(route('concerts.show', $concert))->assertOk()
             ->assertSeeInOrder(['5pm show', 'Dance 0', '7pm show', 'Dance 1'])
-            ->assertSee('crossorigin="anonymous"', false);
+            ->assertDontSee('crossorigin=', false);
     }
 
     public function test_signed_download_bypasses_password_without_exposing_an_internal_id(): void

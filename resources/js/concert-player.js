@@ -27,7 +27,7 @@ if (player && items.length > 0) {
         destroyHls();
         activeFallbackUrl = null;
         fallbackInProgress = true;
-        player.crossOrigin = 'anonymous';
+        player.removeAttribute('crossorigin');
         player.src = url;
         playerStatus.textContent = 'MP4 playback';
         player.load();

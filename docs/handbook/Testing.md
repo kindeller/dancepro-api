@@ -102,11 +102,13 @@ mode at source assignment, direct MP4, native HLS, hls.js credentialed requests,
 and each MP4 fallback, including switching back from HLS. They do not simulate
 browser CORS enforcement or verify production CloudFront headers.
 
-Signed MP4 playback uses `crossOrigin = 'anonymous'` before source assignment.
+Signed MP4 playback removes the `crossorigin` attribute before source assignment,
+including when switching from HLS. The initial video markup also omits it, so
+native MP4 playback does not require a CORS-enabled media response.
 HLS retains signed cookies, `use-credentials`, and hls.js `withCredentials`.
 The Laravel playback metadata fetch retains same-origin session authentication.
-CloudFront SimpleCORS supports anonymous MP4 delivery; credentialed HLS needs an
-explicit allowed app origin and `Access-Control-Allow-Credentials: true`.
+Credentialed HLS needs an explicit allowed app origin and
+`Access-Control-Allow-Credentials: true`.
 
 Production frontend checks (also required by the manual deployment workflow):
 
