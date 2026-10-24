@@ -40,6 +40,9 @@ jobs:
     needs: validate-request
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Laravel uses mysql:3306 inside Sail; avoid the runner's host MySQL port.
+      FORWARD_DB_PORT: '13306'
     steps:
       - name: Check out the approved commit
         uses: actions/checkout@v6
@@ -77,17 +80,32 @@ jobs:
           replace_env_value DB_USERNAME sail
           replace_env_value DB_PASSWORD password
 
-      - name: Install dependencies through the Sail Composer image
-        run: |
-          docker run --rm \
-            --user "$(id -u):$(id -g)" \
-            --volume "$PWD:/var/www/html" \
-            --workdir /var/www/html \
-            laravelsail/php85-composer:latest \
-            composer install --no-interaction --prefer-dist --no-progress
+      # Bootstrap Sail from composer.lock with real PHP 8.5 platform checks.
+      # Integration and Laravel tests still run in compose.yaml's Sail 8.5 image.
+      - name: Set up PHP 8.5 and Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: bcmath, curl, dom, fileinfo, intl, mbstring, pdo_mysql, pdo_sqlite, simplexml, xml, xmlwriter, zip
+          tools: composer:v2
+          coverage: none
 
-      - name: Start Sail
-        run: ./vendor/bin/sail up -d
+      - name: Install locked dependencies including Sail
+        id: composer
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          composer install --no-interaction --prefer-dist --no-progress
+          composer check-platform-reqs
+          test -x ./vendor/bin/sail
+          test -f ./vendor/laravel/sail/runtimes/8.5/Dockerfile
+
+      - name: Start Sail and wait for healthy services
+        id: sail
+        run: ./vendor/bin/sail up -d --wait --wait-timeout 180
+
+      - name: Verify dependencies against the Sail PHP runtime
+        run: ./vendor/bin/sail composer check-platform-reqs
 
       - name: Test deployment with separate Unix identities
         run: ./vendor/bin/sail exec -T -u root laravel.test bash tests/Deployment/deployment-scripts.sh --integration
@@ -99,7 +117,7 @@ jobs:
         run: ./vendor/bin/sail artisan test
 
       - name: Stop Sail
-        if: always()
+        if: ${{ always() && steps.composer.outcome == 'success' && steps.sail.outcome != 'skipped' }}
         run: ./vendor/bin/sail down -v
 
   deploy:

@@ -225,3 +225,18 @@ source does not update AWS or the working production application.
 
 See [ADR-0008](../decisions/ADR-0008-Single-Snapshot-Deployment.md),
 [Testing](Testing.md), and [Git Workflow](Git-Workflow.md).
+
+### GitHub test-job bootstrap
+
+The manual production workflow installs PHP 8.5 and Composer 2 using
+`shivammathur/setup-php`, then installs `composer.lock` with development
+packages so `vendor/bin/sail` is available. It checks platform requirements on
+both the runner and Sail; no platform requirements are ignored. This bootstrap
+is required before the vendor-provided Sail runtime can be built.
+
+Integration and Laravel tests still use the PHP 8.5 runtime in `compose.yaml`.
+Sail waits for services to become healthy before testing. MySQL publishes port
+13306 on the disposable runner to avoid a host MySQL conflict; Laravel still
+connects to `mysql:3306` inside Docker. Cleanup runs after a Sail startup attempt
+(including a partial startup failure), but skips failed dependency installation
+so a missing Sail executable does not obscure the installation failure.
