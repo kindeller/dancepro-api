@@ -67,6 +67,7 @@ for path in bootstrap/cache storage/framework storage/framework/views; do
     sudo chmod 2770 "$path"
 done
 sudo install -d -o ec2-user -g ec2-user -m 0700 /var/log/dancepro-deploy
+sudo install -d -o ec2-user -g ec2-user -m 0700 /var/www/dancepro-staging
 sudo touch /var/lock/dancepro-deploy.lock
 sudo chown ec2-user:ec2-user /var/lock/dancepro-deploy.lock
 sudo chmod 0600 /var/lock/dancepro-deploy.lock
@@ -257,10 +258,14 @@ verify it on EC2 rather than treating HEAD as evidence of a completed deployment
   script requires this exact Node version; Actions uses the same pin.
 - Retain the existing PHP/Composer, dump tool, AWS CLI, Apache group, scoped sudo,
   lock/log directory and runtime permissions described above. Also provide `tar`.
-- Permit the deployment user to create private staging directories beside the
-  application (`/var/www/.dancepro-release.*`). These must be on the same filesystem
-  as `public/build`; provision parent access deliberately, without making it
-  world-writable. Allow enough disk for dependencies, a build and previous assets.
+- Provision `/var/www/dancepro-staging` once using the setup command above:
+  `ec2-user:ec2-user`, mode `0700`. Keep `/var/www` owned by `root:root` with mode
+  `0755`; the deployment user does not need write access to it. The script creates
+  private `dancepro-release.*` directories inside the dedicated parent. It rejects
+  missing, symlinked, incorrectly owned or non-0700 parents and requires the same
+  filesystem as `public/build`. Allow enough disk for dependencies, a build and
+  retained previous assets. `DANCEPRO_STAGING_PARENT` supports isolated tests or a
+  deliberately provisioned alternate absolute path with the same checks.
 - Permit outbound HTTPS to the npm registry and Bunny font endpoints used by the
   configured Laravel Vite font plugin. No production secrets enter build staging.
 - `public/build`, if present, must be a deployment-owned regular directory, without
