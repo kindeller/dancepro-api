@@ -23,6 +23,8 @@ experience ready for use.
 
 - Public studio browsing, limited to studios with an available concert.
 - Published-concert browsing with approval and availability controls.
+- Studio and concert cards are clickable across their full area, with keyboard
+  navigation and visible focus indicators.
 - Password and student-name access with session unlocks and attempt logging.
 - Managed video playlist, next-item playback and protected original downloads.
 - Optional program and external-gallery links with explicit empty states.

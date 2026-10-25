@@ -31,7 +31,9 @@
         .card { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); box-shadow: 0 16px 45px rgba(16, 24, 32, .07); }
         .card-media { aspect-ratio: 16/9; background: linear-gradient(135deg, var(--accent), #101820); object-fit: cover; width: 100%; }
         .card-body { padding: 20px; }
-        .card a.stretched { text-decoration: none; }
+        .card-link { display: block; text-decoration: none; }
+        .card-link:hover { border-color: var(--accent); }
+        .card-link:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
         .meta, .muted { color: var(--muted); }
         .meta { font-size: 14px; font-weight: 650; }
         .button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; border: 0; border-radius: 7px; background: var(--accent); color: #fff; cursor: pointer; font: inherit; font-weight: 800; padding: 10px 17px; text-decoration: none; }
