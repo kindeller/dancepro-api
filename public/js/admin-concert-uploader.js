@@ -354,8 +354,11 @@
     }));
 
     document.querySelectorAll('[data-collection-status]').forEach(button => button.addEventListener('click', async () => {
+        if (button.dataset.publishWarning && !confirm(button.dataset.publishWarning)) return;
+        const data = { status: button.dataset.collectionStatus };
+        if (button.dataset.showAllVerified === '1') data.show_all_verified = true;
         button.disabled = true;
-        try { await api(`collections/${button.closest('[data-collection]').dataset.collection}`, 'PATCH', { status: button.dataset.collectionStatus }); location.reload(); }
+        try { await api(`collections/${button.closest('[data-collection]').dataset.collection}`, 'PATCH', data); location.reload(); }
         catch (error) { status.textContent = error.message; button.disabled = false; }
     }));
 })();

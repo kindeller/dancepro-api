@@ -53,13 +53,18 @@ This is documentation, not an instruction to execute mutating operations.
    playlists/init files/segments first, then sign/upload/complete the master last.
 6. Finalise with the same output set. Success is available/verified but hidden.
    Staff review, collection publication and concert availability are separate.
+   Publication can optionally show all verified videos at once after a warning;
+   see [updateCollection](#updatecollection).
 
 Generate a separate UUID `Idempotency-Key` for collection creation, asset
 reservation, upload URL batches, multipart initiation and legacy imports. Reuse
 it for an unchanged retry. Completion/finalisation need no new header. Persist
 upload IDs, checksums and part ETags for resume; status GET does not return the
 S3 part inventory. There is no token refresh, output-contract amendment, desktop
-asset deletion or staff-bearer playback endpoint. Generic download-link creation
+asset deletion or staff-bearer playback endpoint. Failed uploads can be cleared
+through the web-admin force-deletion confirmation after stopping active
+transfers. Archived videos awaiting deletion cleanup reject upload mutations
+with 422, and deleted videos return 404. Generic download-link creation
 is not idempotent and is separate from concert-original web downloads.
 
 See the [Flutter handoff](../handbook/Flutter-Mac-Upload-Handoff.md) for local
@@ -628,7 +633,7 @@ Error responses: Missing, invalid, expired or revoked bearer token. (`401`), Acc
 
 `PATCH /api/staff/media-collections/{collection}`
 
-Fields optional. Published requires a managed video collection with at least one visible, available, verified asset; sets visibility public. Draft sets private. Does not publish the concert. asset_count omitted. Requires an active staff/admin account and explicit token ability concert-media:update.
+Fields optional. Published requires a managed video collection with at least one visible, available, verified asset; sets visibility public. Optional show_all_verified (boolean, non-null, default false) is accepted only with status published: true makes every available, verified, non-deleted asset in this collection visible and publishes atomically. Processing, unverified, missing and archived assets are excluded. Omitting the flag preserves existing visibility. Draft sets private. Archived collections awaiting deletion cleanup cannot be edited or receive new reservations (422). Does not approve or publish the concert. asset_count omitted. Requires an active staff/admin account and explicit token ability concert-media:update.
 
 Authentication: Sanctum bearer. Ability: `concert-media:update`.
 
@@ -636,12 +641,24 @@ Authentication: Sanctum bearer. Ability: `concert-media:update`.
 | --- | --- | --- | --- |
 | `collection` | path | yes | `00000003-0000-4000-8000-000000000001`. Public resource UUID. |
 
+Request fields (all optional and non-null): `name` (string, 1–255 characters),
+`sort_order` (integer, minimum 0), `status` (`draft` or `published`), and
+`show_all_verified` (boolean, default false; allowed only alongside
+`status: published`). Show a warning before sending `show_all_verified: true`,
+as it also shows videos deliberately hidden during review. Staff can hide
+individual videos again after publishing. With no ready videos, publication
+returns 422 and the collection stays unchanged.
+
+Response fields retain the existing collection schema: UUIDs, name, media type,
+catalogue mode, status, visibility and timestamps are strings; sort_order is an
+integer. No additional response fields are introduced.
+
 Request example:
 
 ```json
 {
-  "name": "Evening performances",
-  "sort_order": 10
+  "status": "published",
+  "show_all_verified": true
 }
 ```
 
@@ -657,8 +674,8 @@ Response example — **HTTP 200**:
     "name": "Evening performances",
     "media_type": "video",
     "catalogue_mode": "managed",
-    "status": "draft",
-    "visibility": "private",
+    "status": "published",
+    "visibility": "public",
     "sort_order": 10,
     "created_at": "2026-10-18T08:00:00.000000Z",
     "updated_at": "2026-10-18T08:00:00.000000Z"
@@ -720,7 +737,7 @@ Error responses: Missing, invalid, expired or revoked bearer token. (`401`), Acc
 
 `POST /api/staff/media-collections/{collection}/media-assets`
 
-Requires a managed video collection on the configured upload disk. Both original and fallback_mp4 required. Convert first and reserve the actual outputs. Starts processing/hidden. Same-key retry returns existing reservation; never change its payload. Requires an active staff/admin account and explicit token ability concert-media:upload.
+Requires a managed video collection on the configured upload disk. Both original and fallback_mp4 required. Convert first and reserve the actual outputs. Starts processing/hidden. Same-key retry returns existing reservation; never change its payload. Requires an active staff/admin account and explicit token ability concert-media:upload. Collections archived for deletion cleanup reject new reservations with 422.
 
 Authentication: Sanctum bearer. Ability: `concert-media:upload`.
 
@@ -984,7 +1001,7 @@ Error responses: Missing, invalid, expired or revoked bearer token. (`401`), Acc
 
 `POST /api/staff/media-assets/{asset}/upload-batches/{upload}/complete`
 
-After all batch objects upload. Checks object size and SHA256 when returned by HEAD. Repeat completion returns completed state. No Idempotency-Key required. Validation/state failures return 422. Requires an active staff/admin account and explicit token ability concert-media:upload.
+After all batch objects upload. Checks object size and SHA256 when returned by HEAD. Repeat completion returns completed state. No Idempotency-Key required. Validation/state failures return 422. Requires an active staff/admin account and explicit token ability concert-media:upload. Videos archived for deletion cleanup reject upload completion with 422.
 
 Authentication: Sanctum bearer. Ability: `concert-media:upload`.
 
@@ -1062,7 +1079,7 @@ Error responses: Missing, invalid, expired or revoked bearer token. (`401`), Acc
 
 `POST /api/staff/media-assets/{asset}/multipart-uploads/{upload}/parts`
 
-Pending, unexpired upload record required. CRC64NVME of each exact part. Response expiry refers to URLs, not upload record. Persist successful ETags and part checksums locally. Requires an active staff/admin account and explicit token ability concert-media:upload.
+Pending, unexpired upload record required. CRC64NVME of each exact part. Response expiry refers to URLs, not upload record. Persist successful ETags and part checksums locally. Requires an active staff/admin account and explicit token ability concert-media:upload. Videos archived for deletion cleanup reject part signing with 422.
 
 Authentication: Sanctum bearer. Ability: `concert-media:upload`.
 
@@ -1113,7 +1130,7 @@ Error responses: Missing, invalid, expired or revoked bearer token. (`401`), Acc
 
 `POST /api/staff/media-assets/{asset}/multipart-uploads/{upload}/complete`
 
-Include every consecutive part starting at 1 and the full-object checksum from initiation. Laravel completes S3, verifies full checksum/size and reconciles matching objects after uncertain completion. No Idempotency-Key required. Requires an active staff/admin account and explicit token ability concert-media:upload.
+Include every consecutive part starting at 1 and the full-object checksum from initiation. Laravel completes S3, verifies full checksum/size and reconciles matching objects after uncertain completion. No Idempotency-Key required. Requires an active staff/admin account and explicit token ability concert-media:upload. Videos archived for deletion cleanup reject multipart completion with 422.
 
 Authentication: Sanctum bearer. Ability: `concert-media:upload`.
 
@@ -1158,7 +1175,7 @@ Error responses: Missing, invalid, expired or revoked bearer token. (`401`), Acc
 
 `POST /api/staff/media-assets/{asset}/multipart-uploads/{upload}/abort`
 
-Cancels only an unfinished multipart upload; cannot delete completed media. Stop active part transfers before user-requested cancellation. No Idempotency-Key required. Requires an active staff/admin account and explicit token ability concert-media:upload.
+Cancels only an unfinished multipart upload; cannot delete completed media. Stop active part transfers before user-requested cancellation. No Idempotency-Key required. Requires an active staff/admin account and explicit token ability concert-media:upload. Videos archived for deletion cleanup reject client abort requests with 422; retry the web-admin deletion flow to finish cleanup.
 
 Authentication: Sanctum bearer. Ability: `concert-media:upload`.
 

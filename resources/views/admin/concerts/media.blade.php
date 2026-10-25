@@ -47,17 +47,20 @@
         <summary>{{ $collection->name }} · {{ $collection->assets->count() }} {{ \Illuminate\Support\Str::plural('video', $collection->assets->count()) }} · {{ $collection->status->value }}</summary>
         <div class="media-stack" style="margin-top:18px">
         @if($collection->status->value === 'published' || $managedCollections->contains('id', $collection->id))
-        <div class="media-actions"><button type="button" data-collection-status="{{ $collection->status->value === 'published' ? 'draft' : 'published' }}">{{ $collection->status->value === 'published' ? 'Unpublish show' : 'Publish show' }}</button><span class="muted">Only verified, visible videos appear on the public page.</span></div>
+        <div class="media-actions">@include('admin.concerts._media_publish_button')<span class="muted">Only verified, visible videos appear on the public page.</span></div>
+        @endif
+        @if($managedCollections->contains('id', $collection->id))
+            <p><a href="{{ route('admin.concerts.media.collections.confirm-delete', $collection) }}">Delete collection and videos</a></p>
         @endif
 
-        @if($managedCollections->contains('id', $collection->id))
+        @if($managedCollections->contains('id', $collection->id) && ! $collection->archived_at)
         <div class="media-secondary"><h3>Add a video to this show</h3>
             <form class="new-media-asset media-stack">
                 @include('admin.concerts._media_upload_fields', ['buttonLabel' => 'Upload video'])
             </form>
             @include('admin.concerts._media_bulk_upload', ['autoCollection' => false])
         </div>
-        @else
+        @elseif(! $managedCollections->contains('id', $collection->id))
         <p class="muted">This collection uses legacy storage and cannot receive web uploads.</p>
         @endif
 
@@ -70,8 +73,11 @@
                 <form class="media-file-upload media-stack">
                     @include('admin.concerts._media_upload_fields', ['buttonLabel' => 'Continue upload and verify', 'showTitle' => false])
                 </form>
-                @elseif($asset->verified_at)
+                @elseif($asset->verified_at && $asset->status->value === 'available')
                 <div class="media-actions"><button type="button" data-asset-visible="{{ $asset->is_visible ? '0' : '1' }}">{{ $asset->is_visible ? 'Hide video' : 'Make video visible' }}</button></div>
+                @endif
+                @if($managedCollections->contains('id', $collection->id))
+                    <p><a href="{{ route('admin.concerts.media.assets.confirm-delete', $asset) }}">{{ $asset->status->value === 'processing' ? 'Clear unfinished upload' : 'Delete video and files' }}</a></p>
                 @endif
             </div>
         @endforeach

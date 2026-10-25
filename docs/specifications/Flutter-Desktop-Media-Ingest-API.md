@@ -244,6 +244,23 @@ PATCH also accepts collection `status`: publishing requires a verified, visible
 asset and sets collection visibility to public. That does not publish or approve
 the concert. Keep this operation in the web-admin review workflow initially.
 
+An optional `show_all_verified` boolean (default false, non-null) may accompany
+`status: published`. After staff confirm a warning, setting it to true makes all
+available, verified videos in that collection visible and publishes in one
+transaction. Unverified, processing, missing, archived and deleted videos are
+excluded. Omitting the flag preserves visibility, so existing Flutter requests
+keep their current behaviour. Staff can hide individual videos again afterwards.
+With no ready videos, publication returns 422 without changing the collection.
+
+The web admin can also force-delete a failed upload without completing
+verification. Staff must stop transfers and confirm the enumerated files and
+unfinished upload IDs first. Tracked unfinished uploads are cancelled, current
+files removed and records soft-deleted. Cleanup failures retain hidden, archived
+records for retry. Archived collections reject editing and new reservations;
+archived assets reject upload mutations with 422, and deleted assets return 404.
+Desktop clients should discard those upload sessions. No desktop deletion
+endpoint is added. See the [API contract](../api/README.md#updatecollection).
+
 ### Reserve a new asset
 
 ```text
