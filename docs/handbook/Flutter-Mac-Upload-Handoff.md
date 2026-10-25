@@ -341,7 +341,10 @@ accepts finalisation.
 `PATCH /api/staff/media-assets/<asset_uuid>` accepts `display_name`, `sort_order`
 and `is_visible`; visibility requires verified availability. Leave visibility
 and publication to an explicit review step initially. Collection PATCH also
-accepts `status: published` (requires a verified visible asset), but concert
+accepts `status: published` (requires a verified visible asset), with optional
+`show_all_verified: true` to show every available, verified video and publish
+atomically. Omitting this flag preserves existing visibility. Staff must confirm
+the warning before using it; unfinished videos remain hidden. Concert
 approval/publication/enabled dates remain web-admin concerns. Finalisation alone
 does not release the concert.
 
@@ -467,3 +470,21 @@ Local verification on the review date:
   schema/account/collection metadata inspected. Credential values were not read.
 - No Mac request, real AWS upload, IAM check, CloudFront origin check, cleanup,
   production operation or infrastructure change was performed.
+
+### Clearing a failed upload in the web admin
+
+Staff can use **Clear unfinished upload** on the upload page or the delete link
+in the concert editor. Stop Flutter/browser transfers first, review the exact
+files and unfinished multipart upload IDs, acknowledge force deletion, then type
+`DELETE`. This discards the reservation without completing verification. Tracked
+unfinished uploads are cancelled and confirmed files removed. Cleanup errors
+leave hidden, archived records for review and retry. The API returns 422 for
+upload operations on an archived video awaiting cleanup and 404 after its soft
+deletion; discard that local upload session instead of resuming it. Reserve a new
+asset with a new idempotency key if you need to upload the video again.
+
+Already issued single PUT URLs remain usable until expiry; closing the uploader
+prevents files arriving after cleanup. Provider-side uploads without a database
+record and retained S3 object versions require a separate reviewed operation.
+See [Concert staff recovery](../epics/Concert.md#staff-upload-recovery-and-collection-publication)
+and the [API contract](../api/README.md#updatecollection).

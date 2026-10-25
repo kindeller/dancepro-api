@@ -17,7 +17,7 @@
                 <div class="concert-media-name"><strong>{{ $collection->name }}</strong><small class="muted">{{ $collection->status->value }} · {{ $collection->assets->count() }} videos</small></div>
                 <div class="concert-media-controls">
                     <button type="button" class="button secondary" data-edit-collection aria-label="Edit collection name" title="Edit collection name">✎</button>
-                    @if($managed || $collection->status->value === 'published')<button type="button" class="button secondary" data-collection-status="{{ $collection->status->value === 'published' ? 'draft' : 'published' }}">{{ $collection->status->value === 'published' ? 'Unpublish' : 'Publish' }}</button>@endif
+                    @if($managed || $collection->status->value === 'published')@include('admin.concerts._media_publish_button')@endif
                     @if($managed)<a class="button secondary" href="{{ route('admin.concerts.media.collections.confirm-delete', $collection) }}" aria-label="Delete {{ $collection->name }}" title="Delete collection and videos">🗑</a>@endif
                 </div>
             </div>
@@ -28,8 +28,8 @@
                         <div class="concert-media-name"><span>{{ $asset->display_name }}</span><small class="muted">{{ $asset->status->value }} · {{ $asset->is_visible ? 'visible' : 'hidden' }}</small></div>
                         <div class="concert-media-controls">
                             <button type="button" class="button secondary" data-edit-asset aria-label="Edit video title" title="Edit video title">✎</button>
-                            @if($asset->verified_at)<button type="button" class="button secondary" data-asset-visible="{{ $asset->is_visible ? '0' : '1' }}">{{ $asset->is_visible ? 'Hide' : 'Show' }}</button>@endif
-                            @if($managed && $asset->status->value !== 'processing')<a class="button secondary" href="{{ route('admin.concerts.media.assets.confirm-delete', $asset) }}" aria-label="Delete {{ $asset->display_name }}" title="Delete video and files">🗑</a>@endif
+                            @if($asset->verified_at && $asset->status->value === 'available')<button type="button" class="button secondary" data-asset-visible="{{ $asset->is_visible ? '0' : '1' }}">{{ $asset->is_visible ? 'Hide' : 'Show' }}</button>@endif
+                            @if($managed)<a class="button secondary" href="{{ route('admin.concerts.media.assets.confirm-delete', $asset) }}" aria-label="Delete {{ $asset->display_name }}" title="Delete video and files">🗑</a>@endif
                         </div>
                     </div>
                 @endforeach

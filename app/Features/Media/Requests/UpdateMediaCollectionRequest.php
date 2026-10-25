@@ -19,6 +19,7 @@ class UpdateMediaCollectionRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:255'],
             'sort_order' => ['sometimes', 'integer', 'min:0'],
             'status' => ['sometimes', Rule::in([MediaCollectionStatus::Draft->value, MediaCollectionStatus::Published->value])],
+            'show_all_verified' => ['sometimes', 'boolean', 'prohibited_unless:status,published'],
         ];
     }
 }

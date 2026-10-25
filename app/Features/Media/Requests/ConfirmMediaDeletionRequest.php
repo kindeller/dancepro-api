@@ -16,6 +16,7 @@ class ConfirmMediaDeletionRequest extends FormRequest
         return [
             'confirmation' => ['required', 'in:DELETE'],
             'digest' => ['required', 'string', 'size:64'],
+            'force' => ['sometimes', 'accepted'],
         ];
     }
 }

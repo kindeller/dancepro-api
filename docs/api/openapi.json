@@ -1471,7 +1471,7 @@
         "tags": [
           "Collections"
         ],
-        "description": "Fields optional. Published requires a managed video collection with at least one visible, available, verified asset; sets visibility public. Draft sets private. Does not publish the concert. asset_count omitted. Requires an active staff/admin account and explicit token ability concert-media:update.",
+        "description": "Fields optional. Published requires a managed video collection with at least one visible, available, verified asset; sets visibility public. Optional show_all_verified (boolean, non-null, default false) is accepted only with status published: true makes every available, verified, non-deleted asset in this collection visible and publishes atomically. Processing, unverified, missing and archived assets are excluded. Omitting the flag preserves existing visibility. Draft sets private. Archived collections awaiting deletion cleanup cannot be edited or receive new reservations (422). Does not approve or publish the concert. asset_count omitted. Requires an active staff/admin account and explicit token ability concert-media:update.",
         "security": [
           {
             "sanctumBearer": []
@@ -1494,8 +1494,8 @@
                     "name": "Evening performances",
                     "media_type": "video",
                     "catalogue_mode": "managed",
-                    "status": "draft",
-                    "visibility": "private",
+                    "status": "published",
+                    "visibility": "public",
                     "sort_order": 10,
                     "created_at": "2026-10-18T08:00:00.000000Z",
                     "updated_at": "2026-10-18T08:00:00.000000Z"
@@ -1560,8 +1560,8 @@
                   "success": false,
                   "message": "The given data was invalid.",
                   "errors": {
-                    "expected_outputs": [
-                      "The original output is required."
+                    "status": [
+                      "Publish a verified, visible video before publishing the collection."
                     ]
                   }
                 }
@@ -1604,8 +1604,8 @@
                 "$ref": "#/components/schemas/UpdateCollectionRequest"
               },
               "example": {
-                "name": "Evening performances",
-                "sort_order": 10
+                "status": "published",
+                "show_all_verified": true
               }
             }
           }
@@ -1745,7 +1745,7 @@
         "tags": [
           "Assets"
         ],
-        "description": "Requires a managed video collection on the configured upload disk. Both original and fallback_mp4 required. Convert first and reserve the actual outputs. Starts processing/hidden. Same-key retry returns existing reservation; never change its payload. Requires an active staff/admin account and explicit token ability concert-media:upload.",
+        "description": "Requires a managed video collection on the configured upload disk. Both original and fallback_mp4 required. Convert first and reserve the actual outputs. Starts processing/hidden. Same-key retry returns existing reservation; never change its payload. Requires an active staff/admin account and explicit token ability concert-media:upload. Collections archived for deletion cleanup reject new reservations with 422.",
         "security": [
           {
             "sanctumBearer": []
@@ -2568,7 +2568,7 @@
         "tags": [
           "Uploads"
         ],
-        "description": "After all batch objects upload. Checks object size and SHA256 when returned by HEAD. Repeat completion returns completed state. No Idempotency-Key required. Validation/state failures return 422. Requires an active staff/admin account and explicit token ability concert-media:upload.",
+        "description": "After all batch objects upload. Checks object size and SHA256 when returned by HEAD. Repeat completion returns completed state. No Idempotency-Key required. Validation/state failures return 422. Requires an active staff/admin account and explicit token ability concert-media:upload. Videos archived for deletion cleanup reject upload completion with 422.",
         "security": [
           {
             "sanctumBearer": []
@@ -2934,7 +2934,7 @@
         "tags": [
           "Uploads"
         ],
-        "description": "Pending, unexpired upload record required. CRC64NVME of each exact part. Response expiry refers to URLs, not upload record. Persist successful ETags and part checksums locally. Requires an active staff/admin account and explicit token ability concert-media:upload.",
+        "description": "Pending, unexpired upload record required. CRC64NVME of each exact part. Response expiry refers to URLs, not upload record. Persist successful ETags and part checksums locally. Requires an active staff/admin account and explicit token ability concert-media:upload. Videos archived for deletion cleanup reject part signing with 422.",
         "security": [
           {
             "sanctumBearer": []
@@ -3129,7 +3129,7 @@
         "tags": [
           "Uploads"
         ],
-        "description": "Include every consecutive part starting at 1 and the full-object checksum from initiation. Laravel completes S3, verifies full checksum/size and reconciles matching objects after uncertain completion. No Idempotency-Key required. Requires an active staff/admin account and explicit token ability concert-media:upload.",
+        "description": "Include every consecutive part starting at 1 and the full-object checksum from initiation. Laravel completes S3, verifies full checksum/size and reconciles matching objects after uncertain completion. No Idempotency-Key required. Requires an active staff/admin account and explicit token ability concert-media:upload. Videos archived for deletion cleanup reject multipart completion with 422.",
         "security": [
           {
             "sanctumBearer": []
@@ -3318,7 +3318,7 @@
         "tags": [
           "Uploads"
         ],
-        "description": "Cancels only an unfinished multipart upload; cannot delete completed media. Stop active part transfers before user-requested cancellation. No Idempotency-Key required. Requires an active staff/admin account and explicit token ability concert-media:upload.",
+        "description": "Cancels only an unfinished multipart upload; cannot delete completed media. Stop active part transfers before user-requested cancellation. No Idempotency-Key required. Requires an active staff/admin account and explicit token ability concert-media:upload. Videos archived for deletion cleanup reject client abort requests with 422; retry the web-admin deletion flow to finish cleanup.",
         "security": [
           {
             "sanctumBearer": []
@@ -5559,6 +5559,11 @@
               "draft",
               "published"
             ]
+          },
+          "show_all_verified": {
+            "type": "boolean",
+            "default": false,
+            "description": "Optional and non-null. May be supplied only with status published. True shows all available, verified, non-deleted videos in this collection in the same transaction as publication. False or omission preserves visibility. Does not bypass verification or publish the concert."
           }
         },
         "required": []

@@ -383,6 +383,9 @@ class ManageMediaUploads
 
     private function ensureUploadBelongsTo(MediaAsset $asset, MediaUpload $upload, MediaUploadKind $kind): void
     {
+        if ($asset->status === MediaAssetStatus::Archived) {
+            throw ValidationException::withMessages(['asset' => 'This video is being deleted and cannot receive uploads.']);
+        }
         $this->destination->ensureAllowed($asset->storage_disk);
         $this->destination->ensureCollectionAllowed($asset->collection);
         $this->destination->ensureAllowed($upload->storage_disk);

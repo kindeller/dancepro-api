@@ -23,6 +23,8 @@ experience ready for use.
 
 - Public studio browsing, limited to studios with an available concert.
 - Published-concert browsing with approval and availability controls.
+- Studio and concert cards are clickable across their full area, with keyboard
+  navigation and visible focus indicators.
 - Password and student-name access with session unlocks and attempt logging.
 - Managed video playlist, next-item playback and protected original downloads.
 - Optional program and external-gallery links with explicit empty states.
@@ -77,3 +79,27 @@ Work through these areas before beginning another major product capability:
 - Automatic server-side transcoding, archive restoration and deeper streaming
   optimisation remain future enhancements. Local Flutter conversion and secure
   upload are part of production readiness.
+
+## Staff upload recovery and collection publication
+
+- The concert editor and upload page link to the same deletion confirmation
+  screen, including videos stuck in processing. Finishing verification is not
+  required to discard a failed upload.
+- Deletion previews enumerate current object keys and tracked unfinished uploads.
+  Force deletion requires an explicit acknowledgement plus typing `DELETE`.
+  Submission rechecks the signed preview, archives/hides affected media, cancels
+  tracked pending/failed multipart uploads, closes unfinished upload records and
+  removes only the confirmed current files before soft-deleting database records.
+  Legacy storage remains excluded.
+- Cleanup failures retain hidden, archived records for a new preview and retry.
+  An archived collection cannot receive new reservations or be republished.
+  No database migration or Flutter upload request change is required.
+- Publishing warns about hidden verified videos and can show all available,
+  verified videos in the same transaction. Unfinished/unverified videos remain
+  hidden. Existing API requests preserve visibility unless they explicitly opt
+  into `show_all_verified: true`. Concert approval and release remain separate.
+- Stop browser and Flutter transfers before confirming deletion. Already issued
+  single PUT links remain usable until expiry, and active transfers can recreate
+  files. Review and retry if files change during cleanup. This flow cleans up
+  tracked upload IDs, not untracked provider-side uploads. S3 versions/retention
+  and existing CloudFront caches are unaffected.

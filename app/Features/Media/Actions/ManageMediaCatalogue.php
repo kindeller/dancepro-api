@@ -74,27 +74,38 @@ class ManageMediaCatalogue
      */
     public function updateCollection(MediaCollection $collection, array $data): MediaCollection
     {
+        $this->ensureCollectionEditable($collection);
+        $showAllVerified = (bool) ($data['show_all_verified'] ?? false);
+        unset($data['show_all_verified']);
+
         if (($data['status'] ?? null) === MediaCollectionStatus::Published->value) {
             $this->destination->ensureCollectionAllowed($collection);
         }
 
-        if (($data['status'] ?? null) === MediaCollectionStatus::Published->value
-            && ! $collection->assets()->where('status', MediaAssetStatus::Available->value)
-                ->where('is_visible', true)->whereNotNull('verified_at')->exists()) {
-            throw ValidationException::withMessages(['status' => 'Publish a verified, visible video before publishing the collection.']);
-        }
+        return DB::transaction(function () use ($collection, $data, $showAllVerified): MediaCollection {
+            if (($data['status'] ?? null) === MediaCollectionStatus::Published->value) {
+                $verifiedAssets = $collection->assets()->where('status', MediaAssetStatus::Available->value)
+                    ->whereNotNull('verified_at');
 
-        if (($data['status'] ?? null) === MediaCollectionStatus::Published->value) {
-            $data['visibility'] = MediaCollectionVisibility::Public;
-            $data['published_at'] = $collection->published_at ?? now();
-        } elseif (($data['status'] ?? null) === MediaCollectionStatus::Draft->value) {
-            $data['visibility'] = MediaCollectionVisibility::Private;
-            $data['published_at'] = null;
-        }
+                if ($showAllVerified) {
+                    (clone $verifiedAssets)->update(['is_visible' => true]);
+                }
 
-        $collection->update($data);
+                if (! $verifiedAssets->where('is_visible', true)->exists()) {
+                    throw ValidationException::withMessages(['status' => 'Publish a verified, visible video before publishing the collection.']);
+                }
 
-        return $collection->refresh();
+                $data['visibility'] = MediaCollectionVisibility::Public;
+                $data['published_at'] = $collection->published_at ?? now();
+            } elseif (($data['status'] ?? null) === MediaCollectionStatus::Draft->value) {
+                $data['visibility'] = MediaCollectionVisibility::Private;
+                $data['published_at'] = null;
+            }
+
+            $collection->update($data);
+
+            return $collection->refresh();
+        });
     }
 
     /**
@@ -102,6 +113,7 @@ class ManageMediaCatalogue
      */
     public function reserveAsset(MediaCollection $collection, User $user, array $data, string $idempotencyKey): MediaAsset
     {
+        $this->ensureCollectionEditable($collection);
         $this->destination->ensureCollectionAllowed($collection);
         $this->validateIdempotencyKey($idempotencyKey);
 
@@ -163,6 +175,13 @@ class ManageMediaCatalogue
         $this->recordEvent->handle($user, $asset, 'media_asset.updated', ['fields' => array_keys($data)]);
 
         return $asset->refresh();
+    }
+
+    private function ensureCollectionEditable(MediaCollection $collection): void
+    {
+        if ($collection->archived_at !== null) {
+            throw ValidationException::withMessages(['collection' => 'This collection is archived for deletion. Retry deletion to finish cleanup.']);
+        }
     }
 
     private function validateIdempotencyKey(string $key): void

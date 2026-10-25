@@ -16,14 +16,14 @@ class AdminConcertMediaDeletionController extends Controller
     public function confirmAsset(MediaAsset $asset, DeleteManagedConcertMedia $deletion): View
     {
         Gate::authorize('update', $asset);
-        $keys = $deletion->keysForAsset($asset);
+        $preview = $deletion->previewAsset($asset);
 
         return view('admin.concerts.confirm-media-deletion', [
             'concert' => $asset->collection->concert,
             'label' => $asset->display_name,
             'disk' => $asset->storage_disk,
-            'keys' => $keys,
-            'digest' => $deletion->digest($asset->storage_disk.':'.$asset->uuid, $keys),
+            'preview' => $preview,
+            'digest' => $deletion->digest($asset->storage_disk.':'.$asset->uuid, $preview),
             'action' => route('admin.concerts.media.assets.destroy', $asset),
         ]);
     }
@@ -31,7 +31,7 @@ class AdminConcertMediaDeletionController extends Controller
     public function destroyAsset(ConfirmMediaDeletionRequest $request, MediaAsset $asset, DeleteManagedConcertMedia $deletion): RedirectResponse
     {
         Gate::authorize('update', $asset);
-        $deletion->deleteAsset($asset, $request->validated('digest'));
+        $deletion->deleteAsset($asset, $request->validated('digest'), $request->boolean('force'));
 
         return redirect()->route('admin.concerts.edit', $asset->collection->concert)->with('status', 'Video and its storage objects deleted.');
     }
@@ -39,14 +39,14 @@ class AdminConcertMediaDeletionController extends Controller
     public function confirmCollection(MediaCollection $collection, DeleteManagedConcertMedia $deletion): View
     {
         Gate::authorize('update', $collection);
-        $keys = $deletion->keysForCollection($collection);
+        $preview = $deletion->previewCollection($collection);
 
         return view('admin.concerts.confirm-media-deletion', [
             'concert' => $collection->concert,
             'label' => $collection->name,
             'disk' => $collection->storage_disk,
-            'keys' => $keys,
-            'digest' => $deletion->digest($collection->storage_disk.':'.$collection->uuid, $keys),
+            'preview' => $preview,
+            'digest' => $deletion->digest($collection->storage_disk.':'.$collection->uuid, $preview),
             'action' => route('admin.concerts.media.collections.destroy', $collection),
         ]);
     }
@@ -54,7 +54,7 @@ class AdminConcertMediaDeletionController extends Controller
     public function destroyCollection(ConfirmMediaDeletionRequest $request, MediaCollection $collection, DeleteManagedConcertMedia $deletion): RedirectResponse
     {
         Gate::authorize('update', $collection);
-        $deletion->deleteCollection($collection, $request->validated('digest'));
+        $deletion->deleteCollection($collection, $request->validated('digest'), $request->boolean('force'));
 
         return redirect()->route('admin.concerts.edit', $collection->concert)->with('status', 'Collection, videos and storage objects deleted.');
     }

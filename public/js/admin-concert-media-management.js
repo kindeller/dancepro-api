@@ -40,8 +40,13 @@
         }
 
         if (button.dataset.collectionStatus || button.dataset.assetVisible) {
+            if (button.dataset.publishWarning && !confirm(button.dataset.publishWarning)) return;
+            const data = button.dataset.collectionStatus
+                ? { status: button.dataset.collectionStatus }
+                : { is_visible: button.dataset.assetVisible === '1' };
+            if (button.dataset.showAllVerified === '1') data.show_all_verified = true;
             button.disabled = true;
-            try { await update(path, button.dataset.collectionStatus ? { status: button.dataset.collectionStatus } : { is_visible: button.dataset.assetVisible === '1' }); }
+            try { await update(path, data); }
             catch (error) { showError(error); button.disabled = false; }
         }
     });
